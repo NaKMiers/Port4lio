@@ -4,6 +4,7 @@ import { SectionFrame } from '@/components/portfolio/primitives/SectionFrame'
 import { collapseWhitespace, excerptText } from '@/lib/profile-copy'
 import type { HeroViewModel } from '@/lib/profile-view-model'
 import type { ProjectItem } from '@/types/profile'
+import Link from 'next/link'
 
 const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
 
@@ -194,22 +195,16 @@ export default function HeroSection({ hero, featuredProjects }: HeroSectionProps
             >
               View selected work
             </a>
-            {hero.cvUrl ? (
-              <a
-                href={hero.cvUrl}
-                className={cx(
-                  'inline-flex min-h-[48px] items-center justify-center rounded-full border border-pp-line bg-pp-panel-strong px-6 py-3 text-sm font-semibold text-pp-text shadow-[0_12px_36px_rgba(46,35,28,0.06)]',
-                  'motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-0.5',
-                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue',
-                )}
-                {...anchorExternalProps(hero.cvUrl)}
-              >
-                Download CV
-                {isExternalHref(hero.cvUrl) ? (
-                  <span className='sr-only'> (opens in a new tab)</span>
-                ) : null}
-              </a>
-            ) : null}
+            <Link
+                href='/cv'
+              className={cx(
+                'inline-flex min-h-[48px] items-center justify-center rounded-full border border-pp-line bg-pp-panel-strong px-6 py-3 text-sm font-semibold text-pp-text shadow-[0_12px_36px_rgba(46,35,28,0.06)]',
+                'motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-0.5',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue',
+              )}
+            >
+              View my CV
+            </Link>
             <a
               href='#contact'
               className={cx(
