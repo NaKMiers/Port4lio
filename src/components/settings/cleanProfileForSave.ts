@@ -94,6 +94,8 @@ function pruneProjects(projects: ProjectItem[]): ProjectItem[] {
   return projects
     .map(prj => {
       const title = trimOrEmpty(prj.title)
+      const overview = trimOrEmpty(prj.overview)
+      const techStack = (prj.techStack ?? []).map(item => trimOrEmpty(item)).filter(Boolean)
       const parts = (prj.parts ?? [])
         .map(part => ({
           image: trimOrEmpty(part.image),
@@ -102,11 +104,14 @@ function pruneProjects(projects: ProjectItem[]): ProjectItem[] {
         }))
         .filter(part => !isBlank(part.image) || !isBlank(part.description) || !isBlank(part.link))
 
-      return { ...prj, title, parts }
+      return { ...prj, title, overview, techStack, parts }
     })
     .filter(
       prj =>
-        !isBlank(prj.title) || (prj.parts?.length ?? 0) > 0
+        !isBlank(prj.title) ||
+        !isBlank(prj.overview) ||
+        (prj.techStack?.length ?? 0) > 0 ||
+        (prj.parts?.length ?? 0) > 0
     )
 }
 

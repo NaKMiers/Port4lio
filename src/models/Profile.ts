@@ -85,6 +85,8 @@ const projectPartSchema = new Schema(
 const projectItemSchema = new Schema(
   {
     title: { type: String, default: '' },
+    overview: { type: String, default: '' },
+    techStack: { type: [String], default: [] },
     parts: { type: [projectPartSchema], default: [] },
   },
   { _id: false }

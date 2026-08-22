@@ -12,7 +12,7 @@ import { buildPortfolioMetadata } from '@/lib/seo'
  * - `/?section=` targets in-page anchors (see `PortfolioSectionScrollTarget`).
  * - `/about`,`/services`,`/work`,`/contact`,`/testimonials` → HTTP 308 to `/` plus `section=` (`next.config.js`).
  *
- * `AppProvider` hydrates profile for client islands; admin `/setting` still uses dark `SiteChrome`.
+ * `AppProvider` hydrates profile for client islands; admin `/settings` still uses dark `SiteChrome`.
  */
 
 export const revalidate = 60

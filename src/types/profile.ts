@@ -52,6 +52,10 @@ export type ProjectPart = {
 
 export type ProjectItem = {
   title: string
+  /** Short editorial summary of what the project is. Rendered as the card overview. */
+  overview?: string
+  /** Notable frameworks, databases, and services. Rendered as chips under the overview. */
+  techStack?: string[]
   parts: ProjectPart[]
 }
 

@@ -7,11 +7,6 @@ export type ProjectStoryMediaProps = {
   parts: ProjectPart[]
   /** First project's first paint */
   priority?: boolean
-  /**
-   * `spotlight`: slightly taller for hero projects.
-   * `hero-strip`: standard featured project media.
-   */
-  layout: 'spotlight' | 'hero-strip'
 }
 
 function slidesFromParts(projectTitle: string, parts: ProjectPart[]): ProjectCarouselSlide[] {
@@ -30,13 +25,16 @@ function slidesFromParts(projectTitle: string, parts: ProjectPart[]): ProjectCar
  * Auto-sliding project media with optional per-image captions.
  * Featured work now uses a true carousel instead of a static strip so multi-image projects read clearly.
  */
-export function ProjectStoryMedia({ projectTitle, parts, priority, layout }: ProjectStoryMediaProps) {
+export function ProjectStoryMedia({ projectTitle, parts, priority }: ProjectStoryMediaProps) {
   const slides = slidesFromParts(projectTitle, parts)
 
   if (!slides.length) {
+    // Keep the media block's aspect ratio so cards stay aligned in the two-up grid.
     return (
-      <div className='flex min-h-[140px] items-center justify-center border-b border-pp-line bg-pp-bg/40 px-6 py-10'>
-        <p className='text-center text-sm text-pp-muted'>Visuals for this story are unavailable.</p>
+      <div className='bg-pp-panel-strong p-3 sm:p-4'>
+        <div className='flex aspect-[16/10] w-full items-center justify-center rounded-[1.6rem] border border-pp-line/80 bg-gradient-to-br from-pp-panel-strong to-pp-bg px-6 text-center'>
+          <p className='text-sm font-medium text-pp-muted'>Preview not published.</p>
+        </div>
       </div>
     )
   }
@@ -46,8 +44,8 @@ export function ProjectStoryMedia({ projectTitle, parts, priority, layout }: Pro
       <ProjectImageCarousel
         slides={slides}
         priority={priority}
-        sizes='(max-width: 768px) 100vw, (max-width: 1200px) 88vw, 920px'
-        aspectClassName={layout === 'spotlight' ? 'aspect-[16/10] md:aspect-[16/9]' : 'aspect-[16/10]'}
+        sizes='(max-width: 640px) 100vw, (max-width: 1024px) 88vw, 620px'
+        aspectClassName='aspect-[16/10]'
         chrome='feature'
       />
     </div>

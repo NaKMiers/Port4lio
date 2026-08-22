@@ -1,5 +1,11 @@
 import { PortfolioExternalLink, ProjectImageCarousel, SectionFrame } from '@/components/portfolio/primitives'
-import { collapseWhitespace, excerptText, trimText, projectOutboundLinks } from '@/lib/profile-copy'
+import {
+  collapseWhitespace,
+  excerptText,
+  projectDetailLines,
+  projectOutboundLinks,
+  trimText,
+} from '@/lib/profile-copy'
 import type { ProjectsBandViewModel } from '@/lib/profile-view-model'
 import type { ProjectItem, ProjectPart } from '@/types/profile'
 
@@ -18,7 +24,7 @@ function slidesFromParts(title: string, parts: ProjectPart[]) {
 function CatalogProjectTile({ project }: { project: ProjectItem }) {
   const title = collapseWhitespace(project.title) || 'Project'
   const slides = slidesFromParts(title, project.parts)
-  const desc = project.parts.map(p => collapseWhitespace(p.description)).find(Boolean)
+  const desc = collapseWhitespace(project.overview ?? '') || projectDetailLines(project)[0] || ''
   const excerpt = desc ? (desc.length > 140 ? excerptText(desc, 140) : desc) : null
   const links = projectOutboundLinks(project)
   const primary = links[0]

@@ -4,28 +4,9 @@ import {
   ProjectStoryMedia,
   SectionFrame,
 } from '@/components/portfolio/primitives'
-import { collapseWhitespace, excerptText, projectOutboundLinks, trimText } from '@/lib/profile-copy'
+import { PROJECT_TECH_LIMIT, collapseWhitespace, projectOutboundLinks } from '@/lib/profile-copy'
 import type { ProjectsBandViewModel } from '@/lib/profile-view-model'
 import type { ProjectItem } from '@/types/profile'
-
-function storyCopy(project: ProjectItem) {
-  const descs = project.parts.map(p => collapseWhitespace(p.description)).filter(Boolean)
-  if (!descs.length) return null
-  const [first, ...rest] = descs
-  const lead = first.length > 360 ? excerptText(first, 360) : first
-  return (
-    <div className='space-y-3'>
-      <p className='text-pp-text/90'>{lead}</p>
-      {rest.length ? (
-        <ul className='list-disc space-y-1.5 pl-5 marker:text-pp-muted'>
-          {rest.slice(0, 4).map((t, i) => (
-            <li key={`${i}-${t.slice(0, 24)}`}>{t.length > 200 ? excerptText(t, 200) : t}</li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  )
-}
 
 function FeaturedProjectArticle({
   project,
@@ -36,34 +17,46 @@ function FeaturedProjectArticle({
   index: number
 }) {
   const title = collapseWhitespace(project.title) || 'Project'
-  const imageCount = project.parts.filter(p => trimText(p.image).length > 0).length
-  const spotlight = index === 0 && imageCount >= 2
+  const overview = collapseWhitespace(project.overview ?? '')
+  const tech = (project.techStack ?? []).slice(0, PROJECT_TECH_LIMIT)
   const ctas = projectOutboundLinks(project)
 
   return (
-    <article>
+    <article className='h-full'>
       <ProjectStoryCard
+        className='h-full'
         meta={`Featured work · ${String(index + 1).padStart(2, '0')}`}
         title={title}
         visual={
-          <ProjectStoryMedia
-            projectTitle={title}
-            parts={project.parts}
-            layout={spotlight ? 'spotlight' : 'hero-strip'}
-            priority={index === 0}
-          />
+          <ProjectStoryMedia projectTitle={title} parts={project.parts} priority={index === 0} />
         }
       >
-        <div className='space-y-4'>
-          <div className='rounded-[1.2rem] border border-pp-line/80 bg-white/72 px-4 py-3 shadow-[0_10px_24px_rgba(46,35,28,0.05)]'>
-            <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>Overview</p>
-            <p className='mt-1 text-sm font-medium leading-relaxed text-pp-text'>
-              {title}
-            </p>
-          </div>
-          {storyCopy(project)}
+        <div className='flex h-full flex-col gap-4'>
+          {overview ? (
+            <div className='rounded-[1.2rem] border border-pp-line/80 bg-white/72 px-4 py-3 shadow-[0_10px_24px_rgba(46,35,28,0.05)]'>
+              <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>Overview</p>
+              <p className='mt-1 text-sm leading-relaxed text-pp-text'>{overview}</p>
+            </div>
+          ) : null}
+          {tech.length ? (
+            <div className='space-y-2'>
+              <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+                Tech stack
+              </p>
+              <ul className='flex flex-wrap gap-1.5'>
+                {tech.map(item => (
+                  <li
+                    key={item}
+                    className='rounded-full border border-pp-line bg-white/70 px-2.5 py-1 text-xs font-medium text-pp-text'
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {ctas.length ? (
-            <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center'>
+            <div className='mt-auto flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center'>
               {ctas.map(({ url, label }) => (
                 <PortfolioExternalLink
                   key={url}
@@ -109,7 +102,7 @@ export default function FeaturedProjectsSection({ featured }: FeaturedProjectsSe
       </div>
 
       {featured.projects.length ? (
-        <div className='space-y-12 md:space-y-14'>
+        <div className='grid gap-6 lg:grid-cols-2 lg:gap-8'>
           {featured.projects.map((project, index) => (
             <FeaturedProjectArticle
               key={`featured-story-${index}`}

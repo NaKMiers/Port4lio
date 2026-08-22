@@ -118,6 +118,8 @@ export function normalizeProfile(raw: unknown): Profile {
 
   profile.projects = profile.projects.map(project => ({
     title: String(project.title ?? ''),
+    overview: String(project.overview ?? ''),
+    techStack: ensureStringArray((project as { techStack?: unknown }).techStack),
     parts: (() => {
       if (Array.isArray((project as { parts?: unknown }).parts)) {
         return ((project as { parts: unknown[] }).parts ?? []).map(part => ({

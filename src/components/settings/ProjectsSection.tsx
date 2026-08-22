@@ -2,6 +2,7 @@ import React from 'react'
 
 import type { Profile } from '@/types/profile'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
+import { PROJECT_TECH_LIMIT } from '@/lib/profile-copy'
 import Section from '@/components/settings/Section'
 import type { UploadingState } from '@/components/settings/types'
 import Spinner from '@/components/settings/Spinner'
@@ -63,7 +64,7 @@ export default function ProjectsSection({
             onClick={() =>
               setProfile(p => ({
                 ...p,
-                projects: [...p.projects, { title: '', parts: [] }],
+                projects: [...p.projects, { title: '', overview: '', techStack: [], parts: [] }],
               }))
             }
           >
@@ -91,6 +92,49 @@ export default function ProjectsSection({
                     })
                   }
                   placeholder='Project title'
+                />
+              </div>
+              <div className='space-y-2 md:col-span-2'>
+                <label className={labelCls}>Overview</label>
+                <p className={helpTextCls}>
+                  Short summary of what the project is. Shown in the Overview block on the work card.
+                </p>
+                <textarea
+                  className={textareaCls}
+                  value={prj.overview ?? ''}
+                  onChange={e =>
+                    setProfile(p => {
+                      const next = [...p.projects]
+                      next[idx] = { ...next[idx], overview: e.target.value }
+                      return { ...p, projects: next }
+                    })
+                  }
+                  placeholder='What is this project, in two sentences?'
+                />
+              </div>
+              <div className='space-y-2 md:col-span-2'>
+                <label className={labelCls}>Tech stack</label>
+                <p className={helpTextCls}>
+                  Comma or newline separated. Shown as chips under the overview (first{' '}
+                  {PROJECT_TECH_LIMIT} render).
+                </p>
+                <textarea
+                  className={textareaCls}
+                  value={(prj.techStack ?? []).join(', ')}
+                  onChange={e =>
+                    setProfile(p => {
+                      const next = [...p.projects]
+                      next[idx] = {
+                        ...next[idx],
+                        techStack: e.target.value
+                          .split(/[,\n]/)
+                          .map(item => item.trim())
+                          .filter(Boolean),
+                      }
+                      return { ...p, projects: next }
+                    })
+                  }
+                  placeholder='Next.js 16, React 19, MongoDB, Tailwind'
                 />
               </div>
               <div className='space-y-3 md:col-span-2'>

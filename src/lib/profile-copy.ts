@@ -11,8 +11,8 @@ import type {
   Stat,
 } from '@/types/profile'
 
-/** Maximum projects surfaced in the featured editorial strip (remainder go to catalog). */
-export const FEATURED_PROJECT_LIMIT = 3
+/** Maximum projects surfaced in the featured two-up grid (remainder go to catalog). */
+export const FEATURED_PROJECT_LIMIT = 4
 
 /** Maximum trust cards so the section stays light when data is noisy. */
 export const TRUST_CARD_LIMIT = 8
@@ -241,6 +241,25 @@ export function sanitizeSkillGroups(groups: SkillGroup[]): SkillGroup[] {
     .filter(g => g.groupName.length > 0 || g.items.length > 0)
 }
 
+/** Maximum tech chips per project card so the surface stays readable. */
+export const PROJECT_TECH_LIMIT = 12
+
+function sanitizeTechStack(techStack: unknown): string[] {
+  if (!Array.isArray(techStack)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of techStack) {
+    const item = collapseWhitespace(String(raw ?? ''))
+    if (!item) continue
+    const key = item.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(item)
+    if (out.length >= PROJECT_TECH_LIMIT) break
+  }
+  return out
+}
+
 function sanitizeProjectParts(parts: ProjectPart[]): ProjectPart[] {
   return parts.map(p => ({
     image: trimText(p.image),
@@ -253,6 +272,8 @@ export function sanitizeProjects(projects: ProjectItem[]): ProjectItem[] {
   return projects
     .map(p => ({
       title: collapseWhitespace(p.title),
+      overview: collapseWhitespace(p.overview ?? ''),
+      techStack: sanitizeTechStack(p.techStack),
       parts: sanitizeProjectParts(Array.isArray(p.parts) ? p.parts : []),
     }))
     .filter(hasRenderableProject)
@@ -260,7 +281,30 @@ export function sanitizeProjects(projects: ProjectItem[]): ProjectItem[] {
 
 function hasRenderableProject(p: ProjectItem): boolean {
   if (p.title.length > 0) return true
+  if ((p.overview ?? '').length > 0) return true
   return p.parts.some(part => part.image.length > 0 || part.description.length > 0 || part.link.length > 0)
+}
+
+/**
+ * Part descriptions double as carousel captions, so a description that merely repeats the
+ * project title carries no information for body copy.
+ */
+export function projectDetailLines(project: ProjectItem): string[] {
+  const title = collapseWhitespace(project.title).toLowerCase()
+  const overview = collapseWhitespace(project.overview ?? '').toLowerCase()
+  const seen = new Set<string>()
+  const out: string[] = []
+
+  for (const part of project.parts) {
+    const line = collapseWhitespace(part.description)
+    if (!line) continue
+    const key = line.toLowerCase()
+    if (key === title || key === overview || seen.has(key)) continue
+    seen.add(key)
+    out.push(line)
+  }
+
+  return out
 }
 
 const STORE_HOST_HINTS =

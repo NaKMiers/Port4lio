@@ -28,12 +28,14 @@ export function ProjectStoryCard({
   return (
     <EditorialPanel variant='strong' className={cx('flex flex-col overflow-hidden p-0', className)} {...rest}>
       {visual ? <div className='border-b border-pp-line bg-pp-bg/40'>{visual}</div> : null}
-      <div className='space-y-3 p-5 sm:p-6'>
+      <div className='flex flex-1 flex-col space-y-3 p-5 sm:p-6'>
         {meta ? (
           <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted'>{meta}</p>
         ) : null}
         <h3 className='font-display text-xl font-semibold tracking-tight text-pp-text'>{title}</h3>
-        <div className='text-sm leading-relaxed [&_p]:text-pp-muted [&_li]:text-pp-muted'>{children}</div>
+        <div className='flex-1 text-sm leading-relaxed [&_p]:text-pp-muted'>
+          {children}
+        </div>
       </div>
     </EditorialPanel>
   )
