@@ -1,0 +1,187 @@
+# Copy this file to the PROFILE repo (NaKMiers/NaKMiers) at
+# .github/workflows/publish-profile.yml
+#
+# It deliberately does NOT live in the portfolio repo. Here, committing the README of
+# another repository would need a cross-repo PAT holding both `contents: write` on the
+# profile repo and `user` on the account - one credential able to rewrite both your
+# profile README and your account bio. Run from the profile repo instead and the README
+# push uses the default GITHUB_TOKEN, leaving the PAT scoped to the bio alone.
+#
+# See docs/publish/README.md for the secrets to create first.
+
+name: publish-profile
+
+on:
+  schedule:
+    # 03:17 UTC = 10:17 ICT. Off the hour on purpose - :00 is a scheduling stampede.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_bio:
+        description: 'Skip the account bio update'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-profile
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        # Pinned by SHA: this job holds an account-scoped PAT, so a moving tag is a
+        # supply-chain risk worth spending one line to remove. v4.2.2.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Fetch manifest
+        env:
+          MANIFEST_URL: ${{ secrets.PORTFOLIO_MANIFEST_URL }}
+          PUBLISH_TOKEN: ${{ secrets.PORTFOLIO_PUBLISH_TOKEN }}
+        run: |
+          set -euo pipefail
+          # $RUNNER_TEMP, never the working tree - an untracked json next to README.md
+          # is one `git add .` away from being committed.
+          curl --fail-with-body --silent --show-error \
+               --max-time 30 --retry 3 --retry-connrefused --retry-delay 5 \
+               -H "Authorization: Bearer ${PUBLISH_TOKEN}" \
+               -H 'Accept: application/json' \
+               "${MANIFEST_URL}" -o "${RUNNER_TEMP}/manifest.json"
+
+          if [ "$(jq -r '.schemaVersion' "${RUNNER_TEMP}/manifest.json")" != '1' ]; then
+            echo '::error::manifest schemaVersion is not 1 - contract changed, refusing to publish'
+            exit 1
+          fi
+
+          # A near-empty README means the profile failed to load, not that you deleted it.
+          if ! jq -e '.targets["github-readme"].artifact.content | length > 400' \
+                  "${RUNNER_TEMP}/manifest.json" >/dev/null; then
+            echo '::error::rendered README is suspiciously short - refusing to overwrite'
+            exit 1
+          fi
+
+          echo "manifest version: $(jq -r '.version' "${RUNNER_TEMP}/manifest.json")"
+
+      - name: Write README
+        run: |
+          set -euo pipefail
+          jq -r '.targets["github-readme"].artifact.content' \
+             "${RUNNER_TEMP}/manifest.json" > README.md
+
+      - name: Commit README if changed
+        id: readme
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- README.md; then
+            echo 'result=unchanged' >> "$GITHUB_OUTPUT"
+            echo 'detail=' >> "$GITHUB_OUTPUT"
+            echo 'README already up to date - no commit'
+            exit 0
+          fi
+          # Bot identity on purpose: bot commits do not count toward the contribution
+          # graph. Pushing as yourself would manufacture green squares from a cron job.
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          git commit -m 'chore: sync profile README from portfolio'
+          git push
+          echo 'result=applied' >> "$GITHUB_OUTPUT"
+          echo "detail=commit $(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Update account bio
+        id: bio
+        if: github.event.inputs.skip_bio != 'true'
+        env:
+          GH_PROFILE_TOKEN: ${{ secrets.GH_PROFILE_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Sorted keys, nulls coerced to "", so the comparison is order-insensitive.
+          norm() {
+            jq -cS '{
+              name:     (.name     // ""),
+              bio:      (.bio      // ""),
+              blog:     (.blog     // ""),
+              location: (.location // ""),
+              company:  (.company  // "")
+            }'
+          }
+
+          desired="$(jq -c '.targets["github-bio"].artifact' "${RUNNER_TEMP}/manifest.json" | norm)"
+          current="$(curl --fail-with-body --silent --show-error --max-time 30 \
+                          -H "Authorization: Bearer ${GH_PROFILE_TOKEN}" \
+                          -H 'Accept: application/vnd.github+json' \
+                          -H 'X-GitHub-Api-Version: 2022-11-28' \
+                          https://api.github.com/user | norm)"
+
+          if [ "${desired}" = "${current}" ]; then
+            echo 'result=unchanged' >> "$GITHUB_OUTPUT"
+            echo 'detail=' >> "$GITHUB_OUTPUT"
+            echo 'Account bio already up to date - no PATCH'
+            exit 0
+          fi
+
+          curl --fail-with-body --silent --show-error --max-time 30 \
+               -X PATCH \
+               -H "Authorization: Bearer ${GH_PROFILE_TOKEN}" \
+               -H 'Accept: application/vnd.github+json' \
+               -H 'X-GitHub-Api-Version: 2022-11-28' \
+               -H 'Content-Type: application/json' \
+               --data "${desired}" \
+               https://api.github.com/user > /dev/null
+
+          echo 'result=applied' >> "$GITHUB_OUTPUT"
+          echo 'detail=PATCH /user' >> "$GITHUB_OUTPUT"
+
+      - name: Acknowledge
+        # `always()` so a FAILED run records `failed` rather than leaving yesterday's
+        # green badge in place. Silence must not read as success.
+        if: always()
+        env:
+          MANIFEST_URL: ${{ secrets.PORTFOLIO_MANIFEST_URL }}
+          PUBLISH_TOKEN: ${{ secrets.PORTFOLIO_PUBLISH_TOKEN }}
+          SKIP_BIO: ${{ github.event.inputs.skip_bio }}
+          README_RESULT: ${{ steps.readme.outcome == 'success' && steps.readme.outputs.result || 'failed' }}
+          README_DETAIL: ${{ steps.readme.outputs.detail }}
+          BIO_RESULT: ${{ steps.bio.outcome == 'success' && steps.bio.outputs.result || 'failed' }}
+          BIO_DETAIL: ${{ steps.bio.outputs.detail }}
+        run: |
+          set -uo pipefail
+          [ -f "${RUNNER_TEMP}/manifest.json" ] || { echo 'no manifest - nothing to acknowledge'; exit 0; }
+
+          ack_url="${MANIFEST_URL%/manifest}/ack"
+
+          ack() {
+            target="$1"; result="$2"; detail="$3"
+            version="$(jq -r --arg t "$target" '.targets[$t].version' "${RUNNER_TEMP}/manifest.json")"
+            payload="$(jq -nc --arg t "$target" --arg v "$version" --arg r "$result" --arg d "$detail" \
+                        '{target:$t, version:$v, result:$r, detail:$d}')"
+            curl --fail-with-body --silent --show-error --max-time 30 \
+                 -X POST \
+                 -H "Authorization: Bearer ${PUBLISH_TOKEN}" \
+                 -H 'Content-Type: application/json' \
+                 --data "${payload}" "${ack_url}" > /dev/null \
+              || echo "::warning::ack failed for ${target}"
+          }
+
+          ack 'github-readme' "${README_RESULT}" "${README_DETAIL}"
+          if [ "${SKIP_BIO}" != 'true' ]; then
+            ack 'github-bio' "${BIO_RESULT}" "${BIO_DETAIL}"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '### publish-profile'
+            echo ''
+            echo '| target | result | detail |'
+            echo '| --- | --- | --- |'
+            echo "| github-readme | ${{ steps.readme.outputs.result || 'failed' }} | ${{ steps.readme.outputs.detail }} |"
+            echo "| github-bio | ${{ steps.bio.outputs.result || 'skipped' }} | ${{ steps.bio.outputs.detail }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,8 +1,8 @@
+import type { PublicProfile } from '@/lib/profile-public'
 import type {
   Certificate,
   EducationItem,
   ExperienceItem,
-  Profile,
   ProjectItem,
   ServiceItem,
   SkillGroup,
@@ -137,7 +137,7 @@ function toSocialProofLinks(
 }
 
 function buildTrustCards(
-  profile: Profile,
+  profile: PublicProfile,
   paragraphs: string[],
   stats: Stat[],
   projects: ProjectItem[],
@@ -223,7 +223,7 @@ function buildTrustCards(
   return cards.slice(0, TRUST_CARD_LIMIT)
 }
 
-function computeMeta(profile: Profile, hero: HeroViewModel, paragraphs: string[]): PublicPortfolioMeta {
+function computeMeta(profile: PublicProfile, hero: HeroViewModel, paragraphs: string[]): PublicPortfolioMeta {
   const displayName = collapseWhitespace(profile.fullName) || hero.headline || 'Portfolio'
   const hasStory = paragraphs.some(p => collapseWhitespace(p).length > 0)
   const hasWork =
@@ -246,7 +246,7 @@ function computeMeta(profile: Profile, hero: HeroViewModel, paragraphs: string[]
  * Derived, defensive view model for the public portfolio page (server-first rendering).
  * Starts from {@link normalizeProfile} output - keep API/admin payloads unchanged.
  */
-export function derivePublicPortfolioViewModel(profile: Profile): PublicPortfolioViewModel {
+export function derivePublicPortfolioViewModel(profile: PublicProfile): PublicPortfolioViewModel {
   const jobTitles = dedupeJobTitles(profile.jobTitle ?? [])
   const paragraphs = splitAboutParagraphs(profile.aboutMe ?? '')
   const stats = sanitizeStats(profile.stats ?? [])
@@ -264,7 +264,10 @@ export function derivePublicPortfolioViewModel(profile: Profile): PublicPortfoli
     subheadline: heroEditorialSubheading(profile),
     avatarUrl: trimText(profile.avatar) || null,
     backgroundImageUrl: trimText(profile.backgroundImage) || null,
-    cvUrl: trimText(profile.cv) || null,
+    // Falls back to the live CV page. `profile.cv` holds a manually uploaded PDF, which
+    // goes stale the moment the CV is edited in the admin - clearing that field is the
+    // way to point every "view my CV" link at the page that is always current.
+    cvUrl: trimText(profile.cv) || '/cv',
     stats,
   }
 

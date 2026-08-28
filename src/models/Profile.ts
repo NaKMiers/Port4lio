@@ -92,16 +92,128 @@ const projectItemSchema = new Schema(
   { _id: false }
 )
 
+/* ---- resume (print copy for /cv) ------------------------------------------- */
+
+const resumeContactLinkSchema = new Schema(
+  {
+    label: { type: String, default: '' },
+    text: { type: String, default: '' },
+    href: { type: String, default: '' },
+  },
+  { _id: false }
+)
+
+const resumeContactSchema = new Schema(
+  {
+    email: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    location: { type: String, default: '' },
+    links: { type: [resumeContactLinkSchema], default: [] },
+  },
+  { _id: false }
+)
+
+const resumeTextBlockSchema = new Schema(
+  {
+    heading: { type: String, default: '' },
+    lines: { type: [String], default: [] },
+  },
+  { _id: false }
+)
+
+const resumeSkillRowSchema = new Schema({ items: { type: [String], default: [] } }, { _id: false })
+
+const resumeSkillBlockSchema = new Schema(
+  {
+    heading: { type: String, default: '' },
+    rows: { type: [resumeSkillRowSchema], default: [] },
+  },
+  { _id: false }
+)
+
+const resumeCertificationGroupSchema = new Schema(
+  {
+    issuer: { type: String, default: '' },
+    items: { type: [certificateSchema], default: [] },
+  },
+  { _id: false }
+)
+
+const resumeCertificationBlockSchema = new Schema(
+  {
+    heading: { type: String, default: '' },
+    groups: { type: [resumeCertificationGroupSchema], default: [] },
+  },
+  { _id: false }
+)
+
+const resumeLinkSchema = new Schema(
+  {
+    label: { type: String, default: '' },
+    href: { type: String, default: '' },
+  },
+  { _id: false }
+)
+
+const resumeProjectSchema = new Schema(
+  {
+    employer: { type: String, default: '' },
+    title: { type: String, default: '' },
+    period: { type: String, default: '' },
+    details: { type: [String], default: [] },
+    highlights: { type: [String], default: [] },
+    demoLinks: { type: [resumeLinkSchema], default: [] },
+  },
+  { _id: false }
+)
+
+const resumeProjectSectionSchema = new Schema(
+  {
+    heading: { type: String, default: '' },
+    items: { type: [resumeProjectSchema], default: [] },
+  },
+  { _id: false }
+)
+
+const resumePageBreakSchema = new Schema(
+  {
+    sectionIndex: { type: Number, default: 0 },
+    projectIndex: { type: Number, default: 0 },
+    highlightsOnFirstSheet: { type: Number, default: 0 },
+  },
+  { _id: false }
+)
+
+const resumeSchema = new Schema(
+  {
+    name: { type: String, default: '' },
+    role: { type: String, default: '' },
+    photo: { type: String, default: '' },
+    contact: { type: resumeContactSchema, default: undefined },
+    summary: { type: resumeTextBlockSchema, default: undefined },
+    education: { type: resumeTextBlockSchema, default: undefined },
+    skillBlocks: { type: [resumeSkillBlockSchema], default: [] },
+    certifications: { type: resumeCertificationBlockSchema, default: undefined },
+    projectSections: { type: [resumeProjectSectionSchema], default: [] },
+    pageBreak: { type: resumePageBreakSchema, default: undefined },
+  },
+  { _id: false }
+)
+
 const profileSchema = new Schema(
   {
     _id: { type: String, default: PROFILE_DOCUMENT_ID },
     cv: { type: String, default: '' },
+    // `default: undefined` is load-bearing: it keeps "never written" distinguishable from
+    // "written and empty", which `deriveResume` relies on to decide whether to seed.
+    resume: { type: resumeSchema, default: undefined },
     fullName: { type: String, default: '' },
     username: { type: String, default: '' },
     jobTitle: { type: [String], default: [] },
     description: { type: String, default: '' },
     avatar: { type: String, default: '' },
     backgroundImage: { type: String, default: '' },
+    publicLocation: { type: String, default: '' },
     socials: { type: [socialLinkSchema], default: [] },
     profileHeading: { type: String, default: '' },
     profileSubHeading: { type: String, default: '' },

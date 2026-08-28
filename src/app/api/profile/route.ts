@@ -4,17 +4,20 @@ import type { NextRequest } from 'next/server'
 
 import { getAuthCookieName, verifyAuthToken } from '@/lib/auth'
 import { connectDatabase } from '@/lib/mongodb'
-import { sendMail } from '@/lib/mailer'
-import { PUBLIC_PROFILE_CACHE_TAG } from '@/lib/profile-data'
+import { loadPublicProfile, PUBLIC_PROFILE_CACHE_TAG } from '@/lib/profile-data'
 import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
-import { getRequiredEnv } from '@/lib/required-env'
 import { MAX_PROFILE_JSON_BYTES } from '@/lib/upload-limits'
 import type { Profile } from '@/types/profile'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function toClientProfile(doc: Record<string, unknown>) {
+/**
+ * Owner-only projection: strips Mongo bookkeeping but keeps every profile field, including
+ * private ones. Public callers must go through `loadPublicProfile` / `toPublicProfile`
+ * instead - the asymmetry is deliberate, hence the name.
+ */
+function toOwnerProfile(doc: Record<string, unknown>) {
   const { _id, createdAt, updatedAt, ...profile } = doc
   return profile
 }
@@ -23,17 +26,10 @@ function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status })
 }
 
+/** Public read. Allowlisted fields only - see `src/lib/profile-public.ts`. */
 export async function GET() {
   try {
-    await connectDatabase()
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).lean()
-    if (!doc) {
-      return NextResponse.json({ profile: null })
-    }
-
-    return NextResponse.json({
-      profile: toClientProfile(doc as Record<string, unknown>),
-    })
+    return NextResponse.json({ profile: await loadPublicProfile() })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown server error'
     return jsonError(message, 500)
@@ -83,28 +79,9 @@ export async function POST(request: NextRequest) {
 
     revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')
 
-    const summary = `Updated profile: ${parsed.fullName || parsed.username || '-'} (${
-      Array.isArray(parsed.jobTitle) ? parsed.jobTitle.join(', ') || '-' : '-'
-    }) at ${now.toISOString()}`
-
-    try {
-      await sendMail(
-        getRequiredEnv('MAIL_TO'),
-        'Portfolio Updated',
-        `
-          <div>
-            <h1>Portfolio Updated</h1>
-            <p>Summary: ${summary}</p>
-          </div>
-        `
-      )
-    } catch {
-      // Ignore mail failures
-    }
-
     return NextResponse.json({
       ok: true,
-      profile: toClientProfile(updatedDoc as Record<string, unknown>),
+      profile: toOwnerProfile(updatedDoc as Record<string, unknown>),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown server error'

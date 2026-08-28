@@ -1,8 +1,27 @@
 import type { Metadata } from 'next'
 import { Arimo } from 'next/font/google'
+import { Fragment } from 'react'
+import type { ReactNode } from 'react'
+
+import CvPrintButton from '@/components/cv/CvPrintButton'
+import { loadPublicResume } from '@/lib/profile-data'
+import { renderInlineBold } from '@/lib/resume-inline'
+import type { ResumePrintItem } from '@/lib/resume-view-model'
+import { deriveResume, planResumeSheets } from '@/lib/resume-view-model'
+import type {
+  ResumeCertificationBlock,
+  ResumeContact,
+  ResumeSkillBlock,
+  ResumeTextBlock,
+} from '@/types/profile'
 
 /**
- * Static 2 x A4 CV, typographically identical to the original `Globee Trainee.pdf`.
+ * Data-driven 2 x A4 CV, typographically identical to the original `Globee Trainee.pdf`.
+ *
+ * Copy comes from `profile.resume` (see `deriveResume`); the geometry below is unchanged
+ * from the hardcoded original. Sheets are `height: 297mm; overflow: hidden`, so content
+ * that grows past the page is CLIPPED, not reflowed - `tests/e2e/cv-pagination.spec.ts`
+ * is what turns that silent failure into a loud one.
  *
  * Geometry is expressed in the source document's own unit grid: **893u = 210mm** (one A4
  * width). `u()` converts a raw unit to `pt` (1u = 2/3pt).
@@ -26,9 +45,14 @@ const arimo = Arimo({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: 'Anh Khoa Nguyen — CV',
-  description: 'Full Stack Developer — curriculum vitae of Anh Khoa Nguyen.',
+export const revalidate = 60
+
+export async function generateMetadata(): Promise<Metadata> {
+  const resume = deriveResume({ resume: await loadPublicResume() })
+  return {
+    title: `${resume.name} — CV`,
+    description: `${resume.role} — curriculum vitae of ${resume.name}.`,
+  }
 }
 
 /** PDF unit (893u = 210mm) -> CSS pt. */
@@ -168,8 +192,13 @@ const css = `
 .ul { color: inherit; }
 .lnk { color: #0c57fa; }
 
-/* ---- floating download action (screen only) -------------------------------- */
+/* ---- floating print action (screen only) ----------------------------------- */
 .dl {
+  /* Was an <a>, now a <button> - reset the UA chrome the anchor never had. */
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
   position: fixed;
   right: 28px;
   bottom: 28px;
@@ -217,7 +246,192 @@ const css = `
 @media screen and (max-width: 430px) { .sheet { zoom: 0.37; } }
 `
 
-export default function CVPage() {
+/**
+ * Hand-measured gaps around the vector pipes in the masthead, in source units.
+ *
+ * Each value is tuned to the glyph advances of the specific strings on either side, so
+ * CHANGING THE CONTACT COPY REQUIRES RE-MEASURING THESE. The overflow test cannot catch a
+ * mismatch here - it only sees height. Rows longer than the list reuse the last gap.
+ */
+const CONTACT_BAR_GAPS = {
+  identity: [
+    { left: 12.58, right: 13.68 },
+    { left: 11.8, right: 14.16 },
+  ],
+  links: [
+    { left: 2.8, right: 3.66 },
+    { left: 3.08, right: 4.68 },
+  ],
+} as const
+
+type BarGap = { left: number; right: number }
+
+function barGap(gaps: readonly BarGap[], index: number): BarGap {
+  return gaps[index] ?? gaps[gaps.length - 1] ?? { left: 12, right: 13 }
+}
+
+function Bar({ gap }: { gap: BarGap }) {
+  return <span className='bar' style={{ marginLeft: u(gap.left), marginRight: u(gap.right) }} />
+}
+
+/** Joins nodes with a separator, without introducing a wrapper element. */
+function joinNodes(nodes: ReactNode[], separator: string): ReactNode[] {
+  return nodes.flatMap((node, index) =>
+    index === 0 ? [node] : [<span key={`sep-${index}`}>{separator}</span>, node]
+  )
+}
+
+function ContactRow({ contact }: { contact: ResumeContact }) {
+  const identity = [contact.email, contact.phone, contact.location].filter(Boolean)
+
+  return (
+    <div className='contact' style={{ left: u(233), top: u(138.95) }}>
+      <div>
+        {identity.map((value, index) => (
+          <span key={value}>
+            {index > 0 && <Bar gap={barGap(CONTACT_BAR_GAPS.identity, index - 1)} />}
+            {value}
+          </span>
+        ))}
+      </div>
+      <div>
+        {contact.links.map((link, index) => (
+          <span key={link.href || link.text}>
+            {index > 0 && <Bar gap={barGap(CONTACT_BAR_GAPS.links, index - 1)} />}
+            {link.label ? `${link.label}: ` : ''}
+            <a className='ul' href={link.href}>
+              <b>{link.text}</b>
+            </a>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SectionRule({ heading, gap }: { heading: string; gap: string }) {
+  return (
+    <div className={`sec ${gap}`}>
+      {heading}
+      <span />
+    </div>
+  )
+}
+
+function TextBlock({ block, justify }: { block: ResumeTextBlock; justify?: boolean }) {
+  return (
+    <div className={`p gBody${justify ? ' jt' : ''}`}>
+      {block.lines.map((line, index) => (
+        <div key={index}>{renderInlineBold(line)}</div>
+      ))}
+    </div>
+  )
+}
+
+function SkillRows({ block }: { block: ResumeSkillBlock }) {
+  return (
+    <div className='sk gSkill'>
+      {block.rows.map((row, index) => (
+        <div key={index}>
+          {row.items.map(item => (
+            <span key={item}>{item}</span>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CertificationBody({ block }: { block: ResumeCertificationBlock }) {
+  return (
+    <div className='p gBody'>
+      {block.groups.map((group, index) => (
+        <div key={index}>
+          {group.issuer && <b>{`${group.issuer}: `}</b>}
+          {joinNodes(
+            group.items.map(item => (
+              <a className='ul' key={item.link || item.name} href={item.link}>
+                {item.name}
+              </a>
+            )),
+            ' · '
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * One printed block from the project stream. `gTop` replaces the block's own leading gap
+ * on the first item of sheet 2, matching the source's page-2 top margin.
+ */
+function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
+  switch (item.kind) {
+    case 'sectionHeading':
+      return <SectionRule heading={item.text} gap={gTop ? 'gTop' : 'gHead'} />
+
+    case 'projectHead':
+      return (
+        <div className={`p ${gTop ? 'gTop' : item.gap} hd`}>
+          {item.employer ? (
+            <b>
+              <span className='ul'>{item.employer}</span>
+              {': '}
+              {renderInlineBold(item.title)}
+            </b>
+          ) : (
+            <div>{renderInlineBold(item.title)}</div>
+          )}
+          <span className='date'>{item.period}</span>
+        </div>
+      )
+
+    case 'details':
+      return (
+        <div className={`p ind1${gTop ? ' gTop' : ''}`}>
+          {item.lines.map((line, index) => (
+            <div className='i1' key={index}>
+              {renderInlineBold(line)}
+            </div>
+          ))}
+        </div>
+      )
+
+    case 'highlights':
+      return (
+        <div className={`p ind2${gTop ? ' gTop' : ''}`}>
+          {item.lines.map((line, index) => (
+            <div className='i2' key={index}>
+              {renderInlineBold(line)}
+            </div>
+          ))}
+        </div>
+      )
+
+    case 'demo':
+      return (
+        <div className={`p ind1${gTop ? ' gTop' : ''}`}>
+          <div className='i1'>
+            <b>Demo:</b>{' '}
+            {joinNodes(
+              item.links.map(link => (
+                <a className='lnk' key={link.href} href={link.href}>
+                  {link.label}
+                </a>
+              )),
+              ' | '
+            )}
+          </div>
+        </div>
+      )
+  }
+}
+
+export default async function CVPage() {
+  const resume = deriveResume({ resume: await loadPublicResume() })
+  const sheets = planResumeSheets(resume)
+
   return (
     <main className={`cv ${arimo.variable}`}>
       <style dangerouslySetInnerHTML={{ __html: css }} />
@@ -238,376 +452,54 @@ export default function CVPage() {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src='/cv/avatar.jpg'
-              alt='Anh Khoa Nguyen'
+              src={resume.photo}
+              alt={resume.name}
               style={{ position: 'absolute', left: u(0), top: u(-0.05), width: u(202), height: u(202), objectFit: 'cover' }}
             />
           </div>
 
           <div className='name' style={{ left: u(233), top: u(21.95) }}>
-            ANH KHOA NGUYEN
+            {resume.name}
           </div>
           <div className='role' style={{ left: u(233), top: u(68.95) }}>
-            FULL STACK DEVELOPER
+            {resume.role}
           </div>
           <div className='rule' style={{ left: u(233), top: u(115.45), width: u(560) }} />
 
-          <div className='contact' style={{ left: u(233), top: u(138.95) }}>
-            <div>
-              anhkhoa14904@gmail.com
-              <span className='bar' style={{ marginLeft: u(12.58), marginRight: u(13.68) }} />
-              0899 320 427
-              <span className='bar' style={{ marginLeft: u(11.8), marginRight: u(14.16) }} />
-              Tan Binh, Ho Chi Minh City
-            </div>
-            <div>
-              {'Portfolio: '}
-              <a className='ul' href='https://anhkhoa.info/'>
-                <b>anhkhoa.info</b>
-              </a>
-              <span className='bar' style={{ marginLeft: u(2.8), marginRight: u(3.66) }} />
-              {'Github: '}
-              <a className='ul' href='https://github.com/NaKMiers'>
-                <b>Nguyen Anh Khoa</b>
-              </a>
-              <span className='bar' style={{ marginLeft: u(3.08), marginRight: u(4.68) }} />
-              {'LinkedIn: '}
-              <a className='ul' href='https://www.linkedin.com/in/anh-khoa-nguyen-9539381a9'>
-                <b>Anh Khoa Nguyen</b>
-              </a>
-            </div>
-          </div>
+          <ContactRow contact={resume.contact} />
         </div>
 
-        {/* --- Summary --- */}
-        <div className='sec gFirst'>
-          SUMMARY
-          <span />
-        </div>
-        <div className='p gBody jt'>
-          <div>
-            · Full Stack Developer · <b>1</b> year professional experience · <b>6k+</b> hours coding · <b>40+</b> projects
-          </div>
-          <div>
-            · Passionate about software since <b>14</b> · Strong foundation with TypeScript, React.js, Next.js, Expo
-          </div>
-          <div>
-            · <b>AI-first engineer</b> · Claude Code, agent skills and MCP are part of how I design, build and ship
-          </div>
-          <div>
-            · Built, launched, and own an E-Commerce platform (<b>12k+</b> orders, <b>3.5k+</b> customers) and a budgeting app (<b>400+</b>{' '}users, App Store &amp; Play Store) - independently
-          </div>
-          <div>· I build for performance, reliability, and long-term scale - and I ship.</div>
-        </div>
+        <SectionRule heading={resume.summary.heading} gap='gFirst' />
+        <TextBlock block={resume.summary} justify />
 
-        {/* --- Education --- */}
-        <div className='sec gHead'>
-          EDUCATION
-          <span />
-        </div>
-        <div className='p gBody'>
-          <div>
-            <b>Ho Chi Minh City University of Foreign Languages and Information Technology (HUFLIT)</b>
-          </div>
-          <div>Bachelor of Software Engineering</div>
-        </div>
+        <SectionRule heading={resume.education.heading} gap='gHead' />
+        <TextBlock block={resume.education} />
 
-        {/* --- Technical skills --- */}
-        <div className='sec gHead'>
-          TECHNICAL SKILLS
-          <span />
-        </div>
-        <div className='sk gSkill'>
-          <div>
-            <span>TypeScript</span>
-            <span>NextJS</span>
-            <span>ReactJS</span>
-            <span>NodeJS</span>
-            <span>Expo</span>
-            <span>React Native</span>
-            <span>PostgreSQL</span>
-            <span>MongoDB</span>
-            <span>AWS</span>
-          </div>
-          <div>
-            <span>WebSocket</span>
-            <span>Socket.IO</span>
-            <span>Redis</span>
-            <span>Bull Queue</span>
-            <span>Prisma</span>
-            <span>Docker</span>
-            <span>Vercel</span>
-            <span>REST</span>
-            <span>GraphQL</span>
-          </div>
-        </div>
+        {resume.skillBlocks.map((block, index) => (
+          <Fragment key={block.heading || index}>
+            <SectionRule heading={block.heading} gap={index === 0 ? 'gHead' : 'gHeadS'} />
+            <SkillRows block={block} />
+          </Fragment>
+        ))}
 
-        {/* --- AI engineering --- */}
-        <div className='sec gHeadS'>
-          AI ENGINEERING
-          <span />
-        </div>
-        <div className='sk gSkill'>
-          <div>
-            <span>Claude Code</span>
-            <span>Agent Skills</span>
-            <span>MCP</span>
-            <span>Claude API</span>
-            <span>OpenAI API</span>
-            <span>Cursor</span>
-            <span>Gstacks</span>
-          </div>
-          <div>
-            <span>Prompt Engineering</span>
-            <span>Agentic Workflows</span>
-            <span>LLM Integration</span>
-            <span>OCR Pipelines</span>
-            <span>AI Code Review</span>
-          </div>
-        </div>
+        <SectionRule heading={resume.certifications.heading} gap='gHeadS' />
+        <CertificationBody block={resume.certifications} />
 
-        {/* --- Soft skills --- */}
-        <div className='sec gHeadS'>
-          SOFT SKILLS
-          <span />
-        </div>
-        <div className='sk gSkill'>
-          <div>
-            <span>Agile Scrum</span>
-            <span>English Communication (TOEIC 780)</span>
-            <span>Time Management</span>
-            <span>Product ownership</span>
-            <span>AI-first mindset</span>
-          </div>
-        </div>
-
-        {/* --- Certifications --- */}
-        <div className='sec gHeadS'>
-          CERTIFICATIONS
-          <span />
-        </div>
-        <div className='p gBody'>
-          <div>
-            <b>Anthropic, 2026: </b>
-            <a className='ul' href='https://verify.skilljar.com/c/8o6g5ysos5w7'>
-              Claude 101
-            </a>
-            {' · '}
-            <a className='ul' href='https://verify.skilljar.com/c/omvytt6pbs7z'>
-              Building with the Claude API
-            </a>
-            {' · '}
-            <a className='ul' href='https://verify.skilljar.com/c/v47sjumd9nas'>
-              Claude Code in Action
-            </a>
-            {' · '}
-            <a className='ul' href='https://verify.skilljar.com/c/dayt6wxu4wpb'>
-              Introduction to Agent Skills
-            </a>
-            {' · '}
-            <a className='ul' href='https://verify.skilljar.com/c/ewnqdgqhaqik'>
-              Introduction to Model Context Protocol
-            </a>
-          </div>
-        </div>
-
-        {/* --- Personal projects --- */}
-        <div className='sec gHead'>
-          PERSONAL PROJECTS
-          <span />
-        </div>
-
-        <div className='p gBody hd'>
-          <div>
-            <b>Deewas: Budgeting App with AI </b>(Android, iOS)
-          </div>
-          <span className='date'>02/2025 - current</span>
-        </div>
-        <div className='p ind1'>
-          <div className='i1'>
-            <b>Position: Full Stack Developer (Owner)</b>
-          </div>
-          <div className='i1'>
-            <b>Achievements:</b> Launched on Play Store, App Store and Web - <b>400+</b> real users, revenue from ads and subscriptions.
-          </div>
-          <div className='i1'>
-            <b>Description: </b>A smart finance application that helps users track spending, income, savings and gain insights through AI-powered analysis.
-          </div>
-          <div className='i1'>
-            <b>Technologies: </b>TypeScript, Expo, Next.js, Realm, MongoDB, OpenAI API, OCR, GCP, Vercel
-          </div>
-          <div className='i1'>
-            <b>Key Responsibilities &amp; Highlights</b>
-          </div>
-        </div>
-        <div className='p ind2'>
-          <div className='i2'>Sole engineer - designed and built Android, iOS, and web from scratch</div>
-          <div className='i2'>Architected offline-first infrastructure (Realm) with seamless cloud sync on login</div>
-        </div>
+        {sheets.first.map((item, index) => (
+          <PrintItem key={index} item={item} gTop={false} />
+        ))}
       </section>
 
       {/* ================================ PAGE 2 ================================ */}
       <section className='sheet' aria-label='Curriculum vitae, page 2 of 2'>
-        <div className='p ind2 gTop'>
-          <div className='i2'>Integrated an AI assistant with a customizable personality for smart financial insights</div>
-          <div className='i2'>Built an OCR pipeline to scan and extract data from receipts</div>
-          <div className='i2'>
-            Implemented <b>12+</b> features - Budgets, Saving Goals, Wallets, Categories, Calendar, Search, and more
-          </div>
-          <div className='i2'>Developed a Premium tier with subscription &amp; ad monetization</div>
-        </div>
-        <div className='p ind1'>
-          <div className='i1'>
-            <b>Demo:</b>{' '}
-            <a className='lnk' href='https://apps.apple.com/us/app/deewas-smart-ai-money-planner/id6745058784'>
-              App Store
-            </a>
-            {' | '}
-            <a className='lnk' href='https://play.google.com/store/apps/details?id=com.nakmiers.deewas'>
-              Play Store
-            </a>
-            {' | '}
-            <a className='lnk' href='https://deewas.com/'>
-              deewas.com
-            </a>
-          </div>
-        </div>
-
-        <div className='p gProj hd'>
-          <b>Anpha Shop: E-commerce Website for Account Rental Services</b>
-          <span className='date'>08/2023 - current</span>
-        </div>
-        <div className='p ind1'>
-          <div className='i1'>
-            <b>Position: Full Stack Developer (Owner)</b>
-          </div>
-          <div className='i1'>
-            <b>Achievements: 3.5k+</b> real users, <b>12k+</b> completed orders, and strong SEO rankings.
-          </div>
-          <div className='i1'>
-            <b>Description: </b>A full-featured e-commerce platform for account rental services, featuring a custom admin panel and built-in analytics dashboard.
-          </div>
-          <div className='i1'>
-            <b>Technologies: </b>ReactJS, NextJS, NodeJS, TypeScript, MongoDB, AWS, GCP, Vercel
-          </div>
-          <div className='i1'>
-            <b>Key Features &amp; Responsibilities:</b>
-          </div>
-        </div>
-        <div className='p ind2'>
-          <div className='i2'>Built entirely solo - every line of code, from frontend to backend, from scratch</div>
-          <div className='i2'>Developed core features such as order management, payment processing, and customer management.</div>
-          <div className='i2'>
-            Scaled the system to support <b>3,500+</b> real customers and over <b>12,000+</b> completed orders.
-          </div>
-        </div>
-        <div className='p ind1'>
-          <div className='i1'>
-            <b>Demo: </b>
-            <a className='lnk' href='https://anpha.shop/'>
-              anpha.shop
-            </a>
-          </div>
-        </div>
-
-        {/* --- Work projects --- */}
-        <div className='sec gHead'>
-          WORK PROJECTS
-          <span />
-        </div>
-
-        <div className='p gBody hd'>
-          <b>
-            <span className='ul'>Rikkeisoft</span>: Enterprise WMS - AngularJS to Next.js Migration
-          </b>
-          <span className='date'>4 months</span>
-        </div>
-        <div className='p ind1'>
-          <div className='i1'>
-            <b>Position: Full Stack Developer</b>
-          </div>
-          <div className='i1'>
-            <b>Description: </b>Modernization of a Japanese enterprise warehouse management system - replacing a legacy AngularJS frontend with a Next.js App Router app over a Laravel API.
-          </div>
-          <div className='i1'>
-            <b>Technologies: </b>Next.js, TypeScript, Turborepo, Zustand, TanStack Table, ShadCN UI, NextAuth, Zod, Orval, Vitest, Laravel, MySQL, Docker
-          </div>
-          <div className='i1'>
-            <b>Contributions</b>
-          </div>
-        </div>
-        <div className='p ind2'>
-          <div className='i2'>Migrated inbound, outbound, picking and inspection screens from AngularJS to the App Router</div>
-          <div className='i2'>Built shared screen-driven UI, hooks and types in a Turborepo monorepo used by the whole team</div>
-          <div className='i2'>Implemented JWT authentication with NextAuth over a proxy layer to the Laravel API</div>
-          <div className='i2'>Delivered bilingual (JA/EN) screens with next-intl and Zod-validated react-hook-form flows</div>
-          <div className='i2'>Drove migration with Claude Code and repo-scoped agent skills to hold team conventions</div>
-          <div className='i2'>Wrote Vitest unit tests and cleared automated code-review findings before every merge</div>
-        </div>
-
-        <div className='p gProj hd'>
-          <b>
-            <span className='ul'>Rikkeisoft</span>: AI Medical Assistant
-          </b>
-          <span className='date'>5 months</span>
-        </div>
-        <div className='p ind1'>
-          <div className='i1'>
-            <b>Position: Full Stack Developer</b>
-          </div>
-          <div className='i1'>
-            <b>Description: </b>An AI-powered medical platform integrating LLM capabilities into healthcare workflows.
-          </div>
-          <div className='i1'>
-            <b>Technologies: </b>Next.js, TypeScript, AWS, DynamoDB, S3, OpenAI, API, SSO, TailwindCSS, ShadCNUI
-          </div>
-          <div className='i1'>
-            <b>Contributions</b>
-          </div>
-        </div>
-        <div className='p ind2'>
-          <div className='i2'>Served as main developer on the team - led core feature development and supported other members</div>
-          <div className='i2'>Built and integrated LLM-powered features via OpenAI API for medical assistance workflows</div>
-          <div className='i2'>Architected frontend with Next.js, ShadCN UI, and Tailwind CSS for a clean, scalable UI</div>
-          <div className='i2'>Wrote unit tests and performed manual testing to ensure reliability and accuracy</div>
-        </div>
-
-        <div className='p gProj hd'>
-          <b>
-            <span className='ul'>Rikkeisoft</span>: Enterprise Chat Platform
-          </b>
-          <span className='date'>3 months</span>
-        </div>
-        <div className='p ind1'>
-          <div className='i1'>
-            <b>Position: Full Stack Developer</b>
-          </div>
-          <div className='i1'>
-            <b>Description: </b>An enterprise workspace for customer communication over Zalo and Chat Plus, with real-time support.
-          </div>
-          <div className='i1'>
-            <b>Technologies: </b>Node.js, ExpressJS, TypeScript, PostgreSQL, MongoDB, Redis, Bull Queue, Socket.IO, Docker
-          </div>
-          <div className='i1'>
-            <b>Contributions</b>
-          </div>
-        </div>
-        <div className='p ind2'>
-          <div className='i2'>Integrated Zalo APIs - built webhook handlers and outbound messaging flows for customers</div>
-          <div className='i2'>Engineered real-time chat infrastructure using WebSocket &amp; Socket.IO</div>
-          <div className='i2'>Improved backend performance through logic optimization and algorithm refinement</div>
-        </div>
+        {sheets.second.map((item, index) => (
+          <PrintItem key={index} item={item} gTop={index === 0} />
+        ))}
       </section>
 
-      {/* Plain anchor, no client JS — the file is this exact page rendered to A4. */}
-      <a className='dl' href='/cv/anh-khoa-nguyen-cv.pdf' download='Anh-Khoa-Nguyen-CV.pdf'>
-        <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-          <path d='M12 3v12' />
-          <path d='m7 10 5 5 5-5' />
-          <path d='M4 20h16' />
-        </svg>
-        Download PDF
-      </a>
+      {/* Prints this page rather than serving a checked-in file, so the download can
+          never fall behind an edit. */}
+      <CvPrintButton />
     </main>
   )
 }

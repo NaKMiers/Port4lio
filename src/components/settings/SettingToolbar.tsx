@@ -67,6 +67,9 @@ export default function SettingToolbar({
               Fill mock data
             </button>
           )}
+          <a className={secondaryBtnCls} href='/publish'>
+            Publish
+          </a>
           <button
             type='button'
             onClick={onSave}

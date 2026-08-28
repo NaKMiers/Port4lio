@@ -1,6 +1,6 @@
 import { collapseWhitespace, excerptText, trimText } from '@/lib/profile-copy'
 import type { PublicPortfolioViewModel } from '@/lib/profile-view-model'
-import type { Profile } from '@/types/profile'
+import type { PublicProfile } from '@/lib/profile-public'
 
 type JsonLdThing = Record<string, unknown>
 
@@ -65,7 +65,7 @@ function featuredListItems(vm: PublicPortfolioViewModel): JsonLdThing[] {
 
 /** Grounded in services fields surfaced on the homepage. */
 function professionalServiceCopy(
-  profile: Profile,
+  profile: PublicProfile,
   vm: PublicPortfolioViewModel,
 ): { name: string; description?: string } {
   const person = collapseWhitespace(profile.fullName) || vm.meta.displayName
@@ -106,7 +106,7 @@ function hasServiceSignals(vm: PublicPortfolioViewModel): boolean {
 /** JSON-LD `Person`, `WebSite`, optional `ProfessionalService` + `ItemList`. */
 function buildPortfolioJsonLdGraph(
   siteOrigin: string,
-  profile: Profile,
+  profile: PublicProfile,
   vm: PublicPortfolioViewModel,
 ): { '@context': string; '@graph': JsonLdThing[] } {
   const homeUrl = canonicalPageUrl(siteOrigin)
@@ -190,6 +190,6 @@ function escapeJsonForInlineScript(json: string): string {
     .replace(/\u2029/g, '\\u2029')
 }
 
-export function serializePortfolioJsonLd(siteOrigin: string, profile: Profile, vm: PublicPortfolioViewModel): string {
+export function serializePortfolioJsonLd(siteOrigin: string, profile: PublicProfile, vm: PublicPortfolioViewModel): string {
   return escapeJsonForInlineScript(JSON.stringify(buildPortfolioJsonLdGraph(siteOrigin, profile, vm)))
 }

@@ -14,6 +14,10 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "on-first-retry",
+    // Playwright's bundled Chromium has no build for newer Ubuntu releases, so drive the
+    // system Google Chrome instead. Override with PLAYWRIGHT_CHANNEL= (empty) to fall
+    // back to the bundled browser on platforms where it does install.
+    channel: process.env.PLAYWRIGHT_CHANNEL ?? "chrome",
   },
   webServer: useExistingServer
     ? undefined

@@ -11,6 +11,10 @@ import IconPickerModal from '@/components/settings/IconPickerModal'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import ProfilePreviewPanel from '@/components/settings/ProfilePreviewPanel'
 import ProjectsSection from '@/components/settings/ProjectsSection'
+import ResumeBlocksSection from '@/components/settings/ResumeBlocksSection'
+import ResumeMastheadSection from '@/components/settings/ResumeMastheadSection'
+import ResumeProjectsSection from '@/components/settings/ResumeProjectsSection'
+import ResumeSkillsSection from '@/components/settings/ResumeSkillsSection'
 import ServicesSection from '@/components/settings/ServicesSection'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoading from '@/components/settings/SettingLoading'
@@ -18,6 +22,8 @@ import SettingToolbar from '@/components/settings/SettingToolbar'
 import SkillsSection from '@/components/settings/SkillsSection'
 import SocialsSection from '@/components/settings/SocialsSection'
 import StatsSection from '@/components/settings/StatsSection'
+import TabNav from '@/components/settings/TabNav'
+import type { TabItem } from '@/components/settings/TabNav'
 import { cleanProfileForSave } from '@/components/settings/cleanProfileForSave'
 import {
   makeMockProfile,
@@ -25,9 +31,19 @@ import {
 import type { IconPickerTarget, UploadingState } from '@/components/settings/types'
 import { useApp } from '@/context/AppContext'
 import { normalizeProfile } from '@/lib/profile'
+import { deriveResume } from '@/lib/resume-view-model'
 import { MAX_PROFILE_JSON_BYTES } from '@/lib/upload-limits'
 import type { Profile, ServiceItem } from '@/types/profile'
 import { getIconCatalog } from '@/utils/iconResolver'
+
+type SettingTabId = 'profile' | 'career' | 'offering' | 'cv'
+
+const SETTING_TABS: TabItem[] = [
+  { id: 'profile', label: 'Profile', count: 4 },
+  { id: 'career', label: 'Career', count: 4 },
+  { id: 'offering', label: 'Offering', count: 2 },
+  { id: 'cv', label: 'CV', count: 4 },
+]
 
 export default function SettingPage() {
   const { profile: appProfile, setProfile: setAppProfile } = useApp()
@@ -45,7 +61,13 @@ interface SettingEditorProps {
 function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [profile, setProfile] = useState<Profile>(() => normalizeProfile(appProfile))
+  // Seed the CV block so the editor opens pre-populated on a document that predates it.
+  // Saving once persists it; from then on the stored value wins.
+  const [profile, setProfile] = useState<Profile>(() => {
+    const normalized = normalizeProfile(appProfile)
+    return { ...normalized, resume: deriveResume(normalized) }
+  })
+  const [tab, setTab] = useState<SettingTabId>('profile')
   const [iconPickerTarget, setIconPickerTarget] = useState<IconPickerTarget>(null)
   const [iconQuery, setIconQuery] = useState('')
   const [uploading, setUploading] = useState<UploadingState>({
@@ -161,45 +183,77 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
 
           <SettingErrorBanner message={error} />
 
+          <TabNav
+            tabs={SETTING_TABS}
+            activeId={tab}
+            onChange={id => setTab(id as SettingTabId)}
+            ariaLabel='Profile editor sections'
+          />
+
           <div className='grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-8'>
+            {/* Every tab writes into the same `profile` state, so switching tabs never
+                discards an unsaved edit - only the section cards unmount. */}
             <div className='space-y-5'>
-              <BasicsSection
-                profile={profile}
-                setProfile={setProfile}
-                preview={preview}
-                uploading={uploading}
-                setUploading={setUploading}
-                setError={setError}
-              />
-              <div className='grid grid-cols-1 items-start gap-5 lg:grid-cols-2'>
-                <SocialsSection
-                  profile={profile}
-                  setProfile={setProfile}
-                  setIconPickerTarget={setIconPickerTarget}
-                />
-                <StatsSection profile={profile} setProfile={setProfile} />
-              </div>
-              <AboutSection profile={profile} setProfile={setProfile} />
-              <SkillsSection
-                profile={profile}
-                setProfile={setProfile}
-                setIconPickerTarget={setIconPickerTarget}
-              />
-              <ExperienceSection profile={profile} setProfile={setProfile} />
-              <EducationSection profile={profile} setProfile={setProfile} />
-              <CertificatesSection profile={profile} setProfile={setProfile} />
-              <ServicesSection
-                profile={profile}
-                setProfile={setProfile}
-                setIconPickerTarget={setIconPickerTarget}
-              />
-              <ProjectsSection
-                profile={profile}
-                setProfile={setProfile}
-                setError={setError}
-                uploading={uploading}
-                setUploading={setUploading}
-              />
+              {tab === 'profile' ? (
+                <>
+                  <BasicsSection
+                    profile={profile}
+                    setProfile={setProfile}
+                    preview={preview}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                    setError={setError}
+                  />
+                  <div className='grid grid-cols-1 items-start gap-5 lg:grid-cols-2'>
+                    <SocialsSection
+                      profile={profile}
+                      setProfile={setProfile}
+                      setIconPickerTarget={setIconPickerTarget}
+                    />
+                    <StatsSection profile={profile} setProfile={setProfile} />
+                  </div>
+                  <AboutSection profile={profile} setProfile={setProfile} />
+                </>
+              ) : null}
+
+              {tab === 'career' ? (
+                <>
+                  <SkillsSection
+                    profile={profile}
+                    setProfile={setProfile}
+                    setIconPickerTarget={setIconPickerTarget}
+                  />
+                  <ExperienceSection profile={profile} setProfile={setProfile} />
+                  <EducationSection profile={profile} setProfile={setProfile} />
+                  <CertificatesSection profile={profile} setProfile={setProfile} />
+                </>
+              ) : null}
+
+              {tab === 'offering' ? (
+                <>
+                  <ServicesSection
+                    profile={profile}
+                    setProfile={setProfile}
+                    setIconPickerTarget={setIconPickerTarget}
+                  />
+                  <ProjectsSection
+                    profile={profile}
+                    setProfile={setProfile}
+                    setError={setError}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                  />
+                </>
+              ) : null}
+
+              {tab === 'cv' ? (
+                <>
+                  <ResumeMastheadSection profile={profile} setProfile={setProfile} />
+                  <ResumeBlocksSection profile={profile} setProfile={setProfile} />
+                  <ResumeSkillsSection profile={profile} setProfile={setProfile} />
+                  <ResumeProjectsSection profile={profile} setProfile={setProfile} />
+                </>
+              ) : null}
             </div>
 
             <div className='xl:pl-2'>

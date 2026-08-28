@@ -10,7 +10,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/api/**/*.test.ts', 'tests/unit/**/*.test.ts'],
+    include: ['tests/api/**/*.test.{ts,tsx}', 'tests/unit/**/*.test.{ts,tsx}'],
     clearMocks: true,
     restoreMocks: true,
   },

@@ -4,6 +4,8 @@ import type {
   ExperienceItem,
   Profile,
   ProjectItem,
+  Resume,
+  ResumeTextBlock,
   ServiceItem,
   SocialLink,
   SkillGroup,
@@ -115,6 +117,96 @@ function pruneProjects(projects: ProjectItem[]): ProjectItem[] {
     )
 }
 
+/**
+ * Trims the CV block and drops empty entries. Returns `undefined` when nothing is left,
+ * so the key is omitted from the payload rather than blanking the stored CV via `$set`.
+ */
+function pruneResume(resume: Resume | undefined): Resume | undefined {
+  if (!resume) return undefined
+
+  const cleaned: Resume = {
+    name: trimOrEmpty(resume.name),
+    role: trimOrEmpty(resume.role),
+    photo: trimOrEmpty(resume.photo),
+    contact: {
+      email: trimOrEmpty(resume.contact?.email),
+      phone: trimOrEmpty(resume.contact?.phone),
+      location: trimOrEmpty(resume.contact?.location),
+      links: (resume.contact?.links ?? [])
+        .map(link => ({
+          label: trimOrEmpty(link.label),
+          text: trimOrEmpty(link.text),
+          href: trimOrEmpty(link.href),
+        }))
+        .filter(link => !isBlank(link.text) || !isBlank(link.href)),
+    },
+    summary: pruneTextBlock(resume.summary),
+    education: pruneTextBlock(resume.education),
+    skillBlocks: (resume.skillBlocks ?? [])
+      .map(block => ({
+        heading: trimOrEmpty(block.heading),
+        rows: (block.rows ?? [])
+          .map(row => ({ items: (row.items ?? []).map(trimOrEmpty).filter(Boolean) }))
+          .filter(row => row.items.length > 0),
+      }))
+      .filter(block => !isBlank(block.heading) || block.rows.length > 0),
+    certifications: {
+      heading: trimOrEmpty(resume.certifications?.heading),
+      groups: (resume.certifications?.groups ?? [])
+        .map(group => ({
+          issuer: trimOrEmpty(group.issuer),
+          items: (group.items ?? [])
+            .map(item => ({ name: trimOrEmpty(item.name), link: trimOrEmpty(item.link) }))
+            .filter(item => !isBlank(item.name) || !isBlank(item.link)),
+        }))
+        .filter(group => !isBlank(group.issuer) || group.items.length > 0),
+    },
+    projectSections: (resume.projectSections ?? [])
+      .map(section => ({
+        heading: trimOrEmpty(section.heading),
+        items: (section.items ?? [])
+          .map(project => ({
+            employer: trimOrEmpty(project.employer),
+            title: trimOrEmpty(project.title),
+            period: trimOrEmpty(project.period),
+            details: (project.details ?? []).map(trimOrEmpty).filter(Boolean),
+            highlights: (project.highlights ?? []).map(trimOrEmpty).filter(Boolean),
+            demoLinks: (project.demoLinks ?? [])
+              .map(link => ({ label: trimOrEmpty(link.label), href: trimOrEmpty(link.href) }))
+              .filter(link => !isBlank(link.href)),
+          }))
+          .filter(project => !isBlank(project.title) || project.details.length > 0),
+      }))
+      .filter(section => !isBlank(section.heading) || section.items.length > 0),
+    pageBreak: {
+      sectionIndex: Math.max(0, Math.trunc(resume.pageBreak?.sectionIndex ?? 0)),
+      projectIndex: Math.max(0, Math.trunc(resume.pageBreak?.projectIndex ?? 0)),
+      highlightsOnFirstSheet: Math.max(
+        0,
+        Math.trunc(resume.pageBreak?.highlightsOnFirstSheet ?? 0)
+      ),
+    },
+  }
+
+  const isEmpty =
+    isBlank(cleaned.name) &&
+    isBlank(cleaned.role) &&
+    cleaned.skillBlocks.length === 0 &&
+    cleaned.projectSections.length === 0 &&
+    cleaned.summary.lines.length === 0 &&
+    cleaned.education.lines.length === 0 &&
+    cleaned.certifications.groups.length === 0
+
+  return isEmpty ? undefined : cleaned
+}
+
+function pruneTextBlock(block: ResumeTextBlock | undefined): ResumeTextBlock {
+  return {
+    heading: trimOrEmpty(block?.heading),
+    lines: (block?.lines ?? []).map(trimOrEmpty).filter(Boolean),
+  }
+}
+
 export function cleanProfileForSave(profile: Profile): Partial<Profile> {
   const cleaned: Partial<Profile> = {
     ...profile,
@@ -143,6 +235,9 @@ export function cleanProfileForSave(profile: Profile): Partial<Profile> {
     workHeading: trimOrEmpty(profile.workHeading),
     workSubHeading: trimOrEmpty(profile.workSubHeading),
     projects: pruneProjects(profile.projects ?? []),
+
+    publicLocation: trimOrEmpty(profile.publicLocation),
+    resume: pruneResume(profile.resume),
   }
 
   // Omit empty arrays/objects from payload (JSON.stringify drops `undefined` keys).
@@ -155,6 +250,8 @@ export function cleanProfileForSave(profile: Profile): Partial<Profile> {
   if (!cleaned.briefServices?.length) delete cleaned.briefServices
   if (!cleaned.services?.length) delete cleaned.services
   if (!cleaned.projects?.length) delete cleaned.projects
+  // Omitting an empty resume is what stops "Fill mock data" + Save from blanking the CV.
+  if (!cleaned.resume) delete cleaned.resume
 
   return cleaned
 }

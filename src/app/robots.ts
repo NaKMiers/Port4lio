@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next'
 
 import { resolveSiteOrigin } from '@/lib/seo'
 
-/** Disallows admin settings; canonical public slice is `/` with section anchors. */
+/** Disallows the admin surfaces; canonical public slice is `/` with section anchors. */
 export default function robots(): MetadataRoute.Robots {
   const origin = resolveSiteOrigin().replace(/\/$/, '')
 
@@ -10,7 +10,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/settings', '/settings/'],
+      disallow: ['/settings', '/settings/', '/publish', '/publish/'],
     },
     sitemap: `${origin}/sitemap.xml`,
   }

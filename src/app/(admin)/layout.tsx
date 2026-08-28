@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppProvider bootstrapOnMount>
+    <AppProvider bootstrapOnMount endpoint='/api/admin/profile'>
       <SiteChrome>{children}</SiteChrome>
     </AppProvider>
   )
