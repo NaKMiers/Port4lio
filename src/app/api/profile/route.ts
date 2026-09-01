@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { hasOwnerAccess } from '@/lib/admin-gate'
+import { jsonError } from '@/lib/api-response'
 import { getAuthCookieName } from '@/lib/auth'
 import { connectDatabase } from '@/lib/mongodb'
 import { loadPublicProfile, PUBLIC_PROFILE_CACHE_TAG } from '@/lib/profile-data'
@@ -21,10 +22,6 @@ export const dynamic = 'force-dynamic'
 function toOwnerProfile(doc: Record<string, unknown>) {
   const { _id, createdAt, updatedAt, ...profile } = doc
   return profile
-}
-
-function jsonError(error: string, status: number) {
-  return NextResponse.json({ error }, { status })
 }
 
 /** Public read. Allowlisted fields only - see `src/lib/profile-public.ts`. */

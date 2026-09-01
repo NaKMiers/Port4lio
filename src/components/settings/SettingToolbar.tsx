@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import React from 'react'
 
 import { primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
@@ -90,9 +91,9 @@ export default function SettingToolbar({
               Fill mock data
             </button>
           )}
-          <a className={secondaryBtnCls} href='/publish'>
+          <Link className={secondaryBtnCls} href='/publish'>
             Publish
-          </a>
+          </Link>
           <button
             type='button'
             onClick={onSave}

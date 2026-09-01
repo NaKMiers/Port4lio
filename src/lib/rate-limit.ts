@@ -1,0 +1,121 @@
+import type { NextRequest } from 'next/server'
+
+import { RateLimitModel } from '@/models/RateLimit'
+
+/**
+ * Fixed-window rate limiting backed by Mongo.
+ *
+ * ```
+ *   request ──▶ bucket key = route : ip : floor(now / window)
+ *                    │
+ *                    ▼
+ *          findOneAndUpdate($inc count, upsert)   ◀── atomic, one round trip
+ *                    │
+ *          count > limit ? 429 : continue
+ * ```
+ *
+ * Fixed window, not sliding: a caller can get up to 2x the limit across a window
+ * boundary. That is a known and accepted property. The job here is to stop a script from
+ * writing a hundred thousand documents into a database shared with the portfolio, not to
+ * meter an API precisely, and a fixed window does that in one atomic operation with no
+ * extra state.
+ *
+ * `$inc` with `upsert` is the whole concurrency story: two simultaneous requests cannot
+ * both read 0 and both write 1, because neither reads at all.
+ */
+
+export type RateLimitResult = {
+  ok: boolean
+  /** Seconds until the current window ends. Sent as `Retry-After` on a 429. */
+  retryAfterSeconds: number
+}
+
+export type RateLimitOptions = {
+  /** Distinguishes routes so submitting a test does not consume the invite budget. */
+  route: string
+  limit: number
+  windowSeconds: number
+}
+
+/**
+ * Best-effort client IP.
+ *
+ * `x-forwarded-for` is client-controlled in general, but behind Vercel (and any sane
+ * proxy) the platform overwrites it, and the leftmost entry is the real client. There is
+ * no perfect answer here without a trusted-proxy config; an attacker who can forge it can
+ * spread across buckets, which is why this is a volume guard and not an auth control.
+ */
+export function clientIpFrom(request: NextRequest): string | null {
+  const forwarded = request.headers.get('x-forwarded-for')
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim()
+    if (first) return first
+  }
+  return request.headers.get('x-real-ip')?.trim() || null
+}
+
+export async function checkRateLimit(
+  ip: string | null,
+  { route, limit, windowSeconds }: RateLimitOptions
+): Promise<RateLimitResult> {
+  // No identifiable caller means no meaningful bucket. Collapsing everyone into a shared
+  // 'unknown' key looks like rate limiting but throttles real visitors against each
+  // other: ten strangers finishing the test in the same minute would 429 one another,
+  // while an actual attacker just rotates headers. Fail open and say so, rather than
+  // punish the users we can least identify.
+  if (!ip) {
+    console.warn(`[rate-limit] no client IP on ${route} - check skipped`)
+    return { ok: true, retryAfterSeconds: 0 }
+  }
+
+  const nowMs = Date.now()
+  const windowMs = windowSeconds * 1000
+  const windowStart = Math.floor(nowMs / windowMs)
+  const windowEndsAt = new Date((windowStart + 1) * windowMs)
+  const retryAfterSeconds = Math.max(1, Math.ceil((windowEndsAt.getTime() - nowMs) / 1000))
+
+  try {
+    const doc = await RateLimitModel.findByIdAndUpdate(
+      `${route}:${ip}:${windowStart}`,
+      { $inc: { count: 1 }, $setOnInsert: { expireAt: windowEndsAt } },
+      { upsert: true, new: true, lean: true }
+    )
+
+    return { ok: (doc?.count ?? 1) <= limit, retryAfterSeconds }
+  } catch (error) {
+    // Fail OPEN, deliberately. This guards against volume, not against an attacker, and a
+    // transient Mongo blip must not take down a free test that is the top of the funnel.
+    // The trade is explicit: a database outage means no rate limiting for its duration.
+    console.error('[rate-limit] check failed, allowing request', error)
+    return { ok: true, retryAfterSeconds }
+  }
+}
+
+/** Submitting a finished 60-question test. Generous: a real person cannot approach this. */
+export const SUBMIT_LIMIT: RateLimitOptions = {
+  route: 'mbti-submit',
+  limit: 10,
+  windowSeconds: 60,
+}
+
+/**
+ * Starting a checkout. Tighter than submitting, because each one creates a payment link at
+ * PayOS and burns an order code - so this is protecting a third-party quota, not just our
+ * own database. A real buyer needs one, or two if they change their mind about the email.
+ */
+export const CHECKOUT_LIMIT: RateLimitOptions = {
+  route: 'mbti-checkout',
+  limit: 6,
+  windowSeconds: 60,
+}
+
+/**
+ * Polling for payment status. Deliberately loose: the client polls every 3 seconds while a
+ * payment is in flight, and someone may have the page open in two tabs. Throttling this
+ * would strand a buyer on a spinner after their money had already left.
+ */
+export const STATUS_LIMIT: RateLimitOptions = {
+  route: 'payos-status',
+  limit: 90,
+  windowSeconds: 60,
+}

@@ -18,6 +18,21 @@ function fragmentId(siteOrigin: string, fragment: string): string {
   return `${canonicalPageUrl(siteOrigin)}${fragment}`
 }
 
+/**
+ * The stable `@id` of the site's Person entity.
+ *
+ * Exported so other pages - `/cv`, and the MBTI section - can point at the SAME entity
+ * instead of each declaring an unrelated one. Google merges nodes that share an `@id`, so
+ * this is what makes a search engine treat everything on the domain as one author's work
+ * rather than several disconnected sites, and it consolidates authority accordingly.
+ *
+ * Deliberately derived from the origin alone: a caller can reference the Person without
+ * loading the profile document, so linking to it costs no database read.
+ */
+export function personEntityId(siteOrigin: string): string {
+  return fragmentId(siteOrigin, PERSON_FRAGMENT)
+}
+
 function stripTrailingSlashOrigin(siteOrigin: string): string {
   return siteOrigin.replace(/\/$/, '')
 }

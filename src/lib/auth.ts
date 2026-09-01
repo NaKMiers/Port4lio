@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 
+import { base64url } from '@/lib/base64url'
 import { getRequiredEnv } from '@/lib/required-env'
 
 const AUTH_COOKIE = 'portfolio_auth'
@@ -14,15 +15,6 @@ export type OtpState = {
 
 function mustGetSecret(): string {
   return getRequiredEnv('AUTH_SECRET')
-}
-
-function base64url(input: Buffer | Uint8Array | string): string {
-  const buf = typeof input === 'string' ? Buffer.from(input) : Buffer.from(input as Uint8Array)
-  return buf
-    .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
 }
 
 function sign(input: string): string {

@@ -5,7 +5,12 @@ import { collapseWhitespace, excerptText } from '@/lib/profile-copy'
 import { derivePublicPortfolioViewModel } from '@/lib/profile-view-model'
 
 export const runtime = 'nodejs'
-export const alt = ''
+/**
+ * Becomes `og:image:alt`, which is what a screen reader announces for the share card and
+ * what some crawlers read when the image itself cannot be fetched. An empty string marks
+ * the image purely decorative - wrong here, since the card carries the name and role.
+ */
+export const alt = 'Portfolio'
 export const revalidate = 60
 
 export const size = {

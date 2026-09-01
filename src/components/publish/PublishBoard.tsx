@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useEffectEvent, useState } from 'react'
 
 import PublishTargetCard from '@/components/publish/PublishTargetCard'
@@ -100,9 +101,9 @@ export default function PublishBoard() {
           </div>
 
           <div className='flex flex-wrap items-center gap-2.5 lg:justify-end'>
-            <a className={secondaryBtnCls} href='/settings'>
+            <Link className={secondaryBtnCls} href='/settings'>
               Edit profile
-            </a>
+            </Link>
             <button type='button' className={primaryBtnCls} onClick={() => void load(true)}>
               Refresh
             </button>
