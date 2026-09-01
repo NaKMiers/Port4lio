@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 
 /**
  * Site-wide 404.
@@ -13,6 +12,9 @@ import Link from 'next/link'
  * Styled with `portfolio-public-root` so the tokens resolve - the same wrapper `(me)` and
  * `(choice)` rely on. Without it the `pp-*` utilities below would render as nothing, since
  * they are backed by CSS variables declared on that class.
+ *
+ * Deliberately has no links out. The header on every other page already carries navigation,
+ * and a row of buttons here read as clutter on what should be a short, quiet message.
  */
 
 export const metadata: Metadata = {
@@ -21,12 +23,6 @@ export const metadata: Metadata = {
   // crawlers that fetch the body before reading the status line.
   robots: { index: false, follow: true },
 }
-
-const DESTINATIONS = [
-  { href: '/', vi: 'Trang chủ', en: 'Home' },
-  { href: '/vi/mbti', vi: 'Trắc nghiệm MBTI', en: 'MBTI test' },
-  { href: '/cv', vi: 'CV', en: 'CV' },
-] as const
 
 export default function NotFound() {
   return (
@@ -46,25 +42,6 @@ export default function NotFound() {
           <br />
           The link may be wrong, or a result you are looking for has expired.
         </p>
-
-        {/*
-          Real links out, not just an apology. A 404 with no route back is a dead end for a
-          visitor and a dead end for a crawler that followed a stale link here.
-        */}
-        <ul className='mt-9 flex flex-wrap items-center justify-center gap-3'>
-          {DESTINATIONS.map(destination => (
-            <li key={destination.href}>
-              <Link
-                href={destination.href}
-                className='inline-flex items-center rounded-full border border-pp-line bg-white/70 px-5 py-2.5 font-display text-xs font-semibold uppercase tracking-[0.16em] text-pp-text no-underline shadow-[0_8px_18px_rgba(46,35,28,0.05)] backdrop-blur-md transition hover:-translate-y-0.5 motion-reduce:hover:translate-y-0'
-              >
-                {destination.vi === destination.en
-                  ? destination.vi
-                  : `${destination.vi} / ${destination.en}`}
-              </Link>
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   )
