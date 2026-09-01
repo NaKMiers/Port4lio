@@ -1,5 +1,7 @@
 import React from 'react'
 
+import AddMoreButton from '@/components/settings/AddMoreButton'
+import ListTextarea, { linesToText, textToLines } from '@/components/settings/ListTextarea'
 import Section from '@/components/settings/Section'
 import {
   emptyStateCls,
@@ -12,14 +14,7 @@ import {
   secondaryBtnCls,
   textareaCls,
 } from '@/components/settings/settings-utils'
-import {
-  BOLD_HINT,
-  linesToText,
-  replaceAt,
-  resumeOf,
-  textToLines,
-  updateResume,
-} from '@/components/settings/resume-utils'
+import { BOLD_HINT, replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
 import type { Certificate, Profile, ResumeCertificationGroup } from '@/types/profile'
 
 export default function ResumeBlocksSection({
@@ -30,6 +25,15 @@ export default function ResumeBlocksSection({
   setProfile: React.Dispatch<React.SetStateAction<Profile>>
 }) {
   const resume = resumeOf(profile)
+
+  const addGroup = () =>
+    updateResume(setProfile, r => ({
+      ...r,
+      certifications: {
+        ...r.certifications,
+        groups: [...r.certifications.groups, { issuer: '', items: [] }],
+      },
+    }))
 
   const updateGroup = (idx: number, patch: Partial<ResumeCertificationGroup>) => {
     updateResume(setProfile, r => ({
@@ -54,7 +58,7 @@ export default function ResumeBlocksSection({
   }
 
   return (
-    <Section title='CV Summary & Certifications' badge='**bold** supported'>
+    <Section id='cv-blocks' title='CV Summary & Certifications' badge='**bold** supported'>
       <div className='space-y-4'>
         <p className={helpTextCls}>{BOLD_HINT} One printed line per row.</p>
 
@@ -74,15 +78,14 @@ export default function ResumeBlocksSection({
           </div>
           <div className='mt-3 space-y-2'>
             <label className={labelCls}>Summary lines</label>
-            <textarea
+            <ListTextarea
               className={textareaCls}
               rows={6}
-              value={linesToText(resume.summary.lines)}
-              onChange={e =>
-                updateResume(setProfile, r => ({
-                  ...r,
-                  summary: { ...r.summary, lines: textToLines(e.target.value) },
-                }))
+              value={resume.summary.lines}
+              join={linesToText}
+              parse={textToLines}
+              onChange={lines =>
+                updateResume(setProfile, r => ({ ...r, summary: { ...r.summary, lines } }))
               }
             />
           </div>
@@ -104,15 +107,14 @@ export default function ResumeBlocksSection({
           </div>
           <div className='mt-3 space-y-2'>
             <label className={labelCls}>Education lines</label>
-            <textarea
+            <ListTextarea
               className={textareaCls}
               rows={3}
-              value={linesToText(resume.education.lines)}
-              onChange={e =>
-                updateResume(setProfile, r => ({
-                  ...r,
-                  education: { ...r.education, lines: textToLines(e.target.value) },
-                }))
+              value={resume.education.lines}
+              join={linesToText}
+              parse={textToLines}
+              onChange={lines =>
+                updateResume(setProfile, r => ({ ...r, education: { ...r.education, lines } }))
               }
             />
           </div>
@@ -137,15 +139,7 @@ export default function ResumeBlocksSection({
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              updateResume(setProfile, r => ({
-                ...r,
-                certifications: {
-                  ...r.certifications,
-                  groups: [...r.certifications.groups, { issuer: '', items: [] }],
-                },
-              }))
-            }
+            onClick={addGroup}
           >
             + Add group
           </button>
@@ -231,6 +225,10 @@ export default function ResumeBlocksSection({
             </div>
           </div>
         ))}
+
+        {resume.certifications.groups.length > 0 ? (
+          <AddMoreButton label='+ Add certification group' onClick={addGroup} />
+        ) : null}
       </div>
     </Section>
   )

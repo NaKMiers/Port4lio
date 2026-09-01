@@ -1,5 +1,8 @@
 import React from 'react'
 
+import AddMoreButton from '@/components/settings/AddMoreButton'
+import ListTextarea, { linesToText, textToLines } from '@/components/settings/ListTextarea'
+import NumberField from '@/components/settings/NumberField'
 import Section from '@/components/settings/Section'
 import {
   emptyStateCls,
@@ -12,14 +15,7 @@ import {
   secondaryBtnCls,
   textareaCls,
 } from '@/components/settings/settings-utils'
-import {
-  BOLD_HINT,
-  linesToText,
-  replaceAt,
-  resumeOf,
-  textToLines,
-  updateResume,
-} from '@/components/settings/resume-utils'
+import { BOLD_HINT, replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
 import { stripInlineBold } from '@/lib/resume-inline'
 import type { Profile, Resume, ResumeLink, ResumeProject } from '@/types/profile'
 
@@ -84,12 +80,18 @@ export default function ResumeProjectsSection({
     })
   }
 
+  const addSection = () =>
+    updateResume(setProfile, r => ({
+      ...r,
+      projectSections: [...r.projectSections, { heading: '', items: [] }],
+    }))
+
   const setBreak = (patch: Partial<Resume['pageBreak']>) => {
     updateResume(setProfile, r => ({ ...r, pageBreak: { ...r.pageBreak, ...patch } }))
   }
 
   return (
-    <Section title='CV Projects' badge='personal & work'>
+    <Section id='cv-projects' title='CV Projects' badge='personal & work'>
       <div className='space-y-4'>
         <div className={itemCardCls}>
           <h2 className='text-sm font-semibold'>Page break</h2>
@@ -112,32 +114,26 @@ export default function ResumeProjectsSection({
           <div className='mt-3 grid grid-cols-1 gap-3 md:grid-cols-3'>
             <div className='space-y-2'>
               <label className={labelCls}>Section index</label>
-              <input
+              <NumberField
                 className={inputCls}
-                type='number'
-                min={0}
                 value={resume.pageBreak.sectionIndex}
-                onChange={e => setBreak({ sectionIndex: Number(e.target.value) || 0 })}
+                onChange={sectionIndex => setBreak({ sectionIndex })}
               />
             </div>
             <div className='space-y-2'>
               <label className={labelCls}>Project index</label>
-              <input
+              <NumberField
                 className={inputCls}
-                type='number'
-                min={0}
                 value={resume.pageBreak.projectIndex}
-                onChange={e => setBreak({ projectIndex: Number(e.target.value) || 0 })}
+                onChange={projectIndex => setBreak({ projectIndex })}
               />
             </div>
             <div className='space-y-2'>
               <label className={labelCls}>Highlights on sheet 1</label>
-              <input
+              <NumberField
                 className={inputCls}
-                type='number'
-                min={0}
                 value={resume.pageBreak.highlightsOnFirstSheet}
-                onChange={e => setBreak({ highlightsOnFirstSheet: Number(e.target.value) || 0 })}
+                onChange={highlightsOnFirstSheet => setBreak({ highlightsOnFirstSheet })}
               />
             </div>
           </div>
@@ -148,12 +144,7 @@ export default function ResumeProjectsSection({
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              updateResume(setProfile, r => ({
-                ...r,
-                projectSections: [...r.projectSections, { heading: '', items: [] }],
-              }))
-            }
+            onClick={addSection}
           >
             + Add section
           </button>
@@ -222,15 +213,13 @@ export default function ResumeProjectsSection({
 
                   <div className='mt-3 space-y-2'>
                     <label className={labelCls}>Details · one line each</label>
-                    <textarea
+                    <ListTextarea
                       className={textareaCls}
                       rows={5}
-                      value={linesToText(project.details)}
-                      onChange={e =>
-                        updateProject(sectionIdx, projectIdx, {
-                          details: textToLines(e.target.value),
-                        })
-                      }
+                      value={project.details}
+                      join={linesToText}
+                      parse={textToLines}
+                      onChange={details => updateProject(sectionIdx, projectIdx, { details })}
                     />
                   </div>
 
@@ -238,15 +227,13 @@ export default function ResumeProjectsSection({
                     <label className={labelCls}>
                       Highlights · {project.highlights.length} bullets
                     </label>
-                    <textarea
+                    <ListTextarea
                       className={textareaCls}
                       rows={5}
-                      value={linesToText(project.highlights)}
-                      onChange={e =>
-                        updateProject(sectionIdx, projectIdx, {
-                          highlights: textToLines(e.target.value),
-                        })
-                      }
+                      value={project.highlights}
+                      join={linesToText}
+                      parse={textToLines}
+                      onChange={highlights => updateProject(sectionIdx, projectIdx, { highlights })}
                     />
                   </div>
 
@@ -357,6 +344,10 @@ export default function ResumeProjectsSection({
             </div>
           </div>
         ))}
+
+        {resume.projectSections.length > 0 ? (
+          <AddMoreButton label='+ Add project section' onClick={addSection} />
+        ) : null}
       </div>
     </Section>
   )

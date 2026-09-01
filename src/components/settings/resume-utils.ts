@@ -23,13 +23,5 @@ export function replaceAt<T>(list: T[], index: number, patch: Partial<T>): T[] {
   return next
 }
 
-/** A textarea holds one list entry per line; blank lines are dropped on the way in. */
-export const linesToText = (lines: string[]) => lines.join('\n')
-export const textToLines = (text: string) =>
-  text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-
 /** Note shown wherever `**bold**` is accepted, so the syntax is discoverable. */
 export const BOLD_HINT = 'Wrap text in **double asterisks** to print it bold.'

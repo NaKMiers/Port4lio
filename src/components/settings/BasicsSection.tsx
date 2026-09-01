@@ -2,13 +2,13 @@ import React from 'react'
 
 import type { Profile } from '@/types/profile'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
 import type { UploadingState } from '@/components/settings/types'
 import Spinner from '@/components/settings/Spinner'
 import {
   emptyStateCls,
   helpTextCls,
-  inlineLinkCls,
   itemCardCls,
   MAX_UPLOAD_MB_LABEL,
   ghostBtnCls,
@@ -34,49 +34,54 @@ export default function BasicsSection({
   setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
   setError: React.Dispatch<React.SetStateAction<string | null>>
 }) {
+  const addJobTitle = () => setProfile(p => ({ ...p, jobTitle: [...p.jobTitle, ''] }))
+
   return (
-    <Section title='Basics' badge='avatar, CV, headings' defaultOpen>
+    <Section id='basics' title='Basics' badge='avatar, CV, headings' defaultOpen>
       <div className='grid grid-cols-1 gap-5 md:grid-cols-2'>
         <div className='space-y-2'>
           <div className='flex items-center justify-between gap-3'>
-            <label className={labelCls}>CV (File)</label>
-            {uploading.cv ? <Spinner className='text-pp-muted' /> : null}
+            <label className={labelCls}>Avatar</label>
+            {uploading.avatar ? <Spinner className='text-pp-muted' /> : null}
           </div>
-          <p className={helpTextCls}>
-            Max {MAX_UPLOAD_MB_LABEL} MB. Uploaded to Cloudinary now; Save stores the URL only.
-          </p>
+          <p className={helpTextCls}>Max {MAX_UPLOAD_MB_LABEL} MB per image. Uploads immediately.</p>
           <input
             type='file'
-            aria-label='Upload CV file'
-            accept='application/pdf,.pdf,.doc,.docx'
-            disabled={uploading.cv}
+            aria-label='Upload avatar image'
+            accept='image/*'
+            disabled={uploading.avatar}
             className={uploadInputCls}
             onChange={async e => {
               const file = e.target.files?.[0]
               e.target.value = ''
               if (!file) return
               if (file.size > MAX_UPLOAD_BYTES) {
-                setError(`File must be ${MAX_UPLOAD_MB_LABEL} MB or smaller`)
+                setError(`Image must be ${MAX_UPLOAD_MB_LABEL} MB or smaller`)
                 return
               }
               setError(null)
-              setUploading(u => ({ ...u, cv: true }))
+              setUploading(u => ({ ...u, avatar: true }))
               try {
-                const url = await uploadAssetToCloudinary(file, 'cv')
-                setProfile(p => ({ ...p, cv: url }))
+                const url = await uploadAssetToCloudinary(file, 'avatar')
+                setProfile(p => ({ ...p, avatar: url }))
               } catch (err) {
                 setError(err instanceof Error ? err.message : 'Upload failed')
               } finally {
-                setUploading(u => ({ ...u, cv: false }))
+                setUploading(u => ({ ...u, avatar: false }))
               }
             }}
           />
-          {uploading.cv ? <p className={helpTextCls}>Uploading...</p> : null}
-          {profile.cv ? (
-            <a className={inlineLinkCls} href={profile.cv} target='_blank' rel='noreferrer'>
-              Current CV
-            </a>
-          ) : null}
+          {uploading.avatar ? <p className={helpTextCls}>Uploading...</p> : null}
+          {preview.av ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={preview.av}
+              alt='Avatar preview'
+              className='h-24 w-24 rounded-full border border-pp-line object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]'
+            />
+          ) : (
+            <div className={emptyStateCls}>Optional</div>
+          )}
         </div>
 
         <div className='space-y-2'>
@@ -125,51 +130,6 @@ export default function BasicsSection({
         </div>
 
         <div className='space-y-2'>
-          <div className='flex items-center justify-between gap-3'>
-            <label className={labelCls}>Avatar</label>
-            {uploading.avatar ? <Spinner className='text-pp-muted' /> : null}
-          </div>
-          <p className={helpTextCls}>Max {MAX_UPLOAD_MB_LABEL} MB per image. Uploads immediately.</p>
-          <input
-            type='file'
-            aria-label='Upload avatar image'
-            accept='image/*'
-            disabled={uploading.avatar}
-            className={uploadInputCls}
-            onChange={async e => {
-              const file = e.target.files?.[0]
-              e.target.value = ''
-              if (!file) return
-              if (file.size > MAX_UPLOAD_BYTES) {
-                setError(`Image must be ${MAX_UPLOAD_MB_LABEL} MB or smaller`)
-                return
-              }
-              setError(null)
-              setUploading(u => ({ ...u, avatar: true }))
-              try {
-                const url = await uploadAssetToCloudinary(file, 'avatar')
-                setProfile(p => ({ ...p, avatar: url }))
-              } catch (err) {
-                setError(err instanceof Error ? err.message : 'Upload failed')
-              } finally {
-                setUploading(u => ({ ...u, avatar: false }))
-              }
-            }}
-          />
-          {uploading.avatar ? <p className={helpTextCls}>Uploading...</p> : null}
-          {preview.av ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview.av}
-              alt='Avatar preview'
-              className='h-24 w-24 rounded-full border border-pp-line object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]'
-            />
-          ) : (
-            <div className={emptyStateCls}>Optional</div>
-          )}
-        </div>
-
-        <div className='space-y-2'>
           <label className={labelCls}>Profile description</label>
           <input
             className={inputCls}
@@ -205,7 +165,7 @@ export default function BasicsSection({
             <button
               type='button'
               className={secondaryBtnCls}
-              onClick={() => setProfile(p => ({ ...p, jobTitle: [...p.jobTitle, ''] }))}
+              onClick={addJobTitle}
             >
               + Add
             </button>
@@ -240,6 +200,9 @@ export default function BasicsSection({
                 </div>
               </div>
             ))}
+            {profile.jobTitle.length > 0 ? (
+              <AddMoreButton label='+ Add job title' onClick={addJobTitle} />
+            ) : null}
           </div>
         </div>
 

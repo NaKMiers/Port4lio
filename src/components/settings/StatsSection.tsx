@@ -1,6 +1,8 @@
 import React from 'react'
 
 import type { Profile } from '@/types/profile'
+import AddMoreButton from '@/components/settings/AddMoreButton'
+import NumberField from '@/components/settings/NumberField'
 import Section from '@/components/settings/Section'
 import {
   emptyStateCls,
@@ -26,14 +28,16 @@ export default function StatsSection({
     })
   }
 
+  const addStat = () => setProfile(p => ({ ...p, stats: [...p.stats, { label: '', value: 0 }] }))
+
   return (
-    <Section title='Stats' badge='hero counters'>
+    <Section id='stats' title='Stats' badge='hero counters'>
       <div className='mb-3 flex items-center justify-between gap-3'>
         <h2 className='text-sm font-semibold'>Stats</h2>
         <button
           type='button'
           className={secondaryBtnCls}
-          onClick={() => setProfile(p => ({ ...p, stats: [...p.stats, { label: '', value: 0 }] }))}
+          onClick={addStat}
         >
           + Add
         </button>
@@ -50,11 +54,10 @@ export default function StatsSection({
               </div>
               <div className='space-y-2'>
                 <label className={labelCls}>Value</label>
-                <input
+                <NumberField
                   className={inputCls}
-                  type='number'
                   value={st.value}
-                  onChange={e => updateStat(idx, { value: Number(e.target.value || 0) })}
+                  onChange={value => updateStat(idx, { value })}
                 />
               </div>
               <div className='flex justify-end'>
@@ -69,6 +72,7 @@ export default function StatsSection({
             </div>
           </div>
         ))}
+        {profile.stats.length > 0 ? <AddMoreButton label='+ Add stat' onClick={addStat} /> : null}
       </div>
     </Section>
   )

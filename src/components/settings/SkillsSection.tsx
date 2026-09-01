@@ -1,6 +1,7 @@
 import React from 'react'
 
 import type { Profile } from '@/types/profile'
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
 import type { IconPickerTarget } from '@/components/settings/types'
 import {
@@ -32,15 +33,25 @@ export default function SkillsSection({
     })
   }
 
+  const addGroup = () => setProfile(p => ({ ...p, skills: [...p.skills, { groupName: '', items: [] }] }))
+
+  const addItem = (gIdx: number) =>
+    setProfile(p => {
+      const next = [...p.skills]
+      const cur = next[gIdx]
+      next[gIdx] = { ...cur, items: [...cur.items, { icon: '', name: '' }] }
+      return { ...p, skills: next }
+    })
+
   return (
-    <Section title='Skills' badge='groups & items'>
+    <Section id='skills' title='Skills' badge='groups & items' defaultOpen>
       <div className='space-y-4'>
         <div className='flex items-center justify-between'>
           <h2 className='text-sm font-semibold'>Skill Groups</h2>
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() => setProfile(p => ({ ...p, skills: [...p.skills, { groupName: '', items: [] }] }))}
+            onClick={addGroup}
           >
             + Add group
           </button>
@@ -79,14 +90,7 @@ export default function SkillsSection({
                 <button
                   type='button'
                   className={secondaryBtnCls}
-                  onClick={() => {
-                    setProfile(p => {
-                      const next = [...p.skills]
-                      const cur = next[gIdx]
-                      next[gIdx] = { ...cur, items: [...cur.items, { icon: '', name: '' }] }
-                      return { ...p, skills: next }
-                    })
-                  }}
+                  onClick={() => addItem(gIdx)}
                 >
                   + Add
                 </button>
@@ -96,81 +100,89 @@ export default function SkillsSection({
                 <div className={emptyStateCls}>No items in this group.</div>
               ) : null}
 
-              {group.items.map((it, iIdx) => (
-                <div key={iIdx} className={nestedItemCardCls}>
-                  <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-                    <div className='space-y-2'>
-                      <label className={labelCls}>Icon code</label>
-                      <div className='flex items-center gap-2'>
-                        <div className={iconPreviewCls}>
-                          {resolveIconFromCode(it.icon, 18)}
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                {group.items.map((it, iIdx) => (
+                  <div key={iIdx} className={nestedItemCardCls}>
+                    <div className='space-y-3'>
+                      <div className='space-y-2'>
+                        <label className={labelCls}>Icon code</label>
+                        <div className='flex items-center gap-2'>
+                          <button
+                            type='button'
+                            className={`${iconPreviewCls} transition hover:-translate-y-0.5 hover:border-pp-blue/35`}
+                            onClick={() =>
+                              setIconPickerTarget({ kind: 'skill', groupIndex: gIdx, itemIndex: iIdx })
+                            }
+                            title='Pick icon'
+                          >
+                            {resolveIconFromCode(it.icon, 18)}
+                          </button>
+                          <input
+                            className={inputCls}
+                            value={it.icon}
+                            onChange={e => {
+                              setProfile(p => {
+                                const next = [...p.skills]
+                                const cur = next[gIdx]
+                                const nextItems = [...cur.items]
+                                nextItems[iIdx] = { ...nextItems[iIdx], icon: e.target.value }
+                                next[gIdx] = { ...cur, items: nextItems }
+                                return { ...p, skills: next }
+                              })
+                            }}
+                            placeholder='e.g. fa:FaReact'
+                          />
                         </div>
+                      </div>
+                      <div className='space-y-2'>
+                        <label className={labelCls}>Name</label>
                         <input
                           className={inputCls}
-                          value={it.icon}
+                          value={it.name}
                           onChange={e => {
                             setProfile(p => {
                               const next = [...p.skills]
                               const cur = next[gIdx]
                               const nextItems = [...cur.items]
-                              nextItems[iIdx] = { ...nextItems[iIdx], icon: e.target.value }
+                              nextItems[iIdx] = { ...nextItems[iIdx], name: e.target.value }
                               next[gIdx] = { ...cur, items: nextItems }
                               return { ...p, skills: next }
                             })
                           }}
-                          placeholder='e.g. fa:FaReact'
+                          placeholder='e.g. TypeScript'
                         />
-                        <button
-                          type='button'
-                          className={secondaryBtnCls}
-                          onClick={() =>
-                            setIconPickerTarget({ kind: 'skill', groupIndex: gIdx, itemIndex: iIdx })
-                          }
-                        >
-                          Pick
-                        </button>
                       </div>
                     </div>
-                    <div className='space-y-2'>
-                      <label className={labelCls}>Name</label>
-                      <input
-                        className={inputCls}
-                        value={it.name}
-                        onChange={e => {
+                    <div className='mt-3 flex justify-end'>
+                      <button
+                        type='button'
+                        className={ghostBtnCls}
+                        onClick={() => {
                           setProfile(p => {
                             const next = [...p.skills]
                             const cur = next[gIdx]
-                            const nextItems = [...cur.items]
-                            nextItems[iIdx] = { ...nextItems[iIdx], name: e.target.value }
-                            next[gIdx] = { ...cur, items: nextItems }
+                            next[gIdx] = { ...cur, items: cur.items.filter((_, i) => i !== iIdx) }
                             return { ...p, skills: next }
                           })
                         }}
-                        placeholder='e.g. TypeScript'
-                      />
+                      >
+                        Remove item
+                      </button>
                     </div>
                   </div>
-                  <div className='mt-3 flex justify-end'>
-                    <button
-                      type='button'
-                      className={ghostBtnCls}
-                      onClick={() => {
-                        setProfile(p => {
-                          const next = [...p.skills]
-                          const cur = next[gIdx]
-                          next[gIdx] = { ...cur, items: cur.items.filter((_, i) => i !== iIdx) }
-                          return { ...p, skills: next }
-                        })
-                      }}
-                    >
-                      Remove item
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+
+              {group.items.length > 0 ? (
+                <AddMoreButton label='+ Add item' onClick={() => addItem(gIdx)} />
+              ) : null}
             </div>
           </div>
         ))}
+
+        {profile.skills.length > 0 ? (
+          <AddMoreButton label='+ Add skill group' onClick={addGroup} />
+        ) : null}
       </div>
     </Section>
   )

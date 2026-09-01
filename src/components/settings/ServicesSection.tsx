@@ -1,6 +1,8 @@
 import React from 'react'
 
 import type { Profile } from '@/types/profile'
+import AddMoreButton from '@/components/settings/AddMoreButton'
+import ListTextarea, { linesToText, textToLines } from '@/components/settings/ListTextarea'
 import Section from '@/components/settings/Section'
 import type { IconPickerTarget } from '@/components/settings/types'
 import {
@@ -24,8 +26,11 @@ export default function ServicesSection({
   setProfile: React.Dispatch<React.SetStateAction<Profile>>
   setIconPickerTarget: React.Dispatch<React.SetStateAction<IconPickerTarget>>
 }) {
+  const addService = () =>
+    setProfile(p => ({ ...p, services: [...p.services, { icon: '', title: '', description: '' }] }))
+
   return (
-    <Section title='Services' badge='offerings'>
+    <Section id='services' title='Services' badge='offerings' defaultOpen>
       <div className='space-y-5'>
         <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
           <div className='space-y-2'>
@@ -48,16 +53,13 @@ export default function ServicesSection({
 
         <div className='space-y-2'>
           <label className={labelCls}>Brief Services (one per line)</label>
-          <textarea
+          <ListTextarea
             className={textareaCls}
-            value={profile.briefServices.join('\n')}
-            onChange={e =>
-              setProfile(p => ({
-                ...p,
-                briefServices: e.target.value.split('\n').map(x => x.trim()).filter(Boolean),
-              }))
-            }
-            placeholder='e.g.\nWeb Design\nSEO Optimization\nAI Integration'
+            value={profile.briefServices}
+            join={linesToText}
+            parse={textToLines}
+            onChange={briefServices => setProfile(p => ({ ...p, briefServices }))}
+            placeholder={'e.g.\nWeb Design\nSEO Optimization\nAI Integration'}
           />
         </div>
 
@@ -67,12 +69,7 @@ export default function ServicesSection({
             <button
               type='button'
               className={secondaryBtnCls}
-              onClick={() =>
-                setProfile(p => ({
-                  ...p,
-                  services: [...p.services, { icon: '', title: '', description: '' }],
-                }))
-              }
+              onClick={addService}
             >
               + Add
             </button>
@@ -86,9 +83,14 @@ export default function ServicesSection({
                 <div className='space-y-2'>
                   <label className={labelCls}>Icon code</label>
                   <div className='flex items-center gap-2'>
-                    <div className={iconPreviewCls}>
+                    <button
+                      type='button'
+                      className={`${iconPreviewCls} transition hover:-translate-y-0.5 hover:border-pp-blue/35`}
+                      onClick={() => setIconPickerTarget({ kind: 'service', serviceIndex: idx })}
+                      title='Pick icon'
+                    >
                       {resolveIconFromCode(sv.icon, 18)}
-                    </div>
+                    </button>
                     <input
                       className={inputCls}
                       value={sv.icon}
@@ -101,13 +103,6 @@ export default function ServicesSection({
                       }
                       placeholder='e.g. tb:TbBolt'
                     />
-                    <button
-                      type='button'
-                      className={secondaryBtnCls}
-                      onClick={() => setIconPickerTarget({ kind: 'service', serviceIndex: idx })}
-                    >
-                      Pick
-                    </button>
                   </div>
                 </div>
                 <div className='space-y-2'>
@@ -151,6 +146,10 @@ export default function ServicesSection({
               </div>
             </div>
           ))}
+
+          {profile.services.length > 0 ? (
+            <AddMoreButton label='+ Add service' onClick={addService} />
+          ) : null}
         </div>
       </div>
     </Section>

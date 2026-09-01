@@ -1,6 +1,13 @@
 import type { Resume } from '@/types/profile'
 
 /**
+ * Printed when neither a CV-specific photo nor a portfolio avatar is set - the last rung
+ * of the chain in `deriveResume`, applied at the `/cv` masthead so an unset photo still
+ * reads as "inherit the avatar" everywhere else.
+ */
+export const CV_FALLBACK_PHOTO = '/cv/avatar.jpg'
+
+/**
  * The CV content as it stood when `/cv` became data-driven, transcribed field for field
  * from the previously hardcoded JSX (`<b>` -> `**`, `&amp;` -> `&`).
  *
@@ -13,7 +20,10 @@ import type { Resume } from '@/types/profile'
 export const RESUME_SEED: Resume = {
   name: 'ANH KHOA NGUYEN',
   role: 'FULL STACK DEVELOPER',
-  photo: '/cv/avatar.jpg',
+  // Empty on purpose: an unwritten CV block should inherit the portfolio avatar rather
+  // than pin the bundled file, and saving the seed once must not turn that inheritance
+  // into an explicit override.
+  photo: '',
 
   contact: {
     email: 'anhkhoa14904@gmail.com',

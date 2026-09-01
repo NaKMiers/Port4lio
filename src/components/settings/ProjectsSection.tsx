@@ -3,6 +3,8 @@ import React from 'react'
 import type { Profile } from '@/types/profile'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
 import { PROJECT_TECH_LIMIT } from '@/lib/profile-copy'
+import AddMoreButton from '@/components/settings/AddMoreButton'
+import ListTextarea, { itemsToText, textToItems } from '@/components/settings/ListTextarea'
 import Section from '@/components/settings/Section'
 import type { UploadingState } from '@/components/settings/types'
 import Spinner from '@/components/settings/Spinner'
@@ -34,8 +36,22 @@ export default function ProjectsSection({
   uploading: UploadingState
   setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
 }) {
+  const addProject = () =>
+    setProfile(p => ({
+      ...p,
+      projects: [...p.projects, { title: '', overview: '', techStack: [], parts: [] }],
+    }))
+
+  const addPart = (idx: number) =>
+    setProfile(p => {
+      const next = [...p.projects]
+      const cur = next[idx]
+      next[idx] = { ...cur, parts: [...(cur.parts ?? []), { image: '', description: '', link: '' }] }
+      return { ...p, projects: next }
+    })
+
   return (
-    <Section title='Work & Projects' badge='parts (image, description, link)'>
+    <Section id='projects' title='Work & Projects' badge='parts (image, description, link)'>
       <div className='space-y-5'>
         <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
           <div className='space-y-2'>
@@ -61,12 +77,7 @@ export default function ProjectsSection({
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              setProfile(p => ({
-                ...p,
-                projects: [...p.projects, { title: '', overview: '', techStack: [], parts: [] }],
-              }))
-            }
+            onClick={addProject}
           >
             + Add project
           </button>
@@ -118,19 +129,15 @@ export default function ProjectsSection({
                   Comma or newline separated. Shown as chips under the overview (first{' '}
                   {PROJECT_TECH_LIMIT} render).
                 </p>
-                <textarea
+                <ListTextarea
                   className={textareaCls}
-                  value={(prj.techStack ?? []).join(', ')}
-                  onChange={e =>
+                  value={prj.techStack ?? []}
+                  join={itemsToText}
+                  parse={textToItems}
+                  onChange={techStack =>
                     setProfile(p => {
                       const next = [...p.projects]
-                      next[idx] = {
-                        ...next[idx],
-                        techStack: e.target.value
-                          .split(/[,\n]/)
-                          .map(item => item.trim())
-                          .filter(Boolean),
-                      }
+                      next[idx] = { ...next[idx], techStack }
                       return { ...p, projects: next }
                     })
                   }
@@ -149,17 +156,7 @@ export default function ProjectsSection({
                   <button
                     type='button'
                     className={secondaryBtnCls}
-                    onClick={() =>
-                      setProfile(p => {
-                        const next = [...p.projects]
-                        const cur = next[idx]
-                        next[idx] = {
-                          ...cur,
-                          parts: [...(cur.parts ?? []), { image: '', description: '', link: '' }],
-                        }
-                        return { ...p, projects: next }
-                      })
-                    }
+                    onClick={() => addPart(idx)}
                   >
                     + Add part
                   </button>
@@ -301,6 +298,10 @@ export default function ProjectsSection({
                       </div>
                     </div>
                   ))}
+
+                  {(prj.parts ?? []).length > 0 ? (
+                    <AddMoreButton label='+ Add part' onClick={() => addPart(idx)} />
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -331,6 +332,10 @@ export default function ProjectsSection({
             </div>
           </div>
         ))}
+
+        {profile.projects.length > 0 ? (
+          <AddMoreButton label='+ Add project' onClick={addProject} />
+        ) : null}
       </div>
     </Section>
   )

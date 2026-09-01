@@ -4,7 +4,20 @@ import React, { useEffect, useState } from 'react'
 
 import { inputCls, labelCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
 
-export default function OwnerAuthGate({ children }: { children: React.ReactNode }) {
+export default function OwnerAuthGate({
+  children,
+  onAuthed,
+}: {
+  children: React.ReactNode
+  /**
+   * Fired once, after a code is verified in this session - not when the mount check finds
+   * an existing cookie, where the caller's own data fetch has already succeeded.
+   *
+   * The settings editor needs it: its profile fetch ran before the cookie existed and
+   * came back 401, so without a refetch here the gate would open onto a spinner.
+   */
+  onAuthed?: () => void
+}) {
   const [checking, setChecking] = useState(true)
   const [authed, setAuthed] = useState(false)
   const [step, setStep] = useState<'request' | 'verify'>('request')
@@ -60,6 +73,7 @@ export default function OwnerAuthGate({ children }: { children: React.ReactNode 
       if (!res.ok) throw new Error(data?.error || 'Verification failed')
       setAuthed(true)
       setInfo('Verified. Access granted for 24 hours.')
+      onAuthed?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed')
     } finally {
@@ -69,7 +83,7 @@ export default function OwnerAuthGate({ children }: { children: React.ReactNode 
 
   if (checking) {
     return (
-      <div className='portfolio-public-root relative z-50 min-h-screen overflow-hidden pt-12 text-pp-text'>
+      <div className='portfolio-public-root relative z-50 min-h-screen clip-decorations pt-12 text-pp-text'>
         <div className='pointer-events-none absolute inset-0 pp-grid-wash opacity-60' />
         <div className='relative mx-auto max-w-xl px-gutter py-10'>
           <div className='rounded-[1.8rem] border border-pp-line bg-white/78 p-6 shadow-panel backdrop-blur-md'>
@@ -83,7 +97,7 @@ export default function OwnerAuthGate({ children }: { children: React.ReactNode 
   if (authed) return <>{children}</>
 
   return (
-    <div className='portfolio-public-root relative z-50 min-h-screen overflow-hidden pt-12 text-pp-text'>
+    <div className='portfolio-public-root relative z-50 min-h-screen clip-decorations pt-12 text-pp-text'>
       <div className='pointer-events-none absolute inset-0 pp-grid-wash opacity-60' />
       <div className='relative mx-auto max-w-xl px-gutter py-10'>
         <div className='rounded-[1.9rem] border border-pp-line bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(255,250,246,0.76))] p-6 shadow-panel backdrop-blur-md'>

@@ -1,5 +1,6 @@
 import React from 'react'
 
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
 import {
   emptyStateCls,
@@ -12,15 +13,9 @@ import {
   secondaryBtnCls,
   textareaCls,
 } from '@/components/settings/settings-utils'
+import ListTextarea, { itemsToText, textToItems } from '@/components/settings/ListTextarea'
 import { replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
 import type { Profile } from '@/types/profile'
-
-/** Rows are comma or newline separated, matching how techStack is edited elsewhere. */
-const parseRow = (text: string) =>
-  text
-    .split(/[,\n]/)
-    .map(item => item.trim())
-    .filter(Boolean)
 
 export default function ResumeSkillsSection({
   profile,
@@ -30,6 +25,12 @@ export default function ResumeSkillsSection({
   setProfile: React.Dispatch<React.SetStateAction<Profile>>
 }) {
   const resume = resumeOf(profile)
+
+  const addBlock = () =>
+    updateResume(setProfile, r => ({
+      ...r,
+      skillBlocks: [...r.skillBlocks, { heading: '', rows: [{ items: [] }] }],
+    }))
 
   const updateRow = (blockIdx: number, rowIdx: number, items: string[]) => {
     updateResume(setProfile, r => {
@@ -44,7 +45,7 @@ export default function ResumeSkillsSection({
   }
 
   return (
-    <Section title='CV Skills' badge='rows are layout'>
+    <Section id='cv-skills' title='CV Skills' badge='rows are layout'>
       <div className='space-y-4'>
         <p className={helpTextCls}>
           Each row justifies edge to edge on the printed page, so row membership is a layout
@@ -57,12 +58,7 @@ export default function ResumeSkillsSection({
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              updateResume(setProfile, r => ({
-                ...r,
-                skillBlocks: [...r.skillBlocks, { heading: '', rows: [{ items: [] }] }],
-              }))
-            }
+            onClick={addBlock}
           >
             + Add block
           </button>
@@ -96,11 +92,13 @@ export default function ResumeSkillsSection({
                     <label className={labelCls}>
                       Row {rowIdx + 1} · {row.items.length} items
                     </label>
-                    <textarea
+                    <ListTextarea
                       className={textareaCls}
                       rows={2}
-                      value={row.items.join(', ')}
-                      onChange={e => updateRow(blockIdx, rowIdx, parseRow(e.target.value))}
+                      value={row.items}
+                      join={itemsToText}
+                      parse={textToItems}
+                      onChange={items => updateRow(blockIdx, rowIdx, items)}
                     />
                   </div>
                   <div className='mt-3 flex justify-end'>
@@ -153,6 +151,10 @@ export default function ResumeSkillsSection({
             </div>
           </div>
         ))}
+
+        {resume.skillBlocks.length > 0 ? (
+          <AddMoreButton label='+ Add skill block' onClick={addBlock} />
+        ) : null}
       </div>
     </Section>
   )

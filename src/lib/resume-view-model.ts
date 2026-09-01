@@ -137,7 +137,16 @@ export function planResumeSheets(resume: Resume): ResumeSheetPlan {
  * The seed lives here in the derived layer, deliberately not in `normalizeProfile` -
  * that function is documented as defensive coercion that never invents content, and
  * keeping it out preserves `undefined` as the "never written" signal.
+ *
+ * `fallbackPhoto` is the portfolio avatar. An empty `resume.photo` means "inherit it",
+ * so the CV tracks the profile picture by default and only diverges when a CV-specific
+ * photo was uploaded. The bundled last resort is applied at the `/cv` masthead instead of
+ * here, so callers that only need the stored intent - the settings editor, which saves
+ * whatever this returns - keep seeing the empty "inherit" value.
  */
-export function deriveResume(profile: Pick<Profile, 'resume'>): Resume {
-  return profile.resume ?? RESUME_SEED
+export function deriveResume(profile: Pick<Profile, 'resume'>, fallbackPhoto?: string): Resume {
+  const resume = profile.resume ?? RESUME_SEED
+  const photo = resume.photo || fallbackPhoto || ''
+
+  return photo === resume.photo ? resume : { ...resume, photo }
 }

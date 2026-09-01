@@ -1,6 +1,10 @@
 import React from 'react'
 
+import { CV_FALLBACK_PHOTO } from '@/lib/resume-seed'
+import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
+import Spinner from '@/components/settings/Spinner'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -8,20 +12,41 @@ import {
   inputCls,
   itemCardCls,
   labelCls,
+  MAX_UPLOAD_MB_LABEL,
   secondaryBtnCls,
+  uploadAssetToCloudinary,
+  uploadInputCls,
 } from '@/components/settings/settings-utils'
 import { replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
+import type { UploadingState } from '@/components/settings/types'
 import type { Profile, ResumeContactLink } from '@/types/profile'
 
 export default function ResumeMastheadSection({
   profile,
   setProfile,
+  uploading,
+  setUploading,
+  setError,
 }: {
   profile: Profile
   setProfile: React.Dispatch<React.SetStateAction<Profile>>
+  uploading: UploadingState
+  setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
+  setError: React.Dispatch<React.SetStateAction<string | null>>
 }) {
   const resume = resumeOf(profile)
   const { contact } = resume
+
+  // An empty `resume.photo` means "inherit". Mirroring the full chain `/cv` resolves at
+  // render time means this preview shows what will actually print, not what is stored.
+  const inheritsAvatar = !resume.photo
+  const effectivePhoto = resume.photo || profile.avatar || CV_FALLBACK_PHOTO
+
+  const addLink = () =>
+    updateResume(setProfile, r => ({
+      ...r,
+      contact: { ...r.contact, links: [...r.contact.links, { label: '', text: '', href: '' }] },
+    }))
 
   const updateLink = (idx: number, patch: Partial<ResumeContactLink>) => {
     updateResume(setProfile, r => ({
@@ -31,7 +56,7 @@ export default function ResumeMastheadSection({
   }
 
   return (
-    <Section title='CV Masthead' badge='name, role, contact'>
+    <Section id='cv-masthead' title='CV Masthead' badge='name, role, contact' defaultOpen>
       <div className='space-y-4'>
         <p className={helpTextCls}>
           Printed at the top of <strong>/cv</strong>. The vertical pipes between contact items use
@@ -57,13 +82,83 @@ export default function ResumeMastheadSection({
               onChange={e => updateResume(setProfile, r => ({ ...r, role: e.target.value }))}
             />
           </div>
-          <div className='space-y-2 md:col-span-2'>
-            <label className={labelCls}>Photo URL</label>
-            <input
-              className={inputCls}
-              value={resume.photo}
-              onChange={e => updateResume(setProfile, r => ({ ...r, photo: e.target.value }))}
+        </div>
+
+        <div className={itemCardCls}>
+          <div className='flex items-center justify-between gap-3'>
+            <label className={labelCls}>CV photo</label>
+            {uploading.cvPhoto ? <Spinner className='text-pp-muted' /> : null}
+          </div>
+          <p className={helpTextCls}>
+            Defaults to your profile avatar. Upload one here only when the printed CV should use a
+            different picture — it is cropped to a circle, so a head-and-shoulders shot works best.
+            Max {MAX_UPLOAD_MB_LABEL} MB, uploads immediately.
+          </p>
+
+          <div className='mt-3 grid grid-cols-1 items-start gap-4 md:grid-cols-[auto_minmax(0,1fr)]'>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={effectivePhoto}
+              alt='CV photo preview'
+              className='h-24 w-24 rounded-full border-2 border-pp-text object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]'
             />
+
+            <div className='space-y-3'>
+              <input
+                type='file'
+                aria-label='Upload CV photo'
+                accept='image/*'
+                disabled={uploading.cvPhoto}
+                className={uploadInputCls}
+                onChange={async e => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (!file) return
+                  if (file.size > MAX_UPLOAD_BYTES) {
+                    setError(`Image must be ${MAX_UPLOAD_MB_LABEL} MB or smaller`)
+                    return
+                  }
+                  setError(null)
+                  setUploading(u => ({ ...u, cvPhoto: true }))
+                  try {
+                    const url = await uploadAssetToCloudinary(file, 'cv-photo')
+                    updateResume(setProfile, r => ({ ...r, photo: url }))
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Upload failed')
+                  } finally {
+                    setUploading(u => ({ ...u, cvPhoto: false }))
+                  }
+                }}
+              />
+
+              <div className='space-y-2'>
+                <label className={labelCls}>Photo URL</label>
+                <input
+                  className={inputCls}
+                  value={resume.photo}
+                  placeholder={profile.avatar || 'Leave empty to use your profile avatar'}
+                  onChange={e => updateResume(setProfile, r => ({ ...r, photo: e.target.value }))}
+                />
+              </div>
+
+              <div className='flex flex-wrap items-center gap-2'>
+                <button
+                  type='button'
+                  className={ghostBtnCls}
+                  disabled={inheritsAvatar}
+                  onClick={() => updateResume(setProfile, r => ({ ...r, photo: '' }))}
+                >
+                  Use profile avatar
+                </button>
+                <span className={helpTextCls}>
+                  {inheritsAvatar
+                    ? profile.avatar
+                      ? 'Using your profile avatar.'
+                      : 'No profile avatar set — the CV falls back to its bundled photo.'
+                    : 'Using the CV-specific photo above.'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -120,12 +215,7 @@ export default function ResumeMastheadSection({
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              updateResume(setProfile, r => ({
-                ...r,
-                contact: { ...r.contact, links: [...r.contact.links, { label: '', text: '', href: '' }] },
-              }))
-            }
+            onClick={addLink}
           >
             + Add
           </button>
@@ -181,6 +271,10 @@ export default function ResumeMastheadSection({
             </div>
           </div>
         ))}
+
+        {contact.links.length > 0 ? (
+          <AddMoreButton label='+ Add contact link' onClick={addLink} />
+        ) : null}
       </div>
     </Section>
   )

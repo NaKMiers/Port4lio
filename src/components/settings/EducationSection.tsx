@@ -1,6 +1,7 @@
 import React from 'react'
 
 import type { Profile, EducationItem } from '@/types/profile'
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
 import {
   emptyStateCls,
@@ -26,20 +27,18 @@ export default function EducationSection({
     })
   }
 
+  const addEducation = () =>
+    setProfile(p => ({ ...p, education: [...p.education, { schoolName: '', major: '', start: '', end: '' }] }))
+
   return (
-    <Section title='Education' badge='schooling'>
+    <Section id='education' title='Education' badge='schooling'>
       <div className='space-y-4'>
         <div className='flex items-center justify-between'>
           <h2 className='text-sm font-semibold'>Education</h2>
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              setProfile(p => ({
-                ...p,
-                education: [...p.education, { schoolName: '', major: '', start: '', end: '' }],
-              }))
-            }
+            onClick={addEducation}
           >
             + Add
           </button>
@@ -96,6 +95,10 @@ export default function EducationSection({
             </div>
           </div>
         ))}
+
+        {profile.education.length > 0 ? (
+          <AddMoreButton label='+ Add education entry' onClick={addEducation} />
+        ) : null}
       </div>
     </Section>
   )

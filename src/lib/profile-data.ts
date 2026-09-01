@@ -49,12 +49,27 @@ export const loadPublicProfile = unstable_cache(loadPublicProfileUncached, ['pub
   tags: [PUBLIC_PROFILE_CACHE_TAG],
 })
 
-async function loadPublicResumeUncached(): Promise<Resume | undefined> {
+export type PublicResumeSource = {
+  /** Absent when the document has never had a CV block written - see `deriveResume`. */
+  resume: Resume | undefined
+  /** The portfolio avatar, which the CV photo falls back to when it is unset. */
+  avatar: string
+}
+
+async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
   try {
     await connectDatabase()
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).select('resume').lean()
-    const raw = (doc as Record<string, unknown> | null)?.resume
-    return raw && typeof raw === 'object' ? normalizeResume(raw) : undefined
+    // `avatar` rides along on the same query: the CV masthead inherits it whenever no
+    // CV-specific photo was uploaded, and a second round trip for one string would only
+    // add a way for the two reads to disagree.
+    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).select('resume avatar').lean()
+    const record = doc as Record<string, unknown> | null
+    const raw = record?.resume
+
+    return {
+      resume: raw && typeof raw === 'object' ? normalizeResume(raw) : undefined,
+      avatar: typeof record?.avatar === 'string' ? record.avatar : '',
+    }
   } catch (error) {
     console.error('Failed to load resume from MongoDB.', error)
     throw new PublicProfileDataError('Failed to load resume from MongoDB.', { cause: error })
@@ -66,7 +81,8 @@ async function loadPublicResumeUncached(): Promise<Resume | undefined> {
  *
  * Kept off the public profile allowlist on purpose: `/cv` renders these contact details
  * as a page - as it always has - but they are never served as machine-readable JSON,
- * which is what makes them cheap to harvest at scale.
+ * which is what makes them cheap to harvest at scale. `avatar` is on the allowlist
+ * already, so including it here exposes nothing new.
  */
 export const loadPublicResume = unstable_cache(loadPublicResumeUncached, ['public-resume'], {
   revalidate: PUBLIC_PROFILE_REVALIDATE_SECONDS,

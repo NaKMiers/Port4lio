@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { getAuthCookieName, verifyAuthToken } from '@/lib/auth'
+import { hasOwnerAccess } from '@/lib/admin-gate'
+import { getAuthCookieName } from '@/lib/auth'
 import { connectDatabase } from '@/lib/mongodb'
 import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
 
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const authCookie = request.cookies.get(getAuthCookieName())?.value
-    if (!verifyAuthToken(authCookie)) {
+    if (!hasOwnerAccess(authCookie)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

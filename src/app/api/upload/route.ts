@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { getAuthCookieName, verifyAuthToken } from '@/lib/auth'
+import { hasOwnerAccess } from '@/lib/admin-gate'
+import { getAuthCookieName } from '@/lib/auth'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
 
-const ALLOWED_KINDS = new Set(['avatar', 'background', 'cv', 'project'])
+const ALLOWED_KINDS = new Set(['avatar', 'background', 'cv', 'cv-photo', 'project'])
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,6 +25,12 @@ function resolveUploadFolder(
 
   if (kind === 'cv') {
     return { folder: 'portfolio/cv' }
+  }
+
+  // Its own folder rather than sharing `portfolio/avatar`: the printed CV photo is
+  // cropped to a circle at a fixed size and is often not the same picture as the hero.
+  if (kind === 'cv-photo') {
+    return { folder: 'portfolio/cv/photo' }
   }
 
   if (typeof projectIndex !== 'string' || !/^\d+$/.test(projectIndex)) {
@@ -50,7 +57,7 @@ function toUploadError(error: unknown): { status: number; message: string } {
 
 export async function POST(request: NextRequest) {
   const authCookie = request.cookies.get(getAuthCookieName())?.value
-  if (!verifyAuthToken(authCookie)) {
+  if (!hasOwnerAccess(authCookie)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -61,7 +68,7 @@ export async function POST(request: NextRequest) {
 
     if (typeof kind !== 'string' || !ALLOWED_KINDS.has(kind)) {
       return NextResponse.json(
-        { error: 'Invalid or missing kind (avatar | background | cv | project)' },
+        { error: 'Invalid or missing kind (avatar | background | cv | cv-photo | project)' },
         { status: 400 }
       )
     }

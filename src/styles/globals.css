@@ -237,8 +237,28 @@
     scrollbar-width: none; /* Firefox */
   }
 
+  /**
+   * Clips decorative overflow (the corner art, the blur circles) without becoming a
+   * scroll container.
+   *
+   * `overflow: hidden` looks equivalent but is not: it establishes a scrollport, and
+   * `position: sticky` anchors to its nearest scrollport rather than to the viewport. Since
+   * these wrappers are as tall as their content and `<html>` does the actual scrolling,
+   * a sticky descendant got a scrollport that never scrolls - so it never stuck. `clip`
+   * clips identically and establishes no scrollport, which is what keeps the settings
+   * editor's preview rail pinned while the page scrolls.
+   *
+   * `hidden` first as the fallback for browsers without `clip`; they lose sticky, not layout.
+   */
+  .clip-decorations {
+    overflow: hidden;
+    overflow: clip;
+  }
+
   .page {
-    @apply w-full min-h-screen overflow-hidden;
+    @apply w-full min-h-screen;
+    overflow: hidden;
+    overflow: clip;
   }
   .h1 {
     @apply text-[35px] leading-tight md:text-[60px] md:leading-[1.3] mb-8 font-semibold;

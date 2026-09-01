@@ -2,7 +2,8 @@ import { revalidateTag } from 'next/cache'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-import { getAuthCookieName, verifyAuthToken } from '@/lib/auth'
+import { hasOwnerAccess } from '@/lib/admin-gate'
+import { getAuthCookieName } from '@/lib/auth'
 import { connectDatabase } from '@/lib/mongodb'
 import { loadPublicProfile, PUBLIC_PROFILE_CACHE_TAG } from '@/lib/profile-data'
 import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     await connectDatabase()
 
     const authCookie = request.cookies.get(getAuthCookieName())?.value
-    if (!verifyAuthToken(authCookie)) {
+    if (!hasOwnerAccess(authCookie)) {
       return jsonError('Unauthorized', 401)
     }
 

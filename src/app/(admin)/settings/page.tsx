@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import AboutSection from '@/components/settings/AboutSection'
 import BasicsSection from '@/components/settings/BasicsSection'
@@ -9,14 +9,16 @@ import EducationSection from '@/components/settings/EducationSection'
 import ExperienceSection from '@/components/settings/ExperienceSection'
 import IconPickerModal from '@/components/settings/IconPickerModal'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
-import ProfilePreviewPanel from '@/components/settings/ProfilePreviewPanel'
 import ProjectsSection from '@/components/settings/ProjectsSection'
 import ResumeBlocksSection from '@/components/settings/ResumeBlocksSection'
 import ResumeMastheadSection from '@/components/settings/ResumeMastheadSection'
 import ResumeProjectsSection from '@/components/settings/ResumeProjectsSection'
 import ResumeSkillsSection from '@/components/settings/ResumeSkillsSection'
+import { SectionOpenProvider } from '@/components/settings/SectionOpenContext'
+import PreviewRail from '@/components/settings/preview/PreviewRail'
 import ServicesSection from '@/components/settings/ServicesSection'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
+import SettingLoadError from '@/components/settings/SettingLoadError'
 import SettingLoading from '@/components/settings/SettingLoading'
 import SettingToolbar from '@/components/settings/SettingToolbar'
 import SkillsSection from '@/components/settings/SkillsSection'
@@ -28,15 +30,25 @@ import { cleanProfileForSave } from '@/components/settings/cleanProfileForSave'
 import {
   makeMockProfile,
 } from '@/components/settings/settings-utils'
-import type { IconPickerTarget, UploadingState } from '@/components/settings/types'
+import type { IconPickerTarget, SettingTabId, UploadingState } from '@/components/settings/types'
 import { useApp } from '@/context/AppContext'
-import { normalizeProfile } from '@/lib/profile'
+import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
 import { deriveResume } from '@/lib/resume-view-model'
 import { MAX_PROFILE_JSON_BYTES } from '@/lib/upload-limits'
 import type { Profile, ServiceItem } from '@/types/profile'
 import { getIconCatalog } from '@/utils/iconResolver'
 
-type SettingTabId = 'profile' | 'career' | 'offering' | 'cv'
+/** Remembered so a wide-screen setup does not have to be re-chosen every visit. */
+const FULL_WIDTH_STORAGE_KEY = 'portfolio:settings:full-width'
+
+function readStoredFullWidth(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(FULL_WIDTH_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 const SETTING_TABS: TabItem[] = [
   { id: 'profile', label: 'Profile', count: 4 },
@@ -46,11 +58,33 @@ const SETTING_TABS: TabItem[] = [
 ]
 
 export default function SettingPage() {
-  const { profile: appProfile, setProfile: setAppProfile } = useApp()
+  const { refetchProfile } = useApp()
 
-  if (!appProfile) return <SettingLoading />
+  // The gate sits above everything that needs profile data on purpose. Nested inside the
+  // editor, it was unreachable: an unauthenticated visit gets 401 from
+  // `/api/admin/profile`, `AppContext` turns that into `profile: null` without an error,
+  // and the page fell through to a spinner that nothing could ever clear.
+  return (
+    <OwnerAuthGate onAuthed={() => void refetchProfile({ blocking: true })}>
+      <SettingEditorGate />
+    </OwnerAuthGate>
+  )
+}
 
-  return <SettingEditor appProfile={appProfile} setAppProfile={setAppProfile} />
+function SettingEditorGate() {
+  const { profile, setProfile, loading, error, refetchProfile } = useApp()
+
+  if (loading) return <SettingLoading />
+  if (error) {
+    return (
+      <SettingLoadError message={error} onRetry={() => void refetchProfile({ blocking: true })} />
+    )
+  }
+
+  // A 200 carrying `profile: null` means the document does not exist yet. Open an empty
+  // editor so the first save can create it, rather than blocking on data that will never
+  // arrive.
+  return <SettingEditor appProfile={profile ?? makeEmptyProfile()} setAppProfile={setProfile} />
 }
 
 interface SettingEditorProps {
@@ -68,14 +102,24 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
     return { ...normalized, resume: deriveResume(normalized) }
   })
   const [tab, setTab] = useState<SettingTabId>('profile')
+  const [fullWidth, setFullWidth] = useState(readStoredFullWidth)
   const [iconPickerTarget, setIconPickerTarget] = useState<IconPickerTarget>(null)
   const [iconQuery, setIconQuery] = useState('')
   const [uploading, setUploading] = useState<UploadingState>({
     avatar: false,
     background: false,
     cv: false,
+    cvPhoto: false,
     projects: {},
   })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FULL_WIDTH_STORAGE_KEY, JSON.stringify(fullWidth))
+    } catch {
+      // A blocked or full storage quota costs the preference, nothing more.
+    }
+  }, [fullWidth])
 
   const preview = useMemo(() => {
     const bg = profile.backgroundImage || ''
@@ -163,36 +207,51 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   }
 
   return (
-    <OwnerAuthGate>
-      <div className='portfolio-public-root relative z-50 min-h-screen overflow-hidden pt-12 text-pp-text'>
-        <div className='pointer-events-none absolute inset-0 pp-grid-wash opacity-60' />
-        <div className='pointer-events-none absolute -left-16 top-32 h-48 w-48 rounded-full bg-pp-orange/15 blur-3xl' />
-        <div className='pointer-events-none absolute right-0 top-20 h-64 w-64 rounded-full bg-pp-blue/10 blur-3xl' />
-        <div className='pointer-events-none absolute bottom-12 left-1/3 h-52 w-52 rounded-full bg-pp-pink/10 blur-3xl' />
+    <div className='portfolio-public-root relative z-50 min-h-screen clip-decorations pt-12 text-pp-text'>
+      <div className='pointer-events-none absolute inset-0 pp-grid-wash opacity-60' />
+      <div className='pointer-events-none absolute -left-16 top-32 h-48 w-48 rounded-full bg-pp-orange/15 blur-3xl' />
+      <div className='pointer-events-none absolute right-0 top-20 h-64 w-64 rounded-full bg-pp-blue/10 blur-3xl' />
+      <div className='pointer-events-none absolute bottom-12 left-1/3 h-52 w-52 rounded-full bg-pp-pink/10 blur-3xl' />
 
-        <div className='relative mx-auto max-w-editorial px-gutter py-10 md:py-12'>
-          <SettingToolbar
-            saving={saving}
-            uploading={uploading}
-            onFillMock={() => {
-              setError(null)
-              setProfile(normalizeProfile(makeMockProfile()))
-            }}
-            onSave={onSave}
-          />
+      {/* `max-w-editorial` matches the public site's column. Dropping the class entirely
+          rather than swapping in `max-w-none` keeps this working regardless of which
+          utilities Tailwind happened to generate. */}
+      <div
+        className={`relative mx-auto px-gutter py-10 md:py-12 ${
+          fullWidth ? '' : 'max-w-editorial'
+        }`}
+      >
+        <SettingToolbar
+          saving={saving}
+          uploading={uploading}
+          fullWidth={fullWidth}
+          onToggleFullWidth={() => setFullWidth(value => !value)}
+          onFillMock={() => {
+            setError(null)
+            setProfile(normalizeProfile(makeMockProfile()))
+          }}
+          onSave={onSave}
+        />
 
-          <SettingErrorBanner message={error} />
+        <SettingErrorBanner message={error} />
 
-          <TabNav
-            tabs={SETTING_TABS}
-            activeId={tab}
-            onChange={id => setTab(id as SettingTabId)}
-            ariaLabel='Profile editor sections'
-          />
+        <TabNav
+          tabs={SETTING_TABS}
+          activeId={tab}
+          onChange={id => setTab(id as SettingTabId)}
+          ariaLabel='Profile editor sections'
+        />
 
-          <div className='grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-8'>
+        <SectionOpenProvider>
+          <div
+            className={`grid grid-cols-1 gap-6 xl:gap-8 ${
+              tab === 'cv'
+                ? 'xl:grid-cols-[minmax(0,1fr)_460px]'
+                : 'xl:grid-cols-[minmax(0,1fr)_380px]'
+            }`}
+          >
             {/* Every tab writes into the same `profile` state, so switching tabs never
-                discards an unsaved edit - only the section cards unmount. */}
+              discards an unsaved edit - only the section cards unmount. */}
             <div className='space-y-5'>
               {tab === 'profile' ? (
                 <>
@@ -248,7 +307,13 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
 
               {tab === 'cv' ? (
                 <>
-                  <ResumeMastheadSection profile={profile} setProfile={setProfile} />
+                  <ResumeMastheadSection
+                    profile={profile}
+                    setProfile={setProfile}
+                    uploading={uploading}
+                    setUploading={setUploading}
+                    setError={setError}
+                  />
                   <ResumeBlocksSection profile={profile} setProfile={setProfile} />
                   <ResumeSkillsSection profile={profile} setProfile={setProfile} />
                   <ResumeProjectsSection profile={profile} setProfile={setProfile} />
@@ -257,23 +322,23 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
             </div>
 
             <div className='xl:pl-2'>
-              <ProfilePreviewPanel profile={profile} preview={preview} />
+              <PreviewRail tab={tab} profile={profile} />
             </div>
           </div>
+        </SectionOpenProvider>
 
-          <IconPickerModal
-            open={!!iconPickerTarget}
-            iconQuery={iconQuery}
-            onQueryChange={setIconQuery}
-            filteredIcons={filteredIcons}
-            onSelect={applyIconCode}
-            onClose={() => {
-              setIconPickerTarget(null)
-              setIconQuery('')
-            }}
-          />
-        </div>
+        <IconPickerModal
+          open={!!iconPickerTarget}
+          iconQuery={iconQuery}
+          onQueryChange={setIconQuery}
+          filteredIcons={filteredIcons}
+          onSelect={applyIconCode}
+          onClose={() => {
+            setIconPickerTarget(null)
+            setIconQuery('')
+          }}
+        />
       </div>
-    </OwnerAuthGate>
+    </div>
   )
 }

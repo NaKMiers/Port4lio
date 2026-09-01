@@ -1,6 +1,7 @@
 import React from 'react'
 
 import type { Profile, ExperienceItem } from '@/types/profile'
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
 import {
   emptyStateCls,
@@ -26,20 +27,18 @@ export default function ExperienceSection({
     })
   }
 
+  const addExperience = () =>
+    setProfile(p => ({ ...p, experience: [...p.experience, { companyName: '', position: '', start: '', end: '' }] }))
+
   return (
-    <Section title='Experience' badge='work history'>
+    <Section id='experience' title='Experience' badge='work history'>
       <div className='space-y-4'>
         <div className='flex items-center justify-between'>
           <h2 className='text-sm font-semibold'>Experience</h2>
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              setProfile(p => ({
-                ...p,
-                experience: [...p.experience, { companyName: '', position: '', start: '', end: '' }],
-              }))
-            }
+            onClick={addExperience}
           >
             + Add
           </button>
@@ -100,6 +99,10 @@ export default function ExperienceSection({
             </div>
           </div>
         ))}
+
+        {profile.experience.length > 0 ? (
+          <AddMoreButton label='+ Add experience item' onClick={addExperience} />
+        ) : null}
       </div>
     </Section>
   )

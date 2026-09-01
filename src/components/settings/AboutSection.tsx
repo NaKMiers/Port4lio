@@ -12,7 +12,7 @@ export default function AboutSection({
   setProfile: React.Dispatch<React.SetStateAction<Profile>>
 }) {
   return (
-    <Section title='About Me' badge='story'>
+    <Section id='about' title='About Me' badge='story'>
       <div className='space-y-2'>
         <label className={labelCls}>About Me</label>
         <textarea

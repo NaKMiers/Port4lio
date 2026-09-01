@@ -6,25 +6,48 @@ import type { UploadingState } from '@/components/settings/types'
 export default function SettingToolbar({
   saving,
   uploading,
+  fullWidth,
+  onToggleFullWidth,
   onFillMock,
   onSave,
 }: {
   saving: boolean
   uploading: UploadingState
+  /** Whether the editor is running edge to edge rather than inside the editorial column. */
+  fullWidth: boolean
+  onToggleFullWidth: () => void
   onFillMock: () => void
   onSave: () => void
 }) {
+  // Save is disabled while any of these run, so a URL cannot be saved before Cloudinary
+  // has returned it. Every new upload kind has to be listed here.
   const hasUploads =
     uploading.avatar ||
     uploading.background ||
     uploading.cv ||
+    uploading.cvPhoto ||
     Object.values(uploading.projects).some(Boolean)
 
   return (
-    <div className='mb-6 rounded-[2rem] border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(255,250,246,0.78))] p-6 shadow-panel backdrop-blur-md sm:p-7'>
+    <div className='relative mb-6 rounded-[2rem] border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(255,250,246,0.78))] p-6 shadow-panel backdrop-blur-md sm:p-7'>
+      {/* Top-right of this block, out of the way of the copy underneath. The editor is
+          normally held to the same editorial column width as the public site; on a wide
+          screen the forms and the preview rail both benefit from dropping that. */}
+      <button
+        type='button'
+        onClick={onToggleFullWidth}
+        aria-pressed={fullWidth}
+        title={fullWidth ? 'Return to the editorial column width' : 'Use the full browser width'}
+        className='absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-pp-line bg-white/86 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_10px_24px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white sm:right-5 sm:top-5'
+      >
+        <span aria-hidden>{fullWidth ? '⇥⇤' : '⇤⇥'}</span>
+        {fullWidth ? 'Shrink' : 'Extend'}
+      </button>
+
       <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
         <div className='max-w-3xl space-y-3'>
-          <div className='flex flex-wrap items-center gap-2.5'>
+          {/* Right padding keeps the badges from sliding under the Extend button. */}
+          <div className='flex flex-wrap items-center gap-2.5 pr-24'>
             <span className='rounded-full border border-pp-line bg-white/82 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
               Portfolio control room
             </span>

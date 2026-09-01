@@ -1,6 +1,7 @@
 import React from 'react'
 
 import type { Profile, SocialLink } from '@/types/profile'
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
 import type { IconPickerTarget } from '@/components/settings/types'
 import {
@@ -31,14 +32,17 @@ export default function SocialsSection({
     })
   }
 
+  const addSocial = () =>
+    setProfile(p => ({ ...p, socials: [...p.socials, { name: '', icon: '', link: '' }] }))
+
   return (
-    <Section title='Social Links' badge='icons + links'>
+    <Section id='socials' title='Social Links' badge='icons + links'>
       <div className='mb-3 flex items-center justify-between gap-3'>
         <h2 className='text-sm font-semibold'>Socials</h2>
         <button
           type='button'
           className={secondaryBtnCls}
-          onClick={() => setProfile(p => ({ ...p, socials: [...p.socials, { name: '', icon: '', link: '' }] }))}
+          onClick={addSocial}
         >
           + Add
         </button>
@@ -57,22 +61,20 @@ export default function SocialsSection({
               <div className='space-y-2'>
                 <label className={labelCls}>Icon code</label>
                 <div className='flex items-center gap-2'>
-                  <div className={iconPreviewCls}>
+                  <button
+                    type='button'
+                    className={`${iconPreviewCls} transition hover:-translate-y-0.5 hover:border-pp-blue/35`}
+                    onClick={() => setIconPickerTarget({ kind: 'social', socialIndex: idx })}
+                    title='Pick icon'
+                  >
                     {s.icon ? resolveIconFromCode(s.icon, 18) : null}
-                  </div>
+                  </button>
                   <input
                     className={inputCls}
                     value={s.icon}
                     onChange={e => updateSocial(idx, { icon: e.target.value })}
                     placeholder='e.g. fa:FaGithub'
                   />
-                  <button
-                    type='button'
-                    className={secondaryBtnCls}
-                    onClick={() => setIconPickerTarget({ kind: 'social', socialIndex: idx })}
-                  >
-                    Pick
-                  </button>
                 </div>
               </div>
 
@@ -98,6 +100,9 @@ export default function SocialsSection({
             </div>
           </div>
         ))}
+        {profile.socials.length > 0 ? (
+          <AddMoreButton label='+ Add social link' onClick={addSocial} />
+        ) : null}
       </div>
     </Section>
   )

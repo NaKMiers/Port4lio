@@ -152,13 +152,34 @@ yarn dev
 Create a `.env.local` file in the root directory:
 
 ```env
-# Email Configuration (Required for contact form)
+# Database - the profile is one document, addressed by id
+MONGODB_URI=mongodb+srv://...
+PROFILE_DOCUMENT_ID=your-profile-id
+
+# Owner gate for /settings and /publish. HMAC key for both the auth cookie and the
+# login-code hash, so treat it like a password, not a label.
+AUTH_SECRET=long-random-string
+
+# Email (login codes + contact form)
 MAIL=your-email@gmail.com
 MAIL_APP_PASSWORD=your-app-password
 MAIL_TO=recipient@email.com
 
-# Optional: Analytics or other services
-NEXT_PUBLIC_GA_ID=your-google-analytics-id
+# Media uploads
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+
+# Bearer token for the /api/publish/* endpoints
+PUBLISH_TOKEN=long-random-string
+
+# Public site origin, used in canonical URLs, JSON-LD and email footers
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+
+# Set to false to skip the emailed login code while working locally, so the editor opens
+# without a round trip through Gmail. Ignored in production builds on purpose: a stale
+# value must not be able to unlock the live editor or the profile-write APIs.
+REQUIRE_ADMIN=true
 ```
 
 ## 📜 Available Scripts

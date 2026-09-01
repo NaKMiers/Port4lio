@@ -1,6 +1,7 @@
 import React from 'react'
 
 import type { Profile, Certificate } from '@/types/profile'
+import AddMoreButton from '@/components/settings/AddMoreButton'
 import Section from '@/components/settings/Section'
 import {
   emptyStateCls,
@@ -26,17 +27,18 @@ export default function CertificatesSection({
     })
   }
 
+  const addCertificates = () =>
+    setProfile(p => ({ ...p, certificates: [...p.certificates, { name: '', link: '' }] }))
+
   return (
-    <Section title='Certificates' badge='links & names'>
+    <Section id='certificates' title='Certificates' badge='links & names'>
       <div className='space-y-4'>
         <div className='flex items-center justify-between'>
           <h2 className='text-sm font-semibold'>Certificates</h2>
           <button
             type='button'
             className={secondaryBtnCls}
-            onClick={() =>
-              setProfile(p => ({ ...p, certificates: [...p.certificates, { name: '', link: '' }] }))
-            }
+            onClick={addCertificates}
           >
             + Add
           </button>
@@ -76,6 +78,10 @@ export default function CertificatesSection({
             </div>
           </div>
         ))}
+
+        {profile.certificates.length > 0 ? (
+          <AddMoreButton label='+ Add certificate' onClick={addCertificates} />
+        ) : null}
       </div>
     </Section>
   )

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { renderContactEmail } from '@/lib/email-templates'
 import { sendMail } from '@/lib/mailer'
 import { getRequiredEnv } from '@/lib/required-env'
 
@@ -23,19 +24,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Please complete all contact form fields.' }, { status: 400 })
   }
 
+  const senderEmail = email.trim()
+
   try {
-    await sendMail(
-      getRequiredEnv('MAIL_TO'),
-      subject.trim(),
-      `
-        <div>
-          <h1>Portfolio: anhkhoa.site</h1>
-          <p>From: ${email.trim()}</p>
-          <p>Name: ${firstname.trim()} ${lastname.trim()}</p>
-          <p>Message: ${message.trim()}</p>
-        </div>
-      `
-    )
+    // The renderer escapes every one of these - they are anonymous visitor input, and
+    // they used to be interpolated into the email HTML raw.
+    const rendered = renderContactEmail({
+      email: senderEmail,
+      firstname: firstname.trim(),
+      lastname: lastname.trim(),
+      subject: subject.trim(),
+      message: message.trim(),
+    })
+
+    await sendMail({
+      to: getRequiredEnv('MAIL_TO'),
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      // Replying to the notification should reach the visitor, not the no-reply mailbox.
+      replyTo: senderEmail,
+    })
 
     return NextResponse.json({ ok: true })
   } catch (error) {
