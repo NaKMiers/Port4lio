@@ -13,7 +13,7 @@
     "clean": "rm -rf .next node_modules package-lock.json bun.lock",
     "typecheck": "tsc --noEmit",
     "test": "vitest run && npm run test:e2e",
-    "test:api": "vitest run tests/api",
+    "test:api": "vitest run tests/api --passWithNoTests",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium"

@@ -44,5 +44,11 @@ jobs:
       # Unit + API only. Playwright is deliberately not run here: it needs a
       # browser install and a booted dev server, and `tests/e2e` is empty. Add
       # a second job when there is an E2E suite worth the ~2 minutes.
+      #
+      # `test:api` carries `--passWithNoTests`. `tests/api/` does not exist yet, and
+      # without the flag vitest exits 1 on an empty match - which made this step fail
+      # every run while `test:unit` passed, so the job was red for a reason that had
+      # nothing to do with the code. The step stays in place so API tests run
+      # automatically the day someone adds the first one.
       - name: Unit and API tests
         run: npm run test:unit && npm run test:api
