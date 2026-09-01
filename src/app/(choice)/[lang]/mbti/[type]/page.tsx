@@ -8,7 +8,7 @@ import { GROUP_ACCENT } from '@/components/mbti/type-accent'
 import { EditorialPanel } from '@/components/portfolio/primitives/EditorialPanel'
 import { SectionFrame } from '@/components/portfolio/primitives/SectionFrame'
 import { isLocale, LOCALES } from '@/lib/i18n'
-import { getTypeContent, UI } from '@/lib/mbti/content'
+import { getCareerContent, getTypeContent, UI } from '@/lib/mbti/content'
 import { getResultPrice } from '@/lib/mbti/pricing'
 import {
   alternateLanguages,
@@ -101,6 +101,7 @@ export default async function MbtiTypePage({
   const siblings = typesInGroup(group).filter(other => other !== type)
   const letters = lettersOf(lang, type)
   const stack = functionStack(type)
+  const careers = getCareerContent(lang, type)
   const faqs = typeFaqEntries(lang, type)
 
   /**
@@ -112,6 +113,7 @@ export default async function MbtiTypePage({
     { id: 'letters', label: copy.lettersTitle },
     { id: 'functions', label: copy.functionsTitle },
     { id: 'strengths', label: copy.strengths },
+    { id: 'careers', label: copy.careersTitle },
     { id: 'relationships', label: copy.inRelationships },
     { id: 'faq', label: copy.faqTitle },
   ]
@@ -314,7 +316,61 @@ export default async function MbtiTypePage({
           </EditorialPanel>
         </div>
 
-        <EditorialPanel id='relationships' variant='default' className='mt-4 scroll-mt-24 p-6'>
+        {/*
+          Careers. Hand-written per type, unlike the letters and functions above - a role
+          list that could belong to any of the sixteen types is precisely what the
+          helpful-content system demotes, and "nghề nghiệp phù hợp với <type>" is the
+          highest-intent query these pages can answer.
+        */}
+        <section id='careers' aria-labelledby='careers-heading' className='mt-12 scroll-mt-24'>
+          <h2
+            id='careers-heading'
+            className='font-display text-xl font-semibold tracking-tight text-pp-text'
+          >
+            {copy.careersTitle}
+          </h2>
+          <p className='mt-3 text-pp-muted'>{careers.workStyle}</p>
+
+          <EditorialPanel variant='strong' className='mt-5 p-6'>
+            <h3 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+              {copy.careersRoles}
+            </h3>
+            <ul className='mt-4 grid gap-2.5 sm:grid-cols-2'>
+              {careers.roles.map(role => (
+                <li key={role} className='flex gap-3 text-sm leading-relaxed text-pp-muted'>
+                  <span
+                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${accent.dot}`}
+                    aria-hidden
+                  />
+                  {role}
+                </li>
+              ))}
+            </ul>
+          </EditorialPanel>
+
+          <div className='mt-4 grid gap-4 md:grid-cols-2'>
+            <EditorialPanel variant='default' className='p-6'>
+              <h3 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+                {copy.careersThrives}
+              </h3>
+              <p className='mt-3 text-sm leading-relaxed text-pp-muted'>{careers.thrivesIn}</p>
+            </EditorialPanel>
+            <EditorialPanel variant='default' className='p-6'>
+              <h3 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+                {copy.careersDrains}
+              </h3>
+              <p className='mt-3 text-sm leading-relaxed text-pp-muted'>{careers.drainedBy}</p>
+            </EditorialPanel>
+          </div>
+
+          {/* Directly under the list, not buried in a footer. */}
+          <p className='mt-4 flex gap-3 rounded-panel border border-[rgba(255,159,64,0.3)] bg-[rgba(255,159,64,0.07)] p-5 text-sm leading-relaxed text-pp-muted'>
+            <span className='mt-1.5 h-2 w-2 shrink-0 rounded-full bg-pp-orange' aria-hidden />
+            {copy.careersCaveat}
+          </p>
+        </section>
+
+        <EditorialPanel id='relationships' variant='default' className='mt-12 scroll-mt-24 p-6'>
           <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
             {copy.inRelationships}
           </h2>

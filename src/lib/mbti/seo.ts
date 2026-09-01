@@ -1,5 +1,5 @@
 import { LOCALES, type Locale } from '@/lib/i18n'
-import { getTypeContent } from '@/lib/mbti/content'
+import { getCareerContent, getTypeContent } from '@/lib/mbti/content'
 import { getResultPrice } from '@/lib/mbti/pricing'
 import { QUESTION_COUNT } from '@/lib/mbti/questions'
 import { FUNCTION_COPY, functionStack, lettersOf } from '@/lib/mbti/theory'
@@ -329,6 +329,7 @@ export function faqEntries(locale: Locale, price: number): { q: string; a: strin
  */
 export function typeFaqEntries(locale: Locale, type: MbtiType): { q: string; a: string }[] {
   const content = getTypeContent(locale, type)
+  const careers = getCareerContent(locale, type)
   const letters = lettersOf(locale, type)
   const stack = functionStack(type)
   const dominant = FUNCTION_COPY[locale][stack[0].fn]
@@ -355,6 +356,10 @@ export function typeFaqEntries(locale: Locale, type: MbtiType): { q: string; a: 
         a: `${content.growth.slice(0, 3).join('; ')}.`,
       },
       {
+        q: `Nghề nghiệp nào phù hợp với ${type}?`,
+        a: `${careers.roles.slice(0, 5).join(', ')}. ${careers.workStyle} Đây là xu hướng chứ không phải chỉ định - nhóm tính cách không quyết định bạn làm được nghề gì.`,
+      },
+      {
         q: `${type} trong các mối quan hệ thì thế nào?`,
         a: content.inRelationships,
       },
@@ -379,6 +384,10 @@ export function typeFaqEntries(locale: Locale, type: MbtiType): { q: string; a: 
       // sounds ("an ENTJ", "an INFJ"), so there is no case here that takes "a".
       q: `What should an ${type} watch out for?`,
       a: `${content.growth.slice(0, 3).join('; ')}.`,
+    },
+    {
+      q: `What careers suit ${type}?`,
+      a: `${careers.roles.slice(0, 5).join(', ')}. ${careers.workStyle} These are tendencies rather than prescriptions - your type does not decide what you are capable of.`,
     },
     {
       q: `What is ${type} like in relationships?`,

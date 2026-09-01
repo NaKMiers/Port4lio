@@ -1,6 +1,8 @@
+import { CAREERS_EN } from '@/lib/mbti/content/careers.en'
+import { CAREERS_VI } from '@/lib/mbti/content/careers.vi'
 import { QUESTIONS_EN } from '@/lib/mbti/content/questions.en'
 import { QUESTIONS_VI } from '@/lib/mbti/content/questions.vi'
-import type { QuestionContent, TypeContent } from '@/lib/mbti/content/types'
+import type { CareerContent, QuestionContent, TypeContent } from '@/lib/mbti/content/types'
 import { TYPES_EN } from '@/lib/mbti/content/types.en'
 import { TYPES_VI } from '@/lib/mbti/content/types.vi'
 import type { Locale } from '@/lib/i18n'
@@ -35,6 +37,15 @@ export function getQuestionContent(locale: Locale, id: number): QuestionContent 
 
 export function getTypeContent(locale: Locale, type: MbtiType): TypeContent {
   return TYPE_CONTENT[locale][type]
+}
+
+const CAREER_CONTENT: Record<Locale, Record<MbtiType, CareerContent>> = {
+  vi: CAREERS_VI,
+  en: CAREERS_EN,
+}
+
+export function getCareerContent(locale: Locale, type: MbtiType): CareerContent {
+  return CAREER_CONTENT[locale][type]
 }
 
 /**
@@ -78,6 +89,16 @@ export const UI = {
     functionsTitle: 'Hàm nhận thức',
     functionsLead:
       'Theo lý thuyết MBTI, mỗi nhóm tính cách dùng bốn hàm nhận thức theo một thứ tự cố định. Thứ tự này giải thích vì sao hai nhóm chỉ khác một chữ cái lại vận hành rất khác nhau.',
+    careersTitle: 'Công việc và nghề nghiệp',
+    careersRoles: 'Những vị trí thường phù hợp',
+    careersThrives: 'Bạn phát huy tốt nhất khi',
+    careersDrains: 'Điều dễ làm bạn kiệt sức',
+    /**
+     * Đặt ngay dưới danh sách nghề, không giấu ở cuối trang. Một trang gợi ý nghề nghiệp mà
+     * không nói rõ giới hạn của nó thì đang bán một sự chắc chắn không có thật.
+     */
+    careersCaveat:
+      'Đây là xu hướng, không phải chỉ định. Nhóm tính cách không quyết định bạn làm được nghề gì - kỹ năng, hoàn cảnh và điều bạn thực sự quan tâm quan trọng hơn nhiều. Hãy dùng danh sách này để hiểu vì sao một số môi trường khiến bạn dễ thở hơn, chứ đừng dùng nó để loại bỏ một lựa chọn.',
     groupLabels: {
       NT: 'Nhà phân tích',
       NF: 'Nhà ngoại giao',
@@ -173,6 +194,13 @@ export const UI = {
     functionsTitle: 'Cognitive functions',
     functionsLead:
       'In MBTI theory each type uses four cognitive functions in a fixed order. That order is why two types differing by a single letter can operate so differently.',
+    careersTitle: 'Work and careers',
+    careersRoles: 'Roles that often fit',
+    careersThrives: 'You do your best work when',
+    careersDrains: 'What reliably drains you',
+    /** See the Vietnamese entry: placed under the list, not buried at the foot of the page. */
+    careersCaveat:
+      'These are tendencies, not prescriptions. Your type does not decide what you are capable of - skills, circumstances and what you actually care about matter far more. Use this to understand why some environments feel easier, not to rule an option out.',
     groupLabels: {
       NT: 'Analysts',
       NF: 'Diplomats',
