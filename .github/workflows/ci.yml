@@ -50,5 +50,11 @@ jobs:
       # and the retention promise on `/[lang]/mbti/privacy` rests on exactly that
       # index. The `--passWithNoTests` workaround this step used to carry is gone;
       # `tests/api/` now has tests, so an empty match is a real failure again.
+      #
+      # The mongod version is pinned in package.json (`config.mongodbMemoryServer`).
+      # Left unpinned it resolves to the current release, which is how the suite
+      # became unrunnable locally: mongod 8.2.6 segfaults on start on some hosts, so
+      # the one check that proves the TTL indexes exist silently stopped running.
+      # A pinned version fails the same way everywhere or not at all.
       - name: Unit and API tests
         run: npm run test:unit && npm run test:api

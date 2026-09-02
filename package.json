@@ -18,6 +18,11 @@
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium"
   },
+  "config": {
+    "mongodbMemoryServer": {
+      "version": "7.0.14"
+    }
+  },
   "dependencies": {
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.1.0",
