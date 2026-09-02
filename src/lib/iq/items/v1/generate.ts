@@ -1,6 +1,7 @@
-import { rulesForRung } from '@/lib/iq/items/rules'
-import { pick, rng, shuffle, type Item } from '@/lib/iq/items/types'
-import { verifyItem } from '@/lib/iq/items/verify'
+import { ITEM_COUNT } from '@/lib/iq/items/config'
+import { rulesForRung } from '@/lib/iq/items/v1/rules'
+import { pick, rng, shuffle, type Item } from '@/lib/iq/items/v1/types'
+import { verifyItem } from '@/lib/iq/items/v1/verify'
 
 /**
  * One verified item for a rung, from a seed.
@@ -22,8 +23,6 @@ import { verifyItem } from '@/lib/iq/items/verify'
  */
 
 const MAX_ATTEMPTS = 40
-
-export const ITEM_COUNT = 26
 
 export function generateItem(seed: number, rung: number): Item {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {

@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { jsonError } from '@/lib/api-response'
-import { answerIndexFor, generateTest } from '@/lib/iq/items/generate'
+import { answerKeyFor } from '@/lib/iq/items'
 import { InvalidIqAnswersError, parseIqAnswers, scoreIq, withinTimeLimit } from '@/lib/iq/scoring'
 import { connectDatabase } from '@/lib/mongodb'
 import { checkRateLimit, clientIpFrom, IQ_SUBMIT_LIMIT } from '@/lib/rate-limit'
-import { iqEffortWaived } from '@/lib/test-kit/effort'
+import { iqEffortWaived, isEffortWaiverEnabled } from '@/lib/test-kit/effort'
 import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { isTokenShaped } from '@/lib/tokens'
 import { IqAttemptModel } from '@/models/IqAttempt'
@@ -27,9 +27,11 @@ const MAX_BODY_BYTES = 4 * 1024
  *
  * ## The answer key is recomputed, never stored
  *
- * `generateTest(seed)` is deterministic, so the correct answers are derived here from the
- * seed on the attempt row. Nothing in the database is an answer key, which means there is
- * no key to leak - and a taker who somehow read their own row still only has a number.
+ * `answerKeyFor(seed, version)` is deterministic, so the correct answers are derived here
+ * from the seed on the attempt row. Nothing in the database is an answer key, which means
+ * there is no key to leak - and a taker who somehow read their own row still only has two
+ * numbers. The version is the second half of that key: a seed identifies a test only in
+ * combination with the generator that built it.
  *
  * ## Idempotent by design
  *
@@ -93,8 +95,15 @@ export async function POST(request: NextRequest) {
     return jsonError('Time limit exceeded', 403)
   }
 
-  const items = generateTest(attempt.seed)
-  const answerKey = items.map((item, index) => answerIndexFor(item, attempt.seed, index))
+  /**
+   * Scored with the generator this attempt was BUILT by, not the current one.
+   *
+   * `?? 1` rather than trusting the schema default: this route also reads documents back
+   * through `findOneAndUpdate({ lean: true })`, and `lean` skips Mongoose hydration, so a
+   * row written before the field existed comes back with it genuinely absent. Every such
+   * row is version 1 by definition, which is why no backfill is needed.
+   */
+  const answerKey = answerKeyFor(attempt.seed, attempt.generatorVersion ?? 1)
   const result = scoreIq(answers, answerKey)
 
   /**
@@ -103,13 +112,18 @@ export async function POST(request: NextRequest) {
    * Not recomputed at render: the result page, the checkout route and any later audit have
    * to agree about whether this attempt is free, and a threshold edit must never start
    * charging someone who has already been told theirs was waived.
+   *
+   * `EFFORT_WAIVER=false` short-circuits the detector entirely, which stores `waived: false`
+   * and sends even a ninety-second guess to the paywall.
    */
-  const waived = iqEffortWaived({
-    raw: result.raw,
-    answers,
-    startedAt: attempt.startedAt,
-    submittedAt: now,
-  })
+  const waived =
+    isEffortWaiverEnabled() &&
+    iqEffortWaived({
+      raw: result.raw,
+      answers,
+      startedAt: attempt.startedAt,
+      submittedAt: now,
+    })
 
   /**
    * The claim is atomic, and `submittedAt: null` in the FILTER is what makes it so.

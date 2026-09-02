@@ -172,3 +172,36 @@ describe('capability tokens', () => {
     expect(isTokenShaped('a'.repeat(TOKEN_LENGTH - 1) + '+')).toBe(false)
   })
 })
+
+/**
+ * The paywall lead has to survive being read by someone who cannot see their type.
+ *
+ * This is the shape of a bug that shipped: the result page printed the four letters above
+ * the paywall, so the lead opened with "You already know your type" and read fine. The
+ * moment the type went behind the wall - which is where it belongs, the type being the
+ * product - that sentence became a page telling a stranger they knew something the same
+ * page was refusing to show them.
+ *
+ * Copy that presupposes what the gate is withholding cannot be caught by a type checker
+ * and is invisible in review unless the reviewer happens to load a locked result. So it is
+ * asserted, per locale, in both directions: the lead must promise the type and must not
+ * assume it has already been seen.
+ */
+describe('the MBTI paywall lead', () => {
+  it.each(LOCALES)('promises the type rather than assuming it in %s', locale => {
+    const lead = UI[locale].paywallLead.toLowerCase()
+
+    // What is being sold, said out loud - the reader's own four letters.
+    expect(lead).toMatch(/bốn chữ|four-letter/)
+
+    // The presupposition that broke. Matching the phrasings rather than a single string, so
+    // a reworded version of the same mistake still trips this.
+    expect(lead).not.toMatch(/bạn đã biết|you already know|as you know/)
+  })
+
+  it.each(LOCALES)('still interpolates the price in %s', locale => {
+    // The rewrite above touched this string; a lost placeholder would render the paywall
+    // with no number on it.
+    expect(UI[locale].paywallLead).toContain('{price}')
+  })
+})

@@ -36,35 +36,11 @@ export type Item = {
 }
 
 /**
- * Deterministic PRNG (mulberry32).
- *
- * `Math.random` is unusable here: a result page must re-render the exact test somebody
- * sat, and the only thing stored is the seed. Small, fast, and good enough for choosing
- * shapes - this is not cryptography, and the share/result tokens that DO need entropy use
- * `crypto.randomBytes` in `lib/tokens.ts`.
+ * The PRNG moved to `items/random.ts` when the generator was versioned - it is shared by
+ * every version and frozen, so it cannot live in a per-version file. Re-exported here so
+ * the v1 modules below read exactly as they did before the move.
  */
-export function rng(seed: number): () => number {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-export function pick<T>(random: () => number, items: readonly T[]): T {
-  return items[Math.floor(random() * items.length)] as T
-}
-
-export function shuffle<T>(random: () => number, items: readonly T[]): T[] {
-  const out = [...items]
-  for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(random() * (i + 1))
-    ;[out[i], out[j]] = [out[j] as T, out[i] as T]
-  }
-  return out
-}
+export { pick, rng, shuffle } from '@/lib/iq/items/random'
 
 /** Structural identity, used by `verify.ts` to prove options are genuinely distinct. */
 export function cellKey(cell: Cell): string {

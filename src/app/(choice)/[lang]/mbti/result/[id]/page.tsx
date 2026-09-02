@@ -96,43 +96,26 @@ export default async function MbtiResultPage({
   recordFunnelDetached('mbti', locked ? FUNNEL_EVENTS.paywallSeen : FUNNEL_EVENTS.resultViewed)
 
   /**
-   * Minted per render, recorded only if the visitor actually taps share.
+   * A locked result renders the paywall and NOTHING ELSE - same shape as the IQ page.
    *
-   * The shared URL points at `/[lang]/mbti/<type>` - already public, already carrying a
-   * prerendered OG card, and crucially carrying no credential. Sharing `id` instead would
-   * paste the capability token for this result into a group chat.
+   * The four letters are the product. This page used to print the type, the nickname and
+   * the tagline above the paywall on the theory that the type is the hook and the depth is
+   * the sale, but that gives away the one thing a taker came here to learn: not what ESTJ
+   * means - `/[lang]/mbti/<type>` explains that to anyone, for free, forever - but that
+   * ESTJ is THEM. Sold the answer, charged for the footnotes.
+   *
+   * An early return rather than a `locked ?` ternary around each block, because the header
+   * sat OUTSIDE that ternary and no amount of care inside it would have covered the leak.
+   * One return is also the only version where "what does a non-payer see" has a single
+   * answer that can be read off the page in one place.
+   *
+   * `waived` and `MBTI_RESULT_PRICE=0` both flow through `locked`, so a free result still
+   * shows everything - the gate closes on unpaid attempts only.
    */
-  const shareToken = mintShareToken()
-  const shareUrl = `/${lang}/mbti/${slugFromType(type)}?s=${shareToken}`
-
-  return (
-    <main>
-      <SectionFrame
-        aria-labelledby='result-heading'
-        disableReveal
-        className='border-b border-pp-line pb-section-sm pt-10 md:pt-14'
-        innerClassName='max-w-3xl'
-      >
-        <p className='font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted'>
-          {copy.yourType}
-        </p>
-        <h1
-          id='result-heading'
-          className='mt-3 font-display text-[clamp(3rem,9vw,5.5rem)] font-semibold leading-[0.95] tracking-tight text-pp-text'
-        >
-          {type}
-        </h1>
-        <p className={`mt-3 font-display text-xl font-semibold ${accent.text}`}>
-          {content.nickname}
-        </p>
-        <p className='mt-4 max-w-2xl text-base leading-relaxed text-pp-muted md:text-lg'>
-          {content.tagline}
-        </p>
-      </SectionFrame>
-
-      <SectionFrame className='py-section-sm' innerClassName='max-w-3xl'>
-        {locked ? (
-          <>
+  if (locked) {
+    return (
+      <main>
+        <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
           <TestPaywall
             token={id}
             locale={lang}
@@ -171,9 +154,47 @@ export default async function MbtiResultPage({
               <Chevron direction='right' />
             </Link>
           </div>
-          </>
-        ) : (
-          <>
+        </SectionFrame>
+      </main>
+    )
+  }
+
+  /**
+   * Minted per render, recorded only if the visitor actually taps share.
+   *
+   * The shared URL points at `/[lang]/mbti/<type>` - already public, already carrying a
+   * prerendered OG card, and crucially carrying no credential. Sharing `id` instead would
+   * paste the capability token for this result into a group chat.
+   */
+  const shareToken = mintShareToken()
+  const shareUrl = `/${lang}/mbti/${slugFromType(type)}?s=${shareToken}`
+
+  return (
+    <main>
+      <SectionFrame
+        aria-labelledby='result-heading'
+        disableReveal
+        className='border-b border-pp-line pb-section-sm pt-10 md:pt-14'
+        innerClassName='max-w-3xl'
+      >
+        <p className='font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+          {copy.yourType}
+        </p>
+        <h1
+          id='result-heading'
+          className='mt-3 font-display text-[clamp(3rem,9vw,5.5rem)] font-semibold leading-[0.95] tracking-tight text-pp-text'
+        >
+          {type}
+        </h1>
+        <p className={`mt-3 font-display text-xl font-semibold ${accent.text}`}>
+          {content.nickname}
+        </p>
+        <p className='mt-4 max-w-2xl text-base leading-relaxed text-pp-muted md:text-lg'>
+          {content.tagline}
+        </p>
+      </SectionFrame>
+
+      <SectionFrame className='py-section-sm' innerClassName='max-w-3xl'>
         {/*
           The waiver, said out loud, above the result it applies to. Same reasoning as the
           IQ page: a free result with no explanation reads as arbitrary pricing, and the
@@ -279,8 +300,6 @@ export default async function MbtiResultPage({
             {copy.resultKeepLink.replace('{days}', String(ATTEMPT_TTL_DAYS))}
           </p>
         </EditorialPanel>
-          </>
-        )}
       </SectionFrame>
     </main>
   )

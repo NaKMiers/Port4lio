@@ -6,6 +6,7 @@ import { SectionFrame } from '@/components/portfolio/primitives/SectionFrame'
 import { isLocale, LOCALES } from '@/lib/i18n'
 import JsonLd from '@/components/JsonLd'
 import { bandTableRows, IQ_METHOD, iqUi } from '@/lib/iq/content'
+import { isEffortWaiverEnabled } from '@/lib/test-kit/effort'
 import { alternateIqLanguages, iqBreadcrumbJsonLd, iqMethodJsonLd } from '@/lib/iq/seo'
 
 /**
@@ -52,6 +53,23 @@ export default async function IqMethodPage({ params }: { params: Promise<{ lang:
   const rows = bandTableRows(lang)
   const isVi = lang === 'vi'
 
+  /**
+   * A section marked `requiresWaiver` describes the effort waiver, so it may only be
+   * published while the waiver is switched on.
+   *
+   * This page is the honesty commitment; a page that promises a free result for a rushed
+   * attempt while `EFFORT_WAIVER=false` sends that attempt to the paywall would be the
+   * exact inflation-by-omission the rest of the page exists to disclaim.
+   *
+   * Read at build time, not per request - the page is `force-static`, so flipping the flag
+   * needs a rebuild before this copy follows it. Acceptable because the flag is deployment
+   * configuration, not something toggled while the site is live.
+   */
+  const waiverOn = isEffortWaiverEnabled()
+  const sections = copy.sections.filter(
+    section => waiverOn || !('requiresWaiver' in section && section.requiresWaiver)
+  )
+
   return (
     <main>
       {/*
@@ -85,7 +103,7 @@ export default async function IqMethodPage({ params }: { params: Promise<{ lang:
 
       <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
         <div className='space-y-8'>
-          {copy.sections.map(section => (
+          {sections.map(section => (
             <section key={section.heading}>
               <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
                 {section.heading}

@@ -20,7 +20,7 @@ export const IQ_UI = {
     howItWorks: 'Cách bài test hoạt động',
     /** `{count}` and `{minutes}` are interpolated. */
     howItWorksBody:
-      'Mỗi câu là một ma trận hình học còn thiếu một ô. Bạn chọn ô đúng trong 6 phương án. Có {count} câu, tăng dần độ khó, trong {minutes} phút. Đề được sinh riêng cho mỗi lượt làm, nên không có đáp án chung để tra.',
+      'Mỗi câu là một hình ghép hình học còn thiếu một ô. Bạn chọn ô đúng trong 6 phương án. Có {count} câu, tăng dần độ khó, trong {minutes} phút. Đề được sinh riêng cho mỗi lượt làm, nên không có đáp án chung để tra.',
     methodLink: 'Cách tính điểm',
     privacyLink: 'Bảo mật',
     /**
@@ -129,7 +129,7 @@ export const IQ_UI = {
     startTest: 'Start the test',
     howItWorks: 'How the test works',
     howItWorksBody:
-      'Each question is a geometric matrix with one cell missing. You pick the right cell from six options. There are {count} questions, rising in difficulty, in {minutes} minutes. The questions are generated per attempt, so there is no shared answer key to look up.',
+      'Each question is a geometric figure with one cell missing. You pick the right cell from six options. There are {count} questions, rising in difficulty, in {minutes} minutes. The questions are generated per attempt, so there is no shared answer key to look up.',
     methodLink: 'How scoring works',
     privacyLink: 'Privacy',
     /** See the Vietnamese entry for why this is a question rather than a label. */
@@ -279,7 +279,11 @@ export const IQ_METHOD = {
          * the result itself so it is a published rule rather than a surprise: a policy
          * someone can read before they start is a promise, the same one discovered
          * afterwards is a trick.
+         *
+         * `requiresWaiver` is what keeps that true in both directions: with
+         * `EFFORT_WAIVER=false` the rule does not exist, so the page must not claim it.
          */
+        requiresWaiver: true,
         heading: 'Nếu bạn làm quá nhanh, chúng tôi không thu phí',
         body: 'Nếu bạn bấm qua bài test trong vài phút hoặc bỏ qua phần lớn câu hỏi, số câu đúng sẽ chỉ ngang mức đoán ngẫu nhiên - và một con số như vậy không đo được gì. Trong trường hợp đó kết quả được mở miễn phí, có ghi rõ lý do, và không kèm chứng nhận. Chúng tôi chỉ thu phí cho một kết quả mà chúng tôi có thể đứng ra bảo đảm.',
       },
@@ -316,6 +320,7 @@ export const IQ_METHOD = {
       },
       {
         /* See the Vietnamese entry: published here so the rule is a promise, not a surprise. */
+        requiresWaiver: true,
         heading: 'If you rush it, we do not charge',
         body: 'If you click through the test in a couple of minutes, or skip most of it, your number of correct answers lands around what guessing produces - and a number like that measures nothing. When that happens the result is opened for free, the reason is stated on it, and no certificate is issued. We only charge for a result we can stand behind.',
       },
@@ -375,21 +380,29 @@ export const IQ_LANDING_SECTIONS = {
     aboutBody:
       'Đây là bài test suy luận bằng hình ảnh, thuộc họ ma trận tiến triển (progressive matrices). Nó không kiểm tra kiến thức, không cần từ vựng, không cần tính toán - nên không phụ thuộc vào việc bạn học trường nào hay đọc bao nhiêu sách. Cái nó đo là khả năng nhìn ra một quy luật chưa từng thấy trước đó, rồi áp dụng quy luật ấy cho một trường hợp mới. Đó là lý do dạng bài này được dùng rộng rãi trong nghiên cứu về trí thông minh linh hoạt (fluid intelligence).',
 
-    rulesHeading: 'Sáu quy luật bạn sẽ gặp',
+    rulesHeading: 'Các quy luật bạn sẽ gặp',
+    /** See the English entry: the layout claim and the direction promise are both load-bearing. */
     rulesLead:
-      'Mỗi câu là một ma trận 3x3 thiếu một ô, và ô còn thiếu luôn được xác định bởi ít nhất một trong sáu quy luật dưới đây. Biết trước danh sách này không giúp bạn "gian lận" - việc khó vẫn là nhận ra quy luật nào đang hoạt động, và ở những câu sau là hai hoặc ba quy luật cùng lúc.',
+      'Phần lớn các câu là ma trận 3x3 thiếu một ô. Một số câu là dãy ngắn hơn để bạn tiếp tục, và ô còn thiếu luôn được xác định bởi ít nhất một trong các quy luật dưới đây. Một dãy luôn tiếp tục theo cùng một chiều - không bao giờ quay ngược lại. Biết trước những điều này không giúp bạn "gian lận" - việc khó vẫn là nhận ra quy luật nào đang hoạt động, và ở những câu sau là hai hoặc ba quy luật cùng lúc.',
+    /**
+     * One entry per family in `lib/iq/items/v2/rules.ts`, and that correspondence is the
+     * point rather than a nicety: this list is a published promise that the missing cell is
+     * always determined by something on it. An entry with no family behind it is a rule the
+     * test does not contain; a family with no entry is a rule the taker was never told about.
+     * Either way the promise breaks, so the two are meant to be edited together.
+     */
     rules: [
       {
         name: 'Chu kỳ tô đậm',
-        body: 'Một hình đi qua các trạng thái rỗng, nửa đậm, đậm theo hàng, trong khi hình dạng thay đổi theo cột. Hai chiều cùng lúc, và ô thiếu được quyết định bởi cả hai.',
+        body: 'Một hình đi qua các trạng thái rỗng, nửa đậm, đậm - theo hàng hoặc theo cột. Ở những câu sau, một chiều khác thay đổi song song và ô thiếu được quyết định bởi cả hai.',
       },
       {
-        name: 'Dãy đếm',
-        body: 'Số lượng phần tử tăng theo một bước cố định. Đơn giản về thị giác nhưng bước nhảy không được nói ra - bạn phải suy ra nó từ những ô đã cho.',
+        name: 'Chu kỳ hình dạng',
+        body: 'Hình đi qua một vòng các dạng và quay lại đầu. Việc khó là nhận ra vòng lặp đang ở đâu - nên quy luật này chỉ xuất hiện ở dạng ma trận, nơi hai trục cùng xác nhận cách đọc.',
       },
       {
-        name: 'Tiến triển hình dạng',
-        body: 'Hình đi theo một chuỗi có thứ tự: tam giác, vuông, lục giác, tròn, rồi quay lại. Cần nhận ra chuỗi đang lặp ở đâu.',
+        name: 'Số cạnh tăng dần',
+        body: 'Tam giác, vuông, ngũ giác, lục giác, thất giác - số cạnh tăng theo một bước cố định. Vì có thứ tự rõ ràng, đây là quy luật hình dạng duy nhất dùng được cho các câu dạng dãy.',
       },
       {
         name: 'Phép xoay',
@@ -397,11 +410,19 @@ export const IQ_LANDING_SECTIONS = {
       },
       {
         name: 'Thay đổi kích thước',
-        body: 'Hình lớn dần hoặc nhỏ dần theo tỉ lệ đều. Dễ nhìn ra, nhưng dễ bị nhiễu khi có thêm một chiều khác thay đổi song song.',
+        body: 'Hình lớn dần hoặc nhỏ dần theo từng bước đều. Dễ nhìn ra, nhưng dễ bị nhiễu khi có thêm một chiều khác thay đổi song song.',
+      },
+      {
+        name: 'Di chuyển vị trí',
+        body: 'Một phần tử đi vòng quanh các vị trí trong ô theo một bước cố định. Bạn phải theo dõi nó đi đâu, không phải nó trông thế nào.',
+      },
+      {
+        name: 'Đếm phần tử',
+        body: 'Số vạch hoặc số phần tử tăng theo một bước cố định. Đơn giản về thị giác nhưng bước nhảy không được nói ra - bạn phải suy ra nó từ những ô đã cho.',
       },
       {
         name: 'Logic tập hợp (AND / OR / XOR)',
-        body: 'Khó nhất. Cột thứ ba là kết quả của một phép logic giữa hai cột đầu, tính trên từng ô của lưới điểm. Bạn phải suy ra phép toán từ hai hàng đầy đủ, rồi áp dụng cho hàng thứ ba.',
+        body: 'Khó nhất, và chỉ xuất hiện ở nửa sau. Cột thứ ba là kết quả của một phép logic giữa hai cột đầu, tính trên từng ô của lưới điểm. Bạn phải suy ra phép toán từ hai hàng đầy đủ, rồi áp dụng cho hàng thứ ba.',
       },
     ],
 
@@ -425,33 +446,55 @@ export const IQ_LANDING_SECTIONS = {
     aboutBody:
       'This is a visual reasoning test in the progressive matrices family. It tests no knowledge, needs no vocabulary and involves no arithmetic - so it does not depend on where you went to school or how much you have read. What it measures is your ability to spot a rule you have never seen before and then apply it to a new case. That is why this format is widely used in research on fluid intelligence.',
 
-    rulesHeading: 'The six rules you will meet',
+    rulesHeading: 'The rules you will meet',
+    /**
+     * Two claims here are load-bearing and were both false for a while, so they are worth
+     * flagging for whoever edits this next.
+     *
+     * The layout sentence: questions are NOT all 3x3. Nine of the 26 are three-cell
+     * sequences and one is a 2x2, and a sequence is the harder container - three cells
+     * confirm a rule once where nine confirm it twice.
+     *
+     * The direction sentence is not documentation. Three cells reading outline, half, filled
+     * are consistent with the cycle continuing AND with a palindrome turning back, so without
+     * a published promise that a series never reverses, two of the six options are defensible
+     * and one of them is marked wrong. Saying it here is what makes the sequence items fair.
+     */
     rulesLead:
-      'Each question is a 3x3 matrix with one cell missing, and the missing cell is always determined by at least one of the six rules below. Knowing the list is not cheating - the hard part is still working out which rule is running, and in later questions it is two or three at once.',
+      'Most questions are a 3x3 matrix with one cell missing. Some are a shorter sequence you continue, and the missing cell is always determined by at least one of the rules below. A series always carries on in the same direction - it is never mirrored back on itself. Knowing all of this is not cheating: the hard part is still working out which rule is running, and in later questions it is two or three at once.',
+    /** See the Vietnamese entry: one entry per family, and they are edited together. */
     rules: [
       {
         name: 'Shading cycle',
-        body: 'A shape moves through outline, half-shaded and filled across a row while the shape itself changes down the columns. Two dimensions at once, and the missing cell is decided by both.',
+        body: 'A shape moves through outline, half-shaded and filled, across a row or down a column. In later questions a second dimension changes alongside it, and the missing cell is decided by both.',
       },
       {
-        name: 'Count series',
-        body: 'The number of elements grows by a fixed step. Visually simple, but the step is never stated - you have to infer it from the cells you are given.',
+        name: 'Shape cycle',
+        body: 'The shape steps through a ring of forms and returns to the start. The hard part is spotting where in the ring you are - which is why this one only appears in matrix questions, where two axes confirm the reading.',
       },
       {
-        name: 'Shape progression',
-        body: 'Shapes follow an ordered series: triangle, square, hexagon, circle, then round again. The work is spotting where the series repeats.',
+        name: 'Side count',
+        body: 'Triangle, square, pentagon, hexagon, heptagon - the number of sides rises by a fixed step. Because it has a genuine order, this is the only shape rule that can be used in the shorter sequence questions.',
       },
       {
         name: 'Rotation',
         body: 'A shape turns by a fixed angle each cell. Wrong options are usually off by exactly one step, which is why guessing almost never lands.',
       },
       {
-        name: 'Size scale',
-        body: 'A shape grows or shrinks by a constant ratio. Easy to see on its own, easy to lose when a second dimension changes alongside it.',
+        name: 'Size',
+        body: 'A shape grows or shrinks by even steps. Easy to see on its own, easy to lose track of when a second dimension moves alongside it.',
+      },
+      {
+        name: 'Movement',
+        body: 'An element travels around the positions inside the cell by a fixed step. You have to follow where it goes, not what it looks like.',
+      },
+      {
+        name: 'Counting',
+        body: 'The number of strokes or elements rises by a fixed step. Visually simple, but the step is never stated - you infer it from the cells you are given.',
       },
       {
         name: 'Set logic (AND / OR / XOR)',
-        body: 'The hardest family. The third column is a logical operation on the first two, computed cell by cell across a dot grid. You have to infer the operator from two complete rows before you can apply it to the third.',
+        body: 'The hardest, and it only appears in the back half. The third column is the result of a logical operation between the first two, worked out slot by slot on the dot lattice. You have to infer which operation from two complete rows, then apply it to the third.',
       },
     ],
 

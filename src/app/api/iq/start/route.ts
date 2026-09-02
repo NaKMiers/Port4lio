@@ -4,8 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { jsonError } from '@/lib/api-response'
 import { DEFAULT_LOCALE, isLocale } from '@/lib/i18n'
-import { generateTest, optionsFor } from '@/lib/iq/items/generate'
-import { renderMatrix, renderOption } from '@/lib/iq/items/render'
+import { CURRENT_GENERATOR_VERSION, renderTest } from '@/lib/iq/items'
 import { TEST_DURATION_SECONDS } from '@/lib/iq/scoring'
 import { connectDatabase } from '@/lib/mongodb'
 import { checkRateLimit, clientIpFrom, IQ_START_LIMIT } from '@/lib/rate-limit'
@@ -83,6 +82,14 @@ export async function POST(request: NextRequest) {
     await IqAttemptModel.create({
       _id: token,
       seed,
+      /**
+       * Stamped at start, and the other half of the reproduction key.
+       *
+       * `seed` names a test only in combination with the generator that built it. Storing
+       * the version here is what lets submit score this attempt with the same generator the
+       * taker actually saw, even if a newer one is live by then.
+       */
+      generatorVersion: CURRENT_GENERATOR_VERSION,
       locale,
       startedAt,
       createdAt: startedAt,
@@ -106,13 +113,7 @@ export async function POST(request: NextRequest) {
    * Rendered to SVG strings rather than sent as specs, so the response never contains
    * enough to recompute the answer.
    */
-  const items = generateTest(seed)
-  const questions = items.map((item, index) => ({
-    matrix: renderMatrix(item, `${index + 1} / ${items.length}`),
-    options: optionsFor(item, seed, index).map((option, optionIndex) =>
-      renderOption(option, `q${index}o${optionIndex}`)
-    ),
-  }))
+  const questions = renderTest(seed, CURRENT_GENERATOR_VERSION)
 
   return NextResponse.json(
     {

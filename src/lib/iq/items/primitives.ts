@@ -58,7 +58,17 @@ export type ShapeKind =
   | 'star4'
   | 'star5'
   | 'star6'
+  | 'pentagon'
+  | 'heptagon'
 
+/**
+ * The kinds generator v1 samples from. FROZEN - do not add to this array.
+ *
+ * `v1/rules.ts` draws from it with `shuffle(random, SHAPE_KINDS).slice(0, 3)`, so its length
+ * and order decide which shapes land in every v1 item. One extra entry re-rolls every test
+ * ever generated. `pentagon` and `heptagon` are in the union above and in `ALL_SHAPE_KINDS`
+ * below, deliberately not here.
+ */
 export const SHAPE_KINDS: readonly ShapeKind[] = [
   'circle',
   'square',
@@ -70,6 +80,53 @@ export const SHAPE_KINDS: readonly ShapeKind[] = [
   'star6',
 ]
 
+/**
+ * Everything drawable, for generators that are not frozen.
+ *
+ * The two extra polygons exist to make side count an honest ORDINAL dimension: 3, 4, 5, 6, 7
+ * is a sequence a solver can extend, where `SHAPE_KINDS`'s mix of polygons and stars is an
+ * unordered set with no next element. That distinction is what lets a shape rule run on a
+ * three-cell sequence at all - a cyclic ring over 3 cells has no determined continuation,
+ * an ordinal progression does.
+ */
+export const ALL_SHAPE_KINDS: readonly ShapeKind[] = [
+  ...SHAPE_KINDS,
+  'pentagon',
+  'heptagon',
+]
+
+/** Sides per polygon kind, for rules that step side count as a series. */
+export const POLYGON_SIDES: Partial<Record<ShapeKind, number>> = {
+  triangle: 3,
+  square: 4,
+  pentagon: 5,
+  hexagon: 6,
+  heptagon: 7,
+}
+
+/**
+ * The angle each shape repeats at, in degrees.
+ *
+ * A correctness table, not a convenience: a square at 0 degrees and one at 90 are the same
+ * picture, so any rule offering both as options would present two correct answers and mark
+ * one wrong. Every identity check on a rotated shape has to reduce modulo this.
+ *
+ * `circle: 1` rather than 360 because a circle is invariant under every rotation, so its
+ * rotation must not enter an identity at all - reducing modulo 1 always yields 0.
+ */
+export const SYMMETRY: Record<ShapeKind, number> = {
+  circle: 1,
+  square: 90,
+  triangle: 120,
+  diamond: 90,
+  hexagon: 60,
+  star4: 90,
+  star5: 72,
+  star6: 60,
+  pentagon: 72,
+  heptagon: 360 / 7,
+}
+
 /** Star point counts, kept beside the kinds so a rule can step 4 -> 5 -> 6 as a series. */
 export const STAR_POINTS: Record<'star4' | 'star5' | 'star6', number> = {
   star4: 4,
@@ -77,12 +134,27 @@ export const STAR_POINTS: Record<'star4' | 'star5' | 'star6', number> = {
   star6: 6,
 }
 
-function polygonPoints(sides: number, radius: number, rotationDeg: number): string {
-  const c = CELL / 2
+/**
+ * Vertices of a regular polygon.
+ *
+ * `cx` / `cy` default to the cell centre, which is the only thing v1 ever wanted. They are
+ * parameters so composite cells can place a shape at an anchor WITHOUT wrapping it in a
+ * `<g transform="scale()">`: a scaling transform also scales `stroke-width`, so a small
+ * inner shape would render as a hairline and vanish entirely at certificate raster sizes,
+ * and `vector-effect="non-scaling-stroke"` is not available because Satori ignores it.
+ * Passing geometry down keeps every stroke absolute.
+ */
+export function polygonPoints(
+  sides: number,
+  radius: number,
+  rotationDeg: number,
+  cx: number = CELL / 2,
+  cy: number = CELL / 2
+): string {
   const offset = (rotationDeg * Math.PI) / 180 - Math.PI / 2
   return Array.from({ length: sides }, (_, i) => {
     const angle = offset + (i * 2 * Math.PI) / sides
-    return `${(c + radius * Math.cos(angle)).toFixed(2)},${(c + radius * Math.sin(angle)).toFixed(2)}`
+    return `${(cx + radius * Math.cos(angle)).toFixed(2)},${(cy + radius * Math.sin(angle)).toFixed(2)}`
   }).join(' ')
 }
 
@@ -93,14 +165,19 @@ function polygonPoints(sides: number, radius: number, rotationDeg: number): stri
  * reference rather than a fat pinwheel. It is tuned by eye against the source images; the
  * exact value is not meaningful beyond "spiky enough to be unmistakable".
  */
-function starPoints(points: number, outer: number, rotationDeg: number): string {
-  const c = CELL / 2
+export function starPoints(
+  points: number,
+  outer: number,
+  rotationDeg: number,
+  cx: number = CELL / 2,
+  cy: number = CELL / 2
+): string {
   const inner = outer * 0.42
   const offset = (rotationDeg * Math.PI) / 180 - Math.PI / 2
   return Array.from({ length: points * 2 }, (_, i) => {
     const radius = i % 2 === 0 ? outer : inner
     const angle = offset + (i * Math.PI) / points
-    return `${(c + radius * Math.cos(angle)).toFixed(2)},${(c + radius * Math.sin(angle)).toFixed(2)}`
+    return `${(cx + radius * Math.cos(angle)).toFixed(2)},${(cy + radius * Math.sin(angle)).toFixed(2)}`
   }).join(' ')
 }
 
@@ -172,6 +249,18 @@ export function shapeSvg(spec: ShapeSpec, uid: string): string {
           outline: `<polygon points="${polygonPoints(6, radius, rotation)}" fill="${fillFor(shading)}" ${stroke}/>`,
           clipped: `<polygon points="${polygonPoints(6, radius, rotation)}" fill="__FILL__"__CLIP__/><polygon points="${polygonPoints(6, radius, rotation)}" fill="none" ${stroke}/>`,
         }
+      // Reachable only from generators that sample `ALL_SHAPE_KINDS`; v1's frozen
+      // `SHAPE_KINDS` excludes both. Present so this switch is total over the union rather
+      // than falling through to the star branch, where `STAR_POINTS` would yield `undefined`
+      // and every coordinate would render as `NaN`.
+      case 'pentagon':
+      case 'heptagon': {
+        const sides = POLYGON_SIDES[kind] as number
+        return {
+          outline: `<polygon points="${polygonPoints(sides, radius, rotation)}" fill="${fillFor(shading)}" ${stroke}/>`,
+          clipped: `<polygon points="${polygonPoints(sides, radius, rotation)}" fill="__FILL__"__CLIP__/><polygon points="${polygonPoints(sides, radius, rotation)}" fill="none" ${stroke}/>`,
+        }
+      }
       default: {
         const points = STAR_POINTS[kind as 'star4' | 'star5' | 'star6']
         return {

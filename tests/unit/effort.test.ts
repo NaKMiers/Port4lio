@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { LOCALES } from '@/lib/i18n'
+import { IQ_METHOD } from '@/lib/iq/content'
 import { QUESTION_COUNT, QUESTIONS } from '@/lib/mbti/questions'
 import {
   IQ_CHANCE_CEILING,
   IQ_RUSH_SECONDS,
   iqEffortWaived,
+  isEffortWaiverEnabled,
   mbtiEffortWaived,
 } from '@/lib/test-kit/effort'
 
@@ -131,5 +134,68 @@ describe('mbtiEffortWaived', () => {
     // Cannot happen - `parseAnswers` rejects a short array before this runs - but a
     // detector that divides by a length must not be the thing that decides that.
     expect(mbtiEffortWaived({ answers: [] })).toBe(false)
+  })
+})
+
+describe('isEffortWaiverEnabled', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('is on when the variable is unset, so an existing deployment does not change', () => {
+    vi.stubEnv('EFFORT_WAIVER', undefined)
+    expect(isEffortWaiverEnabled()).toBe(true)
+  })
+
+  it.each(['false', '0', 'off', 'no', 'FALSE', ' off '])('reads %o as off', raw => {
+    // Every spelling someone might reach for. A value that LOOKS off but reads as on would
+    // leave the operator believing they had disabled a rule that is still running.
+    vi.stubEnv('EFFORT_WAIVER', raw)
+    expect(isEffortWaiverEnabled()).toBe(false)
+  })
+
+  it.each(['true', '1', 'on', 'yes', 'TRUE'])('reads %o as on', raw => {
+    vi.stubEnv('EFFORT_WAIVER', raw)
+    expect(isEffortWaiverEnabled()).toBe(true)
+  })
+
+  it('falls back to on, loudly, when the value is neither', () => {
+    // The safe direction: a typo must not silently start charging for noise scores, which
+    // is the failure the waiver exists to prevent.
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubEnv('EFFORT_WAIVER', 'maybe')
+
+    expect(isEffortWaiverEnabled()).toBe(true)
+    expect(error).toHaveBeenCalledOnce()
+  })
+
+  it('treats an empty string as unset rather than as off', () => {
+    // `EFFORT_WAIVER=` in a .env file is an operator who wrote nothing, not one who wrote
+    // "false", and guessing the stricter reading would charge people on an accident.
+    vi.stubEnv('EFFORT_WAIVER', '')
+    expect(isEffortWaiverEnabled()).toBe(true)
+  })
+})
+
+/**
+ * The published promise and the flag that fulfils it, pinned together.
+ *
+ * `/iq/method` prints its waiver section only while the waiver is on, and it finds that
+ * section by the `requiresWaiver` marker. Lose the marker in a copy edit and the page goes
+ * back to promising a free result for rushed attempts that `EFFORT_WAIVER=false` charges
+ * for - on the one page whose entire purpose is being checkable. Nothing about that failure
+ * is visible in review, so it is asserted here instead.
+ */
+describe('the /iq/method waiver section', () => {
+  it.each(LOCALES)('is marked in %s, exactly once', locale => {
+    const marked = IQ_METHOD[locale].sections.filter(
+      section => 'requiresWaiver' in section && section.requiresWaiver
+    )
+
+    expect(marked).toHaveLength(1)
+    // Guards against the marker migrating onto an unrelated section: the one it belongs to
+    // is the one that says we do not charge.
+    expect(marked[0].heading.toLowerCase()).toMatch(/không thu phí|do not charge/)
   })
 })

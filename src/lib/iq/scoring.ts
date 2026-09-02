@@ -1,4 +1,4 @@
-import { ITEM_COUNT } from '@/lib/iq/items/generate'
+import { ITEM_COUNT } from '@/lib/iq/items/config'
 
 /**
  * Raw correct answers to a score band.

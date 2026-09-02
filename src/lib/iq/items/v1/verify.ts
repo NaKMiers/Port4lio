@@ -1,4 +1,5 @@
-import { cellKey, type Item } from '@/lib/iq/items/types'
+import { SYMMETRY } from '@/lib/iq/items/primitives'
+import { cellKey, type Item } from '@/lib/iq/items/v1/types'
 
 /**
  * Prove an item is answerable before anyone sees it.
@@ -30,27 +31,14 @@ import { cellKey, type Item } from '@/lib/iq/items/types'
 export type VerifyResult = { ok: true } | { ok: false; reason: string }
 
 /**
- * Rotational symmetry, so two visually identical cells cannot key differently.
+ * A cell's identity, reduced by rotational symmetry.
  *
- * A square is symmetric every 90 degrees, a triangle every 120, a hexagon every 60. Without
- * this, `rotation` items could emit a "wrong" option that is pixel-identical to the answer
- * - the taker sees two correct choices and one of them is marked wrong.
+ * Without the reduction, `rotation` items could emit a "wrong" option that is
+ * pixel-identical to the answer - the taker sees two correct choices and one is marked
+ * wrong. `SYMMETRY` lives in `items/primitives.ts` beside the shapes it describes, so v2
+ * reads the same table rather than a second copy that could drift; the values for every kind
+ * v1 samples are unchanged, which the golden-hash test proves rather than assumes.
  */
-const SYMMETRY: Record<string, number> = {
-  circle: 1,
-  square: 90,
-  triangle: 120,
-  diamond: 90,
-  hexagon: 60,
-  star4: 90,
-  star5: 72,
-  star6: 60,
-}
-
-function normalisedKey(cell: ReturnType<typeof identity>): string {
-  return cell
-}
-
 function identity(cell: Item['answer']): string {
   if (cell.type !== 'shape') return cellKey(cell)
   const period = SYMMETRY[cell.spec.kind] ?? 360
@@ -117,11 +105,11 @@ export function verifyItem(item: Item): VerifyResult {
     return { ok: false, reason: `expected 5 distractors, got ${item.distractors.length}` }
   }
 
-  const answerKey = normalisedKey(identity(item.answer))
+  const answerKey = identity(item.answer)
   const seen = new Set<string>([answerKey])
 
   for (const distractor of item.distractors) {
-    const key = normalisedKey(identity(distractor))
+    const key = identity(distractor)
     if (key === answerKey) {
       return { ok: false, reason: `a distractor is identical to the answer (${key})` }
     }

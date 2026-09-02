@@ -1,5 +1,5 @@
 import { LOCALES, type Locale } from '@/lib/i18n'
-import { ITEM_COUNT } from '@/lib/iq/items/generate'
+import { ITEM_COUNT } from '@/lib/iq/items/config'
 import { breadcrumbJsonLd, priceLine, siteOrigin } from '@/lib/mbti/seo'
 import { TEST_DURATION_SECONDS } from '@/lib/iq/scoring'
 import { personEntityId, websiteEntityId } from '@/lib/structured-data'

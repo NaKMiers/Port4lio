@@ -180,6 +180,12 @@ NEXT_PUBLIC_SITE_URL=https://your-domain.com
 # without a round trip through Gmail. Ignored in production builds on purpose: a stale
 # value must not be able to unlock the live editor or the profile-write APIs.
 REQUIRE_ADMIN=true
+
+# Rushed IQ attempts and straight-lined MBTI attempts get their result free, because a
+# score reached by mashing measures nothing. Set to false to paywall every attempt - which
+# also removes the matching promise from /iq/method, so the published rule never outlives
+# the code. Unset means on. Accepts true/1/on/yes and false/0/off/no.
+EFFORT_WAIVER=true
 ```
 
 ## 📜 Available Scripts

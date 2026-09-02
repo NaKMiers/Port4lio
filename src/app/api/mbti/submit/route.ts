@@ -11,7 +11,7 @@ import {
   type ScoreResult,
 } from '@/lib/mbti/scoring'
 import { checkRateLimit, clientIpFrom, SUBMIT_LIMIT } from '@/lib/rate-limit'
-import { mbtiEffortWaived } from '@/lib/test-kit/effort'
+import { isEffortWaiverEnabled, mbtiEffortWaived } from '@/lib/test-kit/effort'
 import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { mintToken } from '@/lib/tokens'
 import { AttemptModel, attemptExpiryFrom } from '@/models/Attempt'
@@ -94,8 +94,11 @@ export async function POST(request: NextRequest) {
    * MBTI has no server-side clock, so this reads the answer pattern itself - which is the
    * signal that cannot be faked without ruining the result being asked for. See
    * `lib/test-kit/effort.ts`.
+   *
+   * `EFFORT_WAIVER=false` short-circuits the detector entirely, which stores `waived: false`
+   * and sends even a held-down button to the paywall.
    */
-  const waived = mbtiEffortWaived({ answers })
+  const waived = isEffortWaiverEnabled() && mbtiEffortWaived({ answers })
 
   try {
     await AttemptModel.create({
@@ -120,5 +123,16 @@ export async function POST(request: NextRequest) {
     recordFunnelDetached('mbti', FUNNEL_EVENTS.waived)
   }
 
-  return NextResponse.json({ token, type: result.type }, { status: 201 })
+  /**
+   * The token only - deliberately NOT the type.
+   *
+   * The result page decides what a taker may see, and it charges for the four letters. This
+   * response used to carry `type` as well, which nothing ever read: `TestClient`
+   * destructures `{ token }` and redirects. So it bought no behaviour and handed anyone with
+   * the network tab open the exact answer the paywall is holding back.
+   *
+   * Keep it that way. Whatever a client needs about a result, it gets from the result page,
+   * which is the one place that knows whether this attempt was paid for.
+   */
+  return NextResponse.json({ token }, { status: 201 })
 }

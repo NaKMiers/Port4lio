@@ -137,10 +137,16 @@ export const UI = {
     // Paywall. Only rendered when MBTI_RESULT_PRICE is set above the PayOS minimum. The
     // mechanical checkout strings (QR, bank fields, countdown) come from
     // `lib/test-kit/payment-copy.ts`, shared with IQ.
-    paywallTitle: 'Mở khóa kết quả đầy đủ',
-    /** `{price}` is filled from the configured amount, formatted in đồng. */
+    paywallTitle: 'Kết quả của bạn đã sẵn sàng',
+    /**
+     * `{price}` is filled from the configured amount, formatted in đồng.
+     *
+     * Leads with the four letters because they are now behind the wall. This line used to
+     * open with "Bạn đã biết nhóm tính cách của mình" - true only while the result page
+     * printed the type above the paywall, and a straight falsehood the moment it stopped.
+     */
     paywallLead:
-      'Bạn đã biết nhóm tính cách của mình. Bản đầy đủ gồm chi tiết từng cặp, phân tích sâu, điểm mạnh, điều cần lưu ý và cách bạn thể hiện trong các mối quan hệ - {price}.',
+      'Bản đầy đủ gồm nhóm tính cách bốn chữ của bạn, chi tiết từng cặp, phân tích sâu, điểm mạnh, điều cần lưu ý và cách bạn thể hiện trong các mối quan hệ - {price}.',
     paywallLocked: 'Phần này sẽ mở sau khi thanh toán',
     emailLabel: 'Email nhận kết quả',
     emailPlaceholder: 'ban@example.com',
@@ -239,10 +245,10 @@ export const UI = {
     // Paywall. Only rendered when MBTI_RESULT_PRICE is set above the PayOS minimum. The
     // mechanical checkout strings (QR, bank fields, countdown) come from
     // `lib/test-kit/payment-copy.ts`, shared with IQ.
-    paywallTitle: 'Unlock the full result',
-    /** `{price}` is filled from the configured amount, formatted in đồng. */
+    paywallTitle: 'Your result is ready',
+    /** See the Vietnamese entry: the four letters lead, because they are behind the wall. */
     paywallLead:
-      'You already know your type. The full result adds the axis breakdown, the deeper read, your strengths, what to watch for, and how you show up in relationships - {price}.',
+      'The full result gives you your four-letter type, the axis breakdown, the deeper read, your strengths, what to watch for, and how you show up in relationships - {price}.',
     paywallLocked: 'Unlocks after payment',
     emailLabel: 'Email for your result',
     emailPlaceholder: 'you@example.com',

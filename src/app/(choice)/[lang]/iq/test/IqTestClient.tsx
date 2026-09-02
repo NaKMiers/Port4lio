@@ -7,7 +7,19 @@ import { clientSessionId } from '@/lib/client-session'
 import type { Locale } from '@/lib/i18n'
 import { fill } from '@/lib/iq/content'
 
-type Question = { matrix: string; options: string[] }
+type Question = {
+  matrix: string
+  options: string[]
+  /**
+   * Intrinsic width-to-height ratio of the question body.
+   *
+   * On the wire because the client cannot infer it. Generator v1 had a single square layout,
+   * so the box below was `aspect-square` and that was correct. v2 also emits three-cell
+   * sequences at roughly 4.5:1, and a square box letterboxes those into a thin strip with
+   * large dead bands - eight of the twenty-six questions, all in the back half.
+   */
+  aspect: number
+}
 
 export type IqTestCopy = {
   questionProgress: string
@@ -315,12 +327,30 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
           WITHOUT their collapsing toolbar, so `vh` overshoots by the height of that bar and
           reintroduces a real scroll on exactly the devices with least room.
         */}
+        {/*
+          The box takes its shape from the question, not from a constant.
+
+          `maxWidth` still reserves vertical room the same way, but it has to be divided by
+          the aspect: the reserve is a HEIGHT budget, and for a wide sequence the width that
+          fits inside that height is proportionally larger. Using the height budget directly
+          as a width cap would shrink a 4.5:1 sequence to a fifth of the space it could use.
+        */}
         <div
-          className='mx-auto aspect-square w-full rounded-2xl border border-pp-line bg-white p-3 md:p-5'
-          style={{ maxWidth: 'min(100%, calc(100svh - 14rem))' }}
+          className='mx-auto w-full rounded-2xl border border-pp-line bg-white p-3 md:p-5'
+          style={{ maxWidth: `min(100%, calc((100svh - 14rem) * ${question.aspect}))` }}
         >
+          {/*
+            The ratio is on the CONTENT box, not the padded one.
+
+            Padding is uniform, so on a square it cancels and either position works - which is
+            why v1 got away with `aspect-square` on the outer box. On a 4.36:1 sequence it does
+            not cancel: 20px of padding each side leaves a content area at 5.5:1, and the SVG's
+            `xMidYMid meet` then centres a 4.36:1 drawing inside it with dead space either
+            side. Putting the ratio here makes the drawing fill the box it was measured for.
+          */}
           <div
-            className='h-full w-full [&>svg]:h-full [&>svg]:w-full'
+            className='w-full [&>svg]:h-full [&>svg]:w-full'
+            style={{ aspectRatio: String(question.aspect) }}
             dangerouslySetInnerHTML={{ __html: question.matrix }}
           />
         </div>

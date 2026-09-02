@@ -24,10 +24,15 @@ import { ATTEMPT_TTL_DAYS } from '@/models/Attempt'
  *
  * ## Why the seed is stored and the items are not
  *
- * The 26 items are a pure function of the seed (`lib/iq/items/generate.ts`). Storing the
- * seed means the result page can re-render the exact test somebody sat, months later,
- * without persisting any geometry - and it makes the answer key recomputable rather than
- * stored, so there is no key in the database to leak.
+ * The 26 items are a pure function of the seed AND the generator version (`lib/iq/items`).
+ * Storing both means the exact test somebody sat can be re-rendered months later without
+ * persisting any geometry - and it makes the answer key recomputable rather than stored, so
+ * there is no key in the database to leak.
+ *
+ * The version is not metadata. A seed names a test only in combination with the generator
+ * that built it; the moment a second generator exists, the same seed names two different
+ * tests, and scoring an old attempt with a new generator grades a taker against a test they
+ * never saw - returning a number that looks entirely plausible and means nothing.
  *
  * ## Retention
  *
@@ -41,6 +46,15 @@ export type IqAttemptDocument = {
   _id: string
   /** Regenerates the 26 items and the answer key. Never exposed to the client. */
   seed: number
+  /**
+   * Which generator built this attempt's items. Written at start, read at submit, never changed.
+   *
+   * Read as `attempt.generatorVersion ?? 1` at the call site rather than relying on the
+   * schema default: `findOneAndUpdate({ lean: true })` skips hydration, so a row written
+   * before this field existed comes back with it genuinely absent. Every such row is
+   * version 1 by definition, so no backfill is needed.
+   */
+  generatorVersion: number
   locale: string
   startedAt: Date
   submittedAt: Date | null
@@ -99,6 +113,7 @@ const iqAttemptSchema = new Schema(
   {
     _id: { type: String, required: true },
     seed: { type: Number, required: true },
+    generatorVersion: { type: Number, required: true, default: 1 },
     locale: { type: String, required: true },
     startedAt: { type: Date, required: true },
     submittedAt: { type: Date, default: null },

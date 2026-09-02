@@ -1,5 +1,6 @@
-import { barStripSvg, CELL, dotGridSvg, INK, shapeSvg } from '@/lib/iq/items/primitives'
-import type { Cell, Item } from '@/lib/iq/items/types'
+import { boxOf, GAP, holeAt, svgDocument } from '@/lib/iq/items/frame'
+import { barStripSvg, CELL, dotGridSvg, shapeSvg } from '@/lib/iq/items/primitives'
+import type { Cell, Item } from '@/lib/iq/items/v1/types'
 
 /**
  * Item to SVG.
@@ -24,8 +25,6 @@ import type { Cell, Item } from '@/lib/iq/items/types'
  * rather than its appearance.
  */
 
-const GAP = 12
-
 function cellSvg(cell: Cell, uid: string): string {
   switch (cell.type) {
     case 'shape':
@@ -39,21 +38,14 @@ function cellSvg(cell: Cell, uid: string): string {
   }
 }
 
-/** One cell at its own origin, boxed so the grid reads as a matrix rather than floating art. */
-function framedCell(cell: Cell, x: number, y: number, uid: string, boxed: boolean): string {
-  const frame = boxed
-    ? `<rect x="0.75" y="0.75" width="${CELL - 1.5}" height="${CELL - 1.5}" fill="none" stroke="${INK}" stroke-width="1" opacity="0.28"/>`
-    : ''
-  return `<g transform="translate(${x} ${y})">${frame}${cellSvg(cell, uid)}</g>`
-}
-
 /**
  * The 3x3 matrix with the bottom-right cell replaced by a question mark.
  *
- * `role="img"` plus a title, because a matrix with no text alternative is invisible to a
- * screen reader - and while a visual reasoning test cannot be made fully non-visual, it can
- * at least announce what it is and how far along the taker is, rather than reading as an
- * empty region.
+ * The box, hole and document markup come from `items/frame.ts`, shared with v2 - they are
+ * presentation decisions with no reason to fork just because the puzzle vocabulary did.
+ * Every byte is unchanged from the inline versions this replaced, which is not a claim to
+ * take on trust: `tests/unit/iq-generator-v1-frozen.test.ts` hashes the rendered output for
+ * twenty seeds, so a single moved space fails the build.
  */
 export function renderMatrix(item: Item, label: string): string {
   const width = CELL * 3 + GAP * 2
@@ -66,18 +58,16 @@ export function renderMatrix(item: Item, label: string): string {
     const y = row * (CELL + GAP)
 
     if (index === 8) {
-      parts.push(
-        `<g transform="translate(${x} ${y})"><rect x="0.75" y="0.75" width="${CELL - 1.5}" height="${CELL - 1.5}" fill="none" stroke="${INK}" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${CELL / 2}" y="${CELL / 2 + 14}" text-anchor="middle" font-size="42" font-weight="600" fill="${INK}">?</text></g>`
-      )
+      parts.push(holeAt(x, y))
       continue
     }
-    parts.push(framedCell(item.cells[index] as Cell, x, y, `m${index}`, true))
+    parts.push(boxOf(cellSvg(item.cells[index] as Cell, `m${index}`), x, y, true))
   }
 
-  return `<svg viewBox="0 0 ${width} ${width}" width="100%" role="img" aria-label="${label}" xmlns="http://www.w3.org/2000/svg">${parts.join('')}</svg>`
+  return svgDocument(width, width, parts.join(''), label)
 }
 
 /** A single answer option, sized to sit in a tap target. */
 export function renderOption(cell: Cell, uid: string): string {
-  return `<svg viewBox="0 0 ${CELL} ${CELL}" width="100%" role="presentation" xmlns="http://www.w3.org/2000/svg">${cellSvg(cell, uid)}</svg>`
+  return svgDocument(CELL, CELL, cellSvg(cell, uid))
 }

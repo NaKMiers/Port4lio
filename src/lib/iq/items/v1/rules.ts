@@ -1,5 +1,5 @@
 import { SHAPE_KINDS, type Shading, type ShapeKind } from '@/lib/iq/items/primitives'
-import { cellKey, pick, rng, shuffle, type Cell, type RuleSpec } from '@/lib/iq/items/types'
+import { cellKey, pick, rng, shuffle, type Cell, type RuleSpec } from '@/lib/iq/items/v1/types'
 
 /**
  * The rule vocabulary.

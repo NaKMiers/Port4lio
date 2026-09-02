@@ -8,7 +8,7 @@ import { SectionFrame } from '@/components/portfolio/primitives/SectionFrame'
 import MethodTease from '@/components/test-kit/MethodTease'
 import { isLocale, LOCALES } from '@/lib/i18n'
 import { fill, IQ_LANDING_SECTIONS, iqUi } from '@/lib/iq/content'
-import { ITEM_COUNT } from '@/lib/iq/items/generate'
+import { ITEM_COUNT } from '@/lib/iq/items/config'
 import { TEST_DURATION_SECONDS } from '@/lib/iq/scoring'
 import { getIqResultPrice } from '@/lib/iq/pricing'
 import {

@@ -44,7 +44,50 @@
  *
  * Both err toward generosity. A false positive costs one sale; a false negative charges
  * someone for noise, which is the failure that damages trust.
+ *
+ * The whole rule can be switched off with `EFFORT_WAIVER` - see `isEffortWaiverEnabled`.
  */
+
+/** Spellings accepted for the switch, so `off` and `0` do not silently read as "on". */
+const WAIVER_OFF_VALUES = new Set(['false', '0', 'off', 'no'])
+const WAIVER_ON_VALUES = new Set(['true', '1', 'on', 'yes'])
+
+/**
+ * Whether the waiver is switched on at all.
+ *
+ * ```
+ *   EFFORT_WAIVER          behaviour
+ *   ──────────────────────────────────────────────────────────────
+ *   unset / true / 1 / on  waived as described above (the default)
+ *   false / 0 / off / no   never waived - every attempt is charged
+ * ```
+ *
+ * One switch for both products, because this is one rule: the two detectors below differ
+ * only in what evidence they can read, and a deployment that does not want the waiver does
+ * not want half of it.
+ *
+ * Turning it off is only honest while nothing on the site still promises it, which is why
+ * `/iq/method` drops its "if you rush it, we do not charge" section from this same flag. A
+ * published promise the code does not keep is worse than never having made the promise.
+ *
+ * Default-on, so a deployment that never sets the variable keeps the behaviour it already
+ * shipped with. Three callers - the two submit routes and `/iq/method` - and nothing else
+ * reads `process.env.EFFORT_WAIVER`, so there is one place to look when the site starts
+ * charging for attempts it used to give away.
+ */
+export function isEffortWaiverEnabled(): boolean {
+  const raw = process.env.EFFORT_WAIVER?.trim().toLowerCase()
+  if (!raw) return true
+
+  if (WAIVER_OFF_VALUES.has(raw)) return false
+  if (WAIVER_ON_VALUES.has(raw)) return true
+
+  // Neither spelling. Falling back to ON keeps a typo from quietly starting to charge for
+  // noise scores, which is the exact failure this whole rule exists to prevent - and it is
+  // the same direction every threshold below errs in.
+  console.error(`[effort] EFFORT_WAIVER is not a boolean ("${raw}") - leaving the waiver on`)
+  return true
+}
 
 /**
  * The most correct answers a guesser is expected to stumble into.

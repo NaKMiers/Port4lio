@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { answerIndexFor, generateItem, generateTest, ITEM_COUNT, optionsFor } from '@/lib/iq/items/generate'
-import { renderMatrix, renderOption } from '@/lib/iq/items/render'
+import { ITEM_COUNT } from '@/lib/iq/items/config'
+import { answerIndexFor, generateItem, generateTest, optionsFor } from '@/lib/iq/items/v1/generate'
+import { renderMatrix, renderOption } from '@/lib/iq/items/v1/render'
 import { CELL } from '@/lib/iq/items/primitives'
-import { MAX_BARS } from '@/lib/iq/items/rules'
-import { cellKey } from '@/lib/iq/items/types'
-import { verifyItem } from '@/lib/iq/items/verify'
+import { MAX_BARS } from '@/lib/iq/items/v1/rules'
+import { cellKey } from '@/lib/iq/items/v1/types'
+import { verifyItem } from '@/lib/iq/items/v1/verify'
 
 /**
  * The generator's safety net.
