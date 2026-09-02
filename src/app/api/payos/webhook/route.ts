@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { deliverResultEmail } from '@/lib/mbti/result-email'
 import { connectDatabase } from '@/lib/mongodb'
 import { verifyPayosData, type PayosWebhookBody } from '@/lib/payos'
+import { fulfilIqPayment } from '@/lib/iq/fulfil'
+import { deliverIqResultEmail } from '@/lib/iq/result-email'
 import { fulfilMbtiPayment } from '@/lib/payos-fulfil'
 
 export const runtime = 'nodejs'
@@ -48,6 +50,12 @@ export async function POST(request: NextRequest) {
   try {
     await connectDatabase()
 
+    // Set when the order turns out to be an IQ one, so the acknowledgement below reports
+    // what actually happened rather than MBTI's `unknown-order-code`. Only ever read in
+    // logs and by PayOS's dashboard, but a fulfilled IQ payment reporting "unknown" is the
+    // kind of thing that wastes an hour during an incident.
+    let iqOutcome: string | null = null
+
     const result = await fulfilMbtiPayment(
       {
         orderCode,
@@ -67,11 +75,53 @@ export async function POST(request: NextRequest) {
         console.info(`[PayOS Webhook] ${orderCode} already processed`)
         break
 
-      // PayOS posts an arbitrary payload when the webhook URL is registered, and it must
-      // still receive a 2XX or registration fails.
-      case 'unknown-order-code':
-        console.info(`[PayOS Webhook] No payment for ${orderCode} (registration ping?)`)
+      /**
+       * Not an MBTI order. Two possibilities, and they need telling apart.
+       *
+       * ```
+       *   orderCode ──▶ fulfilMbtiPayment ──▶ unknown-order-code
+       *                                            │
+       *                                            ▼
+       *                                    fulfilIqPayment
+       *                                       │          │
+       *                                   fulfilled   unknown ──▶ registration ping
+       * ```
+       *
+       * Both products share one PayOS merchant account, so one webhook receives both and
+       * has to route by order code. Chaining on `unknown-order-code` rather than looking
+       * the code up twice up front keeps MBTI - the older, higher-volume path - at one
+       * query.
+       *
+       * PayOS also posts an arbitrary payload when the webhook URL is registered, and must
+       * receive a 2XX or registration fails. That is what falls through both lookups.
+       */
+      case 'unknown-order-code': {
+        const iq = await fulfilIqPayment(
+          { orderCode, amount, reference: data?.reference },
+          deliverIqResultEmail
+        )
+        iqOutcome = iq.outcome
+        switch (iq.outcome) {
+          case 'fulfilled':
+            console.info(`[PayOS Webhook] Fulfilled IQ result ${orderCode}`)
+            break
+          case 'already-processed':
+            console.info(`[PayOS Webhook] IQ ${orderCode} already processed`)
+            break
+          case 'amount-mismatch':
+            console.error(`[PayOS Webhook] AMOUNT MISMATCH on IQ ${orderCode}`)
+            break
+          // Already logged in full by fulfilIqPayment, which is the only place that knows
+          // a claimed payment failed to unlock or deliver.
+          case 'delivery-failed':
+            console.error(`[PayOS Webhook] IQ paid but undelivered: ${orderCode}`)
+            break
+          case 'unknown-order-code':
+            console.info(`[PayOS Webhook] No payment for ${orderCode} (registration ping?)`)
+            break
+        }
         break
+      }
 
       // Someone paid an amount we never asked for. Not fulfilled, and loud: this is either
       // a bug in our own amount handling or someone probing the endpoint.
@@ -89,7 +139,10 @@ export async function POST(request: NextRequest) {
     // Always acknowledge a verified webhook, whatever the outcome. A non-2XX makes PayOS
     // retry a payload we have already recorded, and the retry would find the payment
     // claimed and report success - so the retry buys nothing and costs a duplicate.
-    return NextResponse.json({ success: true, outcome: result.outcome }, { status: 200 })
+    return NextResponse.json(
+      { success: true, outcome: iqOutcome ?? result.outcome },
+      { status: 200 }
+    )
   } catch (error) {
     // A genuine server-side failure - database down, most likely. Let PayOS retry, because
     // this one really might succeed next time.

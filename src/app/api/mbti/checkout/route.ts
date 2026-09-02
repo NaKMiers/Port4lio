@@ -8,6 +8,8 @@ import { createPaymentLink, generatePayosOrderCode, PayosError } from '@/lib/pay
 import { payosOrderCodeIsTaken } from '@/lib/payos-fulfil'
 import { checkRateLimit, CHECKOUT_LIMIT, clientIpFrom } from '@/lib/rate-limit'
 import { resolveSiteOrigin } from '@/lib/seo'
+import { normaliseEmail } from '@/lib/test-kit/contact'
+import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { isTokenShaped } from '@/lib/tokens'
 import { AttemptModel, type AttemptDocument } from '@/models/Attempt'
 import { PaymentModel, unpaidPaymentExpiryFrom, type PaymentDocument } from '@/models/Payment'
@@ -16,8 +18,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const MAX_BODY_BYTES = 4 * 1024
-/** RFC 5321 caps the whole address at 254. */
-const MAX_EMAIL_LENGTH = 254
+
 /**
  * How long a payment link stays payable. Long enough to open a banking app and find the
  * transfer screen, short enough that an abandoned link does not sit around claimable.
@@ -27,13 +28,6 @@ const MAX_EMAIL_LENGTH = 254
  * matches what PayOS enforces.
  */
 const LINK_TTL_MINUTES = 15
-
-/**
- * Deliberately permissive. The only thing this needs to catch is a typo bad enough that no
- * mail could ever be delivered; anything stricter starts rejecting valid addresses, and the
- * real proof an address works is whether the result email arrives.
- */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
  * [POST] /api/mbti/checkout
@@ -88,8 +82,8 @@ export async function POST(request: NextRequest) {
     return jsonError('Invalid result token', 400)
   }
 
-  const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : ''
-  if (!email || email.length > MAX_EMAIL_LENGTH || !EMAIL_PATTERN.test(email)) {
+  const email = normaliseEmail(rawEmail)
+  if (!email) {
     return jsonError('Please enter a valid email address', 400)
   }
 
@@ -105,6 +99,13 @@ export async function POST(request: NextRequest) {
 
   // Not an error worth charging for twice. The client treats this as "reload and read it".
   if (attempt.paid) {
+    return NextResponse.json({ alreadyPaid: true }, { status: 200 })
+  }
+
+  // Already free, and the result page says so. Answered the same way as `paid` because it
+  // is the same situation from the buyer's side: there is nothing left to buy, so reload
+  // and read it. Taking money here would charge for something we already gave away.
+  if (attempt.waived) {
     return NextResponse.json({ alreadyPaid: true }, { status: 200 })
   }
 
@@ -171,6 +172,11 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       expireAt: unpaidPaymentExpiryFrom(new Date()),
     })
+
+    // Server-emitted, like `paid`: a payment link now exists at PayOS, which is a fact
+    // only this handler knows. Detached so a counter never delays handing the buyer their
+    // QR code.
+    recordFunnelDetached('mbti', FUNNEL_EVENTS.checkoutStarted)
 
     return NextResponse.json(await paymentResponse(created.toObject() as PaymentDocument), {
       status: 201,

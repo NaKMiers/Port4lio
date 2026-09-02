@@ -1,21 +1,25 @@
 import type { Config } from 'tailwindcss'
-import tailwindScrollbar from 'tailwind-scrollbar'
 
+/**
+ * One content glob, because there is one source root.
+ *
+ * The three that used to sit above it - `./app`, `./pages`, `./components` - came from
+ * `create-next-app`'s template and pointed at directories this project has never had.
+ * Tailwind stats every glob on every rebuild, so they were pure cost for zero coverage.
+ */
 const config: Config = {
-  content: [
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-
-    // Or if using `src` directory:
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     container: {
       padding: {
         DEFAULT: '15px',
       },
     },
+    /**
+     * A full override, not an extension - so Tailwind's default `2xl` (1536px) does not
+     * exist here. Deliberate, and verified: nothing in `src/` uses a `2xl:` prefix, and a
+     * `2xl:` class under this config would silently do nothing.
+     */
     screens: {
       sm: '640px',
       md: '768px',
@@ -24,6 +28,7 @@ const config: Config = {
     },
     extend: {
       colors: {
+        /** Dark admin chrome (`SiteChrome` and the nav/header inside it). */
         primary: '#111',
         secondary: '#393A47',
         accent: '#00bfff',
@@ -42,16 +47,14 @@ const config: Config = {
           orange: 'var(--pp-orange)',
         },
       },
-      backgroundImage: {
-        circles: 'url("/bg-circles.png")',
-        circleStar: 'url("/circle-star.svg")',
-        site: 'url("/site-bg.svg")',
-      },
-      animation: {
-        'spin-slow': 'spin 6s linear infinite',
-      },
+      /**
+       * Each of these must have a matching `--font-*` variable set by `next/font` in the
+       * root layout. `poppins` used to be listed here and had none: the font was dropped
+       * from the layout at some point, so `font-poppins` resolved to an empty variable and
+       * fell through to `sans-serif`. Nothing used it, and it would have failed silently if
+       * anything had.
+       */
       fontFamily: {
-        poppins: [`var(--font-poppins)`, 'sans-serif'],
         sora: [`var(--font-sora)`, 'sans-serif'],
         display: [`var(--font-montserrat)`, 'Montserrat', 'system-ui', 'sans-serif'],
         editorial: [`var(--font-source-sans-3)`, 'Source Sans 3', 'system-ui', 'sans-serif'],
@@ -72,11 +75,6 @@ const config: Config = {
       },
     },
   },
-  container: {
-    padding: {
-      DEFAULT: '15px',
-    },
-  },
-  plugins: [tailwindScrollbar],
+  plugins: [],
 }
 export default config

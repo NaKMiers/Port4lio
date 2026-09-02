@@ -69,25 +69,43 @@ describe('metadata copy', () => {
     }
   })
 
-  it('puts the price inside the part of the description that survives truncation', () => {
-    // The price is the whole competitive claim. At the end of a 226-character description
-    // it was written for nobody.
+  /**
+   * No figure reaches a search result.
+   *
+   * The product decision is that someone commits to the test first and sees the price on
+   * their own result page - so a snippet quoting the amount would defeat the sequencing on
+   * the page it links to. This test is the guard: it fails if any amount leaks back into
+   * the metadata, which is exactly what an innocent-looking copy edit would do.
+   */
+  it('never names an amount in metadata, whatever the price is', () => {
     for (const locale of LOCALES) {
-      const description = landingDescription(locale, 2000)
-      expect(description.indexOf('2.000₫'), `${locale}`).toBeLessThan(100)
+      for (const price of [2000, 50_000]) {
+        for (const text of [
+          priceLine(locale, price),
+          landingDescription(locale, price),
+          typeDescription(locale, 'INFJ', price),
+        ]) {
+          expect(text, `${locale} @ ${price}`).not.toMatch(/[\d.,]+\s*₫/)
+          expect(text, `${locale} @ ${price}`).not.toMatch(/\d{3,}/)
+        }
+      }
     }
   })
 
-  it('leads with the price when there is one, and with free when there is not', () => {
+  it('still distinguishes a free product from a paid one', () => {
+    // Withholding the figure is a sequencing choice; implying there is no figure would be a
+    // lie discovered at the worst moment. So the two modes must not read identically.
+    for (const locale of LOCALES) {
+      expect(priceLine(locale, 0)).not.toBe(priceLine(locale, 2000))
+    }
     expect(priceLine('vi', 0)).toContain('miễn phí')
-    expect(priceLine('vi', 2000)).toContain('2.000₫')
-    expect(priceLine('en', 2000)).toContain('2.000₫')
+    expect(priceLine('en', 0).toLowerCase()).toContain('free')
   })
 
   it('makes no unprovable superlative claim', () => {
     // Deliberate: Google does not reward superlatives in meta text, and Vietnam's
-    // advertising law restricts unsubstantiated "nhất" claims. The price is the
-    // differentiator and it is verifiable.
+    // advertising law restricts unsubstantiated "nhất" claims. What the copy claims
+    // instead - question count, four axes, no account - is all checkable on the page.
     for (const locale of LOCALES) {
       const all = [
         landingTitle(locale, 2000),
@@ -118,18 +136,20 @@ describe('hreflang', () => {
 })
 
 describe('structured data', () => {
-  it('prices the offer in dong, as a number a crawler can read', () => {
-    const product = productJsonLd('vi', 2000) as {
-      offers: { price: string; priceCurrency: string }
-    }
-    expect(product.offers.price).toBe('2000')
-    // Omitting the currency makes 2000 read as two thousand dollars.
-    expect(product.offers.priceCurrency).toBe('VND')
+  it('omits the offer entirely when the result is paid', () => {
+    // An `Offer` carrying `price` is exactly how an amount reaches a rich result, and the
+    // amount is not disclosed before someone finishes the test. A crawler is not an
+    // exception to that rule.
+    const product = productJsonLd('vi', 2000) as { offers?: unknown }
+    expect(product.offers).toBeUndefined()
   })
 
   it('still emits a valid offer when results are free', () => {
-    const product = productJsonLd('vi', 0) as { offers: { price: string } }
+    // Nothing to sequence when the answer is "nothing", and "free" is worth saying.
+    const product = productJsonLd('vi', 0) as { offers: { price: string; priceCurrency: string } }
     expect(product.offers.price).toBe('0')
+    // Omitting the currency makes a bare 0 ambiguous rather than free.
+    expect(product.offers.priceCurrency).toBe('VND')
   })
 
   it('builds absolute breadcrumb URLs in order', () => {
@@ -166,9 +186,15 @@ describe('structured data', () => {
     }
   })
 
-  it('tells the truth about price in the FAQ, in both modes', () => {
+  it('answers the cost question honestly without naming the amount', () => {
+    // "Is this free?" has to be answered truthfully on a page that will later charge. The
+    // answer says a paid unlock exists and where the price appears; it just does not
+    // pre-empt the result page by quoting the figure.
     expect(faqEntries('vi', 0)[0].a).toContain('miễn phí')
-    expect(faqEntries('vi', 2000)[0].a).toContain('2.000₫')
+
+    const paid = faqEntries('vi', 2000)[0].a
+    expect(paid).not.toMatch(/[\d.,]+\s*₫/)
+    expect(paid).toContain('trả phí')
   })
 
   it('attributes the MBTI section to the site-wide Person entity', () => {

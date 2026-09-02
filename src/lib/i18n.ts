@@ -53,8 +53,18 @@ export function swapLocale(pathname: string, target: Locale): string {
   }
   // No locale prefix. Shouldn't happen inside `(choice)`, but a wrong guess should still
   // land on a real page rather than build `/en//mbti` or double-prefix the path.
-  return `/${target}/mbti`
+  //
+  // The product is read from the path rather than hardcoded: this used to always return
+  // `/mbti`, which would have sent an IQ visitor to the MBTI landing page on a language
+  // switch. The happy path above never needed changing - it is a segment swap and has
+  // always been product-agnostic - so only this fallback carried the assumption.
+  const product = PRODUCTS.find(candidate => segments[1] === candidate) ?? DEFAULT_PRODUCT
+  return `/${target}/${product}`
 }
+
+/** Test products under `(choice)`. Order matters only for `DEFAULT_PRODUCT`. */
+const PRODUCTS = ['mbti', 'iq'] as const
+const DEFAULT_PRODUCT = PRODUCTS[0]
 
 /**
  * Picks a locale from an `Accept-Language` header.

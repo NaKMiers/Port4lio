@@ -119,3 +119,50 @@ export const STATUS_LIMIT: RateLimitOptions = {
   limit: 90,
   windowSeconds: 60,
 }
+
+/**
+ * Measurement beacons. Loose, because a single honest visitor legitimately emits several:
+ * one share, one attribution on landing, and a progress beacon on each tab switch away
+ * from the test. Tight enough that a script cannot fill a database shared with the
+ * portfolio.
+ *
+ * Worth being clear about what this does and does not protect. Writes here are already
+ * idempotent - the subject is baked into the document `_id`, so a flood of repeats updates
+ * one row rather than adding rows. This is a volume guard on the write path, not the thing
+ * keeping the numbers honest; that job belongs to the `_id` and to `assertClientPostable`.
+ */
+export const EVENT_LIMIT: RateLimitOptions = {
+  route: 'event',
+  limit: 60,
+  windowSeconds: 60,
+}
+
+/**
+ * Starting an IQ test. Each call writes a row and starts a 24-minute clock, so this is the
+ * one IQ endpoint a script could use to fill the collection. Tight, because a real person
+ * starts one test, or a few if they abandon and come back.
+ */
+export const IQ_START_LIMIT: RateLimitOptions = {
+  route: 'iq-start',
+  limit: 8,
+  windowSeconds: 60,
+}
+
+/**
+ * Submitting a finished IQ test. Looser than starting: submit is idempotent, so a retry
+ * after a flaky connection is a normal thing to do and must not be punished with a 429 on
+ * work that took 24 minutes.
+ */
+export const IQ_SUBMIT_LIMIT: RateLimitOptions = {
+  route: 'iq-submit',
+  limit: 20,
+  windowSeconds: 60,
+}
+
+/*
+ * IQ checkout has no limit of its own: `/api/iq/checkout` uses `CHECKOUT_LIMIT` above.
+ *
+ * The limit exists to protect PayOS's order-code quota, which is per merchant account and
+ * shared by both products - so one bucket covering both is the accurate model. Two separate
+ * buckets would let an abuser spend twice the quota by alternating between them.
+ */

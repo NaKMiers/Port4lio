@@ -19,6 +19,35 @@ export const revalidate = 60
  */
 const MBTI_CONTENT_UPDATED_AT = new Date('2026-09-02T00:00:00.000Z')
 
+/**
+ * ## Why there are no `alternates` here, even though hreflang matters
+ *
+ * Next renders `alternates.languages` as `<xhtml:link>` elements and declares
+ * `xmlns:xhtml` on `<urlset>`. That is valid sitemap XML and crawlers read it fine - but
+ * Chrome's built-in XML tree viewer refuses to engage on any document containing
+ * XHTML-namespace elements, because those are potentially renderable HTML. The viewer
+ * falls back to default XML styling, where unknown elements are `display: inline` and
+ * carry no tag decoration, so `/sitemap.xml` renders as one unreadable paragraph of run
+ * together URLs and dates instead of the familiar collapsible tree.
+ *
+ * Measured on this exact feed, same server and same `application/xml` response, changing
+ * nothing but these elements:
+ *
+ * ```
+ *   with <xhtml:link>   documentElement = urlset   viewer off   height  800px  (flat text)
+ *   without             documentElement = html     viewer on    height 4083px  (tree)
+ * ```
+ *
+ * The signal is not lost. Every page already emits its own hreflang set in `<head>` via
+ * `alternates.languages` in its `generateMetadata`, and that set additionally carries
+ * `x-default`, which the sitemap entries never did. Page-level hreflang is the form
+ * Google documents first; the sitemap pair was a redundant second copy.
+ *
+ * So this trades a duplicate machine-readable hint for a feed a human can actually read
+ * while debugging. If sitemap-level hreflang is ever wanted back, re-adding `alternates`
+ * to these entries is all it takes - and the tree view will disappear again.
+ */
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = resolveSiteOrigin().replace(/\/$/, '')
   const lm = await getPublicProfileUpdatedAt()
@@ -39,26 +68,50 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: MBTI_CONTENT_UPDATED_AT,
       changeFrequency: 'monthly' as const,
       priority: 0.9,
-      // hreflang pairs in the sitemap as well as in each page's head. Google treats the
-      // two as independent signals and a sitemap-level pair is the one that survives a
-      // crawler that never fetches the alternate page.
-      alternates: {
-        languages: Object.fromEntries(LOCALES.map(l => [l, `${origin}/${l}/mbti`])),
-      },
     },
     ...MBTI_TYPES.map(type => ({
       url: `${origin}/${lang}/mbti/${slugFromType(type)}`,
       lastModified: MBTI_CONTENT_UPDATED_AT,
       changeFrequency: 'monthly' as const,
       priority: 0.7,
-      alternates: {
-        languages: Object.fromEntries(
-          LOCALES.map(l => [l, `${origin}/${l}/mbti/${slugFromType(type)}`])
-        ),
-      },
     })),
     {
       url: `${origin}/${lang}/mbti/privacy`,
+      lastModified: MBTI_CONTENT_UPDATED_AT,
+      changeFrequency: 'yearly' as const,
+      priority: 0.2,
+    },
+  ])
+
+  /**
+   * IQ. Only the three pages that are genuinely public and static.
+   *
+   * Deliberately absent, and each for its own reason:
+   *   /iq/test              a shell with no content, and a crawl would start a real attempt
+   *   /iq/result/[id]       the URL IS the credential; an indexed one is a leaked one
+   *   /iq/certificate/[id]  public, but unbounded and per-buyer - it belongs in an unfurl,
+   *                         not a sitemap, and nobody searches for a stranger's certificate
+   *   /iq/verify/[id]       same, and it only means anything to someone holding the id
+   *
+   * `/iq/method` gets a real priority rather than a token one: "how is this scored" is a
+   * genuine search, and it is the page carrying the honesty commitment, so it is worth
+   * being findable independently of the landing page.
+   */
+  const iq: MetadataRoute.Sitemap = LOCALES.flatMap(lang => [
+    {
+      url: `${origin}/${lang}/iq`,
+      lastModified: MBTI_CONTENT_UPDATED_AT,
+      changeFrequency: 'monthly' as const,
+      priority: 0.9,
+    },
+    {
+      url: `${origin}/${lang}/iq/method`,
+      lastModified: MBTI_CONTENT_UPDATED_AT,
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    },
+    {
+      url: `${origin}/${lang}/iq/privacy`,
       lastModified: MBTI_CONTENT_UPDATED_AT,
       changeFrequency: 'yearly' as const,
       priority: 0.2,
@@ -88,5 +141,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     ...mbti,
+    ...iq,
   ]
 }

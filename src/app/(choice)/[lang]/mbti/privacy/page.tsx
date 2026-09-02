@@ -7,6 +7,7 @@ import { EditorialPanel } from '@/components/portfolio/primitives/EditorialPanel
 import { SectionFrame } from '@/components/portfolio/primitives/SectionFrame'
 import { isLocale, LOCALES } from '@/lib/i18n'
 import { UI } from '@/lib/mbti/content'
+import { alternateLanguages } from '@/lib/mbti/seo'
 import { ATTEMPT_TTL_DAYS } from '@/models/Attempt'
 
 /**
@@ -32,7 +33,33 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { lang } = await params
   if (!isLocale(lang)) return {}
-  return { title: UI[lang].privacy }
+
+  /**
+   * This page is listed in `sitemap.ts`, so it is a page we are actively asking Google to
+   * index - but it was shipping with nothing except a title. No canonical, no hreflang, no
+   * description, while its IQ counterpart had the first two.
+   *
+   * Each of those has a concrete cost. Without a canonical, any URL that reaches this
+   * content (a query string appended by a referrer, say) is a separate indexable duplicate
+   * competing with the real one. Without `languages`, the Vietnamese and English notices
+   * look like two unrelated pages, and Google picks one and suppresses the other rather
+   * than serving each to its own audience. Without a description, the search snippet is
+   * whatever fragment of the page Google decides to scrape - on a privacy notice that is
+   * often a sentence from the middle of the retention section.
+   *
+   * The description reuses `COPY[lang].intro`, the paragraph already rendered at the top of
+   * the page, rather than a second hand-written summary that would be free to contradict
+   * it. `COPY` is declared below this function; that is fine, because `generateMetadata`
+   * runs after the module has evaluated.
+   */
+  return {
+    title: UI[lang].privacy,
+    description: COPY[lang].intro,
+    alternates: {
+      canonical: `/${lang}/mbti/privacy`,
+      languages: alternateLanguages(locale => `/${locale}/mbti/privacy`),
+    },
+  }
 }
 
 const COPY = {
@@ -48,6 +75,10 @@ const COPY = {
       {
         heading: 'Những gì KHÔNG được lưu',
         body: 'Chúng tôi không dùng cookie theo dõi, không gắn mã quảng cáo, và không chia sẻ dữ liệu với bên thứ ba. Nếu bạn chỉ làm bài trắc nghiệm miễn phí, chúng tôi không có bất kỳ thông tin liên hệ nào của bạn.',
+      },
+      {
+        heading: 'Số liệu sử dụng',
+        body: `Chúng tôi đếm một số việc để biết trang này có hoạt động hay không: bài test được xem, được chia sẻ, và bạn dừng lại ở câu hỏi thứ mấy nếu bỏ dở. Khi bạn bấm chia sẻ, chúng tôi tạo một mã ngẫu nhiên gắn trong đường dẫn - mã này chỉ cho biết một lượt chia sẻ đã xảy ra, và không mở được kết quả của bạn. Mỗi tab trình duyệt có một mã tạm thời, lưu trong sessionStorage, tự mất khi bạn đóng tab; nó chỉ để tránh đếm trùng một người. Không có tên, không có email, không có bên thứ ba, và toàn bộ số liệu này cũng tự xóa sau ${ATTEMPT_TTL_DAYS} ngày như kết quả.`,
       },
       {
         heading: 'Nếu bạn mua kết quả đầy đủ',
@@ -83,6 +114,10 @@ const COPY = {
       {
         heading: 'What is NOT stored',
         body: 'No tracking cookies, no advertising pixels, and no sharing with third parties. If you only take the free test, we hold no way of contacting you at all.',
+      },
+      {
+        heading: 'Usage counts',
+        body: `We count a few things to know whether this actually works: results viewed, results shared, and how far you got if you left the test unfinished. When you tap share we generate a random code that travels in the link - it only records that a share happened and cannot open your result. Each browser tab gets a temporary id kept in sessionStorage, which disappears when you close the tab; its only job is to avoid counting one person twice. No name, no email, no third party, and these counts are deleted after ${ATTEMPT_TTL_DAYS} days along with the result itself.`,
       },
       {
         heading: 'If you buy the full result',

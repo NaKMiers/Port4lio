@@ -21,7 +21,8 @@ import { groupOfType, MBTI_TYPES, slugFromType, typeFromSlug } from '@/lib/mbti/
 export const runtime = 'nodejs'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
-export const alt = ''
+/** See the landing card: a text-bearing share image gets a real alt. */
+export const alt = 'MBTI personality type'
 
 /** Prerender all 32 cards at build time; these routes are already `dynamicParams: false`. */
 export function generateStaticParams() {

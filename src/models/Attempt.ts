@@ -9,7 +9,7 @@ import type { Axis } from '@/lib/mbti/types'
  *   POST /api/mbti/submit
  *        │
  *        ▼
- *   score(answers) ──▶ Attempt { _id: <token>, type, scores, expireAt: +90d }
+ *   score(answers) ──▶ Attempt { _id: <token>, type, scores, expireAt: +21d }
  *        │                          │
  *        │                          ▼
  *        └────────────▶ /[lang]/mbti/result/<token>
@@ -41,6 +41,14 @@ export type AttemptDocument = {
    * must hold nothing that identifies a person.
    */
   paid: boolean
+  /**
+   * Whether the result was released free because the answers are a pattern, not an opinion.
+   *
+   * Decided at submit and stored, so the result page and the checkout route cannot disagree
+   * and a later threshold change cannot start charging someone already told it was free.
+   * Never conflated with `paid` - that counter is revenue. See `lib/test-kit/effort.ts`.
+   */
+  waived: boolean
   createdAt: Date
   /**
    * TTL anchor. Mongo deletes the document once this timestamp passes.
@@ -91,6 +99,7 @@ const attemptSchema = new Schema(
     answers: { type: [String], required: true },
     locale: { type: String, required: true },
     paid: { type: Boolean, required: true, default: false },
+    waived: { type: Boolean, required: true, default: false },
     createdAt: { type: Date, default: Date.now },
     expireAt: { type: Date, default: null },
   },

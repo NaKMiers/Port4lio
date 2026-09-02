@@ -34,16 +34,21 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   /**
-   * Only unprefixed `/mbti` paths. Everything else - the portfolio at `/`, `/cv`,
+   * Only unprefixed test-product paths. Everything else - the portfolio at `/`, `/cv`,
    * `/api/*`, `/_next/*`, files with extensions, and already-prefixed `/vi|/en` paths -
    * skips this proxy entirely, so the portfolio's static rendering is untouched.
    *
    * Kept as an explicit list rather than a negative lookahead: the failure mode of a
    * too-broad matcher here is redirecting the portfolio into a locale that does not
    * exist, and an allowlist cannot do that.
+   *
+   * The cost of the allowlist is that a new product is invisible here until someone adds
+   * it, which is exactly what happened to `/iq` - the routes existed and worked under
+   * `/vi/iq`, but a bare `/iq` fell through to a 404. Next requires these to be static
+   * literals it can analyse at build time, so this cannot be generated from
+   * `TEST_PRODUCTS`; `tests/unit/proxy-matcher.test.ts` asserts the two stay in step
+   * instead.
    */
-  matcher: ['/mbti', '/mbti/:path*'],
+  matcher: ['/mbti', '/mbti/:path*', '/iq', '/iq/:path*'],
 }
 
-/** Exported for the proxy test; not used at runtime. */
-export const SUPPORTED_LOCALES = LOCALES

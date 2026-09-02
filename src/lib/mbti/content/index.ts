@@ -134,7 +134,9 @@ export const UI = {
     rateLimited: 'Bạn thao tác hơi nhanh. Vui lòng thử lại sau một lát.',
     genericError: 'Có lỗi xảy ra. Vui lòng thử lại.',
 
-    // Paywall. Only rendered when MBTI_RESULT_PRICE is set above the PayOS minimum.
+    // Paywall. Only rendered when MBTI_RESULT_PRICE is set above the PayOS minimum. The
+    // mechanical checkout strings (QR, bank fields, countdown) come from
+    // `lib/test-kit/payment-copy.ts`, shared with IQ.
     paywallTitle: 'Mở khóa kết quả đầy đủ',
     /** `{price}` is filled from the configured amount, formatted in đồng. */
     paywallLead:
@@ -143,30 +145,35 @@ export const UI = {
     emailLabel: 'Email nhận kết quả',
     emailPlaceholder: 'ban@example.com',
     emailHint: 'Chúng tôi chỉ dùng email này để gửi kết quả cho bạn.',
-    payButton: 'Thanh toán',
-    payPreparing: 'Đang tạo mã thanh toán...',
-    payScanTitle: 'Quét mã để thanh toán',
-    payScanLead: 'Mở app ngân hàng và quét mã QR bên dưới.',
-    payManualTitle: 'Hoặc chuyển khoản thủ công',
-    payBank: 'Ngân hàng',
-    payAccountNumber: 'Số tài khoản',
-    payAccountName: 'Chủ tài khoản',
-    payAmount: 'Số tiền',
-    payTransferNote: 'Nội dung chuyển khoản',
-    payTransferWarning:
-      'Chuyển đúng nội dung ở trên, nếu không hệ thống không thể đối chiếu giao dịch của bạn.',
-    payWaiting: 'Đang chờ thanh toán...',
-    payDone: 'Đã nhận thanh toán. Đang mở kết quả...',
-    payCancelled: 'Giao dịch đã hết hạn hoặc bị hủy. Vui lòng thử lại.',
-    payExpiresIn: 'Mã thanh toán còn hiệu lực',
-    payExpired: 'Mã thanh toán đã hết hạn.',
-    payRetry: 'Tạo mã thanh toán mới',
     /** `{email}` is the address the buyer just entered. */
     payDeliveryNote:
       'Kết quả sẽ hiện ngay trên trang này sau khi thanh toán, đồng thời được gửi tới {email}. Vui lòng không rời khỏi trang trong lúc chờ.',
     copy: 'Sao chép',
     copied: 'Đã sao chép',
     invalidEmail: 'Email không hợp lệ.',
+    /**
+     * Sharing. The link points at the public type page, never at a result URL - a result
+     * URL is the credential for that result, so pasting one into a group chat would hand
+     * it to everyone there.
+     */
+    shareButton: 'Chia sẻ kết quả',
+    shareCopied: 'Đã sao chép liên kết',
+    shareCopyManually: 'Sao chép liên kết này:',
+    /** `{type}` is the four-letter code. Written to read well pasted into a group chat. */
+    shareTitle: 'Tôi thuộc nhóm {type}',
+    shareText: 'Tôi vừa làm bài test MBTI và ra {type}. Bạn thì sao?',
+    /** Shown on a locked result so a recipient still has a way into the test. */
+    lockedRecruitLead: 'Chưa làm bài test?',
+    /**
+     * Shown instead of the paywall when the answers are a pattern rather than a choice.
+     *
+     * Names what was detected instead of hinting at it. MBTI has no wrong answers, so the
+     * only honest thing to point at is the shape of the responses themselves.
+     */
+    waivedTitle: 'Lần này miễn phí',
+    waivedBody:
+      'Gần như toàn bộ câu trả lời của bạn đều nghiêng về một phía, hoặc lặp lại theo một nhịp cố định. Kết quả bên dưới vì vậy phản ánh cách bạn bấm, không phải cách bạn nghĩ - nên chúng tôi không thu phí cho nó. Nếu bạn muốn một kết quả có ý nghĩa, hãy làm lại và trả lời theo cảm nhận thật.',
+    lockedRecruitCta: 'Làm bài test miễn phí',
   },
   en: {
     brand: 'MBTI',
@@ -229,7 +236,9 @@ export const UI = {
     rateLimited: 'That was a bit fast. Please try again in a moment.',
     genericError: 'Something went wrong. Please try again.',
 
-    // Paywall. Only rendered when MBTI_RESULT_PRICE is set above the PayOS minimum.
+    // Paywall. Only rendered when MBTI_RESULT_PRICE is set above the PayOS minimum. The
+    // mechanical checkout strings (QR, bank fields, countdown) come from
+    // `lib/test-kit/payment-copy.ts`, shared with IQ.
     paywallTitle: 'Unlock the full result',
     /** `{price}` is filled from the configured amount, formatted in đồng. */
     paywallLead:
@@ -238,29 +247,25 @@ export const UI = {
     emailLabel: 'Email for your result',
     emailPlaceholder: 'you@example.com',
     emailHint: 'Used only to send you the result.',
-    payButton: 'Pay',
-    payPreparing: 'Creating your payment...',
-    payScanTitle: 'Scan to pay',
-    payScanLead: 'Open your banking app and scan the QR code below.',
-    payManualTitle: 'Or transfer manually',
-    payBank: 'Bank',
-    payAccountNumber: 'Account number',
-    payAccountName: 'Account name',
-    payAmount: 'Amount',
-    payTransferNote: 'Transfer description',
-    payTransferWarning:
-      'Send exactly the description above, or the transfer cannot be matched to your result.',
-    payWaiting: 'Waiting for your payment...',
-    payDone: 'Payment received. Opening your result...',
-    payCancelled: 'That payment expired or was cancelled. Please try again.',
-    payExpiresIn: 'Payment code valid for',
-    payExpired: 'This payment code has expired.',
-    payRetry: 'Create a new payment code',
     /** `{email}` is the address the buyer just entered. */
     payDeliveryNote:
       'Your result will appear on this page as soon as the payment lands, and a copy goes to {email}. Please stay on this page while you pay.',
     copy: 'Copy',
     copied: 'Copied',
     invalidEmail: 'That email address is not valid.',
+    /** See the Vietnamese entry for why the shared link is never a result URL. */
+    shareButton: 'Share your result',
+    shareCopied: 'Link copied',
+    shareCopyManually: 'Copy this link:',
+    /** `{type}` is the four-letter code. */
+    shareTitle: "I'm {type}",
+    shareText: 'I just took the MBTI test and got {type}. What about you?',
+    /** Shown on a locked result so a recipient still has a way into the test. */
+    lockedRecruitLead: 'Not taken the test yet?',
+    /** See the Vietnamese entry: the detected pattern is named, not hinted at. */
+    waivedTitle: 'This one is free',
+    waivedBody:
+      'Almost every answer leaned the same way, or repeated on a fixed rhythm. The result below therefore reflects how you clicked rather than how you think - so we are not charging for it. If you want a result that means something, take it again and answer as you actually feel.',
+    lockedRecruitCta: 'Take it free',
   },
 } as const

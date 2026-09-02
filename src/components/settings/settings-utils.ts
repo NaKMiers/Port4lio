@@ -1,16 +1,3 @@
-import type {
-  Certificate,
-  EducationItem,
-  ExperienceItem,
-  Profile,
-  ProjectItem,
-  ProjectPart,
-  ServiceItem,
-  SocialLink,
-  SkillGroup,
-  SkillItem,
-} from '@/types/profile'
-import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
 import { MAX_UPLOAD_BYTES, formatMaxUploadMb } from '@/lib/upload-limits'
 
 export const MAX_UPLOAD_MB_LABEL = formatMaxUploadMb()
@@ -38,8 +25,6 @@ export const emptyStateCls =
   'rounded-[1rem] border border-dashed border-pp-line bg-white/42 px-4 py-3 text-xs font-medium text-pp-muted'
 export const uploadInputCls =
   `${inputCls} file:mr-3 file:rounded-full file:border file:border-pp-line file:bg-[rgba(255,255,255,0.94)] file:px-3.5 file:py-2 file:text-[11px] file:font-semibold file:uppercase file:tracking-[0.14em] file:text-pp-text hover:file:bg-white`
-export const inlineLinkCls =
-  'text-xs font-semibold text-pp-blue underline decoration-pp-blue/45 underline-offset-[0.2em] hover:decoration-pp-blue'
 
 export async function uploadAssetToCloudinary(
   file: File,
@@ -61,88 +46,3 @@ export async function uploadAssetToCloudinary(
   if (!data.url) throw new Error('Upload returned no URL')
   return data.url
 }
-
-export function makeMockProfile(): Profile {
-  return {
-    cv: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-    fullName: 'Alex Johnson',
-    username: 'Alex Developer',
-    jobTitle: ['Full-stack engineer'],
-    description: 'I build fast, accessible web apps with Next.js and thoughtful UX.',
-    avatar: '/file.svg',
-    backgroundImage: '/vercel.svg',
-    socials: [
-      { name: 'AlexDev', icon: 'github', link: 'https://github.com/example' },
-      { name: 'Alex', icon: 'linkedin', link: 'https://linkedin.com/in/example' },
-    ],
-    profileHeading: 'Ship products people love',
-    profileSubHeading: 'Design systems, APIs, and polished interfaces.',
-    stats: [
-      { label: 'Years experience', value: 6 },
-      { label: 'Projects shipped', value: 24 },
-    ],
-    aboutMe:
-      'Former designer turned engineer. I care about performance, a11y, and clear copy. Based in UTC+7.',
-    skills: [
-      {
-        groupName: 'Frontend',
-        items: [
-          { icon: 'react', name: 'React' },
-          { icon: 'next', name: 'Next.js' },
-        ],
-      },
-      {
-        groupName: 'Backend',
-        items: [
-          { icon: 'node', name: 'Node.js' },
-          { icon: 'mongo', name: 'MongoDB' },
-        ],
-      },
-    ],
-    experience: [
-      { companyName: 'Acme Labs', position: 'Senior engineer', start: '2021-03-01', end: '2025-01-15' },
-      { companyName: 'Beta Studio', position: 'Full-stack developer', start: '2019-06-01', end: '2021-02-28' },
-    ],
-    education: [
-      { schoolName: 'State University', major: 'Computer Science', start: '2015-09-01', end: '2019-05-01' },
-    ],
-    certificates: [{ name: 'AWS Cloud Practitioner', link: 'https://example.com/cert/aws' }],
-    serviceHeading: 'What I can help with',
-    serviceSubHeading: 'From idea to production',
-    briefServices: ['Web apps', 'API design', 'Performance audits', 'Mentoring'],
-    services: [
-      { icon: 'layout', title: 'Product builds', description: 'End-to-end implementation with CI, monitoring, and docs.' },
-      { icon: 'zap', title: 'Performance', description: 'Core Web Vitals, caching, and lean bundles.' },
-    ],
-    workHeading: 'Selected work',
-    workSubHeading: 'Recent case studies',
-    projects: [
-      {
-        title: 'Analytics Dashboard',
-        parts: [
-          {
-            image: '/window.svg',
-            description: 'SaaS dashboard with real-time analytics and role-based access.',
-            link: 'https://example.com/demo',
-          },
-          {
-            image: '/file.svg',
-            description: 'Repository and technical notes.',
-            link: 'https://github.com/example/app',
-          },
-        ],
-      },
-      {
-        title: 'Marketing Platform',
-        parts: [
-          {
-            image: '/vercel.svg',
-            description: 'Marketing site with CMS-driven content and A/B hooks.',
-            link: 'https://example.com/case-study',
-          },
-        ],
-      },
-    ],
-  }
-}
-

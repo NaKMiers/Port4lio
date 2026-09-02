@@ -62,7 +62,7 @@ export default function ListTextarea({
   // the wrong text. See React's "adjusting state when a prop changes" pattern.
   if (joined !== lastJoined) {
     setLastJoined(joined)
-    // Only accept a genuine external replacement - a Save round-trip, "Fill mock data".
+    // Only accept a genuine external replacement, such as a Save round-trip.
     // When the incoming list is just our own parse coming back, the draft is the more
     // faithful copy and must win, otherwise it gets clobbered mid-keystroke.
     if (!sameList(parse(draft), value)) {

@@ -27,9 +27,6 @@ import StatsSection from '@/components/settings/StatsSection'
 import TabNav from '@/components/settings/TabNav'
 import type { TabItem } from '@/components/settings/TabNav'
 import { cleanProfileForSave } from '@/components/settings/cleanProfileForSave'
-import {
-  makeMockProfile,
-} from '@/components/settings/settings-utils'
 import type { IconPickerTarget, SettingTabId, UploadingState } from '@/components/settings/types'
 import { useApp } from '@/context/AppContext'
 import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
@@ -226,10 +223,6 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
           uploading={uploading}
           fullWidth={fullWidth}
           onToggleFullWidth={() => setFullWidth(value => !value)}
-          onFillMock={() => {
-            setError(null)
-            setProfile(normalizeProfile(makeMockProfile()))
-          }}
           onSave={onSave}
         />
 

@@ -250,7 +250,9 @@ export function cleanProfileForSave(profile: Profile): Partial<Profile> {
   if (!cleaned.briefServices?.length) delete cleaned.briefServices
   if (!cleaned.services?.length) delete cleaned.services
   if (!cleaned.projects?.length) delete cleaned.projects
-  // Omitting an empty resume is what stops "Fill mock data" + Save from blanking the CV.
+  // Omitted rather than sent empty: an absent key leaves the stored resume alone, while
+  // `resume: {}` would overwrite it. That is what stops any editor state that never
+  // populated the CV tab from blanking a saved CV on the next save.
   if (!cleaned.resume) delete cleaned.resume
 
   return cleaned

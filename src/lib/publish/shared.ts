@@ -20,16 +20,6 @@ export function publishableSocials(socials: SocialLink[]): SocialLink[] {
   return sanitizeSocialLinks(socials).filter(social => /^https:\/\//i.test(trimText(social.link)))
 }
 
-/** The first published social matching a host hint, if any. */
-export function findSocialByHost(socials: SocialLink[], host: string): SocialLink | undefined {
-  return publishableSocials(socials).find(social => {
-    try {
-      return new URL(social.link).hostname.replace(/^www\./, '').includes(host)
-    } catch {
-      return false
-    }
-  })
-}
 
 /** Builds a paste-safe field that also reports how much was cut. */
 export function manualField(

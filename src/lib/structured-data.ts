@@ -33,6 +33,22 @@ export function personEntityId(siteOrigin: string): string {
   return fragmentId(siteOrigin, PERSON_FRAGMENT)
 }
 
+/**
+ * The stable `@id` of the site's WebSite entity.
+ *
+ * Same job as `personEntityId`, for the other half of the pair. The node itself is declared
+ * once in `serializePortfolioJsonLd`; everything else points at it with `isPartOf` so the
+ * MBTI and IQ sections read as parts of one site rather than three sites that happen to
+ * share a domain.
+ *
+ * Exported because `/cv` was already writing `${origin}/#website` by hand. A fragment
+ * duplicated as a string literal is one rename away from silently splitting the graph in
+ * two - and a split graph fails silently, by simply not consolidating.
+ */
+export function websiteEntityId(siteOrigin: string): string {
+  return fragmentId(siteOrigin, WEBSITE_FRAGMENT)
+}
+
 function stripTrailingSlashOrigin(siteOrigin: string): string {
   return siteOrigin.replace(/\/$/, '')
 }

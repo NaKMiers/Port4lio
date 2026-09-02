@@ -3,15 +3,19 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import Chevron from '@/components/mbti/Chevron'
-import ResultPaywall from '@/components/mbti/ResultPaywall'
 import { GROUP_ACCENT } from '@/components/mbti/type-accent'
 import { EditorialPanel } from '@/components/portfolio/primitives/EditorialPanel'
 import { SectionFrame } from '@/components/portfolio/primitives/SectionFrame'
+import ShareControl from '@/components/test-kit/ShareControl'
+import TestPaywall from '@/components/test-kit/TestPaywall'
+import { paymentCopy } from '@/lib/test-kit/payment-copy'
 import { isLocale } from '@/lib/i18n'
 import { getTypeContent, UI } from '@/lib/mbti/content'
 import { formatPrice, getResultPrice, isPaidMode } from '@/lib/mbti/pricing'
 import { connectDatabase } from '@/lib/mongodb'
 import { AXES, groupOfType, isMbtiType, slugFromType, type MbtiType } from '@/lib/mbti/types'
+import { mintShareToken } from '@/lib/share'
+import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { isTokenShaped } from '@/lib/tokens'
 import { AttemptModel, ATTEMPT_TTL_DAYS } from '@/models/Attempt'
 
@@ -76,8 +80,30 @@ export default async function MbtiResultPage({
    * leaving old ones stuck behind a paywall that no longer exists. This page is already
    * `force-dynamic` + `fetchCache: 'force-no-store'`, so there is no cached copy of the
    * locked version to serve to someone who has since paid.
+   *
+   * `waived` is the third way out, decided at submit: an attempt whose answers are a held
+   * button rather than an opinion is released free, because there is nothing there worth
+   * charging for. See `lib/test-kit/effort.ts`.
    */
-  const locked = isPaidMode() && !attempt.paid
+  const paidMode = isPaidMode()
+  const locked = paidMode && !attempt.paid && !attempt.waived
+
+  /** See the IQ result page: a waiver is only worth explaining where a charge was possible. */
+  const explainWaiver = paidMode && attempt.waived
+
+  // Fire-and-forget: a counter must never delay or fail a render, least of all one someone
+  // paid for. `recordFunnelDetached` swallows everything internally.
+  recordFunnelDetached('mbti', locked ? FUNNEL_EVENTS.paywallSeen : FUNNEL_EVENTS.resultViewed)
+
+  /**
+   * Minted per render, recorded only if the visitor actually taps share.
+   *
+   * The shared URL points at `/[lang]/mbti/<type>` - already public, already carrying a
+   * prerendered OG card, and crucially carrying no credential. Sharing `id` instead would
+   * paste the capability token for this result into a group chat.
+   */
+  const shareToken = mintShareToken()
+  const shareUrl = `/${lang}/mbti/${slugFromType(type)}?s=${shareToken}`
 
   return (
     <main>
@@ -106,47 +132,70 @@ export default async function MbtiResultPage({
 
       <SectionFrame className='py-section-sm' innerClassName='max-w-3xl'>
         {locked ? (
-          <ResultPaywall
+          <>
+          <TestPaywall
             token={id}
             locale={lang}
+            endpoint='/api/mbti/checkout'
             // Formatted here rather than in the client so đồng formatting lives in one
             // place and the client never has to know the raw amount.
             price={formatPrice(getResultPrice())}
             copy={{
+              // Product-specific copy from MBTI's own content file; everything about the
+              // bank transfer itself is shared with IQ.
+              ...paymentCopy(lang),
               title: copy.paywallTitle,
               lead: copy.paywallLead,
               emailLabel: copy.emailLabel,
               emailPlaceholder: copy.emailPlaceholder,
               emailHint: copy.emailHint,
-              payButton: copy.payButton,
-              preparing: copy.payPreparing,
-              scanTitle: copy.payScanTitle,
-              scanLead: copy.payScanLead,
-              waiting: copy.payWaiting,
-              done: copy.payDone,
-              cancelled: copy.payCancelled,
-              expiresIn: copy.payExpiresIn,
-              expired: copy.payExpired,
-              retry: copy.payRetry,
               deliveryNote: copy.payDeliveryNote,
               invalidEmail: copy.invalidEmail,
               rateLimited: copy.rateLimited,
               genericError: copy.genericError,
-              transfer: {
-                title: copy.payManualTitle,
-                bank: copy.payBank,
-                accountNumber: copy.payAccountNumber,
-                accountName: copy.payAccountName,
-                amount: copy.payAmount,
-                transferNote: copy.payTransferNote,
-                transferWarning: copy.payTransferWarning,
-                copy: copy.copy,
-                copied: copy.copied,
-              },
             }}
           />
+
+          {/*
+            A locked result is a dead end without this. Someone who followed a shared link
+            lands on a paywall for a stranger's result with no way into the product - the
+            loop stops on the exact page it is supposed to continue from. One link fixes it.
+          */}
+          <div className='mt-8 border-t border-pp-line pt-6'>
+            <p className='text-sm text-pp-muted'>{copy.lockedRecruitLead}</p>
+            <Link
+              href={`/${lang}/mbti/test`}
+              className='mt-3 inline-flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text'
+            >
+              {copy.lockedRecruitCta}
+              <Chevron direction='right' />
+            </Link>
+          </div>
+          </>
         ) : (
           <>
+        {/*
+          The waiver, said out loud, above the result it applies to. Same reasoning as the
+          IQ page: a free result with no explanation reads as arbitrary pricing, and the
+          sentence is what makes it a validity guarantee instead. The retake link is the
+          point - they have now seen the product.
+        */}
+        {explainWaiver ? (
+          <EditorialPanel variant='strong' className='mb-8 p-6 md:p-7'>
+            <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+              {copy.waivedTitle}
+            </h2>
+            <p className='mt-3 text-pp-muted'>{copy.waivedBody}</p>
+            <Link
+              href={`/${lang}/mbti/test`}
+              className='mt-5 inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline'
+            >
+              {copy.retake}
+              <Chevron direction='right' />
+            </Link>
+          </EditorialPanel>
+        ) : null}
+
         <EditorialPanel variant='strong' className='p-6 md:p-7'>
           <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
             {copy.axisBreakdown}
@@ -200,6 +249,19 @@ export default async function MbtiResultPage({
             {copy.readFullType} {type}
             <Chevron direction='right' />
           </Link>
+          <ShareControl
+            product='mbti'
+            shareToken={shareToken}
+            type={slugFromType(type)}
+            url={shareUrl}
+            title={copy.shareTitle.replace('{type}', type)}
+            text={copy.shareText.replace('{type}', type)}
+            copy={{
+              share: copy.shareButton,
+              copied: copy.shareCopied,
+              copyManually: copy.shareCopyManually,
+            }}
+          />
           <Link
             href={`/${lang}/mbti/test`}
             className='text-sm font-semibold text-pp-muted no-underline transition hover:text-pp-text'

@@ -49,6 +49,14 @@ export default function PortfolioBackdropOrnaments() {
       <div className='pp-grid-wash absolute inset-0 opacity-80' />
       <div className='absolute inset-0 bg-[radial-gradient(circle_at_12%_16%,rgba(255,159,64,0.12),transparent_16%),radial-gradient(circle_at_86%_28%,rgba(51,152,255,0.1),transparent_18%),radial-gradient(circle_at_76%_72%,rgba(243,143,209,0.12),transparent_16%),radial-gradient(circle_at_18%_78%,rgba(57,190,113,0.1),transparent_14%)] opacity-90' />
 
+      {/*
+        Everything below is decoration. Grouped under `pp-decorations` so a page can opt
+        out of the floating shapes, meteors and stickers while keeping the grid wash and
+        colour gradients above - see `.portfolio-public-root:has([data-plain])` in
+        globals.css. The IQ test page uses it: shapes drifting past the edge of a timed
+        visual-reasoning test compete with the exact thing the taker is trying to look at.
+      */}
+      <div className='pp-decorations'>
       {ornaments.map((className, index) => (
         <div key={`${index}-${className.slice(0, 18)}`} className={cx('absolute hidden lg:block', className)}>
           {index === 1 ? (
@@ -130,6 +138,7 @@ export default function PortfolioBackdropOrnaments() {
         <div className='absolute inset-x-10 inset-y-5 rounded-full bg-[linear-gradient(145deg,rgba(255,255,255,0.94),rgba(236,233,255,0.96))] shadow-[0_12px_22px_rgba(123,109,255,0.08)]' />
         <div className='absolute left-3 top-8 h-16 w-16 rounded-full bg-[linear-gradient(145deg,rgba(255,255,255,0.95),rgba(236,233,255,0.96))] shadow-[0_12px_22px_rgba(123,109,255,0.08)]' />
         <div className='absolute right-4 top-4 h-[4.75rem] w-[4.75rem] rounded-full bg-[linear-gradient(145deg,rgba(255,255,255,0.94),rgba(225,248,235,0.96))] shadow-[0_12px_22px_rgba(57,190,113,0.08)]' />
+      </div>
       </div>
     </div>
   )

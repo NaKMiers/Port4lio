@@ -11,6 +11,8 @@ import {
   type ScoreResult,
 } from '@/lib/mbti/scoring'
 import { checkRateLimit, clientIpFrom, SUBMIT_LIMIT } from '@/lib/rate-limit'
+import { mbtiEffortWaived } from '@/lib/test-kit/effort'
+import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { mintToken } from '@/lib/tokens'
 import { AttemptModel, attemptExpiryFrom } from '@/models/Attempt'
 
@@ -84,12 +86,24 @@ export async function POST(request: NextRequest) {
 
   const token = mintToken()
 
+  /**
+   * Decided here rather than at render, for the same reason IQ decides it at submit: the
+   * result page and the checkout route must agree, and a later threshold change must not
+   * retroactively charge someone already told their result was free.
+   *
+   * MBTI has no server-side clock, so this reads the answer pattern itself - which is the
+   * signal that cannot be faked without ruining the result being asked for. See
+   * `lib/test-kit/effort.ts`.
+   */
+  const waived = mbtiEffortWaived({ answers })
+
   try {
     await AttemptModel.create({
       _id: token,
       type: result.type,
       scores: result.scores,
       answers,
+      waived,
       locale,
       createdAt: new Date(),
       expireAt: attemptExpiryFrom(new Date()),
@@ -97,6 +111,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[mbti-submit] failed to persist attempt', error)
     return jsonError('Could not save your result. Please try again.', 500)
+  }
+
+  // Counted here rather than at render, because this is where the decision is made. IQ
+  // does the same, so the two products' waiver rates are measured the same way - and a
+  // waived unlock never touches `paid`, which is the counter revenue is read from.
+  if (waived) {
+    recordFunnelDetached('mbti', FUNNEL_EVENTS.waived)
   }
 
   return NextResponse.json({ token, type: result.type }, { status: 201 })

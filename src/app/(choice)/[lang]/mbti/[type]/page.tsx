@@ -7,6 +7,7 @@ import JsonLd from '@/components/JsonLd'
 import { GROUP_ACCENT } from '@/components/mbti/type-accent'
 import { EditorialPanel } from '@/components/portfolio/primitives/EditorialPanel'
 import { SectionFrame } from '@/components/portfolio/primitives/SectionFrame'
+import AttributionBeacon from '@/components/test-kit/AttributionBeacon'
 import { isLocale, LOCALES } from '@/lib/i18n'
 import { getCareerContent, getTypeContent, UI } from '@/lib/mbti/content'
 import { getResultPrice } from '@/lib/mbti/pricing'
@@ -120,6 +121,12 @@ export default async function MbtiTypePage({
 
   return (
     <main>
+      {/*
+        Renders nothing. Reads `?s=` after mount and records the arrival, which keeps this
+        page `force-static` - reading searchParams on the server would deopt all 32
+        type/locale pages to dynamic rendering to collect one number.
+      */}
+      <AttributionBeacon product='mbti' />
       <JsonLd data={typeArticleJsonLd(lang, type)} />
       <JsonLd data={faqPageJsonLd(faqs)} />
       <JsonLd

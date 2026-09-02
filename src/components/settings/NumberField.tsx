@@ -27,7 +27,7 @@ export default function NumberField({
 
   if (value !== lastValue) {
     setLastValue(value)
-    // Ignore our own commit echoing back; take anything else (Save round-trip, mock data).
+    // Ignore our own commit echoing back; take anything else (e.g. a Save round-trip).
     if (Number(draft) !== value) {
       setDraft(String(value))
     }

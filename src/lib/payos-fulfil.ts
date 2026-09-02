@@ -1,3 +1,4 @@
+import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { AttemptModel } from '@/models/Attempt'
 import { PaymentModel, type PaymentDocument } from '@/models/Payment'
 
@@ -107,6 +108,7 @@ export async function fulfilMbtiPayment(
   // payment reads as delivered while the buyer never got anything and nobody was told.
   // Every step below is individually guarded for that reason.
   let failure: string | null = null
+  let unlockedNow = false
 
   try {
     // Unlocking the result is what the buyer actually paid for, so it happens before the
@@ -126,10 +128,32 @@ export async function fulfilMbtiPayment(
       // The attempt expired or was deleted between checkout and payment. The money is
       // real, so this is a refund conversation, not something to swallow.
       failure = `Attempt ${claimed.attemptToken} no longer exists - paid result cannot be unlocked`
+    } else {
+      unlockedNow = true
     }
   } catch (error) {
     console.error(`[PayOS Fulfil] Unlock threw for ${orderCode}:`, error)
     failure = error instanceof Error ? error.message : 'Unknown error unlocking the attempt'
+  }
+
+  /**
+   * The funnel's terminal event, counted here and ONLY here.
+   *
+   * Outside the try above, and detached, for two reasons. The webhook retries when
+   * responses are slow, so it must not wait on a counter. And that `catch` sets `failure`,
+   * which is what logs PAID BUT UNDELIVERED - a metrics blip must never be reported as a
+   * payment that did not settle.
+   *
+   * Gated on `unlockedNow` so the atomic claim above is what decides: a duplicate webhook
+   * that loses the claim race counts nothing.
+   *
+   * `paid` is the number a pricing decision gets made from, so it is written by server
+   * code no request can reach - `/api/event` refuses it outright. A forged row would be
+   * indistinguishable from a real one afterward, making the funnel quietly worthless
+   * rather than obviously broken.
+   */
+  if (unlockedNow) {
+    recordFunnelDetached('mbti', FUNNEL_EVENTS.paid)
   }
 
   if (!failure) {

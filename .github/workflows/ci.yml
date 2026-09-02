@@ -45,10 +45,10 @@ jobs:
       # browser install and a booted dev server, and `tests/e2e` is empty. Add
       # a second job when there is an E2E suite worth the ~2 minutes.
       #
-      # `test:api` carries `--passWithNoTests`. `tests/api/` does not exist yet, and
-      # without the flag vitest exits 1 on an empty match - which made this step fail
-      # every run while `test:unit` passed, so the job was red for a reason that had
-      # nothing to do with the code. The step stays in place so API tests run
-      # automatically the day someone adds the first one.
+      # `test:api` boots a real mongod via mongodb-memory-server. That is the only
+      # way to assert a TTL index was actually BUILT rather than merely declared -
+      # and the retention promise on `/[lang]/mbti/privacy` rests on exactly that
+      # index. The `--passWithNoTests` workaround this step used to carry is gone;
+      # `tests/api/` now has tests, so an empty match is a real failure again.
       - name: Unit and API tests
         run: npm run test:unit && npm run test:api

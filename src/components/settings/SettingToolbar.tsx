@@ -9,7 +9,6 @@ export default function SettingToolbar({
   uploading,
   fullWidth,
   onToggleFullWidth,
-  onFillMock,
   onSave,
 }: {
   saving: boolean
@@ -17,7 +16,6 @@ export default function SettingToolbar({
   /** Whether the editor is running edge to edge rather than inside the editorial column. */
   fullWidth: boolean
   onToggleFullWidth: () => void
-  onFillMock: () => void
   onSave: () => void
 }) {
   // Save is disabled while any of these run, so a URL cannot be saved before Cloudinary
@@ -86,11 +84,15 @@ export default function SettingToolbar({
         </div>
 
         <div className='flex flex-wrap items-center gap-2.5 lg:justify-end'>
-          {process.env.NODE_ENV === 'development' && (
-            <button type='button' className={secondaryBtnCls} onClick={onFillMock}>
-              Fill mock data
-            </button>
-          )}
+          {/*
+            Not dev-gated, unlike the "Fill mock data" button this replaced. That one was
+            development-only because it overwrote the live editor state with fixtures;
+            reading the funnel is something you want most on the deployed site, and
+            `/metrics` is owner-gated server-side anyway.
+          */}
+          <Link className={secondaryBtnCls} href='/metrics'>
+            Metrics
+          </Link>
           <Link className={secondaryBtnCls} href='/publish'>
             Publish
           </Link>

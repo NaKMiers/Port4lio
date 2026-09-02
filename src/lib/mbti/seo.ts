@@ -27,23 +27,33 @@ export function siteOrigin(): string {
   return resolveSiteOrigin().replace(/\/$/, '')
 }
 
-/** `2000` -> `"2.000₫"`. Duplicated from pricing's formatter to keep this module server-safe. */
-function dong(amount: number): string {
-  return `${new Intl.NumberFormat('vi-VN').format(amount)}₫`
-}
-
 /**
  * How the offer is described, in prose, for a given price.
  *
- * Free and paid need genuinely different pitches: "miễn phí" is the strongest word in the
- * category and should lead when it is true, while a paid page leads on how small the number
- * is. Reading the price at render time means the copy cannot advertise the wrong one.
+ * ## The amount is deliberately absent
+ *
+ * Nothing before the result page names a figure - not this line, not the FAQ, not the
+ * structured data. The product decision is that someone decides whether to spend ten
+ * minutes on the test, and only then decides whether to spend money; a number in the hero
+ * or in a search snippet forces both decisions at once, and loses the people who would
+ * have paid after seeing their own result.
+ *
+ * It still says a paid unlock EXISTS, because the alternative is answering "is this free?"
+ * with something that turns out not to be true twenty minutes later. Withholding the figure
+ * is a sequencing choice; implying there is no figure would be a lie, and it would be
+ * discovered at the worst possible moment.
+ *
+ * The price itself lives in exactly one user-facing place: the paywall, where it is read
+ * from config at render time (see `lib/mbti/pricing.ts`).
  */
 export function priceLine(locale: Locale, price: number): string {
   if (price <= 0) {
     return locale === 'vi' ? 'Hoàn toàn miễn phí' : 'Completely free'
   }
-  return locale === 'vi' ? `Chỉ ${dong(price)} mỗi kết quả` : `Only ${dong(price)} per result`
+  // Short on purpose as well as figure-free: this sits inside a meta description with a
+  // ~160-character budget, and the sentence it replaced was 30 characters longer, which
+  // pushed the per-type descriptions past what Google renders.
+  return locale === 'vi' ? 'Làm bài miễn phí' : 'The test is free'
 }
 
 export const SEO = {
@@ -149,14 +159,18 @@ export function alternateLanguages(path: (locale: Locale) => string): Record<str
 type JsonLd = Record<string, unknown>
 
 /**
- * The test as a purchasable thing.
+ * The test as a product.
  *
- * `Product` rather than a bare `WebPage` because it is the only vocabulary Google reads a
- * price out of, and the price IS the differentiator here. `priceCurrency: 'VND'` matters:
- * omit it and a 2000 reads as two thousand dollars.
+ * ## Why there is an offer only when the test is free
  *
- * When results are free the offer is emitted at price 0, which is valid schema and still
- * conveys "no cost" to a crawler.
+ * An `Offer` carrying `price` is exactly how a figure reaches a search result, and the
+ * price is not disclosed before someone finishes the test - see `priceLine`. A crawler is
+ * not a special case: a rich result quoting the amount would defeat the decision on the
+ * page it links to.
+ *
+ * When results ARE free the offer is emitted at price 0, which is valid schema and conveys
+ * "no cost" - worth saying, and no sequencing to protect. `priceCurrency` stays alongside
+ * it because omitting it makes a 0 ambiguous rather than free.
  */
 export function productJsonLd(locale: Locale, price: number): JsonLd {
   const origin = siteOrigin()
@@ -168,16 +182,20 @@ export function productJsonLd(locale: Locale, price: number): JsonLd {
     description: landingDescription(locale, price),
     url: `${origin}/${locale}/mbti`,
     category: locale === 'vi' ? 'Trắc nghiệm tính cách' : 'Personality assessment',
-    offers: {
-      '@type': 'Offer',
-      price: String(price),
-      priceCurrency: 'VND',
-      availability: 'https://schema.org/InStock',
-      url: `${origin}/${locale}/mbti`,
-      // Named explicitly so a crawler does not have to infer that a digital result has no
-      // shipping and no return window.
-      category: locale === 'vi' ? 'Sản phẩm số' : 'Digital product',
-    },
+    ...(price > 0
+      ? {}
+      : {
+          offers: {
+            '@type': 'Offer',
+            price: '0',
+            priceCurrency: 'VND',
+            availability: 'https://schema.org/InStock',
+            url: `${origin}/${locale}/mbti`,
+            // Named explicitly so a crawler does not have to infer that a digital result
+            // has no shipping and no return window.
+            category: locale === 'vi' ? 'Sản phẩm số' : 'Digital product',
+          },
+        }),
   }
 }
 
@@ -261,8 +279,8 @@ export function faqEntries(locale: Locale, price: number): { q: string; a: strin
         ? 'Hoàn toàn miễn phí. Không cần tài khoản, không cần để lại email.'
         : 'Completely free. No account, no email required.'
       : locale === 'vi'
-        ? `Bài trắc nghiệm miễn phí. Bạn chỉ trả ${dong(price)} nếu muốn mở khóa kết quả đầy đủ, và trả một lần cho mỗi kết quả.`
-        : `The test is free. You only pay ${dong(price)} to unlock the full result, once per result.`
+        ? 'Làm bài trắc nghiệm thì miễn phí, không cần tài khoản. Bản kết quả đầy đủ là tùy chọn có trả phí, và mức giá hiện ngay trên trang kết quả sau khi bạn làm xong.'
+        : 'Taking the test is free, with no account. The full result is an optional paid unlock, and the price is shown on your result page once you finish.'
 
   if (locale === 'vi') {
     return [

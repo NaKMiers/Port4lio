@@ -292,3 +292,23 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
+
+/*
+ * A page that opts out of decoration.
+ *
+ * `PortfolioBackdropOrnaments` groups its floating shapes, meteors and stickers under
+ * `.pp-decorations`, keeping the grid wash and colour gradients outside it. Any page that
+ * renders an element with `data-plain` therefore keeps the background exactly as it is and
+ * loses only the moving furniture.
+ *
+ * Used by the IQ test. Shapes drifting past the edge of a timed visual-reasoning test
+ * compete with the one thing the taker is trying to look at, and several of the shapes are
+ * circles and half-filled rounds - the same vocabulary as the answers.
+ *
+ * `:has()` rather than a prop because the chrome is rendered by a route-group layout, which
+ * cannot know which child page is active without becoming dynamic and costing every IQ page
+ * its static rendering.
+ */
+.portfolio-public-root:has([data-plain]) .pp-decorations {
+  display: none;
+}
