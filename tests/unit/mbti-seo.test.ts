@@ -9,7 +9,7 @@ import {
   landingDescription,
   landingTitle,
   priceLine,
-  productJsonLd,
+  quizJsonLd,
   SEO,
   typeDescription,
   typeListJsonLd,
@@ -136,20 +136,49 @@ describe('hreflang', () => {
 })
 
 describe('structured data', () => {
-  it('omits the offer entirely when the result is paid', () => {
-    // An `Offer` carrying `price` is exactly how an amount reaches a rich result, and the
-    // amount is not disclosed before someone finishes the test. A crawler is not an
-    // exception to that rule.
-    const product = productJsonLd('vi', 2000) as { offers?: unknown }
-    expect(product.offers).toBeUndefined()
+  it('is not a Product, in either pricing mode', () => {
+    // Search Console rejected the `Product` this replaced: *Either "offers", "review", or
+    // "aggregateRating" should be specified*. None of the three can be supplied honestly -
+    // `offers` carries the price this page deliberately withholds until after the test,
+    // and the other two would have to be invented - so the type was invalid on every
+    // crawl. Reintroducing it would restore a permanent error, not a rich result.
+    for (const price of [0, 2000]) {
+      const quiz = quizJsonLd('vi', price) as { '@type': string }
+      expect(quiz['@type'], `price ${price}`).toBe('Quiz')
+    }
   })
 
-  it('still emits a valid offer when results are free', () => {
-    // Nothing to sequence when the answer is "nothing", and "free" is worth saying.
-    const product = productJsonLd('vi', 0) as { offers: { price: string; priceCurrency: string } }
-    expect(product.offers.price).toBe('0')
-    // Omitting the currency makes a bare 0 ambiguous rather than free.
-    expect(product.offers.priceCurrency).toBe('VND')
+  it('never carries an offer, so no amount can reach a rich result', () => {
+    // The reason the type changed rather than the offer being filled in: an `Offer`
+    // carrying `price` is exactly how an amount reaches a search result, and the amount is
+    // not disclosed before someone finishes the test. A crawler is not an exception.
+    for (const price of [0, 2000]) {
+      const quiz = quizJsonLd('vi', price) as { offers?: unknown }
+      expect(quiz.offers, `price ${price}`).toBeUndefined()
+    }
+  })
+
+  it('says whether the result is free without naming a figure', () => {
+    // What `isAccessibleForFree` buys over silence: "there is a paid unlock" is answerable
+    // without the number, and answering it late is how someone finds out twenty minutes in.
+    expect((quizJsonLd('vi', 0) as { isAccessibleForFree: boolean }).isAccessibleForFree).toBe(true)
+    expect((quizJsonLd('vi', 2000) as { isAccessibleForFree: boolean }).isAccessibleForFree).toBe(
+      false
+    )
+    const serialised = JSON.stringify(quizJsonLd('vi', 2000))
+    expect(serialised).not.toContain('2000')
+  })
+
+  it('states a duration that matches the FAQ on the same page', () => {
+    // A structured-data figure that disagrees with the prose beside it is worse than not
+    // stating one, and these are two separate claims that could drift apart.
+    const quiz = quizJsonLd('en', 0) as { timeRequired: string; numberOfQuestions: number }
+    const minutes = Number(/^PT(\d+)M$/.exec(quiz.timeRequired)?.[1])
+    expect(Number.isInteger(minutes)).toBe(true)
+    expect(quiz.numberOfQuestions).toBe(QUESTION_COUNT)
+
+    const answers = faqEntries('en', 0).map(entry => entry.a)
+    expect(answers.some(a => a.includes(`About ${minutes} minutes`))).toBe(true)
   })
 
   it('builds absolute breadcrumb URLs in order', () => {
@@ -210,7 +239,7 @@ describe('structured data', () => {
   it('serialises to JSON without throwing', () => {
     // Anything non-serialisable here renders an empty script tag and fails silently.
     for (const locale of LOCALES) {
-      expect(() => JSON.stringify(productJsonLd(locale, 2000))).not.toThrow()
+      expect(() => JSON.stringify(quizJsonLd(locale, 2000))).not.toThrow()
       expect(() => JSON.stringify(faqJsonLd(locale, 2000))).not.toThrow()
     }
   })

@@ -28,6 +28,16 @@ export function siteOrigin(): string {
 }
 
 /**
+ * How long the test takes, in minutes.
+ *
+ * Named because three places claim it - the FAQ in both languages below, and
+ * `timeRequired` in the quiz JSON-LD - and a structured-data figure that disagrees with
+ * the prose on the same page is worse than not stating one. The fourth copy lives in
+ * `content/index.ts` as `testMeta`, inside a translated sentence this module cannot reach.
+ */
+const APPROX_MINUTES = 8
+
+/**
  * How the offer is described, in prose, for a given price.
  *
  * ## The amount is deliberately absent
@@ -159,43 +169,54 @@ export function alternateLanguages(path: (locale: Locale) => string): Record<str
 type JsonLd = Record<string, unknown>
 
 /**
- * The test as a product.
+ * The test as a quiz.
  *
- * ## Why there is an offer only when the test is free
+ * ## Why this is not a `Product`
  *
- * An `Offer` carrying `price` is exactly how a figure reaches a search result, and the
- * price is not disclosed before someone finishes the test - see `priceLine`. A crawler is
- * not a special case: a rich result quoting the amount would defeat the decision on the
- * page it links to.
+ * It was one, and Search Console rejected it: *Either "offers", "review", or
+ * "aggregateRating" should be specified*. All three are unavailable here, and not by
+ * oversight.
  *
- * When results ARE free the offer is emitted at price 0, which is valid schema and conveys
- * "no cost" - worth saying, and no sequencing to protect. `priceCurrency` stays alongside
- * it because omitting it makes a 0 ambiguous rather than free.
+ * `offers` carries `price`, and that is exactly how a figure reaches a search result - the
+ * amount is not disclosed before someone finishes the test (see `priceLine`), and a rich
+ * result quoting it would defeat the decision on the page it links to. `review` and
+ * `aggregateRating` would have to be invented; a fabricated star rating is the one SEO
+ * mistake that is also a lie to every person who sees it. So a paid MBTI test could never
+ * be a valid `Product`, and the block was invalid on every crawl rather than occasionally.
+ *
+ * `Quiz` is what the page actually is, and it requires none of the three. The IQ section
+ * arrived at the same answer independently (`lib/iq/seo.ts`), which is the other reason to
+ * use it here: one idiom on the domain rather than two.
+ *
+ * `isAccessibleForFree` is how the free/paid distinction survives the move. It describes
+ * the RESULT - taking the test is free either way - so it stays truthful in both modes,
+ * and it says a paid unlock exists without naming the number. That is the honest half of
+ * the sequencing decision, and it is the half a crawler needs.
  */
-export function productJsonLd(locale: Locale, price: number): JsonLd {
+export function quizJsonLd(locale: Locale, price: number): JsonLd {
   const origin = siteOrigin()
 
   return {
     '@context': 'https://schema.org',
-    '@type': 'Product',
+    '@type': 'Quiz',
     name: SEO[locale].siteName,
     description: landingDescription(locale, price),
     url: `${origin}/${locale}/mbti`,
-    category: locale === 'vi' ? 'Trắc nghiệm tính cách' : 'Personality assessment',
-    ...(price > 0
-      ? {}
-      : {
-          offers: {
-            '@type': 'Offer',
-            price: '0',
-            priceCurrency: 'VND',
-            availability: 'https://schema.org/InStock',
-            url: `${origin}/${locale}/mbti`,
-            // Named explicitly so a crawler does not have to infer that a digital result
-            // has no shipping and no return window.
-            category: locale === 'vi' ? 'Sản phẩm số' : 'Digital product',
-          },
-        }),
+    inLanguage: locale === 'vi' ? 'vi-VN' : 'en',
+    numberOfQuestions: QUESTION_COUNT,
+    timeRequired: `PT${APPROX_MINUTES}M`,
+    isAccessibleForFree: price <= 0,
+    // What `Product.category` used to carry. A `Thing` rather than a bare string, because
+    // `about` expects one and a string here is the kind of near-miss a validator tolerates
+    // until it does not.
+    about: {
+      '@type': 'Thing',
+      name: locale === 'vi' ? 'Trắc nghiệm tính cách' : 'Personality assessment',
+    },
+    // The `Product` block named no publisher, so the only thing tying this page to the
+    // site's Person entity was `websiteJsonLd`. Stating it here too costs nothing and
+    // matches what the IQ quiz does.
+    publisher: { '@id': personEntityId(origin) },
   }
 }
 
@@ -287,7 +308,7 @@ export function faqEntries(locale: Locale, price: number): { q: string; a: strin
       { q: 'Trắc nghiệm MBTI này có mất phí không?', a: priceAnswer },
       {
         q: 'Bài test mất bao lâu?',
-        a: `Khoảng 8 phút cho ${QUESTION_COUNT} câu. Mỗi câu chỉ có hai lựa chọn, bạn chọn phương án gần với mình hơn và không cần suy nghĩ quá lâu.`,
+        a: `Khoảng ${APPROX_MINUTES} phút cho ${QUESTION_COUNT} câu. Mỗi câu chỉ có hai lựa chọn, bạn chọn phương án gần với mình hơn và không cần suy nghĩ quá lâu.`,
       },
       {
         q: 'Kết quả MBTI có chính xác không?',
@@ -312,7 +333,7 @@ export function faqEntries(locale: Locale, price: number): { q: string; a: strin
     { q: 'Does this MBTI test cost anything?', a: priceAnswer },
     {
       q: 'How long does it take?',
-      a: `About 8 minutes for ${QUESTION_COUNT} questions. Each one has two options; pick whichever is closer to you without overthinking it.`,
+      a: `About ${APPROX_MINUTES} minutes for ${QUESTION_COUNT} questions. Each one has two options; pick whichever is closer to you without overthinking it.`,
     },
     {
       q: 'Is the MBTI result accurate?',

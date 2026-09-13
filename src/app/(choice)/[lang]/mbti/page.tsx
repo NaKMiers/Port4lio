@@ -18,7 +18,7 @@ import {
   faqJsonLd,
   landingDescription,
   landingTitle,
-  productJsonLd,
+  quizJsonLd,
   SEO,
   typeListJsonLd,
   websiteJsonLd,
@@ -90,7 +90,7 @@ export default async function MbtiLandingPage({ params }: { params: Promise<{ la
         malformed one then fails alone instead of taking the whole payload down with it.
       */}
       <JsonLd data={websiteJsonLd(lang)} />
-      <JsonLd data={productJsonLd(lang, price)} />
+      <JsonLd data={quizJsonLd(lang, price)} />
       <JsonLd data={typeListJsonLd(lang, MBTI_TYPES)} />
       <JsonLd data={faqJsonLd(lang, price)} />
       <JsonLd
