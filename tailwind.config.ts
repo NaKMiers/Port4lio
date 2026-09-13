@@ -1,6 +1,36 @@
 import type { Config } from 'tailwindcss'
 
 /**
+ * A `pp-*` token that survives an opacity modifier.
+ *
+ * These colours are CSS variables, and a bare `var(--pp-blue)` is opaque to Tailwind's
+ * colour parser: `withAlphaValue` fails to parse it and the utility is dropped entirely,
+ * so `bg-pp-blue/10` used to compile to *nothing at all* rather than to a translucent
+ * blue. Roughly forty such classes were written across the app and every one of them was
+ * silently dead - tinted chips with no tint, rings with no ring.
+ *
+ * Returning a function lets Tailwind hand us the alpha it wants. Numeric alphas become a
+ * `color-mix`, which works regardless of what the variable holds (`#3398ff`, but also
+ * `rgba(255, 255, 255, 0.78)` for `--pp-panel`). Anything non-numeric - Tailwind passes
+ * `var(--tw-bg-opacity, 1)` for the un-modified utility - falls back to the plain
+ * variable, which is what that case wants anyway.
+ */
+const ppColor = (token: string): string => {
+  const resolve = ({
+    opacityValue,
+  }: { opacityValue?: string | number } = {}): string => {
+    const base = `var(--pp-${token})`
+    const alpha = Number(opacityValue)
+    if (opacityValue === undefined || !Number.isFinite(alpha) || alpha >= 1) {
+      return base
+    }
+    return `color-mix(in srgb, ${base} ${alpha * 100}%, transparent)`
+  }
+  // Tailwind takes a resolver here at runtime; its v3 `Config` type only admits strings.
+  return resolve as unknown as string
+}
+
+/**
  * One content glob, because there is one source root.
  *
  * The three that used to sit above it - `./app`, `./pages`, `./components` - came from
@@ -34,17 +64,17 @@ const config: Config = {
         accent: '#00bfff',
         /** Editorial one-page (tokens also live as CSS vars on `.portfolio-public-root`) */
         pp: {
-          bg: 'var(--pp-bg)',
-          panel: 'var(--pp-panel)',
-          'panel-strong': 'var(--pp-panel-strong)',
-          text: 'var(--pp-text)',
-          muted: 'var(--pp-muted)',
-          line: 'var(--pp-line)',
-          blue: 'var(--pp-blue)',
-          green: 'var(--pp-green)',
-          violet: 'var(--pp-violet)',
-          pink: 'var(--pp-pink)',
-          orange: 'var(--pp-orange)',
+          bg: ppColor('bg'),
+          panel: ppColor('panel'),
+          'panel-strong': ppColor('panel-strong'),
+          text: ppColor('text'),
+          muted: ppColor('muted'),
+          line: ppColor('line'),
+          blue: ppColor('blue'),
+          green: ppColor('green'),
+          violet: ppColor('violet'),
+          pink: ppColor('pink'),
+          orange: ppColor('orange'),
         },
       },
       /**

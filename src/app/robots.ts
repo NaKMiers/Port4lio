@@ -22,6 +22,12 @@ import { resolveSiteOrigin } from '@/lib/seo'
  * `/metrics` joins `/settings` and `/publish` for the same reason - it is an admin surface,
  * and it was the only one of the three without a rule.
  *
+ * ## `/ccaf` moved behind the gate
+ *
+ * The CCA-F study plan shipped as a public page and was in the sitemap. It is owner-only
+ * now, so it joins the same list. `/ccaf/` covers the English twin at `/ccaf/en` without a
+ * second entry, and the bare `/ccaf` covers the Vietnamese original.
+ *
  * Kept as explicit per-product entries rather than collapsing to `/*&#47;iq/`: the IQ
  * landing, `/iq/method` and `/iq/privacy` are all in the sitemap and MUST stay crawlable,
  * so a prefix that broad would deindex the three pages this product needs found.
@@ -40,6 +46,8 @@ export default function robots(): MetadataRoute.Robots {
         '/publish/',
         '/metrics',
         '/metrics/',
+        '/ccaf',
+        '/ccaf/',
         '/api/',
         // Every locale, without enumerating them: `/vi/mbti/result/...`, `/en/...`.
         '/*/mbti/result/',

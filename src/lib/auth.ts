@@ -6,7 +6,6 @@ import { getRequiredEnv } from '@/lib/required-env'
 const AUTH_COOKIE = 'portfolio_auth'
 const OTP_COOKIE = 'portfolio_otp'
 const OTP_TTL_SECONDS = 10 * 60
-const AUTH_TTL_SECONDS = 24 * 60 * 60
 
 export type OtpState = {
   hash: string
@@ -76,10 +75,6 @@ export function getOtpCookieName() {
 
 export function getOtpTtlSeconds() {
   return OTP_TTL_SECONDS
-}
-
-export function getAuthTtlSeconds() {
-  return AUTH_TTL_SECONDS
 }
 
 export function parseOtpState(raw: string | undefined): OtpState | null {

@@ -3,6 +3,12 @@
 import React, { useEffect, useState } from 'react'
 
 import { inputCls, labelCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
+import { AUTH_DEFAULT_DAYS, AUTH_MAX_DAYS, AUTH_MIN_DAYS } from '@/lib/auth-limits'
+
+/** `1 day` / `30 days`, without pulling in a formatter for one string. */
+function dayLabel(days: number): string {
+  return `${days} ${days === 1 ? 'day' : 'days'}`
+}
 
 export default function OwnerAuthGate({
   children,
@@ -22,6 +28,7 @@ export default function OwnerAuthGate({
   const [authed, setAuthed] = useState(false)
   const [step, setStep] = useState<'request' | 'verify'>('request')
   const [code, setCode] = useState('')
+  const [days, setDays] = useState(String(AUTH_DEFAULT_DAYS))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -67,12 +74,17 @@ export default function OwnerAuthGate({
       const res = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
+        // Sent as a number so an empty field is a clear `null` the route rejects, rather
+        // than an empty string it would have to guess at.
+        body: JSON.stringify({ code, days: days === '' ? null : Number(days) }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Verification failed')
+      // No success message: `authed` short-circuits the render below straight to
+      // `children`, so anything set here paints for zero frames. The old code set one
+      // ("Access granted for 24 hours.") and it was never once seen. The gate getting out
+      // of the way is the confirmation.
       setAuthed(true)
-      setInfo('Verified. Access granted for 24 hours.')
       onAuthed?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed')
@@ -108,7 +120,8 @@ export default function OwnerAuthGate({
             Owner access required
           </div>
           <div className='mt-2 text-sm leading-relaxed text-pp-muted'>
-            Request a login code. If verified, this browser will be allowed for 24 hours.
+            Request a login code. You choose how long this browser stays allowed - anything
+            from {dayLabel(AUTH_MIN_DAYS)} to {dayLabel(AUTH_MAX_DAYS)}.
           </div>
 
           {error ? (
@@ -130,14 +143,43 @@ export default function OwnerAuthGate({
             ) : (
               <>
                 <div className='space-y-2'>
-                  <label className={labelCls}>6-digit code</label>
+                  <label className={labelCls} htmlFor='owner-auth-code'>
+                    6-digit code
+                  </label>
                   <input
+                    id='owner-auth-code'
                     className={inputCls}
                     value={code}
                     onChange={e => setCode(e.target.value)}
                     placeholder='123456'
                     inputMode='numeric'
                   />
+                </div>
+                <div className='space-y-2'>
+                  <label className={labelCls} htmlFor='owner-auth-days'>
+                    Stay signed in for
+                  </label>
+                  <div className='flex items-center gap-3'>
+                    <input
+                      id='owner-auth-days'
+                      type='number'
+                      min={AUTH_MIN_DAYS}
+                      max={AUTH_MAX_DAYS}
+                      step={1}
+                      value={days}
+                      onChange={e => setDays(e.target.value)}
+                      inputMode='numeric'
+                      aria-describedby='owner-auth-days-hint'
+                      className={`${inputCls} w-24`}
+                    />
+                    <span
+                      id='owner-auth-days-hint'
+                      className='text-sm text-pp-muted'
+                    >
+                      {AUTH_MIN_DAYS}-{AUTH_MAX_DAYS} days. Longer means fewer emails, and
+                      longer for a borrowed laptop to stay signed in.
+                    </span>
+                  </div>
                 </div>
                 <div className='flex flex-wrap items-center gap-2'>
                   <button type='button' className={primaryBtnCls} disabled={busy} onClick={verifyCode}>

@@ -72,7 +72,10 @@ export async function checkRateLimit(
   const windowMs = windowSeconds * 1000
   const windowStart = Math.floor(nowMs / windowMs)
   const windowEndsAt = new Date((windowStart + 1) * windowMs)
-  const retryAfterSeconds = Math.max(1, Math.ceil((windowEndsAt.getTime() - nowMs) / 1000))
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((windowEndsAt.getTime() - nowMs) / 1000)
+  )
 
   try {
     const doc = await RateLimitModel.findByIdAndUpdate(
@@ -156,6 +159,19 @@ export const IQ_START_LIMIT: RateLimitOptions = {
 export const IQ_SUBMIT_LIMIT: RateLimitOptions = {
   route: 'iq-submit',
   limit: 20,
+  windowSeconds: 60,
+}
+
+/**
+ * Saving CCA-F study progress. Behind the owner gate, so this is not protecting against
+ * strangers - it is a ceiling on a debounced autosave that fires on every tick of a
+ * checkbox. The client coalesces edits into one write per ~800ms; a burst of ticking is a
+ * handful of writes, so 40 leaves room for an impatient session without letting a stuck
+ * retry loop rewrite the same document hundreds of times a minute.
+ */
+export const CCAF_SAVE_LIMIT: RateLimitOptions = {
+  route: 'ccaf-save',
+  limit: 40,
   windowSeconds: 60,
 }
 

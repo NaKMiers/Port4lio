@@ -140,6 +140,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.7,
     },
+    // Deliberately absent, in the style of the MBTI and IQ notes below: `/ccaf` and
+    // `/ccaf/en`. They were listed here while the study plan was a public page. It is an
+    // owner-only surface now, alongside `/settings`, `/publish` and `/metrics`, none of
+    // which have ever been listed either.
     ...mbti,
     ...iq,
   ]
