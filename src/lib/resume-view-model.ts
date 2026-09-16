@@ -1,12 +1,29 @@
+import { normalizeResumeSectionOrder } from '@/lib/resume-sections'
 import { RESUME_SEED } from '@/lib/resume-seed'
-import type { Profile, Resume, ResumeLink, ResumeProjectSection } from '@/types/profile'
+import type {
+  Profile,
+  Resume,
+  ResumeCertificationGroup,
+  ResumeLink,
+  ResumeSkillRow,
+} from '@/types/profile'
+
+/** Vertical gap a section rule takes, chosen from what printed immediately above it. */
+export type HeadingGap = 'gFirst' | 'gHead' | 'gHeadS'
 
 /**
- * One printed block in the project stream. Sheets are slices of this flat list, which is
+ * One printed block in the sheet stream. Sheets are slices of this flat list, which is
  * what lets a page break land inside a bullet list rather than only on a project boundary.
+ *
+ * Everything below the masthead is in here - summary, education, skills and certifications
+ * as well as the projects - because {@link Resume.sectionOrder} can put those blocks in any
+ * order, including after the page break.
  */
 export type ResumePrintItem =
-  | { kind: 'sectionHeading'; text: string }
+  | { kind: 'sectionHeading'; text: string; gap: HeadingGap }
+  | { kind: 'text'; lines: string[]; justify: boolean }
+  | { kind: 'skillRows'; rows: ResumeSkillRow[] }
+  | { kind: 'certifications'; groups: ResumeCertificationGroup[] }
   | {
       kind: 'projectHead'
       employer: string
@@ -20,63 +37,132 @@ export type ResumePrintItem =
   | { kind: 'demo'; links: ResumeLink[] }
 
 export type ResumeSheetPlan = {
-  /** Printed on sheet 1, below the masthead / summary / skills / certifications blocks. */
+  /** Printed on sheet 1, below the masthead. */
   first: ResumePrintItem[]
   /** Printed on sheet 2. The first item carries the `gTop` margin. */
   second: ResumePrintItem[]
 }
 
-/** Where a print item came from, so the splitter can find the break coordinate. */
-type LocatedItem = {
+/**
+ * Where a print item came from, so the splitter can find the break coordinate. Blocks that
+ * are not projects carry `-1`, which no page-break coordinate can address.
+ */
+export type LocatedResumeItem = {
   item: ResumePrintItem
   sectionIndex: number
   projectIndex: number
 }
 
+const NOT_A_PROJECT = { sectionIndex: -1, projectIndex: -1 }
+
 /**
- * Flattens sections and projects into the exact sequence of printed blocks.
+ * The gap a section rule needs given what printed above it.
+ *
+ * The source document uses three different values here, and which one is right is a
+ * function of the preceding block, not of the section's identity - a rule after a skill row
+ * sits tighter than one after body copy, and the first rule on the page clears the masthead.
+ * Deriving it is what keeps the typography exact under an arbitrary section order.
+ */
+function headingGap(previous: ResumePrintItem | undefined): HeadingGap {
+  if (!previous) return 'gFirst'
+  return previous.kind === 'skillRows' ? 'gHeadS' : 'gHead'
+}
+
+/**
+ * Flattens the resume into the exact sequence of printed blocks, in `sectionOrder`.
  *
  * Empty `details` / `highlights` / `demoLinks` emit no item at all, so an emptied list
  * cannot leave a stray vertical gap on the sheet.
  */
-export function flattenResumeProjects(sections: ResumeProjectSection[]): ResumePrintItem[] {
-  return locateResumeProjects(sections).map(entry => entry.item)
+export function flattenResume(resume: Resume): ResumePrintItem[] {
+  return locateResumeItems(resume).map(entry => entry.item)
 }
 
-function locateResumeProjects(sections: ResumeProjectSection[]): LocatedItem[] {
-  const out: LocatedItem[] = []
+/**
+ * The flat stream with each block's origin attached, in `sectionOrder`.
+ *
+ * Exported for the page-break fitter, which measures the rendered blocks and has to map a
+ * DOM child back to the project coordinate that addresses it.
+ */
+export function locateResumeItems(resume: Resume): LocatedResumeItem[] {
+  const out: LocatedResumeItem[] = []
+  const push = (item: ResumePrintItem, at = NOT_A_PROJECT) => out.push({ item, ...at })
+  const lastItem = () => out[out.length - 1]?.item
 
-  sections.forEach((section, sectionIndex) => {
+  for (const key of normalizeResumeSectionOrder(resume.sectionOrder)) {
+    switch (key) {
+      case 'summary':
+        push({ kind: 'sectionHeading', text: resume.summary.heading, gap: headingGap(lastItem()) })
+        push({ kind: 'text', lines: resume.summary.lines, justify: true })
+        break
+
+      case 'education':
+        push({ kind: 'sectionHeading', text: resume.education.heading, gap: headingGap(lastItem()) })
+        push({ kind: 'text', lines: resume.education.lines, justify: false })
+        break
+
+      case 'skills':
+        for (const block of resume.skillBlocks ?? []) {
+          push({ kind: 'sectionHeading', text: block.heading, gap: headingGap(lastItem()) })
+          push({ kind: 'skillRows', rows: block.rows ?? [] })
+        }
+        break
+
+      case 'certifications':
+        push({
+          kind: 'sectionHeading',
+          text: resume.certifications.heading,
+          gap: headingGap(lastItem()),
+        })
+        push({ kind: 'certifications', groups: resume.certifications.groups ?? [] })
+        break
+
+      case 'projects':
+        pushProjects(resume, push, lastItem)
+        break
+    }
+  }
+
+  return out
+}
+
+function pushProjects(
+  resume: Resume,
+  push: (item: ResumePrintItem, at?: { sectionIndex: number; projectIndex: number }) => void,
+  lastItem: () => ResumePrintItem | undefined
+) {
+  ;(resume.projectSections ?? []).forEach((section, sectionIndex) => {
     const items = Array.isArray(section.items) ? section.items : []
     if (section.heading) {
-      out.push({ item: { kind: 'sectionHeading', text: section.heading }, sectionIndex, projectIndex: 0 })
+      push(
+        { kind: 'sectionHeading', text: section.heading, gap: headingGap(lastItem()) },
+        { sectionIndex, projectIndex: 0 }
+      )
     }
 
     items.forEach((project, projectIndex) => {
       const at = { sectionIndex, projectIndex }
-      out.push({
-        item: {
+      push(
+        {
           kind: 'projectHead',
           employer: project.employer ?? '',
           title: project.title ?? '',
           period: project.period ?? '',
           gap: projectIndex === 0 ? 'gBody' : 'gProj',
         },
-        ...at,
-      })
+        at
+      )
 
       const details = (project.details ?? []).filter(Boolean)
-      if (details.length > 0) out.push({ item: { kind: 'details', lines: details }, ...at })
+      if (details.length > 0) push({ kind: 'details', lines: details }, at)
 
       const highlights = (project.highlights ?? []).filter(Boolean)
-      if (highlights.length > 0) out.push({ item: { kind: 'highlights', lines: highlights }, ...at })
+      if (highlights.length > 0) push({ kind: 'highlights', lines: highlights }, at)
 
       const links = (project.demoLinks ?? []).filter(link => link?.href)
-      if (links.length > 0) out.push({ item: { kind: 'demo', links }, ...at })
+      if (links.length > 0) push({ kind: 'demo', links }, at)
     })
   })
-
-  return out
 }
 
 /**
@@ -87,7 +173,7 @@ function locateResumeProjects(sections: ResumeProjectSection[]): LocatedItem[] {
  * throwing - a bad number in the admin should misplace the break, not blank the page.
  */
 export function planResumeSheets(resume: Resume): ResumeSheetPlan {
-  const located = locateResumeProjects(resume.projectSections ?? [])
+  const located = locateResumeItems(resume)
   const { sectionIndex, projectIndex, highlightsOnFirstSheet } = resume.pageBreak ?? {
     sectionIndex: 0,
     projectIndex: 0,

@@ -1,19 +1,17 @@
 'use client'
 
-import { Fragment } from 'react'
 import type { ReactNode } from 'react'
 
 import { CV_SHEET_CSS, u } from '@/components/cv/cv-sheet-css'
 import { renderInlineBold } from '@/lib/resume-inline'
 import { CV_FALLBACK_PHOTO } from '@/lib/resume-seed'
 import type { ResumePrintItem } from '@/lib/resume-view-model'
-import { planResumeSheets } from '@/lib/resume-view-model'
+import { flattenResume, planResumeSheets } from '@/lib/resume-view-model'
 import type {
   Resume,
-  ResumeCertificationBlock,
+  ResumeCertificationGroup,
   ResumeContact,
-  ResumeSkillBlock,
-  ResumeTextBlock,
+  ResumeSkillRow,
 } from '@/types/profile'
 
 /**
@@ -114,20 +112,28 @@ function SectionRule({ heading, gap }: { heading: string; gap: string }) {
   )
 }
 
-function TextBlock({ block, justify }: { block: ResumeTextBlock; justify?: boolean }) {
+function TextBlock({
+  lines,
+  justify,
+  gTop,
+}: {
+  lines: string[]
+  justify: boolean
+  gTop: boolean
+}) {
   return (
-    <div className={`p gBody${justify ? ' jt' : ''}`}>
-      {block.lines.map((line, index) => (
+    <div className={`p ${gTop ? 'gTop' : 'gBody'}${justify ? ' jt' : ''}`}>
+      {lines.map((line, index) => (
         <div key={index}>{renderInlineBold(line)}</div>
       ))}
     </div>
   )
 }
 
-function SkillRows({ block }: { block: ResumeSkillBlock }) {
+function SkillRows({ rows, gTop }: { rows: ResumeSkillRow[]; gTop: boolean }) {
   return (
-    <div className='sk gSkill'>
-      {block.rows.map((row, index) => (
+    <div className={`sk ${gTop ? 'gTop' : 'gSkill'}`}>
+      {rows.map((row, index) => (
         <div key={index}>
           {row.items.map(item => (
             <span key={item}>{item}</span>
@@ -138,10 +144,16 @@ function SkillRows({ block }: { block: ResumeSkillBlock }) {
   )
 }
 
-function CertificationBody({ block }: { block: ResumeCertificationBlock }) {
+function CertificationBody({
+  groups,
+  gTop,
+}: {
+  groups: ResumeCertificationGroup[]
+  gTop: boolean
+}) {
   return (
-    <div className='p gBody'>
-      {block.groups.map((group, index) => (
+    <div className={`p ${gTop ? 'gTop' : 'gBody'}`}>
+      {groups.map((group, index) => (
         <div key={index}>
           {group.issuer && <b>{`${group.issuer}: `}</b>}
           {joinNodes(
@@ -158,6 +170,49 @@ function CertificationBody({ block }: { block: ResumeCertificationBlock }) {
   )
 }
 
+/** The fixed page header: photo, name, role, rule, contact rows. Always sheet 1, always first. */
+function Masthead({ resume }: { resume: Resume }) {
+  return (
+    <div className='mast'>
+      <div
+        style={{
+          left: u(0.37),
+          top: 0,
+          width: u(181),
+          height: u(181),
+          border: `${u(4)} solid #000000`,
+          borderRadius: '50%',
+          overflow: 'hidden',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={resume.photo || CV_FALLBACK_PHOTO}
+          alt={resume.name}
+          style={{
+            position: 'absolute',
+            left: u(0),
+            top: u(-0.05),
+            width: u(202),
+            height: u(202),
+            objectFit: 'cover',
+          }}
+        />
+      </div>
+
+      <div className='name' style={{ left: u(233), top: u(21.95) }}>
+        {resume.name}
+      </div>
+      <div className='role' style={{ left: u(233), top: u(68.95) }}>
+        {resume.role}
+      </div>
+      <div className='rule' style={{ left: u(233), top: u(115.45), width: u(560) }} />
+
+      <ContactRow contact={resume.contact} />
+    </div>
+  )
+}
+
 /**
  * One printed block from the project stream. `gTop` replaces the block's own leading gap
  * on the first item of sheet 2, matching the source's page-2 top margin.
@@ -165,7 +220,16 @@ function CertificationBody({ block }: { block: ResumeCertificationBlock }) {
 function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
   switch (item.kind) {
     case 'sectionHeading':
-      return <SectionRule heading={item.text} gap={gTop ? 'gTop' : 'gHead'} />
+      return <SectionRule heading={item.text} gap={gTop ? 'gTop' : item.gap} />
+
+    case 'text':
+      return <TextBlock lines={item.lines} justify={item.justify} gTop={gTop} />
+
+    case 'skillRows':
+      return <SkillRows rows={item.rows} gTop={gTop} />
+
+    case 'certifications':
+      return <CertificationBody groups={item.groups} gTop={gTop} />
 
     case 'projectHead':
       return (
@@ -233,59 +297,7 @@ export default function CvSheets({ resume }: { resume: Resume }) {
 
       {/* ================================ PAGE 1 ================================ */}
       <section className='sheet' aria-label='Curriculum vitae, page 1 of 2'>
-        <div className='mast'>
-          <div
-            style={{
-              left: u(0.37),
-              top: 0,
-              width: u(181),
-              height: u(181),
-              border: `${u(4)} solid #000000`,
-              borderRadius: '50%',
-              overflow: 'hidden',
-            }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={resume.photo || CV_FALLBACK_PHOTO}
-              alt={resume.name}
-              style={{
-                position: 'absolute',
-                left: u(0),
-                top: u(-0.05),
-                width: u(202),
-                height: u(202),
-                objectFit: 'cover',
-              }}
-            />
-          </div>
-
-          <div className='name' style={{ left: u(233), top: u(21.95) }}>
-            {resume.name}
-          </div>
-          <div className='role' style={{ left: u(233), top: u(68.95) }}>
-            {resume.role}
-          </div>
-          <div className='rule' style={{ left: u(233), top: u(115.45), width: u(560) }} />
-
-          <ContactRow contact={resume.contact} />
-        </div>
-
-        <SectionRule heading={resume.summary.heading} gap='gFirst' />
-        <TextBlock block={resume.summary} justify />
-
-        <SectionRule heading={resume.education.heading} gap='gHead' />
-        <TextBlock block={resume.education} />
-
-        {resume.skillBlocks.map((block, index) => (
-          <Fragment key={block.heading || index}>
-            <SectionRule heading={block.heading} gap={index === 0 ? 'gHead' : 'gHeadS'} />
-            <SkillRows block={block} />
-          </Fragment>
-        ))}
-
-        <SectionRule heading={resume.certifications.heading} gap='gHeadS' />
-        <CertificationBody block={resume.certifications} />
+        <Masthead resume={resume} />
 
         {sheets.first.map((item, index) => (
           <PrintItem key={index} item={item} gTop={false} />
@@ -296,6 +308,37 @@ export default function CvSheets({ resume }: { resume: Resume }) {
       <section className='sheet' aria-label='Curriculum vitae, page 2 of 2'>
         {sheets.second.map((item, index) => (
           <PrintItem key={index} item={item} gTop={index === 0} />
+        ))}
+      </section>
+    </>
+  )
+}
+
+/**
+ * Every printed block in one sheet of unbounded height, for measuring only.
+ *
+ * The page break is a manual coordinate into a fixed 297mm page, so the only way to know
+ * where sheet 1 actually has to stop is to lay the whole stream out at true A4 width and
+ * read the geometry back. Same component, same CSS, same order as the real sheets, with
+ * the height cap and the clipping lifted - so `fitResumePageBreak` can find the last block
+ * boundary that still fits.
+ *
+ * Never shown to anyone: callers park it offscreen and unmount it once measured.
+ */
+export function CvFlowSheet({ resume }: { resume: Resume }) {
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: CV_SHEET_CSS }} />
+
+      {/* Only the height cap is lifted. `overflow: hidden` stays: it is what makes the sheet
+          a block formatting context, and without it the masthead's top margin collapses out
+          through the top edge and every block below measures ~41px too high. With an auto
+          height it clips nothing. */}
+      <section className='sheet' style={{ height: 'auto' }}>
+        <Masthead resume={resume} />
+
+        {flattenResume(resume).map((item, index) => (
+          <PrintItem key={index} item={item} gTop={false} />
         ))}
       </section>
     </>

@@ -11,6 +11,7 @@ import type {
   SkillGroup,
   SkillItem,
 } from '@/types/profile'
+import { DEFAULT_RESUME_SECTION_ORDER, normalizeResumeSectionOrder } from '@/lib/resume-sections'
 import { resolveIconCode } from '@/utils/iconResolver'
 
 export function makeEmptyProfile(): Profile {
@@ -67,6 +68,7 @@ export function makeEmptyResume(): Resume {
     role: '',
     photo: '',
     contact: { email: '', phone: '', location: '', links: [] },
+    sectionOrder: [...DEFAULT_RESUME_SECTION_ORDER],
     summary: { heading: '', lines: [] },
     education: { heading: '', lines: [] },
     skillBlocks: [],
@@ -106,6 +108,7 @@ export function normalizeResume(raw: unknown): Resume {
         }
       }),
     },
+    sectionOrder: normalizeResumeSectionOrder(source.sectionOrder),
     summary: normalizeTextBlock(source.summary),
     education: normalizeTextBlock(source.education),
     skillBlocks: ensureArray(source.skillBlocks).map(item => {

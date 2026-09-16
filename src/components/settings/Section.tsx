@@ -8,6 +8,7 @@ export default function Section({
   id,
   title,
   badge,
+  handle,
   defaultOpen = false,
   children,
 }: {
@@ -15,6 +16,8 @@ export default function Section({
   id: string
   title: string
   badge?: string
+  /** Drag grip from a `DragList`, shown ahead of the title when the card is reorderable. */
+  handle?: React.ReactNode
   /** Applies only until the section has been toggled once - see `SectionOpenProvider`. */
   defaultOpen?: boolean
   children: React.ReactNode
@@ -29,6 +32,7 @@ export default function Section({
     >
       <summary className='cursor-pointer list-none px-5 py-5 sm:px-6'>
         <div className='flex flex-wrap items-center gap-3'>
+          {handle}
           <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(246,240,233,0.84))] shadow-[0_10px_24px_rgba(46,35,28,0.06)]'>
             <span className='h-2.5 w-2.5 rounded-full bg-[linear-gradient(135deg,var(--pp-blue),var(--pp-violet))]' />
           </div>

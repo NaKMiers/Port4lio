@@ -3,6 +3,7 @@ import React from 'react'
 import { CV_FALLBACK_PHOTO } from '@/lib/resume-seed'
 import { MAX_UPLOAD_BYTES } from '@/lib/upload-limits'
 import AddMoreButton from '@/components/settings/AddMoreButton'
+import DragList from '@/components/settings/DragList'
 import Section from '@/components/settings/Section'
 import Spinner from '@/components/settings/Spinner'
 import {
@@ -18,6 +19,7 @@ import {
   uploadInputCls,
 } from '@/components/settings/settings-utils'
 import { replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
+import { moveItem } from '@/lib/resume-sections'
 import type { UploadingState } from '@/components/settings/types'
 import type { Profile, ResumeContactLink } from '@/types/profile'
 
@@ -54,6 +56,12 @@ export default function ResumeMastheadSection({
       contact: { ...r.contact, links: replaceAt(r.contact.links, idx, patch) },
     }))
   }
+
+  const moveLink = (from: number, to: number) =>
+    updateResume(setProfile, r => ({
+      ...r,
+      contact: { ...r.contact, links: moveItem(r.contact.links, from, to) },
+    }))
 
   return (
     <Section id='cv-masthead' title='CV Masthead' badge='name, role, contact' defaultOpen>
@@ -225,52 +233,67 @@ export default function ResumeMastheadSection({
           <div className={emptyStateCls}>No contact links yet.</div>
         ) : null}
 
-        {contact.links.map((link, idx) => (
-          <div key={idx} className={itemCardCls}>
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
-              <div className='space-y-2'>
-                <label className={labelCls}>Label</label>
-                <input
-                  className={inputCls}
-                  placeholder='Portfolio'
-                  value={link.label}
-                  onChange={e => updateLink(idx, { label: e.target.value })}
-                />
+        <DragList
+          ids={contact.links.map((_, idx) => `link-${idx}`)}
+          onReorder={moveLink}
+          itemLabel='contact link'
+        >
+          {(idx, linkHandle) => {
+            const link = contact.links[idx]
+            return (
+              <div className={itemCardCls}>
+                <div className='flex items-start gap-2'>
+                  <div className='grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-3'>
+                    <div className='space-y-2'>
+                      <label className={labelCls}>Label</label>
+                      <input
+                        className={inputCls}
+                        placeholder='Portfolio'
+                        value={link.label}
+                        onChange={e => updateLink(idx, { label: e.target.value })}
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className={labelCls}>Anchor text</label>
+                      <input
+                        className={inputCls}
+                        placeholder='anhkhoa.info'
+                        value={link.text}
+                        onChange={e => updateLink(idx, { text: e.target.value })}
+                      />
+                    </div>
+                    <div className='space-y-2'>
+                      <label className={labelCls}>Href</label>
+                      <input
+                        className={inputCls}
+                        value={link.href}
+                        onChange={e => updateLink(idx, { href: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className='pt-6'>{linkHandle}</div>
+                </div>
+                <div className='mt-3 flex justify-end'>
+                  <button
+                    type='button'
+                    className={ghostBtnCls}
+                    onClick={() =>
+                      updateResume(setProfile, r => ({
+                        ...r,
+                        contact: {
+                          ...r.contact,
+                          links: r.contact.links.filter((_, i) => i !== idx),
+                        },
+                      }))
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
-              <div className='space-y-2'>
-                <label className={labelCls}>Anchor text</label>
-                <input
-                  className={inputCls}
-                  placeholder='anhkhoa.info'
-                  value={link.text}
-                  onChange={e => updateLink(idx, { text: e.target.value })}
-                />
-              </div>
-              <div className='space-y-2'>
-                <label className={labelCls}>Href</label>
-                <input
-                  className={inputCls}
-                  value={link.href}
-                  onChange={e => updateLink(idx, { href: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className='mt-3 flex justify-end'>
-              <button
-                type='button'
-                className={ghostBtnCls}
-                onClick={() =>
-                  updateResume(setProfile, r => ({
-                    ...r,
-                    contact: { ...r.contact, links: r.contact.links.filter((_, i) => i !== idx) },
-                  }))
-                }
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
+            )
+          }}
+        </DragList>
 
         {contact.links.length > 0 ? (
           <AddMoreButton label='+ Add contact link' onClick={addLink} />

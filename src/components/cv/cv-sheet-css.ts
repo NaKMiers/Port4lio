@@ -147,6 +147,24 @@ export const CV_SHEET_CSS = `
 .cv .i1::before { left: -10.6pt; width: 2.6pt; height: 2.6pt; background: var(--ink); }
 .cv .i2::before { left: -11.43pt; width: 3.6pt; height: 3.6pt; border: 1px solid var(--ink); }
 
+/* Every rule on this sheet is a 1px box filled with a background rather than a border -
+   the masthead rule, the rule trailing each section heading, the vector pipes between
+   contact items - and the level-1 bullet is a background disc. Browsers omit backgrounds
+   when printing, and Chrome's print dialog ships with "Background graphics" off, so an
+   exported PDF lost every divider and every level-1 bullet while the level-2 rings, drawn
+   with a border, came through fine.
+
+   Scoped to these four selectors rather than set on .cv itself: the sheet's own #f9f9f9
+   must keep printing white, and forcing exact colour on the whole subtree would lay a
+   grey panel under both pages. */
+.cv .rule,
+.cv .sec span,
+.cv .bar,
+.cv .i1::before {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 /* Two class selectors, not one: the settings page carries \`portfolio-public-root\`, whose
    \`.portfolio-public-root a\` rule would otherwise outrank a bare \`.ul\` and repaint every
    link in the preview. */

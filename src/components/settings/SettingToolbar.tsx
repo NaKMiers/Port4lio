@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import React from 'react'
 
-import { primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
+import { hasActiveUploads, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
 import type { UploadingState } from '@/components/settings/types'
 
 export default function SettingToolbar({
@@ -10,6 +10,7 @@ export default function SettingToolbar({
   fullWidth,
   onToggleFullWidth,
   onSave,
+  saveButtonRef,
 }: {
   saving: boolean
   uploading: UploadingState
@@ -17,15 +18,10 @@ export default function SettingToolbar({
   fullWidth: boolean
   onToggleFullWidth: () => void
   onSave: () => void
+  /** Watched by `FloatingSaveButton`, which takes over once this one scrolls away. */
+  saveButtonRef?: React.Ref<HTMLButtonElement>
 }) {
-  // Save is disabled while any of these run, so a URL cannot be saved before Cloudinary
-  // has returned it. Every new upload kind has to be listed here.
-  const hasUploads =
-    uploading.avatar ||
-    uploading.background ||
-    uploading.cv ||
-    uploading.cvPhoto ||
-    Object.values(uploading.projects).some(Boolean)
+  const hasUploads = hasActiveUploads(uploading)
 
   return (
     <div className='relative mb-6 rounded-[2rem] border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(255,250,246,0.78))] p-6 shadow-panel backdrop-blur-md sm:p-7'>
@@ -97,6 +93,7 @@ export default function SettingToolbar({
             Publish
           </Link>
           <button
+            ref={saveButtonRef}
             type='button'
             onClick={onSave}
             disabled={saving || hasUploads}

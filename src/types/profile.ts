@@ -138,6 +138,16 @@ export type ResumeProjectSection = {
 }
 
 /**
+ * One reorderable block of printed sheet 1. See `src/lib/resume-sections.ts`.
+ *
+ * `skills` covers every entry of {@link Resume.skillBlocks} as a unit - the blocks print
+ * consecutively and are reordered among themselves, not interleaved with other sections.
+ * `projects` is the stream that spills onto sheet 2; sections placed after it therefore
+ * print after the page break.
+ */
+export type ResumeSectionKey = 'summary' | 'education' | 'skills' | 'certifications' | 'projects'
+
+/**
  * Where sheet 1 ends. The source splits mid bullet list, so the coordinate addresses a
  * highlight inside a project, not a project boundary. Out-of-range values clamp rather
  * than throw - see `planResumeSheets`.
@@ -167,6 +177,11 @@ export type Resume = {
   role: string
   photo: string
   contact: ResumeContact
+  /**
+   * Print order of the blocks below the masthead. Normalised to name every section
+   * exactly once - see `normalizeResumeSectionOrder`.
+   */
+  sectionOrder: ResumeSectionKey[]
   summary: ResumeTextBlock
   education: ResumeTextBlock
   /** TECHNICAL SKILLS / AI ENGINEERING / SOFT SKILLS, in print order. */

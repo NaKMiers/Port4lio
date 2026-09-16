@@ -1,3 +1,4 @@
+import { DEFAULT_RESUME_SECTION_ORDER } from '@/lib/resume-sections'
 import type { Resume } from '@/types/profile'
 
 /**
@@ -24,6 +25,8 @@ export const RESUME_SEED: Resume = {
   // than pin the bundled file, and saving the seed once must not turn that inheritance
   // into an explicit override.
   photo: '',
+
+  sectionOrder: [...DEFAULT_RESUME_SECTION_ORDER],
 
   contact: {
     email: 'anhkhoa14904@gmail.com',

@@ -118,7 +118,9 @@ export default function PreviewRail({ tab, profile }: { tab: SettingTabId; profi
           {tab === 'cv' ? (
             <>
               The CV is length-capped by the sheet, not reflowed: anything past 297mm is cut off
-              rather than pushed to a third page. Move the page break in{' '}
+              rather than pushed to a third page. Reordering re-measures the sheets on its own;
+              after an edit that made the copy longer, use{' '}
+              <span className='font-semibold text-pp-text'>Fit to sheet 1</span> in{' '}
               <span className='font-semibold text-pp-text'>CV Projects</span> to rebalance.
             </>
           ) : (

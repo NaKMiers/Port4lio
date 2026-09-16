@@ -1,3 +1,4 @@
+import { normalizeResumeSectionOrder } from '@/lib/resume-sections'
 import type {
   Certificate,
   EducationItem,
@@ -140,6 +141,7 @@ function pruneResume(resume: Resume | undefined): Resume | undefined {
         }))
         .filter(link => !isBlank(link.text) || !isBlank(link.href)),
     },
+    sectionOrder: normalizeResumeSectionOrder(resume.sectionOrder),
     summary: pruneTextBlock(resume.summary),
     education: pruneTextBlock(resume.education),
     skillBlocks: (resume.skillBlocks ?? [])

@@ -190,6 +190,10 @@ const resumeSchema = new Schema(
     role: { type: String, default: '' },
     photo: { type: String, default: '' },
     contact: { type: resumeContactSchema, default: undefined },
+    // Print order of the blocks below the masthead. An absent or partial array is
+    // repaired by `normalizeResumeSectionOrder`, so documents written before this field
+    // existed still print every section.
+    sectionOrder: { type: [String], default: undefined },
     summary: { type: resumeTextBlockSchema, default: undefined },
     education: { type: resumeTextBlockSchema, default: undefined },
     skillBlocks: { type: [resumeSkillBlockSchema], default: [] },

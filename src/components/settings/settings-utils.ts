@@ -1,4 +1,22 @@
+import type { UploadingState } from '@/components/settings/types'
 import { MAX_UPLOAD_BYTES, formatMaxUploadMb } from '@/lib/upload-limits'
+
+/**
+ * Whether any asset is still on its way to Cloudinary.
+ *
+ * Saving is blocked while one is, so a profile cannot be written before the URL it should
+ * carry exists. Every new upload kind has to be listed here - and it is listed here, once,
+ * because both the toolbar's save button and the floating one gate on the same answer.
+ */
+export function hasActiveUploads(uploading: UploadingState): boolean {
+  return (
+    uploading.avatar ||
+    uploading.background ||
+    uploading.cv ||
+    uploading.cvPhoto ||
+    Object.values(uploading.projects).some(Boolean)
+  )
+}
 
 export const MAX_UPLOAD_MB_LABEL = formatMaxUploadMb()
 

@@ -1,21 +1,20 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import AboutSection from '@/components/settings/AboutSection'
 import BasicsSection from '@/components/settings/BasicsSection'
 import CertificatesSection from '@/components/settings/CertificatesSection'
+import CvTabSections from '@/components/settings/CvTabSections'
 import EducationSection from '@/components/settings/EducationSection'
 import ExperienceSection from '@/components/settings/ExperienceSection'
+import FloatingSaveButton from '@/components/settings/FloatingSaveButton'
 import IconPickerModal from '@/components/settings/IconPickerModal'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import ProjectsSection from '@/components/settings/ProjectsSection'
-import ResumeBlocksSection from '@/components/settings/ResumeBlocksSection'
-import ResumeMastheadSection from '@/components/settings/ResumeMastheadSection'
-import ResumeProjectsSection from '@/components/settings/ResumeProjectsSection'
-import ResumeSkillsSection from '@/components/settings/ResumeSkillsSection'
 import { SectionOpenProvider } from '@/components/settings/SectionOpenContext'
 import PreviewRail from '@/components/settings/preview/PreviewRail'
+import RailResizeHandle from '@/components/settings/RailResizeHandle'
 import ServicesSection from '@/components/settings/ServicesSection'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoadError from '@/components/settings/SettingLoadError'
@@ -25,6 +24,7 @@ import SkillsSection from '@/components/settings/SkillsSection'
 import SocialsSection from '@/components/settings/SocialsSection'
 import StatsSection from '@/components/settings/StatsSection'
 import TabNav from '@/components/settings/TabNav'
+import { useRailWidth } from '@/components/settings/useRailWidth'
 import type { TabItem } from '@/components/settings/TabNav'
 import { cleanProfileForSave } from '@/components/settings/cleanProfileForSave'
 import type { IconPickerTarget, SettingTabId, UploadingState } from '@/components/settings/types'
@@ -51,7 +51,7 @@ const SETTING_TABS: TabItem[] = [
   { id: 'profile', label: 'Profile', count: 4 },
   { id: 'career', label: 'Career', count: 4 },
   { id: 'offering', label: 'Offering', count: 2 },
-  { id: 'cv', label: 'CV', count: 4 },
+  { id: 'cv', label: 'CV', count: 6 },
 ]
 
 export default function SettingPage() {
@@ -102,6 +102,9 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   const [fullWidth, setFullWidth] = useState(readStoredFullWidth)
   const [iconPickerTarget, setIconPickerTarget] = useState<IconPickerTarget>(null)
   const [iconQuery, setIconQuery] = useState('')
+  const { width: railWidth, setWidth: setRailWidth, resetWidth: resetRailWidth } = useRailWidth(tab)
+  const layoutRef = useRef<HTMLDivElement | null>(null)
+  const saveButtonRef = useRef<HTMLButtonElement | null>(null)
   const [uploading, setUploading] = useState<UploadingState>({
     avatar: false,
     background: false,
@@ -224,6 +227,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
           fullWidth={fullWidth}
           onToggleFullWidth={() => setFullWidth(value => !value)}
           onSave={onSave}
+          saveButtonRef={saveButtonRef}
         />
 
         <SettingErrorBanner message={error} />
@@ -236,12 +240,13 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         />
 
         <SectionOpenProvider>
+          {/* The rail track is a variable so `RailResizeHandle` can drive it without this
+              layout being rebuilt on every pointer move, and so the single-column stack
+              below `xl` stays a plain Tailwind class rather than an inline override. */}
           <div
-            className={`grid grid-cols-1 gap-6 xl:gap-8 ${
-              tab === 'cv'
-                ? 'xl:grid-cols-[minmax(0,1fr)_460px]'
-                : 'xl:grid-cols-[minmax(0,1fr)_380px]'
-            }`}
+            ref={layoutRef}
+            className='grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_var(--rail-width)] xl:gap-8'
+            style={{ '--rail-width': `${railWidth}px` } as React.CSSProperties}
           >
             {/* Every tab writes into the same `profile` state, so switching tabs never
               discards an unsaved edit - only the section cards unmount. */}
@@ -299,26 +304,34 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
               ) : null}
 
               {tab === 'cv' ? (
-                <>
-                  <ResumeMastheadSection
-                    profile={profile}
-                    setProfile={setProfile}
-                    uploading={uploading}
-                    setUploading={setUploading}
-                    setError={setError}
-                  />
-                  <ResumeBlocksSection profile={profile} setProfile={setProfile} />
-                  <ResumeSkillsSection profile={profile} setProfile={setProfile} />
-                  <ResumeProjectsSection profile={profile} setProfile={setProfile} />
-                </>
+                <CvTabSections
+                  profile={profile}
+                  setProfile={setProfile}
+                  uploading={uploading}
+                  setUploading={setUploading}
+                  setError={setError}
+                />
               ) : null}
             </div>
 
-            <div className='xl:pl-2'>
+            <div className='relative xl:pl-2'>
+              <RailResizeHandle
+                width={railWidth}
+                onResize={setRailWidth}
+                onReset={resetRailWidth}
+                containerRef={layoutRef}
+              />
               <PreviewRail tab={tab} profile={profile} />
             </div>
           </div>
         </SectionOpenProvider>
+
+        <FloatingSaveButton
+          anchorRef={saveButtonRef}
+          saving={saving}
+          uploading={uploading}
+          onSave={onSave}
+        />
 
         <IconPickerModal
           open={!!iconPickerTarget}
