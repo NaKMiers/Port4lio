@@ -1,5 +1,7 @@
 import mongoose, { Schema } from 'mongoose'
 
+import { compileModel } from '@/lib/mongoose-model'
+
 /** Single portfolio document id (singleton row in `profile` collection). */
 export const PROFILE_DOCUMENT_ID = process.env.PROFILE_DOCUMENT_ID!
 
@@ -189,6 +191,7 @@ const resumeSchema = new Schema(
     name: { type: String, default: '' },
     role: { type: String, default: '' },
     photo: { type: String, default: '' },
+    hidePhoto: { type: Boolean, default: false },
     contact: { type: resumeContactSchema, default: undefined },
     // Print order of the blocks below the masthead. An absent or partial array is
     // repaired by `normalizeResumeSectionOrder`, so documents written before this field
@@ -243,4 +246,7 @@ const profileSchema = new Schema(
   }
 )
 
-export const ProfileModel: any = mongoose.models.Profile ?? mongoose.model('Profile', profileSchema)
+// `compileModel`, not the usual `mongoose.models.X ?? ...`: this schema gains fields while
+// a dev server is running, and the cached-model version of that guard drops them from every
+// write without erroring. See `src/lib/mongoose-model.ts`.
+export const ProfileModel: any = compileModel('Profile', profileSchema)

@@ -67,6 +67,7 @@ export function makeEmptyResume(): Resume {
     name: '',
     role: '',
     photo: '',
+    hidePhoto: false,
     contact: { email: '', phone: '', location: '', links: [] },
     sectionOrder: [...DEFAULT_RESUME_SECTION_ORDER],
     summary: { heading: '', lines: [] },
@@ -95,6 +96,7 @@ export function normalizeResume(raw: unknown): Resume {
     name: String(source.name ?? ''),
     role: String(source.role ?? ''),
     photo: String(source.photo ?? ''),
+    hidePhoto: Boolean(source.hidePhoto),
     contact: {
       email: String(contact.email ?? ''),
       phone: String(contact.phone ?? ''),

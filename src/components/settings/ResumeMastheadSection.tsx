@@ -95,15 +95,37 @@ export default function ResumeMastheadSection({
         <div className={itemCardCls}>
           <div className='flex items-center justify-between gap-3'>
             <label className={labelCls}>CV photo</label>
-            {uploading.cvPhoto ? <Spinner className='text-pp-muted' /> : null}
+            <div className='flex items-center gap-2'>
+              {uploading.cvPhoto ? <Spinner className='text-pp-muted' /> : null}
+              <button
+                type='button'
+                className={ghostBtnCls}
+                onClick={() =>
+                  updateResume(setProfile, r => ({ ...r, hidePhoto: !r.hidePhoto }))
+                }
+              >
+                {resume.hidePhoto ? 'Show avatar on CV' : 'Hide avatar on CV'}
+              </button>
+            </div>
           </div>
           <p className={helpTextCls}>
             Defaults to your profile avatar. Upload one here only when the printed CV should use a
             different picture — it is cropped to a circle, so a head-and-shoulders shot works best.
             Max {MAX_UPLOAD_MB_LABEL} MB, uploads immediately.
           </p>
+          {resume.hidePhoto ? (
+            <p className={`${helpTextCls} mt-1 font-semibold text-pp-text`}>
+              Hidden on the printed CV — name, role and contact reclaim the width it used, all the
+              way to the right margin. The photo below is kept, so switching this back on restores
+              it without a re-upload.
+            </p>
+          ) : null}
 
-          <div className='mt-3 grid grid-cols-1 items-start gap-4 md:grid-cols-[auto_minmax(0,1fr)]'>
+          <div
+            className={`mt-3 grid grid-cols-1 items-start gap-4 md:grid-cols-[auto_minmax(0,1fr)] ${
+              resume.hidePhoto ? 'opacity-50' : ''
+            }`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={effectivePhoto}

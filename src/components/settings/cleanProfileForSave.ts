@@ -129,6 +129,7 @@ function pruneResume(resume: Resume | undefined): Resume | undefined {
     name: trimOrEmpty(resume.name),
     role: trimOrEmpty(resume.role),
     photo: trimOrEmpty(resume.photo),
+    hidePhoto: !!resume.hidePhoto,
     contact: {
       email: trimOrEmpty(resume.contact?.email),
       phone: trimOrEmpty(resume.contact?.phone),

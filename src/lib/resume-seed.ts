@@ -25,6 +25,7 @@ export const RESUME_SEED: Resume = {
   // than pin the bundled file, and saving the seed once must not turn that inheritance
   // into an explicit override.
   photo: '',
+  hidePhoto: false,
 
   sectionOrder: [...DEFAULT_RESUME_SECTION_ORDER],
 

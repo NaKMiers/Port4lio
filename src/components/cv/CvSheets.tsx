@@ -58,6 +58,20 @@ const CONTACT_BAR_GAPS = {
   ],
 } as const
 
+/**
+ * Horizontal geometry of the name/role/rule/contact block, in source units.
+ *
+ * With the photo showing, that block starts to its right at 233u and its rule reaches to
+ * 793u - the sheet's content edge (893u sheet minus the 50u margin on each side). Hiding
+ * the photo does not shrink the masthead - `.mast` is a fixed height matching the photo's
+ * own, sized independently of whether one prints - so the only thing to adjust is this
+ * block reclaiming the width the photo used to occupy, by starting at the same left edge
+ * as everything else on the sheet (0) instead of past the photo.
+ */
+const MASTHEAD_CONTENT_RIGHT = 793
+const MASTHEAD_TEXT_LEFT_WITH_PHOTO = 233
+const MASTHEAD_TEXT_LEFT_NO_PHOTO = 0
+
 type BarGap = { left: number; right: number }
 
 function barGap(gaps: readonly BarGap[], index: number): BarGap {
@@ -75,11 +89,11 @@ function joinNodes(nodes: ReactNode[], separator: string): ReactNode[] {
   )
 }
 
-function ContactRow({ contact }: { contact: ResumeContact }) {
+function ContactRow({ contact, left }: { contact: ResumeContact; left: number }) {
   const identity = [contact.email, contact.phone, contact.location].filter(Boolean)
 
   return (
-    <div className='contact' style={{ left: u(233), top: u(138.95) }}>
+    <div className='contact' style={{ left: u(left), top: u(138.95) }}>
       <div>
         {identity.map((value, index) => (
           <span key={value}>
@@ -172,43 +186,50 @@ function CertificationBody({
 
 /** The fixed page header: photo, name, role, rule, contact rows. Always sheet 1, always first. */
 function Masthead({ resume }: { resume: Resume }) {
+  const textLeft = resume.hidePhoto ? MASTHEAD_TEXT_LEFT_NO_PHOTO : MASTHEAD_TEXT_LEFT_WITH_PHOTO
+
   return (
     <div className='mast'>
-      <div
-        style={{
-          left: u(0.37),
-          top: 0,
-          width: u(181),
-          height: u(181),
-          border: `${u(4)} solid #000000`,
-          borderRadius: '50%',
-          overflow: 'hidden',
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={resume.photo || CV_FALLBACK_PHOTO}
-          alt={resume.name}
+      {resume.hidePhoto ? null : (
+        <div
           style={{
-            position: 'absolute',
-            left: u(0),
-            top: u(-0.05),
-            width: u(202),
-            height: u(202),
-            objectFit: 'cover',
+            left: u(0.37),
+            top: 0,
+            width: u(181),
+            height: u(181),
+            border: `${u(4)} solid #000000`,
+            borderRadius: '50%',
+            overflow: 'hidden',
           }}
-        />
-      </div>
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resume.photo || CV_FALLBACK_PHOTO}
+            alt={resume.name}
+            style={{
+              position: 'absolute',
+              left: u(0),
+              top: u(-0.05),
+              width: u(202),
+              height: u(202),
+              objectFit: 'cover',
+            }}
+          />
+        </div>
+      )}
 
-      <div className='name' style={{ left: u(233), top: u(21.95) }}>
+      <div className='name' style={{ left: u(textLeft), top: u(21.95) }}>
         {resume.name}
       </div>
-      <div className='role' style={{ left: u(233), top: u(68.95) }}>
+      <div className='role' style={{ left: u(textLeft), top: u(68.95) }}>
         {resume.role}
       </div>
-      <div className='rule' style={{ left: u(233), top: u(115.45), width: u(560) }} />
+      <div
+        className='rule'
+        style={{ left: u(textLeft), top: u(115.45), width: u(MASTHEAD_CONTENT_RIGHT - textLeft) }}
+      />
 
-      <ContactRow contact={resume.contact} />
+      <ContactRow contact={resume.contact} left={textLeft} />
     </div>
   )
 }

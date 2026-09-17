@@ -37,6 +37,8 @@ import { getIconCatalog } from '@/utils/iconResolver'
 
 /** Remembered so a wide-screen setup does not have to be re-chosen every visit. */
 const FULL_WIDTH_STORAGE_KEY = 'portfolio:settings:full-width'
+/** Remembered so a reload lands back on the tab being edited, not always Profile. */
+const ACTIVE_TAB_STORAGE_KEY = 'portfolio:settings:active-tab'
 
 function readStoredFullWidth(): boolean {
   if (typeof window === 'undefined') return false
@@ -53,6 +55,20 @@ const SETTING_TABS: TabItem[] = [
   { id: 'offering', label: 'Offering', count: 2 },
   { id: 'cv', label: 'CV', count: 6 },
 ]
+
+const SETTING_TAB_IDS: readonly SettingTabId[] = SETTING_TABS.map(t => t.id as SettingTabId)
+
+/** Falls back to `profile` for anything that is not a tab id this build knows about -
+ * a stale value from a removed tab, or storage tampered with by hand. */
+function readStoredTab(): SettingTabId {
+  if (typeof window === 'undefined') return 'profile'
+  try {
+    const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)
+    return (SETTING_TAB_IDS as string[]).includes(stored ?? '') ? (stored as SettingTabId) : 'profile'
+  } catch {
+    return 'profile'
+  }
+}
 
 export default function SettingPage() {
   const { refetchProfile } = useApp()
@@ -98,7 +114,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
     const normalized = normalizeProfile(appProfile)
     return { ...normalized, resume: deriveResume(normalized) }
   })
-  const [tab, setTab] = useState<SettingTabId>('profile')
+  const [tab, setTab] = useState<SettingTabId>(readStoredTab)
   const [fullWidth, setFullWidth] = useState(readStoredFullWidth)
   const [iconPickerTarget, setIconPickerTarget] = useState<IconPickerTarget>(null)
   const [iconQuery, setIconQuery] = useState('')
@@ -120,6 +136,14 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
       // A blocked or full storage quota costs the preference, nothing more.
     }
   }, [fullWidth])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab)
+    } catch {
+      // A blocked or full storage quota costs the preference, nothing more.
+    }
+  }, [tab])
 
   const preview = useMemo(() => {
     const bg = profile.backgroundImage || ''

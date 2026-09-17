@@ -176,6 +176,12 @@ export type Resume = {
   name: string
   role: string
   photo: string
+  /**
+   * Hides the masthead photo and lets the name/role/rule/contact block reclaim its width.
+   * The stored `photo` (and any CV-specific upload) is untouched - toggling this back on
+   * restores it exactly, rather than requiring a re-upload.
+   */
+  hidePhoto: boolean
   contact: ResumeContact
   /**
    * Print order of the blocks below the masthead. Normalised to name every section
