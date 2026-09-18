@@ -42,9 +42,21 @@ import { ATTEMPT_TTL_DAYS } from '@/models/Attempt'
  *
  * ## Retention
  *
- * Same TTL as `Attempt`, deliberately. These rows are a behavioural trace of a stranger
- * and must not outlive the result they describe. `/[lang]/mbti/privacy` promises one
- * retention window; this collection is inside that promise, not beside it.
+ * Same TTL as `Attempt`, deliberately. These rows are a behavioural trace of a stranger and
+ * must not outlive the result they describe.
+ *
+ * Amended when the blog shipped: the site no longer has ONE retention window, so the old
+ * phrasing here ("`/[lang]/mbti/privacy` promises one retention window; this collection is
+ * inside that promise") is no longer the whole story. `ContactMessage` has **no** TTL at all,
+ * deliberately - correspondence is not a behavioural trace and expiring it would delete the
+ * owner's own inbox on a timer. That collection is outside the MBTI notice entirely, which is
+ * why `/blog/privacy` exists and states all of the regimes in one place, interpolating the
+ * constants rather than repeating the numbers.
+ *
+ * What is unchanged is the claim that matters for THIS collection: it is a behavioural trace,
+ * it shares `Attempt`'s window, and the MBTI notice covers it. `tests/api/retention.test.ts`
+ * asserts the equality and `tests/unit/retention.test.ts` pins the number itself, so neither
+ * half can drift without a test naming it.
  */
 
 export type TestEventKind = 'share' | 'attribute' | 'progress' | 'funnel'

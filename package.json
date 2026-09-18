@@ -12,10 +12,11 @@
     "lint": "eslint .",
     "clean": "rm -rf .next node_modules package-lock.json bun.lock",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run && npm run test:e2e",
+    "test": "vitest run",
     "test:api": "vitest run tests/api",
     "test:unit": "vitest run tests/unit",
     "test:e2e": "playwright test",
+    "test:e2e:local": "MONGODB_URI=mongodb://127.0.0.1:27017/port4lio_e2e E2E_ALLOW_DB=port4lio_e2e playwright test",
     "test:e2e:install": "playwright install chromium"
   },
   "config": {
