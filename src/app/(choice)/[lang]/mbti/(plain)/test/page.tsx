@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import TestClient from '@/app/(choice)/[lang]/mbti/test/TestClient'
+import TestClient from '@/app/(choice)/[lang]/mbti/(plain)/test/TestClient'
 import { isLocale, LOCALES } from '@/lib/i18n'
 import { getQuestionContent, UI } from '@/lib/mbti/content'
 import { QUESTIONS } from '@/lib/mbti/questions'

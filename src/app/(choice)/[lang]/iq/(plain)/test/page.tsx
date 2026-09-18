@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import IqTestClient from '@/app/(choice)/[lang]/iq/test/IqTestClient'
+import IqTestClient from '@/app/(choice)/[lang]/iq/(plain)/test/IqTestClient'
 import { isLocale, LOCALES } from '@/lib/i18n'
 import { iqUi } from '@/lib/iq/content'
 
