@@ -160,10 +160,25 @@ describe('the four indexes', () => {
 })
 
 describe('field constraints', () => {
-  it('rejects a series outside the closed union', async () => {
+  /**
+   * This test used to assert the opposite, and the inversion is the point.
+   *
+   * `series` carried `enum: [...POST_SERIES, null]` while the series list was a build-time
+   * constant. The list now lives in the `blog_series` collection so it can be managed without
+   * a deploy, and a mongoose enum is fixed at module load - so keeping it would have meant
+   * the database validating against whatever the list happened to be when the process
+   * booted. A series created at 10:00 would be rejected by a server started at 09:00 until it
+   * restarted: a validator that is wrong on a schedule is worse than no validator.
+   *
+   * So the guarantee moved rather than disappearing. It lives in
+   * `PATCH /api/admin/blog/[id]`, which calls `seriesExists` and returns 400 - covered by
+   * `tests/api/blog-series.test.ts`. This asserts the schema's half of that split honestly,
+   * so nobody "restores" the enum without reading why it went.
+   */
+  it('accepts any string series - the enum moved to the write path, deliberately', async () => {
     await expect(
-      PostModel.create({ ...BASE, slug: 's', series: 'made-up-series' as never })
-    ).rejects.toThrow()
+      PostModel.create({ ...BASE, slug: 's', series: 'made-up-series' })
+    ).resolves.toBeDefined()
   })
 
   it('caps relatedSlugs at 5 and tags at 8', async () => {

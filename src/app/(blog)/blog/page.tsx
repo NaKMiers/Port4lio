@@ -2,12 +2,16 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 import AvailabilityBlock from '@/components/blog/AvailabilityBlock'
-import PostCard from '@/components/blog/PostCard'
+import BlogIndexHeader from '@/components/blog/BlogIndexHeader'
+import BlogIndexList from '@/components/blog/BlogIndexList'
+import Breadcrumbs from '@/components/blog/Breadcrumbs'
 import SubscribeForm from '@/components/blog/SubscribeForm'
-import { listPublishedPosts, type PostListItem } from '@/lib/blog/post-data'
-import { buildBlogIndexMetadata } from '@/lib/blog/seo'
+import { listPublishedPosts } from '@/lib/blog/post-data'
+import { buildBlogIndexJsonLd, buildBlogIndexMetadata } from '@/lib/blog/seo'
+import { loadPublicProfileUncached } from '@/lib/profile-data'
 import { resolveSiteOrigin } from '@/lib/seo'
-import { POST_SERIES, type PostSeries } from '@/lib/blog/constants'
+import { kindPresentationMap } from '@/lib/blog/kind-data'
+import { listSeries } from '@/lib/blog/series-data'
 
 /**
  * `/blog` - the index, and the hub the clusters hang off.
@@ -42,23 +46,23 @@ import { POST_SERIES, type PostSeries } from '@/lib/blog/constants'
 
 export const revalidate = 300
 
+/**
+ * ## The read here is guarded and `generateStaticParams`' is not
+ *
+ * `buildBlogIndexMetadata` derives `keywords` from the tags across published posts, so it
+ * wants the list - but a database blip must not cost this page its title, canonical URL and
+ * share card as well. The catch degrades to the keyword-free metadata, which is every field
+ * that actually matters.
+ */
 export async function generateMetadata(): Promise<Metadata> {
-  return buildBlogIndexMetadata(resolveSiteOrigin().replace(/\/$/, ''))
-}
+  const origin = resolveSiteOrigin().replace(/\/$/, '')
 
-const SERIES_COPY: Record<PostSeries, { title: string; blurb: string }> = {
-  'measured-in-production': {
-    title: 'Measured in production',
-    blurb: 'Things I tested against a real build, where the result contradicted the docs.',
-  },
-  'shipping-side-products': {
-    title: 'Shipping side products',
-    blurb: 'Two personality tests with real traffic, and what that traffic did and did not do.',
-  },
-  'dev-career-vn': {
-    title: 'A developer career, from Vietnam',
-    blurb: 'How the work actually gets found, through one lens rather than general advice.',
-  },
+  try {
+    return buildBlogIndexMetadata(origin, await listPublishedPosts())
+  } catch (error) {
+    console.error('[blog] index metadata degraded - posts unavailable for keywords', error)
+    return buildBlogIndexMetadata(origin)
+  }
 }
 
 export default async function BlogIndexPage() {
@@ -71,97 +75,91 @@ export default async function BlogIndexPage() {
    * - which is the honest outcome, because an index that swallowed the error would render as
    * an empty blog and tell a reader there is nothing to read.
    */
-  const posts = await listPublishedPosts()
+  /*
+    Two reads, not one, and they are independent - so `Promise.all` rather than sequential
+    awaits. `listSeries` is what used to be the `POST_SERIES` constant plus the `SERIES_COPY`
+    map that lived in this file; both moved into `blog_series` so the owner can manage them
+    from the editor. See `models/Series.ts`.
+  */
+  const [posts, allSeries, kinds, profile] = await Promise.all([
+    listPublishedPosts(),
+    listSeries(),
+    // One lookup for the whole page. A card resolving its own kind would be a query per
+    // post, on a page whose entire job is to be fast for a stranger arriving from a
+    // cross-post.
+    kindPresentationMap(),
+    // For the `Person` node in the graph below. The index had no structured data at all,
+    // which made it the one page in a hub-and-spoke model that a crawler could learn nothing
+    // about - every post pointed at a blog that was never described.
+    loadPublicProfileUncached(),
+  ])
 
-  const pillars = posts.filter(post => post.isPillar)
-  const bySeries = new Map<PostSeries, PostListItem[]>()
-  for (const series of POST_SERIES) bySeries.set(series, [])
-  const unclustered: PostListItem[] = []
+  const origin = resolveSiteOrigin().replace(/\/$/, '')
 
-  for (const post of posts) {
-    if (post.isPillar) continue
-    if (post.series) bySeries.get(post.series)?.push(post)
-    else unclustered.push(post)
-  }
+  /**
+   * The three most common tags, for the one-line "mostly X, Y, Z" in the header.
+   *
+   * Derived rather than written down: a hand-kept list describes what somebody hoped to
+   * publish rather than what is actually here, and goes quietly wrong the first time the
+   * blog's subject drifts. `seo.ts` derives its `keywords` from the same place for the same
+   * reason.
+   */
+  const topics = Object.entries(
+    posts.flatMap(post => post.tags).reduce<Record<string, number>>((counts, tag) => {
+      counts[tag] = (counts[tag] ?? 0) + 1
+      return counts
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([tag]) => tag)
 
   return (
     <>
-      <div className='mx-auto w-full max-w-editorial px-gutter py-12'>
-        <header>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
-            Writing
-          </p>
-          <h1 className='mt-2 font-display text-3xl font-semibold text-pp-text sm:text-4xl'>
-            Things I measured while shipping
-          </h1>
-          <p className='mt-4 max-w-[60ch] text-lg leading-relaxed text-pp-muted'>
-            Mostly Next.js, mostly the parts the documentation did not say. Every post here
-            has a number in it or a failure with a name.
-          </p>
-          <div className='mt-5 flex flex-wrap gap-4 text-sm'>
-            <Link href='/' className='text-pp-muted no-underline hover:text-pp-text'>
-              Portfolio
-            </Link>
-            <Link href='/cv' className='text-pp-muted no-underline hover:text-pp-text'>
-              CV
-            </Link>
-            <Link href='/blog/rss.xml' className='text-pp-muted no-underline hover:text-pp-text'>
-              RSS
-            </Link>
-          </div>
-        </header>
+      <script
+        type='application/ld+json'
+        // `JSON.stringify` output through `escapeJsonForInlineScript`, over stored fields
+        // only - see `serializeGraph` in `lib/blog/seo.ts`.
+        dangerouslySetInnerHTML={{ __html: buildBlogIndexJsonLd(origin, profile, posts) }}
+      />
+
+      <div className='mx-auto w-full max-w-editorial flex-1 px-gutter py-12'>
+        {/*
+          The trail this page's `BreadcrumbList` describes, rendered rather than only
+          declared. Two levels is a short trail, and it is still the one Google prints in
+          place of the raw URL in a result. See `components/blog/Breadcrumbs.tsx`.
+        */}
+        <Breadcrumbs
+          trail={[
+            { name: 'Home', href: '/' },
+            { name: 'Writing', href: '/blog' },
+          ]}
+        />
+
+        <BlogIndexHeader postCount={posts.length} topics={topics} />
 
         {posts.length === 0 ? (
           /*
             An explicit empty state rather than a bare blank page. This renders exactly once
             in the site's life - between the blog shipping and the first post - and a visitor
             who arrives then should see that the surface is new, not that it is broken.
+
+            Rendered here rather than inside `BlogIndexList` so the search box is not offered
+            over nothing at all.
           */
           <p className='mt-16 text-pp-muted'>Nothing published yet. The first posts are in progress.</p>
-        ) : null}
+        ) : (
+          /*
+            The grouping and the search both live in a client component, because search needs
+            state. It still renders on the server for the initial HTML, so a crawler sees the
+            full grouped list; only the input needs hydration. See `BlogIndexList`.
 
-        {pillars.length > 0 ? (
-          <section className='mt-14'>
-            <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-muted'>
-              Start here
-            </h2>
-            <div className='mt-5 grid gap-5 sm:grid-cols-2'>
-              {pillars.map(post => (
-                <PostCard key={post.slug} post={post} featured />
-              ))}
-            </div>
-          </section>
-        ) : null}
+            `kinds` is handed over as entries rather than as the `Map` it is on the server: a
+            `Map` does not survive serialisation across the server-to-client boundary.
+          */
+          <BlogIndexList posts={posts} series={allSeries} kinds={Array.from(kinds)} />
+        )}
 
-        {POST_SERIES.map(series => {
-          const items = bySeries.get(series) ?? []
-          if (items.length === 0) return null
-
-          return (
-            <section key={series} className='mt-14'>
-              <h2 className='font-display text-xl font-semibold text-pp-text'>
-                {SERIES_COPY[series].title}
-              </h2>
-              <p className='mt-1 max-w-[60ch] text-sm text-pp-muted'>{SERIES_COPY[series].blurb}</p>
-              <div className='mt-5 grid gap-5 sm:grid-cols-2'>
-                {items.map(post => (
-                  <PostCard key={post.slug} post={post} />
-                ))}
-              </div>
-            </section>
-          )
-        })}
-
-        {unclustered.length > 0 ? (
-          <section className='mt-14'>
-            <h2 className='font-display text-xl font-semibold text-pp-text'>Everything else</h2>
-            <div className='mt-5 grid gap-5 sm:grid-cols-2'>
-              {unclustered.map(post => (
-                <PostCard key={post.slug} post={post} />
-              ))}
-            </div>
-          </section>
-        ) : null}
         {/*
           At the foot of the page and nowhere else. No modal, no scroll trigger, no article
           wall - interrupting a reader to harvest an address trades the only thing this

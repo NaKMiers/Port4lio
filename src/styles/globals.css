@@ -224,8 +224,22 @@
 }
 
 @layer base {
+  /*
+   * Cream, not `bg-secondary` (#393A47).
+   *
+   * The dark value was correct while `SiteChrome` existed: it wrapped every admin route in
+   * `.page text-white`, so the body behind it matched. Nothing renders that chrome any more
+   * - `(admin)` now uses `AdminChrome`, and `(me)`, `(blog)` and `(choice)` were always
+   * `.portfolio-public-root` - so a dark body sits behind four cream route groups and is
+   * visible in exactly the places a body background is: the overscroll band at the top and
+   * bottom of a rubber-band scroll, and any moment before the root element paints.
+   *
+   * Literal rather than `var(--pp-bg)`, because that token is declared ON
+   * `.portfolio-public-root` and is therefore not in scope here. Keep the two in step.
+   */
   body {
-    @apply bg-secondary leading-relaxed;
+    @apply leading-relaxed;
+    background-color: #f7f3ee;
   }
   /* Hide scrollbar for Chrome, Safari and Opera */
   .no-scrollbar::-webkit-scrollbar {

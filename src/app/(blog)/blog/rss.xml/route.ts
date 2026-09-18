@@ -33,6 +33,16 @@ import { resolveSiteOrigin } from '@/lib/seo'
 
 export const revalidate = 300
 
+/**
+ * The byline on every item.
+ *
+ * A literal rather than a profile read, and that is a deliberate difference from the pages:
+ * a feed is a cache of what was true when it was generated, it is re-read by aggregators for
+ * years, and adding a database call here would put the whole feed behind a query that can
+ * fail. `lib/blog/seo.ts` carries the same fallback for the same name.
+ */
+const AUTHOR = 'Anh Khoa Nguyen'
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -49,23 +59,50 @@ export async function GET() {
   const items = posts
     .map(post => {
       const url = postUrl(origin, post.slug)
+      /*
+        `<category>` per tag, and `<dc:creator>` for the author.
+
+        Both are how an aggregator files a post rather than merely listing it - a reader
+        subscribed through a service that supports topic filtering sees this post under the
+        tags it actually carries, and a syndicated copy is attributed instead of anonymous.
+        The tags are the same values the page renders and the JSON-LD declares as `keywords`,
+        so there is one source for all three.
+      */
+      const categories = post.tags
+        .map(tag => `      <category>${escapeXml(tag)}</category>`)
+        .join('\n')
+
       return `    <item>
       <title>${escapeXml(post.title)}</title>
       <link>${escapeXml(url)}</link>
       <guid isPermaLink="true">${escapeXml(url)}</guid>
+      <dc:creator>${escapeXml(AUTHOR)}</dc:creator>
       ${post.publishedAt ? `<pubDate>${post.publishedAt.toUTCString()}</pubDate>` : ''}
       ${post.excerpt ? `<description>${escapeXml(post.excerpt)}</description>` : ''}
+${categories}
     </item>`
     })
     .join('\n')
 
+  /*
+    `lastBuildDate` from the newest post's own `contentUpdatedAt`, never `new Date()`.
+
+    The same cry-wolf failure `sitemap.ts` documents for `lastModified` applies here one
+    channel over: with `revalidate = 300`, a live clock would tell every polling reader the
+    feed changed five minutes ago, every time, forever. Aggregators use this field to decide
+    whether to re-fetch, and one that learns the field is noise stops reading it - so the
+    post that genuinely is new gets no priority either.
+  */
+  const lastBuild = posts[0]?.contentUpdatedAt ?? posts[0]?.publishedAt ?? null
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>Anh Khoa Nguyen - Writing</title>
+    <title>${escapeXml(AUTHOR)} - Writing</title>
     <link>${escapeXml(blogIndexUrl(origin))}</link>
-    <description>Things I measured while shipping side projects.</description>
+    <description>Things I measured while shipping side projects - mostly Next.js, mostly the parts the docs did not say.</description>
     <language>en</language>
+    ${lastBuild ? `<lastBuildDate>${lastBuild.toUTCString()}</lastBuildDate>` : ''}
     <atom:link href="${escapeXml(`${origin}/blog/rss.xml`)}" rel="self" type="application/rss+xml" />
 ${items}
   </channel>

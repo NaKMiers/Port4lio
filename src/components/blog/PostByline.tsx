@@ -23,6 +23,17 @@ import Link from 'next/link'
  * "12 March 2026" reads as a mistake. The one-day threshold is a judgement, not a
  * measurement: a typo fix an hour after publishing is not an update a reader needs told
  * about, and a revision a week later is.
+ *
+ * ## Why the reading time is here and not only in the JSON-LD
+ *
+ * Same argument as the author name above, and the same pairing: `timeRequired` on the
+ * BlogPosting is the machine-readable half, this is the half a reader uses. It is the single
+ * most-read piece of metadata on a technical post - it is what decides "now or later", and a
+ * post that does not say costs the reader that decision every time.
+ *
+ * It is computed from the body rather than stored, and it deliberately excludes code blocks.
+ * See `lib/blog/reading.ts` for why a reading time that overstates the page is worse than
+ * none at all.
  */
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
@@ -44,10 +55,13 @@ export default function PostByline({
   authorName,
   publishedAt,
   contentUpdatedAt,
+  readingMinutes,
 }: {
   authorName: string
   publishedAt: Date | null
   contentUpdatedAt: Date | null
+  /** Minutes of prose. Omitted on a surface with no body in hand, rather than shown as zero. */
+  readingMinutes?: number
 }) {
   const published = formatDate(publishedAt)
   const showUpdated =
@@ -79,6 +93,16 @@ export default function PostByline({
         <>
           <span aria-hidden>·</span>
           <time dateTime={contentUpdatedAt?.toISOString()}>Updated {updated}</time>
+        </>
+      ) : null}
+      {readingMinutes ? (
+        <>
+          <span aria-hidden>·</span>
+          {/*
+            `<time>` with an ISO 8601 duration, the same string the JSON-LD carries as
+            `timeRequired`. One value, two encodings of it, and no way for them to disagree.
+          */}
+          <time dateTime={`PT${readingMinutes}M`}>{readingMinutes} min read</time>
         </>
       ) : null}
     </div>

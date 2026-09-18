@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 import { listPublishedPosts } from '@/lib/blog/post-data'
@@ -53,9 +54,10 @@ export default async function WritingTeaser({ limit = 3 }: { limit?: number }) {
         </h2>
         <Link
           href='/blog'
-          className='text-xs font-semibold text-pp-blue no-underline hover:underline'
+          className='inline-flex items-center gap-1 text-xs font-semibold text-pp-blue no-underline hover:underline'
         >
-          All posts &rarr;
+          All posts
+          <ArrowRight aria-hidden size={13} />
         </Link>
       </div>
 

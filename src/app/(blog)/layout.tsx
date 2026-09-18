@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import BlogLocaleProvider from '@/components/blog/BlogLocaleProvider'
 import { resolveSiteOrigin } from '@/lib/seo'
 
 /**
@@ -32,6 +33,20 @@ import { resolveSiteOrigin } from '@/lib/seo'
  * underneath it is a second thing to invalidate and a second way for a published post to
  * stay stale.
  *
+ * ## Why it is a flex column
+ *
+ * The pages below render their content and then `AvailabilityBlock`, and `min-h-screen`
+ * alone only guarantees that the *wrapper* fills the viewport - it says nothing about where
+ * a short page's last child lands. So `/blog` with two posts, and `/blog` with none at all,
+ * put the availability footer halfway up the screen with cream background under it. A
+ * column with `flex-1` on the content lets the footer be pushed to the bottom when the page
+ * is short and sit directly under the content when it is not, which is the behaviour a
+ * footer is expected to have and the reason `AvailabilityBlock` exists at all: it is the
+ * conversion surface, and a conversion surface floating mid-page reads as a mistake.
+ *
+ * `flex-1` goes on the pages rather than on a wrapper here, because a wrapper would have to
+ * guess which child is content and which is footer.
+ *
  * So: no chrome, no provider, no profile. `portfolio-public-root` carries the design tokens
  * (`--pp-bg`, `--pp-text`, the Montserrat/Source Sans pairing, `--pp-max`) that make this
  * look like the rest of the site, and it is a class name, not a component - it needs no
@@ -61,5 +76,21 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
-  return <div className='portfolio-public-root min-h-screen'>{children}</div>
+  /*
+    `BlogLocaleProvider` is a provider, and the header above spends four paragraphs on why
+    this layout must not have one - so the distinction matters. What it refuses is
+    `AppProvider`: that one FETCHES, which means either a full-screen loading overlay across
+    every blog page or `unstable_cache` in the blog read path, and D3 forbids the second in
+    its own words.
+
+    This provider fetches nothing. It is a `createContext` holding one string and a setter,
+    reading `localStorage` in an effect after paint. It adds no request, no cache layer and
+    no blocking state - the page renders identically with it and without it until a reader
+    presses VI.
+  */
+  return (
+    <BlogLocaleProvider>
+      <div className='portfolio-public-root flex min-h-screen flex-col'>{children}</div>
+    </BlogLocaleProvider>
+  )
 }

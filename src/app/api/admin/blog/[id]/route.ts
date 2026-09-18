@@ -4,14 +4,14 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError } from '@/lib/api-response'
 import { renderMarkdown, BLOG_PIPELINE_VERSION } from '@/lib/blog/markdown'
 import { revalidatePublishedPost } from '@/lib/blog/revalidate'
+import { kindExists } from '@/lib/blog/kind-data'
+import { seriesExists } from '@/lib/blog/series-data'
 import { connectDatabase } from '@/lib/mongodb'
 import { BLOG_SAVE_LIMIT, checkRateLimit, clientIpFrom } from '@/lib/rate-limit'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import {
   isReservedSlug,
-  POST_KINDS,
-  POST_SERIES,
   PostModel,
   SLUG_PATTERN,
   type PostDocument,
@@ -96,6 +96,7 @@ type PatchBody = Partial<
     | 'isPillar'
     | 'bodyMarkdown'
     | 'coverImage'
+    | 'coverCaption'
     | 'tags'
     | 'relatedSlugs'
     | 'language'
@@ -193,6 +194,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       excerpt: post.excerpt,
       bodyMarkdown: post.bodyMarkdown,
       coverImage: post.coverImage,
+      coverCaption: post.coverCaption,
     }
 
     if (typeof body.title === 'string') post.title = body.title.trim()
@@ -201,11 +203,36 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     if (body.coverImage === null || typeof body.coverImage === 'string') {
       post.coverImage = body.coverImage
     }
-    if (typeof body.kind === 'string' && (POST_KINDS as readonly string[]).includes(body.kind)) {
+    if (typeof body.coverCaption === 'string') post.coverCaption = body.coverCaption
+    /*
+      Refuses an unknown kind rather than ignoring it - the same change, and the same
+      reasoning, as `series` below. `Post.kind` has no schema enum any more, so this is the
+      only thing between a post and a kind that was deleted out from under the editor tab
+      that is saving. Silently dropping the value would report success and change nothing.
+    */
+    if (typeof body.kind === 'string') {
+      if (!(await kindExists(body.kind))) {
+        return jsonError(`"${body.kind}" is not a kind. It may have been deleted.`, 400)
+      }
       post.kind = body.kind
     }
     if (body.series === null) post.series = null
-    if (typeof body.series === 'string' && (POST_SERIES as readonly string[]).includes(body.series)) {
+    /*
+      The series list moved to a collection, so this is now the ONLY thing standing between a
+      post and a dangling series reference - `Post.series` has no schema enum any more,
+      because a mongoose enum is fixed at module load and the list is not. See the comment on
+      the field in `models/Post.ts`.
+
+      Refuses an unknown slug rather than ignoring it. The old code silently dropped a value
+      that failed the `includes` check, which was survivable when the only writer was a
+      `<select>` of three hardcoded options and is not now: a stale editor tab holding a
+      series that has since been deleted would save "successfully" with the field quietly
+      unchanged, and the author would have no way to tell.
+    */
+    if (typeof body.series === 'string') {
+      if (!(await seriesExists(body.series))) {
+        return jsonError(`"${body.series}" is not a series. It may have been deleted.`, 400)
+      }
       post.series = body.series
     }
     if (typeof body.isPillar === 'boolean') post.isPillar = body.isPillar
@@ -217,7 +244,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       post.title !== beforeContent.title ||
       post.excerpt !== beforeContent.excerpt ||
       post.bodyMarkdown !== beforeContent.bodyMarkdown ||
-      post.coverImage !== beforeContent.coverImage
+      post.coverImage !== beforeContent.coverImage ||
+      // The caption is public text on /blog, so editing it is a real content change - the
+      // sitemap should say so. It does NOT re-render the markdown: that has its own check on
+      // `bodyMarkdown` below, and a credit line is not worth a Shiki pass.
+      post.coverCaption !== beforeContent.coverCaption
 
     /**
      * Render at SAVE time (D9), and only when the source actually changed.

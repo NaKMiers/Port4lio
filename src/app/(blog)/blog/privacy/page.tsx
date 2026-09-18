@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 import { ATTEMPT_TTL_DAYS } from '@/models/Attempt'
@@ -130,8 +131,12 @@ export default function BlogPrivacyPage() {
       </section>
 
       <p className='mt-12 text-sm'>
-        <Link href='/blog' className='text-pp-muted no-underline hover:text-pp-text'>
-          &larr; Writing
+        <Link
+          href='/blog'
+          className='inline-flex items-center gap-1.5 text-pp-muted no-underline hover:text-pp-text'
+        >
+          <ArrowLeft aria-hidden size={14} />
+          Writing
         </Link>
       </p>
     </div>

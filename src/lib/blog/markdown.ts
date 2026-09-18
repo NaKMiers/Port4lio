@@ -10,6 +10,7 @@ import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 import { visit } from 'unist-util-visit'
 
+import rehypeHeadingIds from '@/lib/blog/rehype-heading-ids'
 import rehypeRestrictImageHosts from '@/lib/blog/rehype-restrict-image-hosts'
 import { blogSanitizeSchema } from '@/lib/blog/sanitize-schema'
 
@@ -33,6 +34,9 @@ import { blogSanitizeSchema } from '@/lib/blog/sanitize-schema'
  *         │
  *         ▼
  *   downgradeUnknownFences      ← so Shiki is never handed a grammar it lacks
+ *         │
+ *         ▼
+ *   rehypeHeadingIds            ← id on every h2/h3/h4, for the TOC and anchor results
  *         │
  *         ▼
  *   @shikijs/rehype             input: text of pre > code. output: style on its own spans
@@ -60,6 +64,11 @@ import { blogSanitizeSchema } from '@/lib/blog/sanitize-schema'
  * schema and running it before means the sanitizer deletes its work. Adding it is a decision
  * to reopen this ordering, not a one-line import.
  *
+ * `rehypeHeadingIds` is the first plugin to take that route, and its own header carries the
+ * re-derivation the paragraph above demands: it writes one attribute, `id`, whose value is
+ * the output of a whitelist transform to `[a-z0-9-]` rather than any author string. Read it
+ * before appending anything else here.
+ *
  * ## Why this runs at save time (D9)
  *
  * Measured: Shiki costs a **~5.5 second one-time bootstrap per process** (first call 5469ms,
@@ -82,8 +91,16 @@ import { blogSanitizeSchema } from '@/lib/blog/sanitize-schema'
  * is uncoloured code rather than an error page.
  */
 
-/** Bump when anything in this pipeline changes. Stored on the document as `renderedWith`. */
-export const BLOG_PIPELINE_VERSION = 'blog-md-1'
+/**
+ * Bump when anything in this pipeline changes. Stored on the document as `renderedWith`.
+ *
+ * `blog-md-2` added `rehypeHeadingIds`. A post still stored as `blog-md-1` renders exactly as
+ * before - its headings simply carry no `id`, so `extractToc` finds nothing and the table of
+ * contents is absent rather than broken. Opening and saving the post in the editor re-renders
+ * it, because `PATCH /api/admin/blog/[id]` re-runs the pipeline whenever `renderedWith` does
+ * not match this constant. That degradation is why no backfill script ships with this.
+ */
+export const BLOG_PIPELINE_VERSION = 'blog-md-2'
 
 /**
  * The grammars Shiki loads, pinned explicitly rather than letting it resolve on demand.
@@ -176,6 +193,9 @@ export async function renderMarkdown(markdown: string, slug: string): Promise<st
     .use(rehypeSanitize, blogSanitizeSchema)
     .use(rehypeRestrictImageHosts)
     .use(downgradeUnknownFences, slug)
+    // After sanitize by necessity - see the ordering note in the header. Before Shiki only
+    // because Shiki has more work to do and no reason to be handed a larger tree.
+    .use(rehypeHeadingIds)
     .use(rehypeShiki, {
       theme: 'github-dark',
       langs: [...SHIKI_LANGUAGES],

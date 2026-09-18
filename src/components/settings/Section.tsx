@@ -7,6 +7,7 @@ import { useSectionOpen } from '@/components/settings/SectionOpenContext'
 export default function Section({
   id,
   title,
+  eyebrow = 'Portfolio editor',
   badge,
   handle,
   defaultOpen = false,
@@ -15,6 +16,12 @@ export default function Section({
   /** Stable key the open/closed preference is stored under. */
   id: string
   title: string
+  /**
+   * The small caps line above the title. Defaults to the profile editor's wording because
+   * that was the only caller when this card was written; `BlogEditor` passes its own, so the
+   * blog's sections do not announce themselves as part of the portfolio editor.
+   */
+  eyebrow?: string
   badge?: string
   /** Drag grip from a `DragList`, shown ahead of the title when the card is reorderable. */
   handle?: React.ReactNode
@@ -38,7 +45,7 @@ export default function Section({
           </div>
           <div className='min-w-0'>
             <div className='text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted'>
-              Portfolio editor
+              {eyebrow}
             </div>
             <div className='font-display text-lg font-semibold tracking-tight text-pp-text sm:text-xl'>
               {title}

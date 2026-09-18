@@ -15,13 +15,10 @@ export const metadata: Metadata = {
  */
 export default function MetricsPage() {
   return (
-    <div className='portfolio-public-root relative z-50 min-h-screen clip-decorations pt-12 text-pp-text'>
-      <div className='pointer-events-none absolute inset-0 pp-grid-wash opacity-60' />
-      <div className='relative mx-auto max-w-editorial px-gutter py-10'>
-        <OwnerAuthGate>
-          <MetricsBoard />
-        </OwnerAuthGate>
-      </div>
+    <div className='mx-auto w-full max-w-editorial px-gutter py-10'>
+      <OwnerAuthGate>
+        <MetricsBoard />
+      </OwnerAuthGate>
     </div>
   )
 }

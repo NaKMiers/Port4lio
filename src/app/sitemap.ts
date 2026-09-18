@@ -97,9 +97,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${origin}/blog/${post.slug}`,
         lastModified: post.contentUpdatedAt,
         changeFrequency: 'monthly' as const,
-        priority: 0.7,
+        /*
+          A pillar outranks an ordinary post in the feed, because that is what a pillar IS -
+          the entry point for its cluster, the page the other posts in the series link up to.
+          Priority is a hint about relative importance WITHIN one site and nothing else, so
+          the only way it carries information is if the values differ; a feed where every
+          post is 0.7 tells a crawler exactly as much as one where every post is 0.5.
+        */
+        priority: post.isPillar ? 0.8 : 0.6,
         ...(post.coverImage ? { images: [post.coverImage] } : {}),
       })),
+      {
+        // `/blog/privacy` was indexable - it declares its own canonical - and reachable only
+        // by link. A page worth having a canonical tag is a page worth listing, even at the
+        // priority the MBTI and IQ privacy notices already carry.
+        url: `${origin}/blog/privacy`,
+        lastModified: MBTI_CONTENT_UPDATED_AT,
+        changeFrequency: 'yearly' as const,
+        priority: 0.2,
+      },
     ]
   } catch (error) {
     console.error('[sitemap] blog posts unavailable - serving the rest of the feed', error)

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { jsonError } from '@/lib/api-response'
+import { defaultKindSlug } from '@/lib/blog/kind-data'
 import { aggregatePostMetrics } from '@/lib/blog/post-events'
 import { connectDatabase } from '@/lib/mongodb'
 import { readJsonBody } from '@/lib/read-json-body'
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
     // Both bodies are `select: false`, so the board cannot accidentally ship 30 posts'
     // markdown to a browser that only renders their titles.
     const posts = await PostModel.find({})
-      .select('slug title kind series isPillar status language publishedAt contentUpdatedAt updatedAt')
+      .select('slug title kind series isPillar status language coverImage publishedAt contentUpdatedAt updatedAt')
       .sort({ updatedAt: -1 })
       .lean()
 
@@ -116,7 +117,19 @@ export async function POST(request: NextRequest) {
       return jsonError(`The slug "${slug}" is already taken${because}.`, 409)
     }
 
-    const created = await PostModel.create({ slug, title, status: 'draft' })
+    /*
+      `kind` is set here rather than left to a schema default. It used to be
+      `default: 'note'`, which stopped being safe when the kind list became editable - see
+      the field's comment in `models/Post.ts`. `defaultKindSlug` returns the first kind by
+      order, and `DELETE /api/admin/blog/kinds/[id]` refuses to remove the last one, so the
+      null branch is unreachable rather than merely unlikely.
+    */
+    const kind = await defaultKindSlug()
+    if (!kind) {
+      return jsonError('No post kinds exist. Create one before writing a post.', 409)
+    }
+
+    const created = await PostModel.create({ slug, title, kind, status: 'draft' })
 
     // No revalidation here on purpose: a draft has no public surface to invalidate.
     return NextResponse.json({ id: String(created._id), slug: created.slug }, { status: 201 })

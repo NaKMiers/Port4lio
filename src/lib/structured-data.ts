@@ -212,7 +212,20 @@ function buildPortfolioJsonLdGraph(
   }
 }
 
-function escapeJsonForInlineScript(json: string): string {
+/**
+ * Make a `JSON.stringify` result safe to drop inside a `<script>` element.
+ *
+ * Exported because the blog emits its own `@graph` from `lib/blog/seo.ts` and was
+ * interpolating raw `JSON.stringify` output into `dangerouslySetInnerHTML`. Every other
+ * value on this site is compiled-in content, but a post title and excerpt are stored fields
+ * an editor types - so a title containing `</script>` would have closed the tag early and
+ * turned the rest of the payload into live markup. One escaper, used by both.
+ *
+ * `<` and `>` cover the tag breakout, `&` covers HTML entity re-interpretation, and U+2028 /
+ * U+2029 are valid in JSON strings but are line terminators to a JavaScript parser. All five
+ * round-trip back to themselves through `JSON.parse`, so nothing is lost.
+ */
+export function escapeJsonForInlineScript(json: string): string {
   return json
     .replace(/&/g, '\\u0026')
     .replace(/</g, '\\u003c')

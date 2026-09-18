@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 
+import PostRowActions from '@/components/blog-admin/PostRowActions'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoading from '@/components/settings/SettingLoading'
-import { buildDraftFromSourceComment } from '@/lib/blog/draft-template'
-import { ghostBtnCls, inputCls, primaryBtnCls, secondaryBtnCls, textareaCls } from '@/components/settings/settings-utils'
+import { inputCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
 
 /**
  * `/admin/blog` - every post, and the two numbers that decide whether this is working.
@@ -33,17 +33,6 @@ import { ghostBtnCls, inputCls, primaryBtnCls, secondaryBtnCls, textareaCls } fr
  * and 8 notes in 6 weeks, so anything past about two weeks means the commitment is already
  * slipping, and the board says so rather than leaving it to be inferred from a list of dates.
  *
- * ## Why there is a Force revalidate button
- *
- * When a published post does not look right on `/blog`, there are exactly three explanations
- * and they are indistinguishable from the outside: the ISR window has not elapsed, a
- * `revalidatePath` call failed, or the post never made it into `generateStaticParams`. The
- * owner cannot tell which, and the first is fine while the second is a bug.
- *
- * This button collapses that. Press it, and if the page is still wrong the ISR window was not
- * the explanation. It is a PATCH with no changes, which runs `revalidatePublishedPost` through
- * the same path a real save does - so it also proves that path still works.
- *
  * ## Deleted posts are listed, greyed, and not hidden
  *
  * A soft-deleted post keeps its slug forever, so that a new post cannot inherit its contact
@@ -55,9 +44,10 @@ type BoardPost = {
   _id: string
   slug: string
   title: string
-  kind: 'article' | 'note'
+  kind: string
   series: string | null
   isPillar: boolean
+  coverImage: string | null
   status: 'draft' | 'published' | 'archived' | 'deleted'
   publishedAt: string | null
   updatedAt: string
@@ -86,8 +76,6 @@ export default function BlogBoard() {
   const [error, setError] = useState<string | null>(null)
   const [newSlug, setNewSlug] = useState('')
   const [busy, setBusy] = useState(false)
-  const [sourceComment, setSourceComment] = useState('')
-  const [sourceFile, setSourceFile] = useState('')
 
   const load = useCallback(async () => {
     setError(null)
@@ -122,11 +110,9 @@ export default function BlogBoard() {
   /**
    * Create a draft, optionally pre-filled from a source comment.
    *
-   * The two paths are one function because they differ by one field. A bare create makes an
-   * empty draft; pasting a comment makes one with the seven-step template already in it and
-   * the comment parked at the bottom - which is the whole of T20. See
-   * `lib/blog/draft-template.ts` for why this exists instead of the source-comment miner
-   * that was cut, and why a topic-to-post generator was refused outright.
+   * Creates an empty draft and reloads the board. It used to have a second path - paste a
+   * doc comment and get a draft pre-filled with the seven-step template (T20) - which was
+   * removed along with `lib/blog/draft-template.ts`.
    */
   async function create() {
     const slug = newSlug.trim()
@@ -143,25 +129,7 @@ export default function BlogBoard() {
       const data = (await res.json()) as { error?: string; id?: string }
       if (!res.ok) throw new Error(data.error ?? 'Could not create the draft')
 
-      // Two requests rather than one: POST creates, PATCH renders the body through the
-      // markdown pipeline. Folding a body into the create would mean a second code path that
-      // also has to render, and rendering is what PATCH is already for.
-      if (sourceComment.trim() && data.id) {
-        await fetch(`/api/admin/blog/${data.id}`, {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            bodyMarkdown: buildDraftFromSourceComment({
-              comment: sourceComment,
-              sourceFile: sourceFile.trim() || undefined,
-            }),
-          }),
-        })
-      }
-
       setNewSlug('')
-      setSourceComment('')
-      setSourceFile('')
       await load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create the draft')
@@ -209,165 +177,195 @@ export default function BlogBoard() {
 
   return (
     <OwnerAuthGate onAuthed={() => void load()}>
-      <div className='portfolio-public-root min-h-screen pt-12 text-pp-text'>
-        <div className='mx-auto max-w-editorial px-gutter py-10'>
-          <header className='flex flex-wrap items-baseline justify-between gap-4'>
-            <div>
-              <h1 className='font-display text-2xl font-semibold tracking-tight'>Blog</h1>
-              <p className='mt-1 text-sm text-pp-muted'>
-                {quietDays === null
-                  ? 'Nothing published yet.'
-                  : `${quietDays} day${quietDays === 1 ? '' : 's'} since the last publish.`}
-                {quietDays !== null && quietDays > 14 ? (
-                  <span className='ml-2 font-semibold text-pp-text'>
-                    Cadence is 2 articles + 8 notes in 6 weeks.
-                  </span>
-                ) : null}
-              </p>
-            </div>
-            <div className='flex gap-2'>
-              <Link className={secondaryBtnCls} href='/admin/settings'>
-                Settings
-              </Link>
-              <Link className={secondaryBtnCls} href='/blog'>
-                View blog
-              </Link>
-            </div>
-          </header>
-
-          {error ? <div className='mt-6'><SettingErrorBanner message={error} /></div> : null}
-
-          <div className='mt-8 flex flex-wrap items-end gap-3'>
-            <div className='min-w-[16rem] flex-1'>
-              <label className='mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted' htmlFor='new-slug'>
-                New draft slug
-              </label>
-              <input
-                id='new-slug'
-                className={inputCls}
-                value={newSlug}
-                onChange={event => setNewSlug(event.target.value)}
-                placeholder='five-things-next-16-did'
-              />
-            </div>
-            <button className={primaryBtnCls} onClick={() => void create()} disabled={busy}>
-              {sourceComment.trim() ? 'Create from comment' : 'Create draft'}
-            </button>
-          </div>
-
-          {/*
-            T20. The 90% of the cut source-comment miner that had value: the miner was a
-            search engine over eight things already listed by name in docs/blog/authoring.md.
-            What "I do not want to spend four hours per post" actually meant is the blank
-            page and re-deriving the structure, not the writing - so paste the comment you
-            already wrote and the template arrives filled in.
-          */}
-          <details className='mt-4'>
-            <summary className='cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
-              Start from a source comment
-            </summary>
-            <div className='mt-3 space-y-3'>
-              <input
-                className={inputCls}
-                value={sourceFile}
-                onChange={event => setSourceFile(event.target.value)}
-                placeholder='src/lib/blog/revalidate.ts  (optional, for attribution)'
-              />
-              <textarea
-                className={`${textareaCls} min-h-[10rem] font-mono text-[13px]`}
-                value={sourceComment}
-                onChange={event => setSourceComment(event.target.value)}
-                placeholder='Paste the doc comment. The seven-step template and the title rule come with it.'
-              />
-            </div>
-          </details>
-
-          <ul className='mt-8 space-y-2'>
-            {(posts ?? []).map(post => (
-              <li
-                key={post._id}
-                className={[
-                  'flex flex-wrap items-center gap-3 rounded-[1.2rem] border border-pp-line bg-white/72 px-4 py-3',
-                  post.status === 'deleted' ? 'opacity-50' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                <span aria-hidden className='w-4 text-pp-muted'>
-                  {STATUS_MARK[post.status]}
+      <div className='mx-auto w-full max-w-editorial px-gutter py-10'>
+        <header className='flex flex-wrap items-baseline justify-between gap-4'>
+          <div>
+            <h1 className='font-display text-2xl font-semibold tracking-tight'>Blog</h1>
+            <p className='mt-1 text-sm text-pp-muted'>
+              {quietDays === null
+                ? 'Nothing published yet.'
+                : `${quietDays} day${quietDays === 1 ? '' : 's'} since the last publish.`}
+              {quietDays !== null && quietDays > 14 ? (
+                <span className='ml-2 font-semibold text-pp-text'>
+                  Cadence is 2 articles + 8 notes in 6 weeks.
                 </span>
-                <span className='sr-only'>{post.status}</span>
-
-                <span className='min-w-0 flex-1'>
-                  <span className='block truncate font-display text-sm font-semibold'>
-                    {post.title}
-                  </span>
-                  <span className='block truncate text-xs text-pp-muted'>
-                    /blog/{post.slug}
-                    {post.isPillar ? ' · pillar' : ''}
-                    {post.series ? ` · ${post.series}` : ''}
-                    {' · edited '}
-                    {new Date(post.updatedAt).toLocaleDateString('en-GB')}
-                    {post.status === 'published'
-                      ? ` · ${post.metrics.views} read · ${post.metrics.shares} shared · ${post.metrics.attributions} arrived`
-                      : ''}
-                  </span>
-                </span>
-
-                {post.status !== 'deleted' ? (
-                  <span className='flex flex-wrap gap-1'>
-                    <Link className={ghostBtnCls} href={`/admin/blog/${post._id}`}>
-                      Edit
-                    </Link>
-                    {post.status === 'published' ? (
-                      <>
-                        <button
-                          className={ghostBtnCls}
-                          disabled={busy}
-                          onClick={() => void mutate(post._id, {}, 'PATCH')}
-                          title='Re-run revalidatePath for this post. If /blog is still wrong after this, the ISR window was not the explanation.'
-                        >
-                          Revalidate
-                        </button>
-                        <button
-                          className={ghostBtnCls}
-                          disabled={busy}
-                          onClick={() => void mutate(post._id, { status: 'archived' }, 'PATCH')}
-                        >
-                          Archive
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className={ghostBtnCls}
-                        disabled={busy}
-                        onClick={() => void mutate(post._id, { status: 'published' }, 'PATCH')}
-                      >
-                        Publish
-                      </button>
-                    )}
-                    <button
-                      className={ghostBtnCls}
-                      disabled={busy}
-                      onClick={() => void mutate(post._id, {}, 'DELETE')}
-                    >
-                      Delete
-                    </button>
-                  </span>
-                ) : (
-                  <span className='text-xs text-pp-muted'>holds its slug</span>
-                )}
-              </li>
-            ))}
-          </ul>
-
-          {posts !== null && posts.length === 0 && !error ? (
-            <p className='mt-8 text-sm text-pp-muted'>
-              No posts yet. The first three should be mined from source comments you have
-              already written - see <code>docs/blog/authoring.md</code>.
+              ) : null}
             </p>
-          ) : null}
+          </div>
+          <div className='flex gap-2'>
+            <Link className={secondaryBtnCls} href='/admin/settings'>
+              Settings
+            </Link>
+            <Link className={secondaryBtnCls} href='/blog'>
+              View blog
+            </Link>
+          </div>
+        </header>
+
+        {error ? <div className='mt-6'><SettingErrorBanner message={error} /></div> : null}
+
+        <div className='mt-8 flex flex-wrap items-end gap-3'>
+          <div className='min-w-[16rem] flex-1'>
+            <label className='mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted' htmlFor='new-slug'>
+              New draft slug
+            </label>
+            <input
+              id='new-slug'
+              className={inputCls}
+              value={newSlug}
+              onChange={event => setNewSlug(event.target.value)}
+              placeholder='five-things-next-16-did'
+            />
+          </div>
+          <button className={primaryBtnCls} onClick={() => void create()} disabled={busy}>
+            Create draft
+          </button>
         </div>
+
+        <ul className='mt-8 space-y-2'>
+          {(posts ?? []).map(post => (
+            <li
+              key={post._id}
+              className={[
+                /*
+                  `bg-white/72` with no blur and no shadow was fine over the flat page this
+                  board used to render on. It is not fine over `AdminBackdrop`: the floating
+                  shapes and colour pools now pass straight under the row, so a 72% white with
+                  nothing lifting it read as a faint outline with the decoration showing
+                  through the title.
+
+                  `/85` and not `/82`, and that is not a taste call. Tailwind's default opacity
+                  scale is multiples of five, and a `/n` outside it MATCHES NOTHING - the
+                  utility is never generated and the element ends up with no background at all,
+                  silently. The old `bg-white/72` here was one of those: this row has had no
+                  background since it was written, which is what made it read as a faint
+                  outline over the decoration. `tailwind.config.ts` documents the same failure
+                  for `pp-*` colours and fixes it with `ppColor()`; plain `white` does not go
+                  through that helper, so the only defence is staying on the scale.
+                */
+                'flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line bg-white/85 px-4 py-3 shadow-[0_18px_36px_rgba(46,35,28,0.06)] backdrop-blur-md transition',
+                'hover:border-pp-blue/30 hover:bg-white/95',
+                post.status === 'deleted' ? 'opacity-50' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <span aria-hidden className='w-4 text-pp-muted'>
+                {STATUS_MARK[post.status]}
+              </span>
+              <span className='sr-only'>{post.status}</span>
+
+              {/*
+                A fixed-size slot whether or not there is an image, so the titles stay on one
+                vertical line down the board. A thumbnail that collapsed when absent would
+                indent every covered row relative to every uncovered one, which on a list you
+                scan is worse than a little empty space.
+
+                `alt=''`: the title is the next element and says the same thing.
+              */}
+              <span className='hidden h-10 w-16 shrink-0 overflow-hidden rounded-[0.6rem] border border-pp-line bg-white/60 sm:block'>
+                {post.coverImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={post.coverImage}
+                    alt=''
+                    aria-hidden
+                    loading='lazy'
+                    className='h-full w-full object-cover'
+                  />
+                ) : null}
+              </span>
+
+              <span className='min-w-0 flex-1'>
+                <span className='block truncate font-display text-sm font-semibold'>
+                  {post.title}
+                </span>
+                <span className='block truncate text-xs text-pp-muted'>
+                  /blog/{post.slug}
+                  {post.isPillar ? ' · pillar' : ''}
+                  {post.series ? ` · ${post.series}` : ''}
+                  {' · edited '}
+                  {new Date(post.updatedAt).toLocaleDateString('en-GB')}
+                  {post.status === 'published'
+                    ? ` · ${post.metrics.views} read · ${post.metrics.shares} shared · ${post.metrics.attributions} arrived`
+                    : ''}
+                </span>
+              </span>
+
+              {post.status !== 'deleted' ? (
+                /*
+                  Four actions still wrap badly on a narrow row, so `PostRowActions` renders
+                  them inline from `md` up and behind one trigger below it.
+                */
+                <PostRowActions
+                  label={`Actions for ${post.title || post.slug}`}
+                  actions={[
+                    /*
+                      Ordered by how often each is reached for and how hard it is to undo:
+                      View and Edit are the everyday pair, Archive is reversible, Delete is
+                      last and separated. `Revalidate` used to sit between them - an empty
+                      PATCH that re-ran `revalidatePath` by hand - and was removed with the
+                      rest of that feature. Note the FUNCTION survives: PATCH and DELETE still
+                      call `revalidatePublishedPost`, which is how a publish reaches a reader
+                      inside the 300s ISR window at all.
+                    */
+                    ...(post.status === 'published'
+                      ? [
+                          /*
+                            Published only, and the same rule `BlogToolbar`'s "View live"
+                            follows. `readPublishedPost` filters on `status: 'published'`, so
+                            this link on a draft or an archived post is a 404 - a button that
+                            reliably breaks is worse than no button.
+
+                            Same tab rather than `target='_blank'`. `PostTracker`'s `sessionId`
+                            lives in sessionStorage, which is per-tab: navigating here reuses
+                            this tab's id so every later visit de-duplicates, while a new tab
+                            can mint a fresh one each time and add a unique read to the very
+                            `metrics.views` number printed on this row.
+                          */
+                          { key: 'view', label: 'View', href: `/blog/${post.slug}` },
+                        ]
+                      : []),
+                    { key: 'edit', label: 'Edit', href: `/admin/blog/${post._id}` },
+                    ...(post.status === 'published'
+                      ? [
+                          {
+                            key: 'archive',
+                            label: 'Archive',
+                            disabled: busy,
+                            onSelect: () => void mutate(post._id, { status: 'archived' }, 'PATCH'),
+                          },
+                        ]
+                      : [
+                          {
+                            key: 'publish',
+                            label: 'Publish',
+                            disabled: busy,
+                            onSelect: () => void mutate(post._id, { status: 'published' }, 'PATCH'),
+                          },
+                        ]),
+                    {
+                      key: 'delete',
+                      label: 'Delete',
+                      disabled: busy,
+                      separated: true,
+                      onSelect: () => void mutate(post._id, {}, 'DELETE'),
+                    },
+                  ]}
+                />
+              ) : (
+                <span className='text-xs text-pp-muted'>holds its slug</span>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        {posts !== null && posts.length === 0 && !error ? (
+          <p className='mt-8 text-sm text-pp-muted'>
+            No posts yet. The first three should be mined from source comments you have
+            already written - see <code>docs/blog/authoring.md</code>.
+          </p>
+        ) : null}
       </div>
     </OwnerAuthGate>
   )

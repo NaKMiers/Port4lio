@@ -157,4 +157,32 @@ describe('renderMarkdown - the error contract', () => {
   it('handles an empty body without throwing', async () => {
     await expect(renderMarkdown('', 'p')).resolves.toBe('')
   })
+
+  /*
+    `rehypeHeadingIds` is the first plugin appended after the sanitize node, which the header
+    of `lib/blog/markdown.ts` declares a closed list. These two assertions are what keeps that
+    concession honest end to end: the ids have to actually appear in stringified output (the
+    unit test in `blog-seo.test.ts` only exercises the visitor against a hand-built tree), and
+    the value written has to stay inside the slug charset no matter what the heading says.
+  */
+  it('gives every h2/h3/h4 an id derived from its own text', async () => {
+    const html = await renderMarkdown('## First section\n\n### Nested `code` one', 'p')
+
+    expect(html).toContain('<h2 id="first-section">')
+    expect(html).toContain('<h3 id="nested-code-one">')
+  })
+
+  it('cannot be made to write anything but a slug into the id attribute', async () => {
+    const html = await renderMarkdown('## Break" onmouseover="alert(1)', 'p')
+
+    /*
+      The quote and the handler survive as TEXT inside the heading, which is correct - that is
+      literally what the author typed, and text content cannot execute. What matters is the
+      opening tag: it must carry `id` and nothing else, because a slug that escaped its own
+      attribute is how a heading becomes an event handler.
+    */
+    const openingTag = html.slice(html.indexOf('<h2'), html.indexOf('>') + 1)
+
+    expect(openingTag).toBe('<h2 id="break-onmouseover-alert-1">')
+  })
 })

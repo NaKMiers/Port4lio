@@ -231,144 +231,140 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   }
 
   return (
-    <div className='portfolio-public-root relative z-50 min-h-screen clip-decorations pt-12 text-pp-text'>
-      <div className='pointer-events-none absolute inset-0 pp-grid-wash opacity-60' />
-      <div className='pointer-events-none absolute -left-16 top-32 h-48 w-48 rounded-full bg-pp-orange/15 blur-3xl' />
-      <div className='pointer-events-none absolute right-0 top-20 h-64 w-64 rounded-full bg-pp-blue/10 blur-3xl' />
-      <div className='pointer-events-none absolute bottom-12 left-1/3 h-52 w-52 rounded-full bg-pp-pink/10 blur-3xl' />
+    /* The grid wash and the blur pools used to be rendered here, and only here - see
+       `AdminBackdrop`, which now draws them behind every owner board rather than behind
+       this one. */
+    /* `max-w-editorial` matches the public site's column. Dropping the class entirely
+       rather than swapping in `max-w-none` keeps this working regardless of which
+       utilities Tailwind happened to generate. */
+    <div
+      className={`mx-auto w-full px-gutter py-10 md:py-12 ${
+        fullWidth ? '' : 'max-w-editorial'
+      }`}
+    >
+      <SettingToolbar
+        saving={saving}
+        uploading={uploading}
+        fullWidth={fullWidth}
+        onToggleFullWidth={() => setFullWidth(value => !value)}
+        onSave={onSave}
+        saveButtonRef={saveButtonRef}
+      />
 
-      {/* `max-w-editorial` matches the public site's column. Dropping the class entirely
-          rather than swapping in `max-w-none` keeps this working regardless of which
-          utilities Tailwind happened to generate. */}
-      <div
-        className={`relative mx-auto px-gutter py-10 md:py-12 ${
-          fullWidth ? '' : 'max-w-editorial'
-        }`}
-      >
-        <SettingToolbar
-          saving={saving}
-          uploading={uploading}
-          fullWidth={fullWidth}
-          onToggleFullWidth={() => setFullWidth(value => !value)}
-          onSave={onSave}
-          saveButtonRef={saveButtonRef}
-        />
+      <SettingErrorBanner message={error} />
 
-        <SettingErrorBanner message={error} />
+      <TabNav
+        tabs={SETTING_TABS}
+        activeId={tab}
+        onChange={id => setTab(id as SettingTabId)}
+        ariaLabel='Profile editor sections'
+      />
 
-        <TabNav
-          tabs={SETTING_TABS}
-          activeId={tab}
-          onChange={id => setTab(id as SettingTabId)}
-          ariaLabel='Profile editor sections'
-        />
-
-        <SectionOpenProvider>
-          {/* The rail track is a variable so `RailResizeHandle` can drive it without this
-              layout being rebuilt on every pointer move, and so the single-column stack
-              below `xl` stays a plain Tailwind class rather than an inline override. */}
-          <div
-            ref={layoutRef}
-            className='grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_var(--rail-width)] xl:gap-8'
-            style={{ '--rail-width': `${railWidth}px` } as React.CSSProperties}
-          >
-            {/* Every tab writes into the same `profile` state, so switching tabs never
-              discards an unsaved edit - only the section cards unmount. */}
-            <div className='space-y-5'>
-              {tab === 'profile' ? (
-                <>
-                  <BasicsSection
-                    profile={profile}
-                    setProfile={setProfile}
-                    preview={preview}
-                    uploading={uploading}
-                    setUploading={setUploading}
-                    setError={setError}
-                  />
-                  <div className='grid grid-cols-1 items-start gap-5 lg:grid-cols-2'>
-                    <SocialsSection
-                      profile={profile}
-                      setProfile={setProfile}
-                      setIconPickerTarget={setIconPickerTarget}
-                    />
-                    <StatsSection profile={profile} setProfile={setProfile} />
-                  </div>
-                  <AboutSection profile={profile} setProfile={setProfile} />
-                </>
-              ) : null}
-
-              {tab === 'career' ? (
-                <>
-                  <SkillsSection
-                    profile={profile}
-                    setProfile={setProfile}
-                    setIconPickerTarget={setIconPickerTarget}
-                  />
-                  <ExperienceSection profile={profile} setProfile={setProfile} />
-                  <EducationSection profile={profile} setProfile={setProfile} />
-                  <CertificatesSection profile={profile} setProfile={setProfile} />
-                </>
-              ) : null}
-
-              {tab === 'offering' ? (
-                <>
-                  <ServicesSection
-                    profile={profile}
-                    setProfile={setProfile}
-                    setIconPickerTarget={setIconPickerTarget}
-                  />
-                  <ProjectsSection
-                    profile={profile}
-                    setProfile={setProfile}
-                    setError={setError}
-                    uploading={uploading}
-                    setUploading={setUploading}
-                  />
-                </>
-              ) : null}
-
-              {tab === 'cv' ? (
-                <CvTabSections
+      <SectionOpenProvider>
+        {/* The rail track is a variable so `RailResizeHandle` can drive it without this
+            layout being rebuilt on every pointer move, and so the single-column stack
+            below `xl` stays a plain Tailwind class rather than an inline override. */}
+        <div
+          ref={layoutRef}
+          className='grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_var(--rail-width)] xl:gap-8'
+          style={{ '--rail-width': `${railWidth}px` } as React.CSSProperties}
+        >
+          {/* Every tab writes into the same `profile` state, so switching tabs never
+            discards an unsaved edit - only the section cards unmount. */}
+          <div className='space-y-5'>
+            {tab === 'profile' ? (
+              <>
+                <BasicsSection
                   profile={profile}
                   setProfile={setProfile}
+                  preview={preview}
                   uploading={uploading}
                   setUploading={setUploading}
                   setError={setError}
                 />
-              ) : null}
-            </div>
+                <div className='grid grid-cols-1 items-start gap-5 lg:grid-cols-2'>
+                  <SocialsSection
+                    profile={profile}
+                    setProfile={setProfile}
+                    setIconPickerTarget={setIconPickerTarget}
+                  />
+                  <StatsSection profile={profile} setProfile={setProfile} />
+                </div>
+                <AboutSection profile={profile} setProfile={setProfile} />
+              </>
+            ) : null}
 
-            <div className='relative xl:pl-2'>
-              <RailResizeHandle
-                width={railWidth}
-                onResize={setRailWidth}
-                onReset={resetRailWidth}
-                containerRef={layoutRef}
+            {tab === 'career' ? (
+              <>
+                <SkillsSection
+                  profile={profile}
+                  setProfile={setProfile}
+                  setIconPickerTarget={setIconPickerTarget}
+                />
+                <ExperienceSection profile={profile} setProfile={setProfile} />
+                <EducationSection profile={profile} setProfile={setProfile} />
+                <CertificatesSection profile={profile} setProfile={setProfile} />
+              </>
+            ) : null}
+
+            {tab === 'offering' ? (
+              <>
+                <ServicesSection
+                  profile={profile}
+                  setProfile={setProfile}
+                  setIconPickerTarget={setIconPickerTarget}
+                />
+                <ProjectsSection
+                  profile={profile}
+                  setProfile={setProfile}
+                  setError={setError}
+                  uploading={uploading}
+                  setUploading={setUploading}
+                />
+              </>
+            ) : null}
+
+            {tab === 'cv' ? (
+              <CvTabSections
+                profile={profile}
+                setProfile={setProfile}
+                uploading={uploading}
+                setUploading={setUploading}
+                setError={setError}
               />
-              <PreviewRail tab={tab} profile={profile} />
-            </div>
+            ) : null}
           </div>
-        </SectionOpenProvider>
 
-        <FloatingSaveButton
-          anchorRef={saveButtonRef}
-          saving={saving}
-          uploading={uploading}
-          onSave={onSave}
-        />
+          <div className='relative xl:pl-2'>
+            <RailResizeHandle
+              width={railWidth}
+              onResize={setRailWidth}
+              onReset={resetRailWidth}
+              containerRef={layoutRef}
+            />
+            <PreviewRail tab={tab} profile={profile} />
+          </div>
+        </div>
+      </SectionOpenProvider>
 
-        <IconPickerModal
-          open={!!iconPickerTarget}
-          iconQuery={iconQuery}
-          onQueryChange={setIconQuery}
-          filteredIcons={filteredIcons}
-          onSelect={applyIconCode}
-          onClose={() => {
-            setIconPickerTarget(null)
-            setIconQuery('')
-          }}
-        />
-      </div>
+      <FloatingSaveButton
+        anchorRef={saveButtonRef}
+        saving={saving}
+        uploading={uploading}
+        onSave={onSave}
+      />
+
+      <IconPickerModal
+        open={!!iconPickerTarget}
+        iconQuery={iconQuery}
+        onQueryChange={setIconQuery}
+        filteredIcons={filteredIcons}
+        onSelect={applyIconCode}
+        onClose={() => {
+          setIconPickerTarget(null)
+          setIconQuery('')
+        }}
+      />
     </div>
   )
 }

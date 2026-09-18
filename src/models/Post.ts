@@ -2,8 +2,6 @@ import mongoose, { Schema } from 'mongoose'
 
 import {
   isReservedSlug,
-  POST_KINDS,
-  POST_SERIES,
   POST_STATUSES,
   SLUG_PATTERN,
   TAG_PATTERN,
@@ -90,9 +88,7 @@ import { compileModel } from '@/lib/mongoose-model'
  * looks for what a post's fields may contain, and that should keep working.
  */
 export {
-  POST_SERIES,
   POST_STATUSES,
-  POST_KINDS,
   SLUG_PATTERN,
   TAG_PATTERN,
   RESERVED_SLUGS,
@@ -113,6 +109,7 @@ export type PostDocument = {
   /** Which pipeline version produced `bodyHtml`. Changing the renderer strands old posts. */
   renderedWith: string
   coverImage: string | null
+  coverCaption: string
   tags: string[]
   relatedSlugs: string[]
   status: PostStatus
@@ -138,8 +135,31 @@ const postSchema = new Schema<PostDocument>(
     language: { type: String, enum: ['vi', 'en'], default: 'en' },
     title: { type: String, required: true, maxlength: 140 },
     excerpt: { type: String, default: '', maxlength: 300 },
-    kind: { type: String, enum: POST_KINDS, required: true, default: 'note' },
-    series: { type: String, enum: [...POST_SERIES, null], default: null },
+    /*
+      No `enum` and no `default`, for the reasons on `series` below plus one of its own.
+
+      `default: 'note'` was how a new draft got a kind - `POST /api/admin/blog` never sets the
+      field. A default baked into a schema cannot survive its value being deleted from an
+      editable list: delete `note` and every subsequent draft is created pointing at a kind
+      that does not exist, with no write path involved to notice. So the create route now asks
+      `defaultKindSlug()` for the first kind by order, and this field is simply required.
+    */
+    kind: { type: String, required: true },
+    /*
+      No `enum`, deliberately - and this is the one field on the schema without one.
+
+      A mongoose enum is baked at module load from a value known at build time, which is
+      exactly what a runtime-editable list is not. Keeping it would mean the database
+      validating against whatever the series list happened to be when the process started,
+      so a series created at 10:00 would be rejected by a server booted at 09:00 until it
+      restarted - the worst kind of bug, because it depends on deploy timing.
+
+      Validation moved to the write path (`PATCH /api/admin/blog/[id]`), which can consult
+      the collection. That is a real downgrade in guarantee: the schema no longer refuses a
+      bad value written by some other caller. It is accepted because there is exactly one
+      writer, it is gated, and the alternative is a validator that is wrong on a schedule.
+    */
+    series: { type: String, default: null },
     isPillar: { type: Boolean, default: false },
     // `select: false` on both bodies: the index page, the sitemap, RSS and
     // generateStaticParams all list many posts and none of them needs either field. A
@@ -148,6 +168,14 @@ const postSchema = new Schema<PostDocument>(
     bodyHtml: { type: String, default: '', maxlength: 400_000, select: false },
     renderedWith: { type: String, default: '' },
     coverImage: { type: String, default: null },
+    /**
+     * Credit or context for `coverImage`, rendered as the `<figcaption>` under the thumbnail.
+     *
+     * Short by design - 140, the length of a credit line rather than a paragraph. It is the
+     * only text on a card that is not the post's own words, so a caption long enough to
+     * compete with the excerpt would be a caption in the wrong place.
+     */
+    coverCaption: { type: String, default: '', maxlength: 140 },
     tags: {
       type: [String],
       default: [],

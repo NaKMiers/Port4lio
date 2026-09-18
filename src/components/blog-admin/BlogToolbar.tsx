@@ -1,20 +1,22 @@
+import { Maximize2, Minimize2 } from 'lucide-react'
 import Link from 'next/link'
+import React from 'react'
 
 import { ghostBtnCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
 
 /**
- * The editor's top bar: where this post is, whether it is saved, and the two transitions.
+ * The editor's header panel: where this post is, whether it is saved, and the transitions.
  *
  * ## Why this is not `SettingToolbar` generalised
  *
- * `SettingToolbar` was the obvious thing to reuse and it is the wrong thing. It has exactly
- * one consumer, and its prop contract is profile-shaped: it takes `uploading: UploadingState`,
- * a record with `avatar`, `background`, `cv`, `cvPhoto` and a `projects` map. Making it serve
- * both would mean widening that type until it describes neither caller, so that two toolbars
- * can share a flex container and three button classes.
+ * `SettingToolbar` was the obvious thing to reuse and it is still the wrong thing. It has
+ * exactly one consumer, and its prop contract is profile-shaped: it takes
+ * `uploading: UploadingState`, a record with `avatar`, `background`, `cv`, `cvPhoto` and a
+ * `projects` map. Making it serve both would mean widening that type until it describes
+ * neither caller, so that two toolbars can share a flex container and three button classes.
  *
  * So this imports the button classes - which is the part that actually is shared, and the
- * part that keeps the two looking like one product - and states its own forty lines. The
+ * part that keeps the two looking like one product - and states its own layout. The
  * duplication is the layout; the thing that would have been coupled is the data model.
  *
  * ## Why saved state is a timestamp and not a spinner
@@ -23,61 +25,160 @@ import { ghostBtnCls, primaryBtnCls, secondaryBtnCls } from '@/components/settin
  * wrong, and an hour is gone at the next reload. A spinner only says "something is happening
  * now". "Saved 14:32" says the last thing that happened succeeded and when - which is the
  * question an author actually has, and it goes stale visibly if saving stops working.
+ *
+ * ## The heading is the post's own title
+ *
+ * `SettingToolbar` carries fixed marketing copy there, because the profile editor edits one
+ * permanent thing. This editor is opened once per post, so the useful heading is which post
+ * - and it reads live from the title field, which doubles as feedback that a title long
+ * enough to be cut in a search result is long.
  */
 export default function BlogToolbar({
   slug,
+  title,
   status,
   saving,
   savedAt,
+  dirty,
   uploading,
+  fullWidth,
+  onSave,
+  saveButtonRef,
+  onToggleFullWidth,
   onPublish,
   onArchive,
 }: {
   slug: string
+  title: string
   status: 'draft' | 'published' | 'archived' | 'deleted'
   saving: boolean
   savedAt: Date | null
+  /** An edit the server has not acknowledged. Drives the status line AND enables Save now. */
+  dirty: boolean
   uploading: boolean
+  /** Whether the editor is running edge to edge rather than inside the editorial column. */
+  fullWidth: boolean
+  onToggleFullWidth: () => void
+  onSave: () => void
+  /** Watched by `BlogSaveDock`, which takes over once this button scrolls away. */
+  saveButtonRef?: React.Ref<HTMLButtonElement>
   onPublish: () => void
   onArchive: () => void
 }) {
+  /*
+    `dirty` is checked before `savedAt`, and the order is the whole point. Reading `savedAt`
+    first meant that once anything had ever saved, a paragraph typed afterwards still showed
+    "Saved 14:32" for the length of the debounce - a stale timestamp presented as current
+    state, which is the one failure mode a save indicator exists to prevent.
+  */
+  const savedLabel = saving
+    ? 'Saving...'
+    : dirty
+      ? 'Unsaved changes'
+      : savedAt
+        ? `Saved ${savedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+        : 'No changes yet'
+
   return (
-    <div className='flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line bg-white/72 px-4 py-3'>
-      <span className='font-display text-sm font-semibold'>/blog/{slug}</span>
-      <span className='rounded-full border border-pp-line px-2.5 py-0.5 text-[11px] uppercase tracking-[0.14em] text-pp-muted'>
-        {status}
-      </span>
+    <div className='relative mb-6 rounded-[2rem] border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(255,250,246,0.78))] p-6 shadow-panel backdrop-blur-md sm:p-7'>
+      {/* Top-right of this block, out of the way of the copy underneath - the same placement
+          and the same pair of states the profile editor's toggle uses, because it is the same
+          gesture on a second board and it should not have to be learned twice. */}
+      <button
+        type='button'
+        onClick={onToggleFullWidth}
+        aria-pressed={fullWidth}
+        title={fullWidth ? 'Return to the editorial column width' : 'Use the full browser width'}
+        className='absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-pp-line bg-white/86 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_10px_24px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white sm:right-5 sm:top-5'
+      >
+        {fullWidth ? <Minimize2 aria-hidden size={12} /> : <Maximize2 aria-hidden size={12} />}
+        {fullWidth ? 'Shrink' : 'Extend'}
+      </button>
 
-      <span className='text-xs text-pp-muted' role='status'>
-        {saving
-          ? 'Saving...'
-          : savedAt
-            ? `Saved ${savedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
-            : 'No changes yet'}
-        {uploading ? ' · uploading image' : ''}
-      </span>
+      <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
+        <div className='max-w-3xl space-y-3'>
+          {/* Right padding keeps the badges from sliding under the Extend button. */}
+          <div className='flex flex-wrap items-center gap-2.5 pr-24'>
+            <span className='rounded-full border border-pp-line bg-white/82 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+              Blog control room
+            </span>
+            <span className='rounded-full bg-pp-text px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white'>
+              {status}
+            </span>
+            {uploading ? (
+              <span className='rounded-full border border-pp-orange/30 bg-pp-orange/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-text'>
+                Upload in progress
+              </span>
+            ) : null}
+          </div>
 
-      <span className='ml-auto flex flex-wrap gap-2'>
-        {status === 'published' ? (
-          <>
-            <Link className={secondaryBtnCls} href={`/blog/${slug}`}>
-              View live
-            </Link>
-            <button className={ghostBtnCls} onClick={onArchive}>
-              Archive
-            </button>
-          </>
-        ) : (
-          <button className={primaryBtnCls} onClick={onPublish} disabled={uploading}>
-            {/*
-              Blocked while an image is in flight, so a post cannot go live referencing a
-              Cloudinary URL that does not exist yet - the same reason the settings editor
-              gates its save on `hasActiveUploads`.
-            */}
-            Publish
+          <div>
+            <h1 className='font-display text-3xl font-semibold tracking-tight text-pp-text sm:text-4xl'>
+              {title.trim() || 'Untitled post'}
+            </h1>
+            <p className='mt-3 max-w-2xl text-sm leading-relaxed text-pp-muted sm:text-base'>
+              <code>/blog/{slug}</code> · <span role='status'>{savedLabel}</span>
+            </p>
+          </div>
+
+          <div className='flex flex-wrap gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+            <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
+              Autosaves as you type
+            </span>
+            <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
+              Preview rendered server-side
+            </span>
+            <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
+              Owner-gated access
+            </span>
+          </div>
+        </div>
+
+        <div className='flex flex-wrap items-center gap-2.5 lg:justify-end'>
+          <Link className={secondaryBtnCls} href='/admin/blog'>
+            All posts
+          </Link>
+          {/*
+            Disabled when there is nothing pending, which is most of the time - autosave has
+            usually already run. That is deliberate: a Save button that is always clickable in
+            an editor that saves by itself teaches you to press it out of superstition, and
+            tells you nothing. Greyed out IS the message that your work is committed.
+          */}
+          <button
+            ref={saveButtonRef}
+            type='button'
+            onClick={onSave}
+            disabled={saving || uploading || !dirty}
+            title={uploading ? 'Waiting for the image upload to finish' : 'Save now'}
+            className={secondaryBtnCls}
+          >
+            {saving ? 'Saving...' : 'Save now'}
           </button>
-        )}
-      </span>
+          {status === 'published' ? (
+            <>
+              <Link className={secondaryBtnCls} href={`/blog/${slug}`}>
+                View live
+              </Link>
+              <button className={ghostBtnCls} onClick={onArchive}>
+                Archive
+              </button>
+            </>
+          ) : (
+            <button
+              className={`${primaryBtnCls} min-w-[180px]`}
+              onClick={onPublish}
+              disabled={uploading}
+            >
+              {/*
+                Blocked while an image is in flight, so a post cannot go live referencing a
+                Cloudinary URL that does not exist yet - the same reason the settings editor
+                gates its save on `hasActiveUploads`.
+              */}
+              Publish
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

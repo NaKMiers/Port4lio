@@ -40,13 +40,31 @@ export type PostListItem = Pick<
   | 'isPillar'
   | 'language'
   | 'coverImage'
+  | 'coverCaption'
   | 'tags'
   | 'publishedAt'
   | 'contentUpdatedAt'
 >
 
+/**
+ * `-_id` is load-bearing, not tidiness.
+ *
+ * `PostListItem` is a `Pick` that does not include `_id`, but `.lean()` returns one anyway -
+ * so the declared type has always been a lie about the runtime shape. That was harmless
+ * while every caller was a server component (the sitemap, RSS, the teaser) and none of them
+ * read the field.
+ *
+ * It stopped being harmless when `/blog` began handing this list to `BlogIndexList`, a client
+ * component: a lean `_id` is a BSON `ObjectId`, React refuses to serialise objects carrying a
+ * `toJSON` across the server-to-client boundary, and the page logged
+ * "Only plain objects can be passed to Client Components" once per post. Excluding it here
+ * fixes that at the source and makes the type honest, rather than mapping the array in the
+ * one caller that happened to notice.
+ *
+ * `publishedAt` and `contentUpdatedAt` stay as `Date`s - React serialises those natively.
+ */
 const LIST_FIELDS =
-  'slug title excerpt kind series isPillar language coverImage tags publishedAt contentUpdatedAt'
+  '-_id slug title excerpt kind series isPillar language coverImage coverCaption tags publishedAt contentUpdatedAt'
 
 export async function listPublishedPosts(): Promise<PostListItem[]> {
   await connectDatabase()
@@ -89,6 +107,42 @@ export async function listPublishedSlugs(): Promise<string[]> {
     .lean<{ slug: string }[]>()
 
   return rows.map(row => row.slug)
+}
+
+/**
+ * The other published posts in one series, newest first.
+ *
+ * ## Why this is automatic where `relatedSlugs` is hand-picked
+ *
+ * They answer different questions and the blog needs both. `relatedSlugs` is an editorial
+ * judgement - "if you found this useful, read that" - and it crosses series freely. This is
+ * structural: a series is a cluster, and the single most reliable thing a small site can do
+ * for search is make every page in a cluster reachable from every other page in it. Leaving
+ * that to the author means it is done for the first three posts and forgotten by the sixth,
+ * and the sixth is the one that needed it.
+ *
+ * Capped, because "every other post in the series" becomes a wall of links on a series that
+ * works. Six is two rows of three and still fits under a post without competing with the
+ * availability block below it.
+ *
+ * `excludeSlug` rather than filtering in the caller: the post itself always matches its own
+ * series, and a "more in this series" list that links back to the page you are on is the kind
+ * of error that looks like the feature is broken.
+ */
+export async function listSeriesPeers(
+  series: string | null | undefined,
+  excludeSlug: string,
+  limit = 6
+): Promise<PostListItem[]> {
+  if (!series) return []
+
+  await connectDatabase()
+
+  return PostModel.find({ status: 'published', series, slug: { $ne: excludeSlug } })
+    .select(LIST_FIELDS)
+    .sort({ publishedAt: -1 })
+    .limit(limit)
+    .lean<PostListItem[]>()
 }
 
 /**

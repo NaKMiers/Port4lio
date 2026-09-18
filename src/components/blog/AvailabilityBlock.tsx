@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 import type { Locale } from '@/lib/i18n'
@@ -10,7 +11,7 @@ import type { Locale } from '@/lib/i18n'
  *   │  BUILT BY                                        ← eyebrow     │
  *   │  Anh Khoa Nguyen · Full stack developer                        │
  *   │  <one line on what he is open to>                              │
- *   │  [ Get in touch → ]  [ See the portfolio ]  [ Write-ups ]      │
+ *   │  [ Get in touch ]  [ See the portfolio ]  [ Write-ups ]        │
  *   └────────────────────────────────────────────────────────────────┘
  *                  ↓                  ↓                  ↓
  *              /#contact              /                /blog
@@ -112,7 +113,7 @@ export default function AvailabilityBlock({ locale }: { locale: Locale }) {
             className='inline-flex min-h-[44px] items-center gap-2 rounded-full bg-pp-text px-6 py-2.5 font-display text-sm font-semibold text-[var(--pp-bg)] no-underline shadow-panel transition-transform motion-safe:hover:-translate-y-0.5'
           >
             {copy.contact}
-            <span aria-hidden>&rarr;</span>
+            <ArrowRight aria-hidden size={15} />
           </Link>
           <Link
             href='/'

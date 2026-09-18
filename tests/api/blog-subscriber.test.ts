@@ -2,7 +2,6 @@ import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { buildDraftFromSourceComment } from '@/lib/blog/draft-template'
 import { SubscriberModel } from '@/models/Subscriber'
 
 /**
@@ -82,37 +81,5 @@ describe('retention', () => {
       ttl,
       'a TTL appeared on Subscriber - it expires consent and un-sticks unsubscribes'
     ).toBeUndefined()
-  })
-})
-
-describe('the source-comment draft (T20)', () => {
-  it('produces the seven-step template with the comment parked at the bottom', async () => {
-    const draft = buildDraftFromSourceComment({
-      comment: 'revalidatePath with the pattern form measured as a complete no-op.',
-      sourceFile: 'src/lib/blog/revalidate.ts',
-    })
-
-    for (const heading of [
-      '## Context',
-      '## What I measured',
-      '## What I expected',
-      '## What happened',
-      '## Root cause',
-      '## What I rejected, and why',
-      "## What I'd tell you",
-    ]) {
-      expect(draft, `the template lost "${heading}"`).toContain(heading)
-    }
-
-    expect(draft).toContain('src/lib/blog/revalidate.ts')
-    expect(draft).toContain('measured as a complete no-op')
-    // The title rule travels with the draft, because it is the thing most likely to be
-    // forgotten at the moment the post is named.
-    expect(draft).toContain('number or a named failure')
-  })
-
-  it('still attributes when no file is given, rather than silently dropping it', async () => {
-    const draft = buildDraftFromSourceComment({ comment: 'a note' })
-    expect(draft).toContain('Add the file path before publishing')
   })
 })

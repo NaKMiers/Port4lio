@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
@@ -51,8 +52,9 @@ export default async function SubscribedPage({
       <h1 className='font-display text-3xl font-semibold text-pp-text'>{copy.heading}</h1>
       <p className='mt-4 max-w-[58ch] text-lg leading-relaxed text-pp-muted'>{copy.body}</p>
       <p className='mt-8 text-sm'>
-        <Link href='/blog' className='text-pp-blue no-underline'>
-          &larr; Back to the writing
+        <Link href='/blog' className='inline-flex items-center gap-1.5 text-pp-blue no-underline'>
+          <ArrowLeft aria-hidden size={14} />
+          Back to the writing
         </Link>
       </p>
     </div>

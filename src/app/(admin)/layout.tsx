@@ -1,17 +1,19 @@
 import type { Metadata } from 'next'
 
-import SiteChrome from '@/components/site/SiteChrome'
+import AdminChrome from '@/components/admin/AdminChrome'
 import AppProvider from '@/context/AppContext'
 
 /**
  * Every owner surface on the site, and nothing else.
  *
  * ```
- *   (admin)/layout.tsx          ← this file: profile bootstrap + chrome, force-dynamic
+ *   (admin)/layout.tsx          this file: profile bootstrap + chrome, force-dynamic
  *     └── admin/
+ *           ├── page.tsx        /admin           the hub every other board hangs off
  *           ├── settings/       /admin/settings
  *           ├── publish/        /admin/publish
  *           ├── metrics/        /admin/metrics
+ *           ├── blog/           /admin/blog, /admin/blog/<id>
  *           └── ccaf/           /admin/ccaf, /admin/ccaf/en
  * ```
  *
@@ -50,7 +52,7 @@ export const dynamic = 'force-dynamic'
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppProvider bootstrapOnMount endpoint='/api/admin/profile'>
-      <SiteChrome>{children}</SiteChrome>
+      <AdminChrome>{children}</AdminChrome>
     </AppProvider>
   )
 }
