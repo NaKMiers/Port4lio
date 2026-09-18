@@ -175,6 +175,33 @@ export const CCAF_SAVE_LIMIT: RateLimitOptions = {
   windowSeconds: 60,
 }
 
+/**
+ * The contact form. The tightest bucket here, and the window is an hour rather than a
+ * minute.
+ *
+ * Every other bucket protects a database. This one protects a *mailbox*: each accepted
+ * submission sends a message with a visitor-controlled subject, body and `replyTo` from the
+ * site's own Gmail account. The failure mode is not a large collection, it is the owner's
+ * inbox buried under a relayed spam run and the sending account suspended for it - and
+ * Gmail's own daily quota is the only thing behind this.
+ *
+ * Three per hour, because a real person sends one. Two if they realise they typoed their
+ * email, and three is already generous for the third attempt nobody makes. A minute-long
+ * window would be useless here: a script sending one message a minute for a day stays under
+ * every limit above and still delivers 1440 emails.
+ *
+ * This is NOT the only bound on the mail path, and it must not be treated as one.
+ * `checkRateLimit` fails open on a missing client IP and fails open on a Mongo error, so
+ * both of the failure modes that make this bucket matter most are also the ones that switch
+ * it off. `api/contact/route.ts` carries a second, process-local ceiling for exactly that
+ * reason - see `claimMailBudget` there.
+ */
+export const CONTACT_LIMIT: RateLimitOptions = {
+  route: 'contact',
+  limit: 3,
+  windowSeconds: 60 * 60,
+}
+
 /*
  * IQ checkout has no limit of its own: `/api/iq/checkout` uses `CHECKOUT_LIMIT` above.
  *
