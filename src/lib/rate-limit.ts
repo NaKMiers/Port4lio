@@ -196,6 +196,25 @@ export const CCAF_SAVE_LIMIT: RateLimitOptions = {
  * it off. `api/contact/route.ts` carries a second, process-local ceiling for exactly that
  * reason - see `claimMailBudget` there.
  */
+/**
+ * The blog editor's autosave, modelled on `CCAF_SAVE_LIMIT` above.
+ *
+ * Owner-only, so this is not an abuse control - `requireOwner` already refused everyone else
+ * before the limiter is reached. What it bounds is our own editor misbehaving: a debounce
+ * that stops debouncing, a retry loop on a failing save, a second tab left open on the same
+ * draft. Each PATCH re-renders the markdown through Shiki and writes `bodyHtml`, so a runaway
+ * client is not a cheap no-op write, it is real CPU per request.
+ *
+ * Generous on purpose. A person typing produces a save every few seconds at most, and 60 in
+ * a minute is far above anything a human can cause, so a 429 here means something is broken
+ * rather than someone being productive.
+ */
+export const BLOG_SAVE_LIMIT: RateLimitOptions = {
+  route: 'blog-save',
+  limit: 60,
+  windowSeconds: 60,
+}
+
 export const CONTACT_LIMIT: RateLimitOptions = {
   route: 'contact',
   limit: 3,
