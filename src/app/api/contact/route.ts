@@ -120,6 +120,31 @@ function claimMailBudget(nowMs: number): boolean {
   return true
 }
 
+/**
+ * Clears the counter above. Tests only - nothing in the request path may call this.
+ *
+ * The budget is module-level mutable state with no natural reset, which makes it the one
+ * thing in this file a test cannot arrange or observe without a door. Two consequences, and
+ * both are why this export exists rather than the tests working around it:
+ *
+ * 1. Without a reset, the control is untestable, so the second door on the mail path - the
+ *    one whose whole justification is holding when `checkRateLimit` fails open - would ship
+ *    asserted by nothing. A `claimMailBudget` that returned `true` unconditionally would
+ *    pass every other test in the suite.
+ * 2. Without a reset, the counter *leaks between tests*. It is process-local and the suite
+ *    is one process, so every mail any test sends is charged to the same 20/hour ceiling.
+ *    The suite sits comfortably under it today, which is exactly the problem: the failure
+ *    arrives later, as unrelated tests going red with `mailed: false` and no visible cause,
+ *    for whoever adds the twenty-first.
+ *
+ * Exported rather than reached through some module-internals trick so that the coupling is
+ * declared in the file that owns the state, where it can be read.
+ */
+export function resetMailBudgetForTests() {
+  mailWindow = 0
+  mailsSentInWindow = 0
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
 }
@@ -258,7 +283,31 @@ export async function POST(request: NextRequest) {
         // Replying to the notification should reach the visitor, not the no-reply mailbox.
         replyTo: fields.email,
       })
-      await ContactMessageModel.updateOne({ _id: savedId }, { $set: { mailed: true } })
+
+      /**
+       * Its own try, for the log rather than for the row.
+       *
+       * Be precise about what this does and does not fix. If this write fails the row keeps
+       * `mailed: false` either way - that is inherent, because the flag write is the thing
+       * that failed, and no arrangement of catches can record a success that never
+       * persisted. `mailed: false` therefore overstates the problem in exactly one case,
+       * and always did.
+       *
+       * What changes is which story the operator gets. Under the outer catch this landed on
+       * `message <id> saved but mail failed - it is NOT lost`, which is false: the mail did
+       * go out, and the owner reading that line re-sends a message the recipient already
+       * has. "Emailed but not recorded" and "not emailed" are different incidents, only one
+       * of them loses a notification, and the row alone cannot tell them apart - so the log
+       * has to.
+       */
+      try {
+        await ContactMessageModel.updateOne({ _id: savedId }, { $set: { mailed: true } })
+      } catch (error) {
+        console.error(
+          `[api/contact] message ${String(savedId)} WAS emailed but the mailed flag did not persist - the row understates delivery`,
+          error
+        )
+      }
     }
   } catch (error) {
     // Deliberately not a 500. See "Why a mail failure returns 200" above. The row keeps

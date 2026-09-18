@@ -225,6 +225,30 @@ export default function PortfolioContactForm() {
           </p>
         ) : null}
 
+        {/*
+          The storage notice, and it is here because nothing else on this surface says it.
+
+          `/` has no privacy page - the only two on this site are `/[lang]/mbti/privacy` and
+          `/[lang]/iq/privacy`, and both describe the tests. This form now writes a
+          `ContactMessage` that has no TTL index on purpose, so what a stranger types here
+          is kept until somebody deletes it, and until this line existed they were never
+          told. That gap widened the moment `AvailabilityBlock` started routing test-takers
+          here from pages whose own notice opens by promising it lists everything stored.
+
+          Deliberately not a checkbox and not a consent gate. They are already typing a
+          message to a person, which is the thing being consented to; a gate would suppress
+          messages to solve a disclosure problem. One sentence they can read before they
+          send is the honest version.
+
+          The delete route is an email address rather than a form because the owner board
+          and its delete action are Phase 1. When those ship, this sentence is the thing to
+          update - it is the promise the board has to keep.
+        */}
+        <p className='text-xs leading-relaxed text-pp-muted'>
+          Your message is stored so it survives an email outage, and kept until I delete it.
+          Nothing here is shared with anyone. Ask me to delete it any time and I will.
+        </p>
+
         <div className='flex flex-wrap items-center gap-4 pt-1'>
           <button
             type='submit'

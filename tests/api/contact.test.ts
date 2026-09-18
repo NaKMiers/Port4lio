@@ -63,6 +63,14 @@ afterEach(async () => {
   await ContactMessageModel.deleteMany({})
   await mongoose.connection.collection('mbtiRateLimits').deleteMany({})
   sendMail.mockReset()
+
+  // The mail budget is module-level state in a single-process suite, so without this every
+  // mail any test sends is charged to the same 20/hour ceiling and the file silently
+  // couples to itself. The failure would not land on whoever broke it - it lands on
+  // whoever adds the twenty-first mailing test, as unrelated cases going red with
+  // `mailed: false` and nothing to point at.
+  const { resetMailBudgetForTests } = await import('@/app/api/contact/route')
+  resetMailBudgetForTests()
 })
 
 /** Imported lazily so the mailer mock and `MONGODB_URI` are both in place first. */
@@ -295,6 +303,89 @@ describe('POST /api/contact - the rate limit', () => {
 
     expect(buckets, 'the limiter never wrote, so it never ran').toHaveLength(1)
     expect(buckets[0].count).toBe(1)
+  })
+})
+
+describe('POST /api/contact - the process-local mail budget', () => {
+  /**
+   * The second door on the mail path, and until now the only control in this handler that
+   * nothing asserted.
+   *
+   * It exists because `CONTACT_LIMIT` fails open on a missing client IP and on a Mongo
+   * error - the two conditions that make a relayed spam run likely are the two that switch
+   * the first door off. So this ceiling has to hold when the limiter does not, which is
+   * precisely the state these tests run in: `post()` sends no `x-forwarded-for`, so
+   * `checkRateLimit` skips the check entirely and the budget is the only thing left.
+   */
+  it('stops mailing after 20 in a window, and STILL persists every message', async () => {
+    sendMail.mockResolvedValue(undefined)
+
+    for (let i = 0; i < 20; i += 1) {
+      expect((await post(VALID)).status, `submission ${i + 1}`).toBe(200)
+    }
+    expect(sendMail, 'the budget refused a mail it should have allowed').toHaveBeenCalledTimes(20)
+
+    const overBudget = await post(VALID)
+
+    // The whole point: what the ceiling drops is a NOTIFICATION, never a message. A 4xx
+    // here would mean the abuse control had started destroying correspondence, which is the
+    // bug this entire file exists to keep out of the handler.
+    expect(overBudget.status).toBe(200)
+    expect(sendMail, 'the 21st mail escaped the ceiling').toHaveBeenCalledTimes(20)
+    expect(await ContactMessageModel.countDocuments({})).toBe(21)
+
+    const unmailed = await ContactMessageModel.countDocuments({ mailed: false })
+    expect(unmailed, 'the dropped notification is not discoverable from the rows').toBe(1)
+  })
+
+  it('refuses nothing once the window rolls', async () => {
+    // Guards the guard. A ceiling that never reset would look identical to a working one in
+    // the test above, and would then silently stop mailing this site forever after the
+    // twentieth message of its life.
+    sendMail.mockResolvedValue(undefined)
+
+    for (let i = 0; i < 20; i += 1) await post(VALID)
+    expect(sendMail).toHaveBeenCalledTimes(20)
+
+    const { resetMailBudgetForTests } = await import('@/app/api/contact/route')
+    resetMailBudgetForTests()
+
+    expect((await post(VALID)).status).toBe(200)
+    expect(sendMail).toHaveBeenCalledTimes(21)
+  })
+})
+
+describe('POST /api/contact - a failed mailed-flag write is not reported as a failed send', () => {
+  /**
+   * The row cannot tell these apart and never will: if the `mailed: true` write is what
+   * failed, the row keeps `mailed: false` whatever we do about it. So the log is the only
+   * thing carrying the distinction, and an operator acting on the wrong one re-sends a
+   * message the recipient already has.
+   */
+  it('logs that the mail WAS sent when only the flag write fails', async () => {
+    sendMail.mockResolvedValueOnce(undefined)
+    const updateOne = vi
+      .spyOn(ContactMessageModel, 'updateOne')
+      .mockRejectedValueOnce(new Error('connection dropped mid-write'))
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const response = await post(VALID)
+
+    expect(response.status).toBe(200)
+    expect(sendMail, 'the mail really did go out').toHaveBeenCalledTimes(1)
+
+    const lines = logged.mock.calls.map(call => String(call[0]))
+    expect(
+      lines.some(line => line.includes('WAS emailed')),
+      'the operator is not told the message was delivered'
+    ).toBe(true)
+    expect(
+      lines.some(line => line.includes('mail failed')),
+      'THE BUG: a failed flag write was reported as a failed send, so the owner re-sends'
+    ).toBe(false)
+
+    updateOne.mockRestore()
+    logged.mockRestore()
   })
 })
 

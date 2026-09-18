@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -20,11 +23,21 @@ import { LOCALES } from '@/lib/i18n'
  * action navigates *off the site*, so on a test page it is not noise - it is an exit
  * rendered next to the answer buttons, on the page a visitor has invested the most in.
  *
- * ## Why this asserts on layouts and not on the pages
+ * ## Why this asserts on layouts AND on where the page files live
  *
  * The rule is enforced by which route group a file sits in, and a directory rename can undo
  * that silently - no type error, no build failure, just a pitch appearing mid-test. The
- * layouts are where the decision is actually expressed, so they are what has to be pinned.
+ * layouts are where the decision is expressed, so they are pinned below.
+ *
+ * But pinning the layouts does not pin the rename, and the first version of this file
+ * claimed it did. Both layouts import by module path, so
+ * `git mv mbti/(plain)/test mbti/(pitch)/test` leaves every render assertion here passing,
+ * along with typecheck, lint and `next build`, while `/vi/mbti/test` starts serving the
+ * block. The layout half of this file is blind to the exact move its own comment named.
+ *
+ * Hence the filesystem assertions first. They are the only ones that fail on a rename, and
+ * they are checked before the render cases so the failure names the cause rather than
+ * arriving as four confusing markup diffs.
  *
  * `/[lang]/mbti/(plain)/test/page.tsx` itself renders a client questionnaire with its own
  * data requirements; rendering it here would test the questionnaire, not the placement.
@@ -66,6 +79,34 @@ async function renderLayout(
   })
   return renderToStaticMarkup(element as React.ReactElement)
 }
+
+/** Repo root. `vitest.config.ts` lives there and resolves `@` against `./src` from it. */
+const APP = path.resolve(process.cwd(), 'src/app/(choice)/[lang]')
+
+describe('the questionnaires live in the (plain) group', () => {
+  // Cheap, and the only assertions in this file that survive a directory rename. Both
+  // directions are asserted: present under (plain) AND absent under (pitch), because a copy
+  // left behind in the wrong group is a build failure nobody would attribute to this rule.
+  for (const product of ['mbti', 'iq'] as const) {
+    it(`${product}/test is under (plain), not (pitch)`, () => {
+      expect(
+        existsSync(path.join(APP, product, '(plain)/test/page.tsx')),
+        `${product}/test/page.tsx is not in the (plain) group - if it moved to (pitch), /[lang]/${product}/test now renders the availability block next to the answer buttons`
+      ).toBe(true)
+
+      expect(
+        existsSync(path.join(APP, product, '(pitch)/test')),
+        `a ${product}/test directory appeared in the (pitch) group`
+      ).toBe(false)
+    })
+  }
+
+  it('the path these assertions resolve against is real', () => {
+    // Guards the guard. `existsSync` on a wrong root returns false for everything, which
+    // would turn the "absent from (pitch)" half above into a test that always passes.
+    expect(existsSync(path.join(APP, 'layout.tsx')), `APP does not resolve: ${APP}`).toBe(true)
+  })
+})
 
 describe('availability block placement', () => {
   for (const lang of LOCALES) {
