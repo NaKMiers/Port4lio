@@ -7,9 +7,10 @@ import BlogToolbar from '@/components/blog-admin/BlogToolbar'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoading from '@/components/settings/SettingLoading'
-import { inputCls, labelCls, uploadInputCls } from '@/components/settings/settings-utils'
+import { ghostBtnCls, inputCls, labelCls, uploadInputCls } from '@/components/settings/settings-utils'
 import { uploadAssetToCloudinary } from '@/components/settings/settings-utils'
 import { POST_SERIES } from '@/lib/blog/constants'
+import { buildSyndicationBundle, type SyndicationTarget } from '@/lib/blog/syndication'
 
 /**
  * The split-pane editor.
@@ -78,6 +79,7 @@ export default function BlogEditor({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [copied, setCopied] = useState<SyndicationTarget | null>(null)
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -184,6 +186,33 @@ export default function BlogEditor({ id }: { id: string }) {
     const timer = window.setTimeout(() => renderInitialPreview(post), 0)
     return () => window.clearTimeout(timer)
   }, [post, preview])
+
+  /**
+   * Copy a channel-ready bundle to the clipboard.
+   *
+   * Built from the CURRENT editor state rather than from what was last saved, so the author
+   * can copy without waiting on the debounce - the bundle is for pasting elsewhere and never
+   * touches the stored document.
+   */
+  async function copyBundle(target: SyndicationTarget) {
+    if (!post) return
+    const canonical = `${window.location.origin}/blog/${post.slug}`
+    const bundle = buildSyndicationBundle({
+      target,
+      title: post.title,
+      bodyMarkdown: post.bodyMarkdown,
+      canonical,
+      tags: post.tags,
+    })
+
+    try {
+      await navigator.clipboard.writeText(bundle)
+      setCopied(target)
+      window.setTimeout(() => setCopied(null), 2000)
+    } catch {
+      setError('Could not reach the clipboard. Copy the markdown pane instead.')
+    }
+  }
 
   async function uploadCover(file: File) {
     setUploading(true)
@@ -385,11 +414,26 @@ export default function BlogEditor({ id }: { id: string }) {
             </div>
           </div>
 
-          <p className='mt-8 text-sm'>
-            <Link href='/admin/blog' className='text-pp-muted no-underline hover:text-pp-text'>
+          <div className='mt-8 flex flex-wrap items-center gap-3'>
+            <span className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+              Cross-post
+            </span>
+            {/*
+              Both bundles carry the availability footer in the TARGET's language. Without it
+              the one P0 conversion criterion exists only on /blog/<slug>, which is the page
+              almost nobody reads - the audience is on these two channels, which is the whole
+              reason for cross-posting at all.
+            */}
+            <button className={ghostBtnCls} onClick={() => void copyBundle('devto')}>
+              {copied === 'devto' ? 'Copied' : 'DEV.to (EN)'}
+            </button>
+            <button className={ghostBtnCls} onClick={() => void copyBundle('viblo')}>
+              {copied === 'viblo' ? 'Copied' : 'Viblo (VI)'}
+            </button>
+            <Link href='/admin/blog' className='ml-auto text-sm text-pp-muted no-underline hover:text-pp-text'>
               &larr; All posts
             </Link>
-          </p>
+          </div>
         </div>
       </div>
     </OwnerAuthGate>
