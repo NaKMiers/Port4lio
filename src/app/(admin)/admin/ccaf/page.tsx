@@ -6,7 +6,7 @@ import { buildCcafMetadata } from '@/lib/ccaf/page-meta'
 import { loadOwnerCcafState } from '@/lib/ccaf/progress-data'
 
 /**
- * `/ccaf` - the CCA-F study plan in Vietnamese, and how far through it I am.
+ * `/admin/ccaf` - the CCA-F study plan in Vietnamese, and how far through it I am.
  *
  * An owner-only surface, same shape as `/settings`, `/publish` and `/metrics`: the admin
  * layout's chrome, `OwnerAuthGate` over the UI, `robots: noindex`, and no sitemap entry.

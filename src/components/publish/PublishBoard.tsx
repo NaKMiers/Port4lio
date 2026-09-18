@@ -102,10 +102,10 @@ export default function PublishBoard() {
 
           <div className='flex flex-wrap items-center gap-2.5 lg:justify-end'>
             {/* The three owner surfaces reach each other from any of them. */}
-            <Link className={secondaryBtnCls} href='/metrics'>
+            <Link className={secondaryBtnCls} href='/admin/metrics'>
               Metrics
             </Link>
-            <Link className={secondaryBtnCls} href='/settings'>
+            <Link className={secondaryBtnCls} href='/admin/settings'>
               Edit profile
             </Link>
             <button type='button' className={primaryBtnCls} onClick={() => void load(true)}>

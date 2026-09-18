@@ -19,15 +19,15 @@ import { LOCALE_LABELS, LOCALES, type Locale } from '@/lib/i18n'
  * ## Why the hrefs are a lookup and not `swapLocale`
  *
  * `swapLocale` rewrites `/vi/thing` into `/en/thing`, which is the shape every other
- * localized route here uses. These two are `/ccaf` and `/ccaf/en` instead: that shape was
- * inherited from the page's public life, when `/ccaf` was already in the sitemap and had
- * already been handed out. Renaming it now would cost a redirect and buy nothing, so the
- * two entries in this map stay.
+ * localized route here uses. These two are `/admin/ccaf` and `/admin/ccaf/en` instead: that
+ * shape was inherited from the page's public life, when `/ccaf` was already in the sitemap
+ * and had already been handed out. D6 later moved the pair under `/admin`, which changed the
+ * prefix and not the shape, so the two entries in this map stay.
  */
 
 const HREF: Record<Locale, string> = {
-  vi: '/ccaf',
-  en: '/ccaf/en',
+  vi: '/admin/ccaf',
+  en: '/admin/ccaf/en',
 }
 
 /** Short label for the toggle; the full name goes to screen readers and the tooltip. */

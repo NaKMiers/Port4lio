@@ -6,7 +6,7 @@ import { buildCcafMetadata } from '@/lib/ccaf/page-meta'
 import { loadOwnerCcafState } from '@/lib/ccaf/progress-data'
 
 /**
- * `/ccaf/en` - the English twin of `../page.tsx`, which carries the reasoning for both.
+ * `/admin/ccaf/en` - the English twin of `../page.tsx`, which carries the reasoning for both.
  */
 
 export const metadata: Metadata = buildCcafMetadata('en')

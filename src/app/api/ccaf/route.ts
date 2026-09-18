@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
  * ## Why the gate is here and not only on the page
  *
  * The rule this repo states plainly in `api/admin/metrics`: a client-side gate hides a
- * page, a server-side gate protects data. `OwnerAuthGate` on `/ccaf` is the first kind.
+ * page, a server-side gate protects data. `OwnerAuthGate` on `/admin/ccaf` is the first kind.
  * This check is the second, and it is the one that matters.
  */
 export async function PUT(request: NextRequest) {

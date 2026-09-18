@@ -10,7 +10,7 @@ export default function ProfileFetchStatus() {
   const { loading, error, refetchProfile } = useApp()
   const pathname = usePathname()
 
-  if (pathname === '/settings') {
+  if (pathname === '/admin/settings') {
     return null
   }
 

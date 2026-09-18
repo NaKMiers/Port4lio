@@ -86,10 +86,10 @@ export default function SettingToolbar({
             reading the funnel is something you want most on the deployed site, and
             `/metrics` is owner-gated server-side anyway.
           */}
-          <Link className={secondaryBtnCls} href='/metrics'>
+          <Link className={secondaryBtnCls} href='/admin/metrics'>
             Metrics
           </Link>
-          <Link className={secondaryBtnCls} href='/publish'>
+          <Link className={secondaryBtnCls} href='/admin/publish'>
             Publish
           </Link>
           <button
