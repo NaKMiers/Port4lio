@@ -60,6 +60,12 @@ type BoardPost = {
   status: 'draft' | 'published' | 'archived' | 'deleted'
   publishedAt: string | null
   updatedAt: string
+  /**
+   * DOCUMENT counts, never a sum of `count`. One reader refreshing five times is one view.
+   * `views` is advisory: `sessionId` is client-chosen, so it is honest as a trend and
+   * worthless as a number to quote. The kill criterion reads ContactMessage.sourceSlug.
+   */
+  metrics: { views: number; shares: number; attributions: number }
 }
 
 const STATUS_MARK: Record<BoardPost['status'], string> = {
@@ -244,6 +250,9 @@ export default function BlogBoard() {
                     {post.series ? ` · ${post.series}` : ''}
                     {' · edited '}
                     {new Date(post.updatedAt).toLocaleDateString('en-GB')}
+                    {post.status === 'published'
+                      ? ` · ${post.metrics.views} read · ${post.metrics.shares} shared · ${post.metrics.attributions} arrived`
+                      : ''}
                   </span>
                 </span>
 

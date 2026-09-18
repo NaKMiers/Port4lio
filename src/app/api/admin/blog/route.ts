@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { jsonError } from '@/lib/api-response'
+import { aggregatePostMetrics } from '@/lib/blog/post-events'
 import { connectDatabase } from '@/lib/mongodb'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
@@ -41,7 +42,27 @@ export async function GET(request: NextRequest) {
       .sort({ updatedAt: -1 })
       .lean()
 
-    return NextResponse.json({ posts })
+    /**
+     * Metrics are joined here rather than left to the client, and failing to read them does
+     * NOT fail the board.
+     *
+     * The board's job is to let the owner publish. Numbers are what it shows while doing
+     * that, so a `postEvents` outage should cost the counts and nothing else - a board that
+     * 500s because an aggregation failed is a board that cannot publish a post over a metric.
+     */
+    let metrics = new Map<string, { views: number; shares: number; attributions: number }>()
+    try {
+      metrics = await aggregatePostMetrics()
+    } catch (error) {
+      console.error('[api/admin/blog] metrics unavailable - listing posts without them', error)
+    }
+
+    return NextResponse.json({
+      posts: posts.map(post => ({
+        ...post,
+        metrics: metrics.get(post.slug) ?? { views: 0, shares: 0, attributions: 0 },
+      })),
+    })
   } catch (error) {
     console.error('[api/admin/blog] list failed', error)
     return jsonError('Unable to load posts right now.', 500)

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 
 import AvailabilityBlock from '@/components/blog/AvailabilityBlock'
 import PostByline from '@/components/blog/PostByline'
+import PostTracker from '@/components/blog/PostTracker'
 import { listPublishedSlugs, readPublishedPost, resolveRelatedSlugs } from '@/lib/blog/post-data'
 import { buildPostJsonLd, buildPostMetadata } from '@/lib/blog/seo'
 import { loadPublicProfileUncached } from '@/lib/profile-data'
@@ -140,6 +141,20 @@ export default async function BlogPostPage({ params }: PageProps) {
             dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
           />
         </article>
+
+        {/*
+          The view beacon and the share button. A client island, and it has to be: the share
+          token is minted ON THE CLICK. Minting it server-side during this render would bake
+          one token into the ISR-cached HTML and serve it to every reader for 300 seconds,
+          collapsing blog:share:<token> to a single document forever while attributions kept
+          growing - a silently, permanently wrong ratio that looks plausible.
+        */}
+        <div className='mt-10 flex items-center gap-3 border-t border-pp-line pt-6'>
+          <PostTracker slug={post.slug} />
+          <span className='text-xs text-pp-muted'>
+            Sharing this link lets me see the post reached somebody.
+          </span>
+        </div>
 
         {related.length > 0 ? (
           <aside className='mt-14 border-t border-pp-line pt-8'>

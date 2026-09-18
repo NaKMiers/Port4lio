@@ -209,6 +209,27 @@ export const CCAF_SAVE_LIMIT: RateLimitOptions = {
  * a minute is far above anything a human can cause, so a 429 here means something is broken
  * rather than someone being productive.
  */
+/**
+ * The public blog beacon. Anonymous, unauthenticated, and writing to Mongo.
+ *
+ * `api/event` - the test beacon - carries three volume controls and the first draft of this
+ * feature copied only its two input-bounding rules. That gap is what this closes: without a
+ * bucket, `POST /api/blog/event` is an unthrottled anonymous write, and the only thing
+ * standing between it and an arbitrarily large collection is how fast a script can loop.
+ *
+ * 60 a minute is generous for a real reader, who fires one `view` per post and occasionally a
+ * `share`. It is not generous for a script, and it is the only bound on the number the admin
+ * board calls "unique readers" - which is why that number is documented as advisory rather
+ * than as evidence. `sessionId` is client-chosen, so a determined caller can still spread
+ * across sessions inside this limit; the kill criterion deliberately reads
+ * `ContactMessage.sourceSlug` instead, which needs a human to have written a sentence.
+ */
+export const BLOG_EVENT_LIMIT: RateLimitOptions = {
+  route: 'blog-event',
+  limit: 60,
+  windowSeconds: 60,
+}
+
 export const BLOG_SAVE_LIMIT: RateLimitOptions = {
   route: 'blog-save',
   limit: 60,
