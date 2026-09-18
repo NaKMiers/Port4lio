@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 
+import { listPublishedPosts } from '@/lib/blog/post-data'
 import { LOCALES } from '@/lib/i18n'
 import { MBTI_TYPES, slugFromType } from '@/lib/mbti/types'
 import { getPublicProfileUpdatedAt } from '@/lib/profile-data'
@@ -38,10 +39,16 @@ const MBTI_CONTENT_UPDATED_AT = new Date('2026-09-02T00:00:00.000Z')
  *   without             documentElement = html     viewer on    height 4083px  (tree)
  * ```
  *
- * The signal is not lost. Every page already emits its own hreflang set in `<head>` via
- * `alternates.languages` in its `generateMetadata`, and that set additionally carries
- * `x-default`, which the sitemap entries never did. Page-level hreflang is the form
- * Google documents first; the sitemap pair was a redundant second copy.
+ * The signal is not lost for the pages that have one. Every *localized* page emits its own
+ * hreflang set in `<head>` via `alternates.languages` in its `generateMetadata`, and that set
+ * additionally carries `x-default`, which the sitemap entries never did. Page-level hreflang
+ * is the form Google documents first; the sitemap pair was a redundant second copy.
+ *
+ * Amended when the blog entered this feed: "every page" stopped being true. Blog posts emit
+ * NO hreflang at all, and that is correct rather than an omission - under D7 the blog is
+ * English-only and the Vietnamese version of a post is a native Viblo post, a different piece
+ * of writing for a different audience, not a translation of this URL. There is no pair to
+ * declare, and declaring one would point hreflang at a page on someone else's domain.
  *
  * So this trades a duplicate machine-readable hint for a feed a human can actually read
  * while debugging. If sitemap-level hreflang is ever wanted back, re-adding `alternates`
@@ -51,6 +58,52 @@ const MBTI_CONTENT_UPDATED_AT = new Date('2026-09-02T00:00:00.000Z')
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = resolveSiteOrigin().replace(/\/$/, '')
   const lm = await getPublicProfileUpdatedAt()
+
+  /**
+   * `/blog` and every published post.
+   *
+   * ## `lastModified` reads `contentUpdatedAt`, never `updatedAt`
+   *
+   * `updatedAt` is a mongoose timestamp, so the editor's autosave bumps it on every debounce
+   * tick. Sourcing this from it would announce that a post changed several times a minute
+   * while somebody was typing - which is the cry-wolf failure the `MBTI_CONTENT_UPDATED_AT`
+   * constant above exists to fix, arriving from a new direction. A crawler that learns this
+   * field lies stops reading it, and then the post that genuinely changed is ignored too.
+   *
+   * Unlike the MBTI pages, a live per-URL date IS correct here: posts genuinely do change,
+   * individually, at times worth telling a crawler about. The hand-maintained constant above
+   * is the right answer for content that changes on deploy; this is the right answer for
+   * content that changes on save.
+   *
+   * ## Why the read is guarded and the MBTI list is not
+   *
+   * The MBTI entries are computed from compiled-in constants and cannot fail. This one hits
+   * the database, and `sitemap.ts` is generated at build time as well as revalidated at
+   * runtime - so an Atlas blip during a Vercel build would otherwise fail the deploy and take
+   * `/`, `/cv` and all 35 test pages down with the blog. Same reasoning as
+   * `generateStaticParams`, same resolution: log it, serve the rest of the feed.
+   */
+  let blog: MetadataRoute.Sitemap = []
+  try {
+    const posts = await listPublishedPosts()
+    blog = [
+      {
+        url: `${origin}/blog`,
+        lastModified: posts[0]?.contentUpdatedAt ?? lm ?? new Date(),
+        changeFrequency: 'weekly',
+        priority: 0.8,
+      },
+      ...posts.map(post => ({
+        url: `${origin}/blog/${post.slug}`,
+        lastModified: post.contentUpdatedAt,
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+        ...(post.coverImage ? { images: [post.coverImage] } : {}),
+      })),
+    ]
+  } catch (error) {
+    console.error('[sitemap] blog posts unavailable - serving the rest of the feed', error)
+  }
 
   /**
    * MBTI landing + the 16 type pages, per locale. Every entry here is statically
@@ -142,9 +195,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     // Deliberately absent, in the style of the MBTI and IQ notes below: `/admin/ccaf` and
     // `/admin/ccaf/en`. They were listed here while the study plan was a public page. It is an
-    // owner-only surface now, alongside `/settings`, `/publish` and `/metrics`, none of
-    // which have ever been listed either.
+    // owner-only surface now, and since D6 every owner surface lives under `/admin` - none
+    // of which has ever been listed here.
     ...mbti,
     ...iq,
+    ...blog,
   ]
 }

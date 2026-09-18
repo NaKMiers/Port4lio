@@ -57,6 +57,12 @@ export async function listPublishedPosts(): Promise<PostListItem[]> {
     .lean<PostListItem[]>()
 }
 
+export type PublishedPost = PostListItem & {
+  bodyHtml: string
+  renderedWith: string
+  relatedSlugs: string[]
+}
+
 /**
  * One post, with its rendered HTML.
  *
@@ -65,12 +71,14 @@ export async function listPublishedPosts(): Promise<PostListItem[]> {
  * no business in a public response. The page renders `bodyHtml`, which was sanitized and
  * highlighted at save time (D9).
  */
-export async function readPublishedPost(slug: string) {
+export async function readPublishedPost(slug: string): Promise<PublishedPost | null> {
   await connectDatabase()
 
+  // `relatedSlugs` is here and NOT in `LIST_FIELDS`: only the post page resolves them, and
+  // putting them in the shared projection would ship an unused array on every index card.
   return PostModel.findOne({ slug, status: 'published' })
-    .select(`${LIST_FIELDS} +bodyHtml renderedWith`)
-    .lean<(PostListItem & { bodyHtml: string; renderedWith: string }) | null>()
+    .select(`${LIST_FIELDS} relatedSlugs +bodyHtml renderedWith`)
+    .lean<PublishedPost | null>()
 }
 
 export async function listPublishedSlugs(): Promise<string[]> {

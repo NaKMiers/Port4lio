@@ -312,3 +312,82 @@
 .portfolio-public-root:has([data-plain]) .pp-decorations {
   display: none;
 }
+
+/* ---------------------------------------------------------------------------
+   Blog prose
+
+   Styles for `bodyHtml` - markdown the pipeline rendered at save time. Scoped to
+   `.blog-prose` rather than written as bare element selectors, because this is the only
+   place on the site where a block of HTML arrives already-shaped and needs typography
+   applied to tags rather than to classes.
+
+   No typography plugin. The tag list a post actually uses is short and known, and the
+   plugin's opinions would then need overriding back to `--pp-*` one at a time - which is
+   more CSS than this, plus a dependency.
+
+   `pre` deliberately sets no colour. Shiki writes inline `style` on every token span, and
+   those survive because the pipeline runs it AFTER sanitize; a colour here would either be
+   overridden invisibly or fight it.
+   --------------------------------------------------------------------------- */
+.blog-prose {
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: var(--pp-text);
+}
+.blog-prose > * + * { margin-top: 1.15em; }
+.blog-prose h2 {
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 2.2em;
+  line-height: 1.3;
+}
+.blog-prose h3 {
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 1.8em;
+}
+.blog-prose a { color: var(--pp-blue); text-underline-offset: 2px; }
+.blog-prose ul, .blog-prose ol { padding-left: 1.4em; }
+.blog-prose ul { list-style: disc; }
+.blog-prose ol { list-style: decimal; }
+.blog-prose li + li { margin-top: 0.4em; }
+.blog-prose blockquote {
+  border-left: 3px solid var(--pp-line);
+  padding-left: 1em;
+  color: var(--pp-muted);
+}
+.blog-prose code {
+  font-size: 0.9em;
+  background: var(--pp-panel);
+  border: 1px solid var(--pp-line);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+}
+.blog-prose pre {
+  overflow-x: auto;
+  padding: 1em 1.1em;
+  border-radius: 12px;
+  border: 1px solid var(--pp-line);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+/* The inner `code` must not re-apply the inline-code chrome inside a highlighted block. */
+.blog-prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+.blog-prose img { max-width: 100%; height: auto; border-radius: 12px; }
+.blog-prose table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.blog-prose th, .blog-prose td {
+  border: 1px solid var(--pp-line);
+  padding: 0.5em 0.7em;
+  text-align: left;
+}
+.blog-prose hr { border: 0; border-top: 1px solid var(--pp-line); margin: 2.5em 0; }
+/* GFM task lists: the checkbox is decorative here, the text carries the meaning. */
+.blog-prose input[type='checkbox'] { margin-right: 0.5em; }
+.blog-prose .footnotes { font-size: 0.9rem; color: var(--pp-muted); }
