@@ -51,7 +51,7 @@ import { compileModel } from '@/lib/mongoose-model'
  * It is not an omission. A contact message is correspondence: someone deliberately wrote to
  * a person and is waiting for a reply, and a conversation that resumes four months later is
  * normal rather than exceptional. Expiring it would delete the owner's own inbox on a timer.
- * `tests/api/contact-retention.test.ts` asserts the absence so that nobody restores
+ * `tests/api/contact.test.ts` asserts the absence so that nobody restores
  * symmetry with the collections this is deliberately not symmetric with.
  *
  * What makes that defensible rather than negligent is disclosure plus an exit: the privacy
