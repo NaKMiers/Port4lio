@@ -1,7 +1,7 @@
 import type { Locale } from '@/lib/i18n'
 
 /**
- * Every user-facing string on `/ccaf`, in both languages.
+ * Every user-facing string on `/admin/ccaf`, in both languages.
  *
  * ## Why this page is bilingual when the rest of `(me)` is not
  *
@@ -12,8 +12,8 @@ import type { Locale } from '@/lib/i18n'
  *
  * `Locale`, `LOCALES` and `LOCALE_LABELS` are reused from `lib/i18n` rather than redeclared
  * - a second `'vi' | 'en'` union that could drift from the first is worth nobody's time -
- * but `swapLocale` is not, because these URLs are `/ccaf` and `/ccaf/en` rather than the
- * `/[lang]/product` shape that function assumes. See the route comment for why.
+ * but `swapLocale` is not, because these URLs are `/admin/ccaf` and `/admin/ccaf/en` rather
+ * than the `/[lang]/product` shape that function assumes. See the route comment for why.
  *
  * ## Why both languages ship to the browser
  *

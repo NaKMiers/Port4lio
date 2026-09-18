@@ -40,3 +40,7 @@ next-env.d.ts
 .prompts
 .gstack/
 package-lock.json
+
+# The e2e suite signs a real owner cookie into here during global setup. It is a valid
+# credential for /admin and every blog handler, with a 30-day expiry - never commit it.
+tests/e2e/.auth/

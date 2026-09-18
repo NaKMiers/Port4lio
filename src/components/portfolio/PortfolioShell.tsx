@@ -1,6 +1,7 @@
 import type { PublicPortfolioViewModel } from '@/lib/profile-view-model'
 import type { Profile } from '@/types/profile'
 
+import WritingTeaser from '@/components/blog/WritingTeaser'
 import FloatingSectionNav from './FloatingSectionNav'
 import PortfolioBackdropOrnaments from './PortfolioBackdropOrnaments'
 import PortfolioSectionScrollTarget from './PortfolioSectionScrollTarget'
@@ -37,6 +38,16 @@ export default function PortfolioShell({ profile, viewModel }: PortfolioShellPro
         <FeaturedProjectsSection featured={viewModel.featuredProjects} />
         <ProjectCatalogSection catalog={viewModel.projectCatalog} />
         <TrustSection trust={viewModel.trust} />
+        {/*
+          Directly above the contact form, and that placement is the whole point. A reader
+          who has scrolled this far is deciding whether to get in touch; three post titles
+          are the last piece of evidence before the ask, and they are the only evidence on
+          this page that shows the work rather than describing it. Renders nothing until
+          there is a published post - see WritingTeaser.
+        */}
+        <div className='mx-auto w-full max-w-editorial px-gutter'>
+          <WritingTeaser />
+        </div>
         <ContactSection profile={profile} />
         <FooterSection profile={profile} />
       </main>

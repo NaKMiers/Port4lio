@@ -67,7 +67,15 @@ export default function PublishBoard() {
     }
   }
 
-  if (loading) return <SettingLoading />
+  // Said "Loading profile..." until SettingLoading took props. This board loads publish
+  // state, not a profile, and had been telling the owner otherwise since it shipped.
+  if (loading)
+    return (
+      <SettingLoading
+        title='Loading publish state...'
+        subtitle='Checking which targets are in sync with the current profile.'
+      />
+    )
 
   const targets = manifest ? manifest.targetOrder.map(id => manifest.targets[id]) : []
   const behind = targets.filter(target => !target.drift.inSync).length
@@ -102,10 +110,10 @@ export default function PublishBoard() {
 
           <div className='flex flex-wrap items-center gap-2.5 lg:justify-end'>
             {/* The three owner surfaces reach each other from any of them. */}
-            <Link className={secondaryBtnCls} href='/metrics'>
+            <Link className={secondaryBtnCls} href='/admin/metrics'>
               Metrics
             </Link>
-            <Link className={secondaryBtnCls} href='/settings'>
+            <Link className={secondaryBtnCls} href='/admin/settings'>
               Edit profile
             </Link>
             <button type='button' className={primaryBtnCls} onClick={() => void load(true)}>

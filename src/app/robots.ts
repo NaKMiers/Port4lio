@@ -19,14 +19,22 @@ import { resolveSiteOrigin } from '@/lib/seo'
  * an IQ result, certificate or verification URL IS its credential in precisely the same
  * way, and `sitemap.ts` already says so in its own exclusion notes.
  *
- * `/metrics` joins `/settings` and `/publish` for the same reason - it is an admin surface,
- * and it was the only one of the three without a rule.
+ * ## One admin rule, because there is now one admin namespace
  *
- * ## `/ccaf` moved behind the gate
+ * This file used to carry eight admin lines: `/settings`, `/publish`, `/metrics`, `/ccaf`
+ * and each of their trailing-slash twins. `/metrics` in particular had to be added later,
+ * because it was an admin surface that shipped without a rule - the same omission as the IQ
+ * paths above, one section later, which is what a list of individually-remembered routes
+ * costs when nobody revisits it.
  *
- * The CCA-F study plan shipped as a public page and was in the sitemap. It is owner-only
- * now, so it joins the same list. `/ccaf/` covers the English twin at `/ccaf/en` without a
- * second entry, and the bare `/ccaf` covers the Vietnamese original.
+ * `/settings`, `/publish`, `/metrics` and `/ccaf` now live under `/admin` (D6), so
+ * `/admin` + `/admin/` covers all four, the CCA-F English twin at `/admin/ccaf/en`, and the
+ * blog board that has not been written yet. The next owner surface is disallowed the moment
+ * it is created rather than the moment somebody notices.
+ *
+ * No redirects from the old paths. They were `noindex` and disallowed, so nothing external
+ * links to them and no crawler holds them; the only reader was a bookmark the owner can
+ * re-make.
  *
  * Kept as explicit per-product entries rather than collapsing to `/*&#47;iq/`: the IQ
  * landing, `/iq/method` and `/iq/privacy` are all in the sitemap and MUST stay crawlable,
@@ -40,14 +48,9 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
       disallow: [
-        '/settings',
-        '/settings/',
-        '/publish',
-        '/publish/',
-        '/metrics',
-        '/metrics/',
-        '/ccaf',
-        '/ccaf/',
+        // One namespace, one rule. See the header - this replaced eight lines.
+        '/admin',
+        '/admin/',
         '/api/',
         // Every locale, without enumerating them: `/vi/mbti/result/...`, `/en/...`.
         '/*/mbti/result/',

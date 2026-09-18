@@ -12,6 +12,7 @@ import type { Locale } from '@/lib/i18n'
  *     ├── PortfolioBackdropOrnaments  (shared, decorative, out of flow)
  *     ├── header  [• brand]                        [VI|EN]
  *     ├── div.grow      {children}    ← eats the leftover height
+ *     ├── {footerSlot}                ← OPTIONAL. Omitted entirely when undefined.
  *     └── footer            [privacy]
  * ```
  *
@@ -61,6 +62,40 @@ import type { Locale } from '@/lib/i18n'
  *
  * The header is sticky: both tests are long, and a language toggle that scrolls away is one
  * someone has to hunt for mid-test.
+ *
+ * ## `footerSlot`: why it is opt-in, and never a default
+ *
+ * It exists to carry `AvailabilityBlock` - a "here is who built this and he is open to
+ * work" panel - above the privacy footer. It is optional, and the default must stay
+ * "nothing", for one reason that is not about taste:
+ *
+ * ```
+ *   /vi/mbti           ✓ block     someone browsing
+ *   /vi/mbti/enfj      ✓ block     someone reading a result they can link to
+ *   /vi/mbti/result/x  ✓ block     someone who just finished
+ *   /vi/mbti/test      ✗ NOTHING   someone 30 questions into a questionnaire
+ *   /vi/iq/test        ✗ NOTHING   someone on a 24-minute clock
+ * ```
+ *
+ * Interrupting a questionnaire with a hire-me pitch is the specific failure this placement
+ * exists to prevent. A visitor mid-test has not agreed to hear anything, the IQ test is
+ * timed, and the block's own call to action navigates *away from the site* - so on the test
+ * page it is not merely noise, it is an exit next to the answer buttons.
+ *
+ * A default would put it there. Every page that wants it says so, and the two that must not
+ * have it get it by *not asking* rather than by remembering to suppress it - which is the
+ * whole difference, because suppression is the thing a new page silently forgets.
+ *
+ * The opt-in is expressed in the route tree rather than in the pages, because a page cannot
+ * pass a prop to its own layout and this shell is rendered by one. Each product is split
+ * into `(pitch)` and `(plain)` route groups, each with its own layout, and the group a page
+ * lives in IS the decision - see `(choice)/[lang]/mbti/(pitch)/layout.tsx`. Route groups add
+ * no path segment, so no URL changed when this landed.
+ *
+ * `tests/unit/test-chrome-footer-slot.test.tsx` asserts the rendered markup is
+ * byte-identical when the prop is undefined. This shell wraps 12 page types across 2
+ * locales, all of them serving real traffic, so "adding an optional prop changed nothing"
+ * needs to be a measurement rather than an expectation.
  */
 export default function TestChrome({
   locale,
@@ -69,6 +104,7 @@ export default function TestChrome({
   privacyLabel,
   nav,
   activeProduct,
+  footerSlot,
   children,
 }: {
   locale: Locale
@@ -79,6 +115,11 @@ export default function TestChrome({
   /** The sibling tests, in display order. */
   nav: { key: string; label: string; href: string }[]
   activeProduct: string
+  /**
+   * Rendered between the content and the privacy footer, when given. Read the header
+   * section above before making this default to anything.
+   */
+  footerSlot?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
@@ -137,6 +178,18 @@ export default function TestChrome({
       </header>
 
       <div className='grow'>{children}</div>
+
+      {/*
+        Outside `.grow`, so it sits at the true bottom of a short page rather than being
+        pushed down by the growing wrapper - and above the privacy footer, so the last thing
+        on the page is still the privacy link and not a pitch.
+
+        Bare `{footerSlot}`: `undefined` renders as nothing at all, with no marker and no
+        wrapper element, which is what makes the byte-identical assertion hold. Wrapping
+        this in a `<div>` "for spacing" would break that, and the slot's own content carries
+        its border and padding for exactly that reason.
+      */}
+      {footerSlot}
 
       <footer className='border-t border-pp-line'>
         <div className='mx-auto flex w-full max-w-editorial items-center justify-center px-gutter py-8 text-sm'>

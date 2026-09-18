@@ -175,6 +175,88 @@ export const CCAF_SAVE_LIMIT: RateLimitOptions = {
   windowSeconds: 60,
 }
 
+/**
+ * The contact form. The tightest bucket here, and the window is an hour rather than a
+ * minute.
+ *
+ * Every other bucket protects a database. This one protects a *mailbox*: each accepted
+ * submission sends a message with a visitor-controlled subject, body and `replyTo` from the
+ * site's own Gmail account. The failure mode is not a large collection, it is the owner's
+ * inbox buried under a relayed spam run and the sending account suspended for it - and
+ * Gmail's own daily quota is the only thing behind this.
+ *
+ * Three per hour, because a real person sends one. Two if they realise they typoed their
+ * email, and three is already generous for the third attempt nobody makes. A minute-long
+ * window would be useless here: a script sending one message a minute for a day stays under
+ * every limit above and still delivers 1440 emails.
+ *
+ * This is NOT the only bound on the mail path, and it must not be treated as one.
+ * `checkRateLimit` fails open on a missing client IP and fails open on a Mongo error, so
+ * both of the failure modes that make this bucket matter most are also the ones that switch
+ * it off. `api/contact/route.ts` carries a second, process-local ceiling for exactly that
+ * reason - see `claimMailBudget` there.
+ */
+/**
+ * The blog editor's autosave, modelled on `CCAF_SAVE_LIMIT` above.
+ *
+ * Owner-only, so this is not an abuse control - `requireOwner` already refused everyone else
+ * before the limiter is reached. What it bounds is our own editor misbehaving: a debounce
+ * that stops debouncing, a retry loop on a failing save, a second tab left open on the same
+ * draft. Each PATCH re-renders the markdown through Shiki and writes `bodyHtml`, so a runaway
+ * client is not a cheap no-op write, it is real CPU per request.
+ *
+ * Generous on purpose. A person typing produces a save every few seconds at most, and 60 in
+ * a minute is far above anything a human can cause, so a 429 here means something is broken
+ * rather than someone being productive.
+ */
+/**
+ * The public blog beacon. Anonymous, unauthenticated, and writing to Mongo.
+ *
+ * `api/event` - the test beacon - carries three volume controls and the first draft of this
+ * feature copied only its two input-bounding rules. That gap is what this closes: without a
+ * bucket, `POST /api/blog/event` is an unthrottled anonymous write, and the only thing
+ * standing between it and an arbitrarily large collection is how fast a script can loop.
+ *
+ * 60 a minute is generous for a real reader, who fires one `view` per post and occasionally a
+ * `share`. It is not generous for a script, and it is the only bound on the number the admin
+ * board calls "unique readers" - which is why that number is documented as advisory rather
+ * than as evidence. `sessionId` is client-chosen, so a determined caller can still spread
+ * across sessions inside this limit; the kill criterion deliberately reads
+ * `ContactMessage.sourceSlug` instead, which needs a human to have written a sentence.
+ */
+/**
+ * Subscribing. Tight for the same reason `CONTACT_LIMIT` is: it sends mail.
+ *
+ * Each accepted submission emails a confirmation to an address the submitter typed, which
+ * means an unthrottled endpoint is a way to send our mail to somebody else's inbox - the
+ * classic double-opt-in abuse, where the confirmation email itself becomes the payload.
+ * Three an hour per IP, and the unique index on email means a repeat for an address already
+ * on the list does not send anything at all.
+ */
+export const SUBSCRIBE_LIMIT: RateLimitOptions = {
+  route: 'blog-subscribe',
+  limit: 3,
+  windowSeconds: 60 * 60,
+}
+
+export const BLOG_EVENT_LIMIT: RateLimitOptions = {
+  route: 'blog-event',
+  limit: 60,
+  windowSeconds: 60,
+}
+
+export const BLOG_SAVE_LIMIT: RateLimitOptions = {
+  route: 'blog-save',
+  limit: 60,
+  windowSeconds: 60,
+}
+
+export const CONTACT_LIMIT: RateLimitOptions = {
+  route: 'contact',
+  limit: 3,
+  windowSeconds: 60 * 60,
+}
+
 /*
  * IQ checkout has no limit of its own: `/api/iq/checkout` uses `CHECKOUT_LIMIT` above.
  *

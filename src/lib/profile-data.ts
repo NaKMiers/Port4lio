@@ -44,6 +44,26 @@ async function loadPublicProfileUncached(): Promise<PublicProfile> {
   return toPublicProfile(normalizeProfile(doc))
 }
 
+/**
+ * The uncached read, exported for the blog and for nothing else.
+ *
+ * D3 forbids `unstable_cache` in the blog read path, so `loadPublicProfile` below cannot be
+ * used there. That is not a performance objection - it is that the blog's freshness story is
+ * route-segment ISR plus `revalidatePath` with a literal path, and `revalidatePath` does not
+ * touch an `unstable_cache` entry. A post page reading through that cache could clear its ISR
+ * shell and still render a stale author name, with nothing to invalidate it but a timer.
+ *
+ * The blog needs this at all because its JSON-LD must carry a full inline `Person` node:
+ * `personEntityId()` returns only a string `@id`, and the node itself is built once in
+ * `buildPortfolioJsonLdGraph` and rendered only under `(me)`. A post emitting a bare `@id`
+ * reference would emit an `author` with no `name` - a required property - so every post
+ * needs the real fields.
+ *
+ * The cost is one indexed read of a singleton document per post render, and post pages are
+ * ISR-cached for 300 seconds, so it is one read per post per five minutes.
+ */
+export { loadPublicProfileUncached }
+
 export const loadPublicProfile = unstable_cache(loadPublicProfileUncached, ['public-profile'], {
   revalidate: PUBLIC_PROFILE_REVALIDATE_SECONDS,
   tags: [PUBLIC_PROFILE_CACHE_TAG],

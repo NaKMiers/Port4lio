@@ -46,7 +46,9 @@ export const uploadInputCls =
 
 export async function uploadAssetToCloudinary(
   file: File,
-  kind: 'avatar' | 'background' | 'cv' | 'cv-photo' | 'project',
+  // `post` added for the blog editor's inline image upload. The route constrains this kind
+  // to a raster-image MIME allowlist, unlike the other five - see `api/upload/route.ts`.
+  kind: 'avatar' | 'background' | 'cv' | 'cv-photo' | 'project' | 'post',
   projectIndex?: number
 ): Promise<string> {
   if (file.size > MAX_UPLOAD_BYTES) {

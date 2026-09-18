@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+import { jsonError } from '@/lib/api-response'
 import { connectDatabase } from '@/lib/mongodb'
 import { isPublishRequestAuthorized } from '@/lib/publish/auth'
 import { isPublishTargetId } from '@/lib/publish/types'
+import { PUBLISH_ACK_MAX_BODY_BYTES, readJsonBody } from '@/lib/read-json-body'
 import { PUBLISH_STATE_DOCUMENT_ID, PublishStateModel } from '@/models/PublishState'
 
 export const runtime = 'nodejs'
@@ -18,32 +20,49 @@ const ALLOWED_RESULTS = new Set(['applied', 'unchanged', 'failed'])
  * The caller sends the exact version string it displayed - never a `current` sentinel.
  * If the profile changed between page load and click, this stores what was really pasted
  * and the badge goes back to showing drift, which is the honest outcome.
+ *
+ * ## Why the parse moved into `readJsonBody`
+ *
+ * The `await request.json()` this replaces did not escape the handler - it landed in the
+ * catch below, which returned the exception's own `message` with a 500. So a malformed body
+ * produced a server error whose text was a slice of whatever the caller had posted, echoed
+ * back. That is the shape `api-response.ts` warns about in its header: an exception's raw
+ * text is not a message meant for a caller, and the next exception to reach that path may
+ * not be a parser error at all. Malformed JSON is a 400 now, with a fixed string, and the
+ * catch no longer speaks for it.
  */
 export async function POST(request: NextRequest) {
   try {
     if (!isPublishRequestAuthorized(request)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return jsonError('Unauthorized', 401)
     }
 
     const contentType = request.headers.get('content-type') ?? ''
     if (!contentType.includes('application/json')) {
-      return NextResponse.json({ error: 'Expected Content-Type: application/json' }, { status: 415 })
+      return jsonError('Expected Content-Type: application/json', 415)
     }
 
-    const body = (await request.json()) as Record<string, unknown>
+    const parsed = await readJsonBody<Record<string, unknown>>(request, {
+      maxBytes: PUBLISH_ACK_MAX_BODY_BYTES,
+    })
+    if (!parsed.ok) {
+      return jsonError(parsed.error, parsed.status)
+    }
+
+    const body = parsed.body ?? {}
     const target = body.target
     const version = typeof body.version === 'string' ? body.version : ''
     const result = typeof body.result === 'string' ? body.result : ''
     const detail = typeof body.detail === 'string' ? body.detail.slice(0, 500) : ''
 
     if (!isPublishTargetId(target)) {
-      return NextResponse.json({ error: 'Unknown publish target' }, { status: 400 })
+      return jsonError('Unknown publish target', 400)
     }
     if (!HEX_64.test(version)) {
-      return NextResponse.json({ error: 'Version must be a sha256 hex digest' }, { status: 400 })
+      return jsonError('Version must be a sha256 hex digest', 400)
     }
     if (result && !ALLOWED_RESULTS.has(result)) {
-      return NextResponse.json({ error: 'Unknown result' }, { status: 400 })
+      return jsonError('Unknown result', 400)
     }
 
     const now = new Date()
@@ -71,7 +90,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, target, acked: result !== 'failed' })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown server error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    // Logged in full, reported as a fixed string. What reaches this now is a database
+    // failure rather than a parse failure, and a Mongoose error message can carry the
+    // connection string it was trying to use.
+    console.error('[api/publish/ack] failed', error)
+    return jsonError('Unable to record the publish right now.', 500)
   }
 }

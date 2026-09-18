@@ -159,19 +159,37 @@ export function renderOtpEmail({
   }
 }
 
-/** The contact-form notification. Every field here is anonymous visitor input. */
+/**
+ * The contact-form notification. Every field here is anonymous visitor input.
+ *
+ * `sourceSlug` and `heardAbout` are the attribution fields, and they are the reason this
+ * signature takes optionals rather than growing two required strings: the portfolio form at
+ * `/` sends neither, and a post page sends only the first. When both are absent the output
+ * is byte-identical to what this rendered before they existed.
+ *
+ * They are escaped like everything else. `heardAbout` in particular is free text a stranger
+ * typed - it is the one field with no charset constraint anywhere in the stack, so it is the
+ * one most likely to carry markup, and it is being interpolated into HTML that lands in the
+ * owner's own mail client.
+ */
 export function renderContactEmail({
   email,
   firstname,
   lastname,
   subject,
   message,
+  sourceSlug,
+  heardAbout,
 }: {
   email: string
   firstname: string
   lastname: string
   subject: string
   message: string
+  /** The blog post the reader came from, when there was one. */
+  sourceSlug?: string | null
+  /** What the visitor typed into "How did you hear about me?". */
+  heardAbout?: string | null
 }): RenderedEmail {
   const fullName = `${firstname} ${lastname}`.trim()
 
@@ -183,10 +201,20 @@ export function renderContactEmail({
                   <td style="padding:0 0 16px 0; font-size:15px; color:${COLOR.text};">${valueHtml}</td>
                 </tr>`
 
+  // Only rendered when present, so the portfolio form's email does not grow two empty rows
+  // that say nothing. Reading "Heard about: -" on every message trains the eye to skip the
+  // line, which loses the one message where it is filled in.
+  const attributionHtml = [
+    sourceSlug ? row('Came from', `<code>/blog/${escapeHtml(sourceSlug)}</code>`) : '',
+    heardAbout ? row('Heard about me via', escapeHtmlMultiline(heardAbout)) : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
   const bodyHtml = `              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="font-family:${FONT};">
 ${row('From', escapeHtml(fullName) || '<span style="color:' + COLOR.muted + ';">(no name given)</span>')}
 ${row('Reply to', `<a href="mailto:${escapeHtml(email)}" style="color:${COLOR.accent}; text-decoration:none;">${escapeHtml(email)}</a>`)}
-${row('Subject', escapeHtml(subject))}
+${row('Subject', escapeHtml(subject))}${attributionHtml ? `\n${attributionHtml}` : ''}
               </table>
               <div style="padding:16px 18px; background-color:${COLOR.codeBg}; border:1px solid ${COLOR.line}; border-radius:12px; font-size:15px; line-height:1.65; color:${COLOR.text}; white-space:normal; word-break:break-word;">${escapeHtmlMultiline(message)}</div>
               <p style="margin:18px 0 0 0; color:${COLOR.muted}; font-size:13px;">Hit reply to answer ${escapeHtml(fullName) || 'them'} directly &mdash; this message is addressed back to the sender.</p>`
@@ -197,6 +225,8 @@ ${row('Subject', escapeHtml(subject))}
     `From: ${fullName || '(no name given)'}`,
     `Reply to: ${email}`,
     `Subject: ${subject}`,
+    ...(sourceSlug ? [`Came from: /blog/${sourceSlug}`] : []),
+    ...(heardAbout ? [`Heard about me via: ${heardAbout}`] : []),
     '',
     message,
   ].join('\n')
@@ -209,6 +239,59 @@ ${row('Subject', escapeHtml(subject))}
       preheader: `${fullName || email}: ${subject}`,
       eyebrow: 'Contact form',
       heading: 'New message from your portfolio',
+      bodyHtml,
+    }),
+    text,
+  }
+}
+
+/**
+ * The double opt-in confirmation.
+ *
+ * ## Why it says what the person is agreeing to, in the email itself
+ *
+ * The whole point of confirming is that the address might have been typed by somebody else.
+ * So this email has to be readable by a person who did NOT sign up and does not know what
+ * this site is: it names the site, says what arrives and how often, and makes ignoring it the
+ * action that results in nothing happening.
+ *
+ * There is no unsubscribe link, deliberately. A pending row is on no list, so an unsubscribe
+ * would be unsubscribing from nothing - and offering one implies they are already subscribed,
+ * which is exactly the impression double opt-in exists to avoid.
+ */
+export function renderSubscribeConfirmEmail({ confirmUrl }: { confirmUrl: string }): RenderedEmail {
+  const bodyHtml = `              <p style="margin:0 0 14px 0; font-size:15px; line-height:1.65; color:${COLOR.text};">
+                Somebody - hopefully you - asked to be told when a new post goes up on
+                ${escapeHtml(siteLabel())}. That is a handful of write-ups a year on things I
+                measured while shipping side projects. Nothing else, ever.
+              </p>
+              <p style="margin:0 0 20px 0; font-size:15px; line-height:1.65; color:${COLOR.text};">
+                Confirm and you are on the list. <strong>Ignore this and nothing happens</strong> -
+                you are not subscribed until you click, and I will not email you again.
+              </p>
+              <p style="margin:0 0 18px 0;">
+                <a href="${escapeHtml(confirmUrl)}" style="display:inline-block; padding:12px 22px; border-radius:999px; background-color:${COLOR.text}; color:#ffffff; font-weight:600; font-size:15px; text-decoration:none;">Yes, sign me up</a>
+              </p>
+              <p style="margin:0; color:${COLOR.muted}; font-size:13px; line-height:1.6;">
+                If the button does not work, paste this into your browser:<br />
+                <span style="word-break:break-all;">${escapeHtml(confirmUrl)}</span>
+              </p>`
+
+  const text = [
+    `Somebody - hopefully you - asked to be told when a new post goes up on ${siteLabel()}.`,
+    '',
+    'Confirm here:',
+    confirmUrl,
+    '',
+    'Ignore this and nothing happens. You are not subscribed until you click.',
+  ].join('\n')
+
+  return {
+    subject: 'Confirm your subscription',
+    html: shell({
+      preheader: 'Confirm and you are on the list. Ignore this and nothing happens.',
+      eyebrow: 'Subscribe',
+      heading: 'One click to confirm',
       bodyHtml,
     }),
     text,

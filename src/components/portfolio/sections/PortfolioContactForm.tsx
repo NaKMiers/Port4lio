@@ -13,13 +13,32 @@ const labelCls = 'block text-[11px] font-semibold uppercase tracking-[0.14em] te
 
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'success' } | { kind: 'error'; message: string }
 
-/** Submits JSON to `POST /api/contact` - fields must match the App Router handler. */
+/**
+ * Submits JSON to `POST /api/contact` - fields must match the App Router handler.
+ *
+ * ## Why "How did you hear about me?" is here, and visible
+ *
+ * It is the highest-information line of UI on this page, for a reason that is not obvious:
+ * the blog measures itself with two different instruments, and this is the only one that can
+ * catch the case the whole thing exists for.
+ *
+ * `sourceSlug` is the other instrument, and it only fires when the person who read a post
+ * fills in the form themselves. But the actual claim is *referral* - a third person, weeks
+ * later, who never saw the post and was told about it by someone who did. That person
+ * arrives at `/`, not at a post, so there is no slug to attach and no automated field that
+ * could ever record them. A sentence they typed is the only trace such a visit can leave.
+ *
+ * Optional, and left optional forever: the handler accepts a submission with this blank, and
+ * a regression test asserts that it does. Making it required would trade the messages of
+ * everyone who does not want to answer for the attribution of the few who do.
+ */
 export default function PortfolioContactForm() {
   const [email, setEmail] = useState('')
   const [firstname, setFirstname] = useState('')
   const [lastname, setLastname] = useState('')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
+  const [heardAbout, setHeardAbout] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -36,6 +55,11 @@ export default function PortfolioContactForm() {
           lastname: lastname.trim(),
           subject: subject.trim(),
           message: message.trim(),
+          // Omitted entirely when blank rather than sent as `''`. The handler treats an
+          // empty string as absent anyway, but a key that is only present when it carries
+          // something keeps "nobody answered" and "answered with nothing" distinguishable
+          // if that distinction ever matters.
+          ...(heardAbout.trim() ? { heardAbout: heardAbout.trim() } : {}),
         }),
       })
       const data = (await res.json()) as { ok?: boolean; error?: string }
@@ -54,6 +78,7 @@ export default function PortfolioContactForm() {
       setLastname('')
       setSubject('')
       setMessage('')
+      setHeardAbout('')
     } catch {
       setStatus({
         kind: 'error',
@@ -154,6 +179,34 @@ export default function PortfolioContactForm() {
           />
         </div>
 
+        <div className='space-y-1.5'>
+          <label className={labelCls} htmlFor='contact-heard-about'>
+            How did you hear about me?
+          </label>
+          <input
+            id='contact-heard-about'
+            name='heardAbout'
+            type='text'
+            disabled={disabled}
+            value={heardAbout}
+            onChange={e => setHeardAbout(e.target.value)}
+            className={fieldCls}
+            // A literal ellipsis, not `&hellip;`. JSX does not decode entities inside an
+            // attribute string, so the escape would render as six visible characters -
+            // which is why the message field above already uses the character itself.
+            placeholder='A blog post, a friend, a search… (optional)'
+            maxLength={200}
+          />
+          {/*
+            No `required`, and the placeholder says "optional" rather than a separate hint
+            line. The other four labels carry no hint, so one that did would read as a
+            warning about this field instead of permission to skip it.
+
+            `maxLength` mirrors the handler's own cap, which rejects with a 400 naming the
+            field. Both exist: the attribute stops an accident, the server stops a `curl`.
+          */}
+        </div>
+
         {status.kind === 'error' ? (
           <p
             role='alert'
@@ -171,6 +224,30 @@ export default function PortfolioContactForm() {
             Thanks - your message was sent. I will get back to you when I can.
           </p>
         ) : null}
+
+        {/*
+          The storage notice, and it is here because nothing else on this surface says it.
+
+          `/` has no privacy page - the only two on this site are `/[lang]/mbti/privacy` and
+          `/[lang]/iq/privacy`, and both describe the tests. This form now writes a
+          `ContactMessage` that has no TTL index on purpose, so what a stranger types here
+          is kept until somebody deletes it, and until this line existed they were never
+          told. That gap widened the moment `AvailabilityBlock` started routing test-takers
+          here from pages whose own notice opens by promising it lists everything stored.
+
+          Deliberately not a checkbox and not a consent gate. They are already typing a
+          message to a person, which is the thing being consented to; a gate would suppress
+          messages to solve a disclosure problem. One sentence they can read before they
+          send is the honest version.
+
+          The delete route is an email address rather than a form because the owner board
+          and its delete action are Phase 1. When those ship, this sentence is the thing to
+          update - it is the promise the board has to keep.
+        */}
+        <p className='text-xs leading-relaxed text-pp-muted'>
+          Your message is stored so it survives an email outage, and kept until I delete it.
+          Nothing here is shared with anyone. Ask me to delete it any time and I will.
+        </p>
 
         <div className='flex flex-wrap items-center gap-4 pt-1'>
           <button
