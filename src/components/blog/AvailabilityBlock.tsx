@@ -6,12 +6,14 @@ import type { Locale } from '@/lib/i18n'
  * Who made this, and that he is open to work.
  *
  * ```
- *   ┌──────────────────────────────────────────────────────┐
- *   │  BUILT BY                              ← eyebrow     │
- *   │  Anh Khoa Nguyen · Full stack developer              │
- *   │  <one line on what he is open to>                    │
- *   │  [ Get in touch → ]        [ See the portfolio ]     │
- *   └──────────────────────────────────────────────────────┘
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │  BUILT BY                                        ← eyebrow     │
+ *   │  Anh Khoa Nguyen · Full stack developer                        │
+ *   │  <one line on what he is open to>                              │
+ *   │  [ Get in touch → ]  [ See the portfolio ]  [ Write-ups ]      │
+ *   └────────────────────────────────────────────────────────────────┘
+ *                  ↓                  ↓                  ↓
+ *              /#contact              /                /blog
  * ```
  *
  * ## Why this exists
@@ -45,7 +47,7 @@ import type { Locale } from '@/lib/i18n'
 
 const COPY: Record<
   Locale,
-  { eyebrow: string; role: string; open: string; contact: string; portfolio: string }
+  { eyebrow: string; role: string; open: string; contact: string; portfolio: string; writing: string }
 > = {
   vi: {
     eyebrow: 'Người làm trang này',
@@ -53,6 +55,10 @@ const COPY: Record<
     open: 'Mình tự viết cả hai bài test trên trang này. Nếu bạn muốn trao đổi về một dự án, hoặc chỉ tò mò nó được làm thế nào, cứ nhắn cho mình.',
     contact: 'Liên hệ',
     portfolio: 'Xem portfolio',
+    // Labelled as English, not silently linked. The blog is English-only (D7) and most of
+    // this locale's traffic is Vietnamese, so an unmarked link would send a reader to a page
+    // they cannot read and teach them that links here waste their time.
+    writing: 'Bài viết kỹ thuật (tiếng Anh)',
   },
   en: {
     eyebrow: 'Built by',
@@ -60,6 +66,7 @@ const COPY: Record<
     open: 'I built both of the tests on this site. I am open to full stack work - contract or full time - and happy to talk about how any of this was put together.',
     contact: 'Get in touch',
     portfolio: 'See the portfolio',
+    writing: 'Read the write-ups',
   },
 }
 
@@ -112,6 +119,18 @@ export default function AvailabilityBlock({ locale }: { locale: Locale }) {
             className='inline-flex min-h-[44px] items-center rounded-full border border-pp-line px-6 py-2.5 font-display text-sm font-semibold text-pp-text no-underline transition-colors hover:border-pp-blue/40'
           >
             {copy.portfolio}
+          </Link>
+          {/*
+            Into the blog. The MBTI and IQ pages are the only channel on this site already
+            carrying volume, so without this link the blog's only inbound traffic is whatever
+            a cross-post sends - and a blog nobody reaches goes quiet, which is the modal
+            failure across the 27 sites reviewed for this feature.
+          */}
+          <Link
+            href='/blog'
+            className='inline-flex min-h-[44px] items-center rounded-full border border-pp-line px-6 py-2.5 font-display text-sm font-semibold text-pp-text no-underline transition-colors hover:border-pp-blue/40'
+          >
+            {copy.writing}
           </Link>
         </div>
       </div>

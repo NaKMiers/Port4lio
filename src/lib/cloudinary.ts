@@ -20,7 +20,26 @@ export type UploadedAsset = {
   publicId?: string
 }
 
-export async function uploadToCloudinary(file: File, folder: string): Promise<UploadedAsset> {
+/**
+ * `resource_type`, and why `'auto'` was the wrong default once the blog existed.
+ *
+ * `'auto'` tells Cloudinary to sniff the file and store it as whatever it looks like -
+ * including `raw`, which accepts anything at all. That was survivable while every upload
+ * was an avatar or a CV chosen by the owner through a file picker. It stopped being
+ * survivable when the markdown pipeline started trusting `res.cloudinary.com`
+ * unconditionally as the ONE host a post may load images from.
+ *
+ * Under `'auto'`, an SVG or an HTML file uploaded through the editor comes back as a
+ * `res.cloudinary.com` URL. SVG is a scripting format - `<svg><script>` executes when the
+ * file is navigated to directly - and it would be served from the exact origin the image
+ * allowlist exists to vouch for. `'image'` makes Cloudinary reject anything that is not a
+ * raster image at the door, which is the constraint the allowlist was assuming all along.
+ */
+export async function uploadToCloudinary(
+  file: File,
+  folder: string,
+  resourceType: 'image' | 'auto' = 'image'
+): Promise<UploadedAsset> {
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error('Missing Cloudinary env vars')
   }
@@ -37,7 +56,7 @@ export async function uploadToCloudinary(file: File, folder: string): Promise<Up
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder,
-        resource_type: 'auto',
+        resource_type: resourceType,
         public_id: undefined,
       },
       (error, result) => {
