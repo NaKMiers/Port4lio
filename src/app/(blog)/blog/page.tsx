@@ -6,7 +6,7 @@ import PostCard from '@/components/blog/PostCard'
 import { listPublishedPosts, type PostListItem } from '@/lib/blog/post-data'
 import { buildBlogIndexMetadata } from '@/lib/blog/seo'
 import { resolveSiteOrigin } from '@/lib/seo'
-import { POST_SERIES, type PostSeries } from '@/models/Post'
+import { POST_SERIES, type PostSeries } from '@/lib/blog/constants'
 
 /**
  * `/blog` - the index, and the hub the clusters hang off.

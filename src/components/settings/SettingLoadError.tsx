@@ -3,7 +3,13 @@ import React from 'react'
 import { secondaryBtnCls } from '@/components/settings/settings-utils'
 
 /**
- * The failure counterpart to `SettingLoading`.
+ * The failure counterpart to `SettingLoading` - no longer a symmetric one.
+ *
+ * `SettingLoading` takes `title`/`subtitle` props now, because three boards render it and
+ * only one of them is loading a profile. This component has stayed hardcoded to the settings
+ * case deliberately: it is rendered by `/admin/settings` alone, and the copy it carries is
+ * about `/api/admin/profile` specifically rather than about loading in general. Give it props
+ * when a second caller exists, not before.
  *
  * `ProfileFetchStatus` suppresses the global error toast on `/settings` so it cannot sit
  * on top of the owner login card, which leaves this page responsible for surfacing its

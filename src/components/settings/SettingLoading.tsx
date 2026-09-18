@@ -1,15 +1,38 @@
 import React from 'react'
 
-export default function SettingLoading() {
+/**
+ * The shared loading screen for every owner board.
+ *
+ * ## Why it takes props now, and why they have defaults
+ *
+ * The copy used to be hardcoded to "Loading profile..." / "Preparing your editorial settings
+ * view.", which was accurate when the settings editor was the only board. It stopped being
+ * accurate the moment it was not: `PublishBoard.tsx` already renders this component, so
+ * `/admin/publish` has been telling the owner it is loading a profile while it loads publish
+ * state, and `/admin/metrics` does the same. The blog board would have been the third.
+ *
+ * Defaults, rather than making the props required: every existing call site is correct as
+ * written or is the settings editor itself, so requiring them would be a mechanical edit to
+ * three files to change the behaviour of two. The default is the settings copy because that
+ * is the caller the words were written for, and the boards that need different words now say
+ * so.
+ */
+export default function SettingLoading({
+  title = 'Loading profile...',
+  subtitle = 'Preparing your editorial settings view.',
+}: {
+  title?: string
+  subtitle?: string
+} = {}) {
   return (
     <div className='portfolio-public-root relative z-50 min-h-screen clip-decorations pt-12 text-pp-text'>
       <div className='pointer-events-none absolute inset-0 pp-grid-wash opacity-60' />
       <div className='relative mx-auto max-w-editorial px-gutter py-10'>
         <div className='rounded-[1.8rem] border border-pp-line bg-white/78 p-6 shadow-panel backdrop-blur-md'>
           <h2 className='font-display text-2xl font-semibold tracking-tight text-pp-text'>
-            Loading profile...
+            {title}
           </h2>
-          <p className='mt-2 text-sm leading-relaxed text-pp-muted'>Preparing your editorial settings view.</p>
+          <p className='mt-2 text-sm leading-relaxed text-pp-muted'>{subtitle}</p>
         </div>
       </div>
     </div>

@@ -1,5 +1,14 @@
 import mongoose, { Schema } from 'mongoose'
 
+import {
+  isReservedSlug,
+  POST_KINDS,
+  POST_SERIES,
+  POST_STATUSES,
+  SLUG_PATTERN,
+  TAG_PATTERN,
+} from '@/lib/blog/constants'
+import type { PostKind, PostSeries, PostStatus } from '@/lib/blog/constants'
 import { compileModel } from '@/lib/mongoose-model'
 
 /**
@@ -69,52 +78,27 @@ import { compileModel } from '@/lib/mongoose-model'
  */
 
 /**
- * Exactly three, declared here rather than left a free string.
+ * The value sets live in `lib/blog/constants.ts`, NOT here, and are re-exported.
  *
- * A free-text series field produces `measured-in-production`, `Measured in production` and
- * `measured_in_prod` within a month, which turns the cluster pages into three pages with one
- * post each. The closed union makes a typo a validation error at save time instead.
+ * They started in this file, which broke the build: `BlogEditor.tsx` is a client component
+ * that renders a `<select>` of series, so importing them from the model pulled mongoose -
+ * and through it the whole mongodb driver - into the browser bundle. Duplicating them into
+ * the component would build fine and then drift from the enums the database validates
+ * against, so the editor would offer a series that saving rejects.
+ *
+ * Re-exported rather than leaving callers to know the split: `models/Post` is where a reader
+ * looks for what a post's fields may contain, and that should keep working.
  */
-export const POST_SERIES = [
-  'measured-in-production',
-  'shipping-side-products',
-  'dev-career-vn',
-] as const
-export type PostSeries = (typeof POST_SERIES)[number]
-
-export const POST_STATUSES = ['draft', 'published', 'archived', 'deleted'] as const
-export type PostStatus = (typeof POST_STATUSES)[number]
-
-export const POST_KINDS = ['article', 'note'] as const
-export type PostKind = (typeof POST_KINDS)[number]
-
-export const SLUG_PATTERN = /^[a-z0-9-]{1,80}$/
-export const TAG_PATTERN = /^[a-z0-9-]{1,32}$/
-
-/**
- * Slugs a post may not take, enforced here AND at every write path.
- *
- * The justification is narrower than it first looks, and worth stating correctly because the
- * first version of this list was defended with an analysis that turned out to be false.
- *
- * `page` does NOT collide with a future `/blog/page/2` pagination route. That was the
- * original reasoning and it was tested and disproved: a post slugged `page` and a route at
- * `blog/page/[page-num]` coexist, both build, both return 200, because the pagination route
- * is one segment deeper and never competes. What `page` actually guards is a future bare
- * `blog/page/page.tsx`, which WOULD collide.
- *
- * `feed` and `rss` guard the RSS route at `/blog/rss.xml`. Note that `rss.xml` itself can
- * never match `SLUG_PATTERN` - the dot is not in the charset - so listing it would be dead
- * weight, and it is deliberately absent.
- *
- * `privacy` guards `/blog/privacy`. Kept short on purpose: every entry here is a word an
- * author cannot use, so the list earns its length one route at a time.
- */
-export const RESERVED_SLUGS = new Set(['page', 'feed', 'rss', 'privacy'])
-
-export function isReservedSlug(slug: string): boolean {
-  return RESERVED_SLUGS.has(slug)
-}
+export {
+  POST_SERIES,
+  POST_STATUSES,
+  POST_KINDS,
+  SLUG_PATTERN,
+  TAG_PATTERN,
+  RESERVED_SLUGS,
+  isReservedSlug,
+} from '@/lib/blog/constants'
+export type { PostSeries, PostStatus, PostKind } from '@/lib/blog/constants'
 
 export type PostDocument = {
   slug: string

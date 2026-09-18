@@ -67,7 +67,15 @@ export default function PublishBoard() {
     }
   }
 
-  if (loading) return <SettingLoading />
+  // Said "Loading profile..." until SettingLoading took props. This board loads publish
+  // state, not a profile, and had been telling the owner otherwise since it shipped.
+  if (loading)
+    return (
+      <SettingLoading
+        title='Loading publish state...'
+        subtitle='Checking which targets are in sync with the current profile.'
+      />
+    )
 
   const targets = manifest ? manifest.targetOrder.map(id => manifest.targets[id]) : []
   const behind = targets.filter(target => !target.drift.inSync).length
