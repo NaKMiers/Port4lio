@@ -102,7 +102,7 @@ export default function CcafOverview({
   const toDeadline = today ? daysUntil(today, COMPANY_DEADLINE) : null
 
   const countdown = (days: number | null) => {
-    if (days === null) return '—'
+    if (days === null) return '-'
     if (days > 0) return `${days} ${t(UI.daysSuffix, locale)}`
     return days === 0 ? t(UI.today, locale) : t(UI.past, locale)
   }
@@ -187,7 +187,7 @@ export default function CcafOverview({
           </Tile>
           <Tile
             label={t(UI.tileReadiness, locale)}
-            value={readiness === null ? '—' : `${readiness}%`}
+            value={readiness === null ? '-' : `${readiness}%`}
             hint={t(UI.tileReadinessHint, locale)}
           />
           <Tile label={t(UI.tileStatus, locale)}>

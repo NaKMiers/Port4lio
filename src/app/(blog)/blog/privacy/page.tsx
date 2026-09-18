@@ -52,7 +52,7 @@ export default function BlogPrivacyPage() {
 
       <section className='mt-10'>
         <h2 className='font-display text-xl font-semibold text-pp-text'>
-          Messages you send me — kept until I delete them
+          Messages you send me - kept until I delete them
         </h2>
         <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
           If you use the contact form, I store your name, email address, subject and message,
@@ -81,7 +81,7 @@ export default function BlogPrivacyPage() {
 
       <section className='mt-8'>
         <h2 className='font-display text-xl font-semibold text-pp-text'>
-          Test results — deleted after {ATTEMPT_TTL_DAYS} days
+          Test results - deleted after {ATTEMPT_TTL_DAYS} days
         </h2>
         <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
           The MBTI and IQ tests store your answers and result against a random link, with no
@@ -101,13 +101,13 @@ export default function BlogPrivacyPage() {
 
       <section className='mt-8'>
         <h2 className='font-display text-xl font-semibold text-pp-text'>
-          Reading a post — deleted after {BLOG_EVENT_TTL_DAYS} days
+          Reading a post - deleted after {BLOG_EVENT_TTL_DAYS} days
         </h2>
         <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
           When you open a post I record that a post was read, and if you arrived through
           somebody&rsquo;s shared link, that the link worked. No name, no email, no account,
           no third-party analytics. Your browser tab gets a random id stored in
-          sessionStorage — it disappears when you close the tab, and its only job is to stop
+          sessionStorage - it disappears when you close the tab, and its only job is to stop
           one person refreshing a page from counting as several. All of it is deleted after{' '}
           {BLOG_EVENT_TTL_DAYS} days.
         </p>

@@ -93,12 +93,12 @@ export function CutoffNote({ children }: { children: React.ReactNode }) {
 /** `n` of `total` shown, when the public surface caps the list. */
 export function limitNote(total: number, shown: number, where: string): string | null {
   if (total <= shown) return null
-  return `${shown} of ${total} shown — ${where}`
+  return `${shown} of ${total} shown - ${where}`
 }
 
 /** How many rows the sanitizers dropped between the raw form and the live site. */
 export function dropNote(rawCount: number, keptCount: number, needs: string): string | null {
   const dropped = rawCount - keptCount
   if (dropped <= 0) return null
-  return `${dropped} row${dropped > 1 ? 's' : ''} hidden from the live site — each needs ${needs}.`
+  return `${dropped} row${dropped > 1 ? 's' : ''} hidden from the live site - each needs ${needs}.`
 }

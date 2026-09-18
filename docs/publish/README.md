@@ -20,7 +20,7 @@ shaped and length-capped for that platform, with a Copy button and a drift badge
 **Mark as pasted** after pasting; the badge goes back to "out of date" the next time the
 generated text actually changes.
 
-Automating those three would mean scripting a logged-in browser session — against their
+Automating those three would mean scripting a logged-in browser session - against their
 terms, fragile, and it would require storing three more passwords. The copy kit is the
 honest answer.
 
@@ -44,10 +44,10 @@ defaults to `NaKMiers`.
 `PATCH /user` is account-level, so `GITHUB_TOKEN` cannot do it and neither can the
 existing `gh` CLI tokens (scopes `gist, read:org, repo, workflow`). Create a new one:
 
-- **Preferred** — a fine-grained PAT with **Account permissions → Profile → Read and
+- **Preferred** - a fine-grained PAT with **Account permissions → Profile → Read and
   write** and *zero* repository permissions, 90-day expiry. That token cannot touch a
   single repo.
-- **Fallback** — a classic PAT with only the `user` scope. This is a real downgrade:
+- **Fallback** - a classic PAT with only the `user` scope. This is a real downgrade:
   `user` also grants read/write on your email addresses and following list. Try
   fine-grained first.
 
@@ -69,7 +69,7 @@ gh repo clone NaKMiers/NaKMiers /tmp/profile-repo
 
 Copy `publish-profile.yml` to `.github/workflows/publish-profile.yml` there, commit, push.
 
-### 5. First run — with the bio disabled
+### 5. First run - with the bio disabled
 
 ```bash
 gh workflow run publish-profile -R NaKMiers/NaKMiers -f skip_bio=true
@@ -82,7 +82,7 @@ confirmed, run without `skip_bio`.
 ## Design notes
 
 **The app renders, the workflow only writes.** `GET /api/publish/manifest` returns
-finished artifacts — the README arrives as a complete markdown string. The alternative
+finished artifacts - the README arrives as a complete markdown string. The alternative
 (the workflow checking out this repo and running a render script) would require
 `MONGODB_URI`, your production database credential, to live in Actions secrets reachable
 by any third-party action in the job. A leaked `PUBLISH_TOKEN` exposes a JSON blob of
@@ -90,21 +90,21 @@ already-public marketing copy instead.
 
 **Version hashes are taken over rendered output, not source fields.** `POST /api/profile`
 writes with `$set: { ...parsed }`, which rewrites the document, and BSON preserves
-insertion order — so hashing the raw document would report phantom drift whenever key
+insertion order - so hashing the raw document would report phantom drift whenever key
 order shifted. Hashing the artifact also means editing `backgroundImage` does not mark
 LinkedIn stale, and improving a renderer correctly does.
 
 **Nothing turns green by itself.** A target reads as in sync only because the workflow
-reported a push or you pressed Mark as pasted. If the workflow stops running — GitHub
+reported a push or you pressed Mark as pasted. If the workflow stops running - GitHub
 disables scheduled workflows after 60 days of repository inactivity, and a profile repo
-receiving only bot commits can trip that — the badge drifts on its own. That is the
+receiving only bot commits can trip that - the badge drifts on its own. That is the
 signal. Do not add a keepalive commit; that is noise pretending to be health.
 
 ## Known gaps
 
 - **Masthead pipe spacing is hand-measured.** The gaps around the vertical bars in the CV
   contact row are tuned to the exact strings on either side. Changing the email, phone or
-  location requires checking `/cv` by eye — `tests/e2e/cv-pagination.spec.ts` only
+  location requires checking `/cv` by eye - `tests/e2e/cv-pagination.spec.ts` only
   measures height.
 - **The CV is nearly full.** Sheet 1 has about 9 mm of headroom and sheet 2 about 6 mm.
   Adding more than a line or two means moving the page break.

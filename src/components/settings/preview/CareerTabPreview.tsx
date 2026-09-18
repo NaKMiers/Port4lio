@@ -72,7 +72,7 @@ export default function CareerTabPreview({
     <div className='space-y-5'>
       <PreviewBlock title='Capability map' count={skills.length}>
         {skills.length === 0 ? (
-          <EmptyHint>No skill groups — the capability column is not rendered.</EmptyHint>
+          <EmptyHint>No skill groups - the capability column is not rendered.</EmptyHint>
         ) : (
           <div className='space-y-2'>
             {skills.map((group, index) => (
@@ -98,7 +98,7 @@ export default function CareerTabPreview({
         ) : null}
         {skillItemCount > 0 ? (
           <CutoffNote>
-            Icons are not printed here — the public page renders skill items as text chips, so
+            Icons are not printed here - the public page renders skill items as text chips, so
             the icon you pick per item never reaches it.
           </CutoffNote>
         ) : null}
@@ -107,7 +107,7 @@ export default function CareerTabPreview({
       <PreviewBlock title='Career timeline'>
         {!hasAnyTimeline ? (
           <EmptyHint>
-            No experience, education or certificates — the whole timeline block is hidden.
+            No experience, education or certificates - the whole timeline block is hidden.
           </EmptyHint>
         ) : (
           <div className='space-y-3'>

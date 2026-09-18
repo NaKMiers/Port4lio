@@ -78,7 +78,7 @@ export default function CvTabSections({
 
       <p className={`${helpTextCls} px-1`}>
         Drag a card by its grip to change the order these blocks print in on{' '}
-        <strong>/cv</strong> — the preview follows immediately. Arrow keys work too once the grip
+        <strong>/cv</strong> - the preview follows immediately. Arrow keys work too once the grip
         has focus. The masthead above is the page header and always prints first. Every reorder
         re-measures the sheets and moves the page break to wherever sheet 1 now ends.
       </p>

@@ -68,7 +68,7 @@ export default function ResumeMastheadSection({
       <div className='space-y-4'>
         <p className={helpTextCls}>
           Printed at the top of <strong>/cv</strong>. The vertical pipes between contact items use
-          gaps measured against these exact strings — after changing the email, phone or location,
+          gaps measured against these exact strings - after changing the email, phone or location,
           open /cv and check the spacing by eye. The overflow test only measures height, so it
           cannot catch a pipe that sits wrong.
         </p>
@@ -110,12 +110,12 @@ export default function ResumeMastheadSection({
           </div>
           <p className={helpTextCls}>
             Defaults to your profile avatar. Upload one here only when the printed CV should use a
-            different picture — it is cropped to a circle, so a head-and-shoulders shot works best.
+            different picture - it is cropped to a circle, so a head-and-shoulders shot works best.
             Max {MAX_UPLOAD_MB_LABEL} MB, uploads immediately.
           </p>
           {resume.hidePhoto ? (
             <p className={`${helpTextCls} mt-1 font-semibold text-pp-text`}>
-              Hidden on the printed CV — name, role and contact reclaim the width it used, all the
+              Hidden on the printed CV - name, role and contact reclaim the width it used, all the
               way to the right margin. The photo below is kept, so switching this back on restores
               it without a re-upload.
             </p>
@@ -184,7 +184,7 @@ export default function ResumeMastheadSection({
                   {inheritsAvatar
                     ? profile.avatar
                       ? 'Using your profile avatar.'
-                      : 'No profile avatar set — the CV falls back to its bundled photo.'
+                      : 'No profile avatar set - the CV falls back to its bundled photo.'
                     : 'Using the CV-specific photo above.'}
                 </span>
               </div>

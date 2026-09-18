@@ -120,7 +120,7 @@ describe('generateTest', () => {
     }
   })
 
-  it('is deterministic — the same seed reproduces the same test exactly', () => {
+  it('is deterministic - the same seed reproduces the same test exactly', () => {
     // The result page stores only a seed. If this drifts, someone reopening their result
     // sees a different test than the one they sat.
     for (const seed of SEEDS.slice(0, 20)) {

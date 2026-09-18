@@ -13,7 +13,7 @@ export default function ResumeEducationSection({ profile, setProfile, handle }: 
     <Section id='cv-education' title='CV Education' badge='**bold** supported' handle={handle}>
       <div className='space-y-4'>
         <p className={helpTextCls}>
-          {BOLD_HINT} One printed line per row. This is the CV block only — the portfolio&apos;s
+          {BOLD_HINT} One printed line per row. This is the CV block only - the portfolio&apos;s
           own education timeline lives on the Career tab.
         </p>
 

@@ -30,7 +30,7 @@ function describePageBreak(resume: Resume): { text: string; valid: boolean } {
 
   if (!section || !project) {
     return {
-      text: `No project at section ${sectionIndex}, project ${projectIndex} — the break will fall back to the nearest project boundary.`,
+      text: `No project at section ${sectionIndex}, project ${projectIndex} - the break will fall back to the nearest project boundary.`,
       valid: false,
     }
   }
@@ -40,7 +40,7 @@ function describePageBreak(resume: Resume): { text: string; valid: boolean } {
   const clamped = Math.min(highlightsOnFirstSheet, total)
   const suffix =
     highlightsOnFirstSheet > total
-      ? ` (clamped from ${highlightsOnFirstSheet} — this project has only ${total})`
+      ? ` (clamped from ${highlightsOnFirstSheet} - this project has only ${total})`
       : ''
 
   return {

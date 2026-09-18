@@ -18,7 +18,7 @@ function AutoArtifact({ target }: { target: PublishTargetWithDrift }) {
   return (
     <div className='space-y-3'>
       <p className={helpTextCls}>
-        Applied automatically by the <strong>publish-profile</strong> workflow. Nothing to paste —
+        Applied automatically by the <strong>publish-profile</strong> workflow. Nothing to paste -
         this is a preview of what it will write.
         {drift.detail ? ` Last run: ${drift.detail}.` : ''}
       </p>
@@ -38,7 +38,7 @@ function AutoArtifact({ target }: { target: PublishTargetWithDrift }) {
           {(['name', 'bio', 'blog', 'location', 'company'] as const).map(key => (
             <div key={key} className='rounded-[1rem] border border-pp-line bg-white/60 px-3 py-2'>
               <dt className={labelCls}>{key}</dt>
-              <dd className='break-words text-sm text-pp-text'>{artifact[key] || '—'}</dd>
+              <dd className='break-words text-sm text-pp-text'>{artifact[key] || '-'}</dd>
             </div>
           ))}
         </dl>
@@ -64,7 +64,7 @@ export default function PublishTargetCard({
         <div>
           <h2 className='text-sm font-semibold text-pp-text'>{target.label}</h2>
           <p className={`${helpTextCls} mt-0.5`}>
-            {isManual ? 'Copy and paste — no write API exists' : 'Automated'} · v
+            {isManual ? 'Copy and paste - no write API exists' : 'Automated'} · v
             {target.version.slice(0, 8)}
           </p>
         </div>

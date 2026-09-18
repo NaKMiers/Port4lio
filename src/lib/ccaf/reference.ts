@@ -81,16 +81,16 @@ export const FACT_GROUPS: FactGroup[] = [
     title: { vi: '3 · tool_choice', en: '3 · tool_choice' },
     items: [
       {
-        vi: '<code>auto</code> — model có thể trả text thay vì gọi tool',
-        en: '<code>auto</code> — the model may answer in prose instead of calling a tool',
+        vi: '<code>auto</code> - model có thể trả text thay vì gọi tool',
+        en: '<code>auto</code> - the model may answer in prose instead of calling a tool',
       },
       {
-        vi: '<code>any</code> — bắt buộc gọi một tool nào đó',
-        en: '<code>any</code> — it must call some tool, but picks which',
+        vi: '<code>any</code> - bắt buộc gọi một tool nào đó',
+        en: '<code>any</code> - it must call some tool, but picks which',
       },
       {
-        vi: '<code>{"type":"tool","name":"…"}</code> — ép đúng tool này (ví dụ ép <code>extract_metadata</code> trước bước enrichment)',
-        en: '<code>{"type":"tool","name":"…"}</code> — forces one named tool (e.g. running <code>extract_metadata</code> before any enrichment step)',
+        vi: '<code>{"type":"tool","name":"…"}</code> - ép đúng tool này (ví dụ ép <code>extract_metadata</code> trước bước enrichment)',
+        en: '<code>{"type":"tool","name":"…"}</code> - forces one named tool (e.g. running <code>extract_metadata</code> before any enrichment step)',
       },
     ],
   },
@@ -107,7 +107,7 @@ export const FACT_GROUPS: FactGroup[] = [
       },
       {
         vi: 'Schema chặt loại lỗi <em>cú pháp</em>, không loại lỗi <em>ngữ nghĩa</em> (tổng không khớp, sai ô) → cần validation + retry',
-        en: 'A strict schema eliminates <em>syntax</em> errors, never <em>semantic</em> ones (totals that do not add up, values in the wrong field) — those need validation and a retry',
+        en: 'A strict schema eliminates <em>syntax</em> errors, never <em>semantic</em> ones (totals that do not add up, values in the wrong field) - those need validation and a retry',
       },
       {
         vi: 'Retry vô ích khi thông tin không có trong nguồn',
@@ -187,12 +187,12 @@ export const JUDGMENT_RULES: Localized[] = [
     en: '<strong>Errors carry context</strong>: category, whether a retry can help, what was attempted, any partial result. Never "Operation failed", never swallowed, never take down the whole workflow.',
   },
   {
-    vi: '<strong>Tool theo vai trò, tối thiểu</strong> (4–5, không 18). Cross-role chỉ cấp scoped tool cho nhu cầu tần suất cao; ca phức tạp vẫn qua coordinator.',
-    en: '<strong>Tools scoped to a role, and few</strong> (4–5, not 18). Grant a cross-role tool only for a high-frequency need; complex cases still route through the coordinator.',
+    vi: '<strong>Tool theo vai trò, tối thiểu</strong> (4-5, không 18). Cross-role chỉ cấp scoped tool cho nhu cầu tần suất cao; ca phức tạp vẫn qua coordinator.',
+    en: '<strong>Tools scoped to a role, and few</strong> (4-5, not 18). Grant a cross-role tool only for a high-frequency need; complex cases still route through the coordinator.',
   },
   {
-    vi: '<strong>Subagent không kế thừa context</strong> — truyền tường minh trong prompt; spawn song song bằng nhiều Task trong <em>một</em> lượt; coordinator phải có "Task" trong allowedTools.',
-    en: '<strong>Subagents inherit nothing</strong> — pass context explicitly in the prompt; spawn in parallel by emitting several Task calls in <em>one</em> turn; the coordinator needs "Task" in allowedTools.',
+    vi: '<strong>Subagent không kế thừa context</strong> - truyền tường minh trong prompt; spawn song song bằng nhiều Task trong <em>một</em> lượt; coordinator phải có "Task" trong allowedTools.',
+    en: '<strong>Subagents inherit nothing</strong> - pass context explicitly in the prompt; spawn in parallel by emitting several Task calls in <em>one</em> turn; the coordinator needs "Task" in allowedTools.',
   },
   {
     vi: '<strong>Bao phủ thiếu</strong> → soi cách coordinator phân rã trước khi đổ lỗi subagent.',
@@ -267,12 +267,12 @@ export const ANSWER_TRAPS: AnswerTrap[] = [
   {
     token: { vi: 'inherit_history', en: 'inherit_history' },
     why: {
-      vi: 'Subagent không tự kế thừa lịch sử coordinator — phải truyền trong prompt.',
-      en: 'A subagent never inherits the coordinator’s history — it has to be passed in the prompt.',
+      vi: 'Subagent không tự kế thừa lịch sử coordinator - phải truyền trong prompt.',
+      en: 'A subagent never inherits the coordinator’s history - it has to be passed in the prompt.',
     },
   },
   {
-    token: { vi: 'confidence 1–10', en: 'confidence 1–10' },
+    token: { vi: 'confidence 1-10', en: 'confidence 1-10' },
     why: {
       vi: 'Tự báo confidence để route escalation: kém hiệu chỉnh, guide bác thẳng.',
       en: 'Routing escalation on self-reported confidence is poorly calibrated, and the guide rejects it outright.',
@@ -281,8 +281,8 @@ export const ANSWER_TRAPS: AnswerTrap[] = [
   {
     token: { vi: 'model to hơn', en: 'a larger model' },
     why: {
-      vi: 'Context window lớn hơn không giải quyết review 14 file thiếu nhất quán — chia pass.',
-      en: 'A bigger context window does not fix an inconsistent 14-file review — split it into passes.',
+      vi: 'Context window lớn hơn không giải quyết review 14 file thiếu nhất quán - chia pass.',
+      en: 'A bigger context window does not fix an inconsistent 14-file review - split it into passes.',
     },
   },
   {

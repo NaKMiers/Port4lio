@@ -167,7 +167,7 @@ function DomainRow({
             level ? 'font-semibold text-pp-text' : 'text-pp-muted'
           )}
         >
-          {level ? `${level}/${MAX_CONFIDENCE}` : '—'}
+          {level ? `${level}/${MAX_CONFIDENCE}` : '-'}
         </span>
       </div>
     </div>
@@ -274,7 +274,7 @@ function MockForm({
               min={0}
               max={100}
               value={percents[i] ?? ''}
-              placeholder='—'
+              placeholder='-'
               disabled={!editable}
               onChange={event =>
                 setPercents(current =>
@@ -480,7 +480,7 @@ export default function CcafRail({
         <div className='mt-3 rounded-xl border border-pp-line bg-pp-bg/50 px-3.5 py-3'>
           <div className='flex items-baseline justify-between gap-3'>
             <span className='font-display text-[2rem] font-semibold leading-none tabular-nums text-pp-text'>
-              {readiness === null ? '—' : `${readiness}%`}
+              {readiness === null ? '-' : `${readiness}%`}
             </span>
             <span className='text-right text-[11px] leading-tight text-pp-muted'>
               {t(UI.readinessTotal, locale)}

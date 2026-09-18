@@ -102,7 +102,7 @@ export default function PublishBoard() {
               </h1>
               <p className='mt-3 max-w-2xl text-sm leading-relaxed text-pp-muted sm:text-base'>
                 GitHub is updated automatically by a scheduled workflow. LinkedIn, Upwork and Fiverr
-                publish no API for editing a profile, so those are copy-and-paste — press Mark as
+                publish no API for editing a profile, so those are copy-and-paste - press Mark as
                 pasted once you have, and this page will tell you when they drift again.
               </p>
             </div>

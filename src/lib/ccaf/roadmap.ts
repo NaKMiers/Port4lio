@@ -175,11 +175,11 @@ export const WEEKS: RoadmapWeek[] = [
       vi: 'Nền tảng + khoá API',
       en: 'Foundations + API course',
     },
-    range: '04–10/09',
+    range: '04-10/09',
     span: 7,
     desc: {
-      vi: 'Bảy ngày đầu, ghi lại đúng như đã diễn ra chứ không như kế hoạch cũ: khoá "Building with the Claude API" 85 bài rải mỏng qua các tối đi làm, cuối tuần dồn nhiều hơn. 15 việc / 20,5 giờ — tốc độ thật ≈2,9 giờ mỗi ngày, và đó là con số dùng để dựng lại toàn bộ phần còn lại.',
-      en: 'The first seven days, recorded the way they actually happened rather than the way they were planned: the 85-lesson "Building with the Claude API" course spread thin across work-night evenings, heavier at the weekend. 15 tasks / 20.5 hours — a real pace of ≈2.9 hours a day, and that is the number the rest of the plan is rebuilt from.',
+      vi: 'Bảy ngày đầu, ghi lại đúng như đã diễn ra chứ không như kế hoạch cũ: khoá "Building with the Claude API" 85 bài rải mỏng qua các tối đi làm, cuối tuần dồn nhiều hơn. 15 việc / 20,5 giờ - tốc độ thật ≈2,9 giờ mỗi ngày, và đó là con số dùng để dựng lại toàn bộ phần còn lại.',
+      en: 'The first seven days, recorded the way they actually happened rather than the way they were planned: the 85-lesson "Building with the Claude API" course spread thin across work-night evenings, heavier at the weekend. 15 tasks / 20.5 hours - a real pace of ≈2.9 hours a day, and that is the number the rest of the plan is rebuilt from.',
     },
     days: [
       {
@@ -200,12 +200,12 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['a'],
             steps: [
               {
-                vi: 'Mở lại tin nhắn nhắc của L&D, bấm link sheet <strong>Danh sách thi</strong>, kiểm tra đã có tên mình chưa — chưa có thì điền ngay, hạn chốt là <strong>thứ Sáu 04/09</strong>.',
-                en: 'Reopen the reminder message from L&D, click the <strong>Exam list</strong> sheet link, and check whether your name is there — if not, add it right away; the deadline is <strong>Friday 04/09</strong>.',
+                vi: 'Mở lại tin nhắn nhắc của L&D, bấm link sheet <strong>Danh sách thi</strong>, kiểm tra đã có tên mình chưa - chưa có thì điền ngay, hạn chốt là <strong>thứ Sáu 04/09</strong>.',
+                en: 'Reopen the reminder message from L&D, click the <strong>Exam list</strong> sheet link, and check whether your name is there - if not, add it right away; the deadline is <strong>Friday 04/09</strong>.',
               },
               {
-                vi: 'Nhắn riêng hỏi đúng 3 ý: (1) email công ty nào dùng để đăng ký, (2) công ty đang ở tier nào trong {partner|Claude Partner Network} — tier quyết định mức giảm phí $125, (3) công ty tài trợ mấy lần thi.',
-                en: 'Send a direct message asking exactly 3 things: (1) which company email to register with, (2) what tier the company is in within {partner|Claude Partner Network} — the tier determines the discount on the $125 fee, (3) how many exam attempts the company sponsors.',
+                vi: 'Nhắn riêng hỏi đúng 3 ý: (1) email công ty nào dùng để đăng ký, (2) công ty đang ở tier nào trong {partner|Claude Partner Network} - tier quyết định mức giảm phí $125, (3) công ty tài trợ mấy lần thi.',
+                en: 'Send a direct message asking exactly 3 things: (1) which company email to register with, (2) what tier the company is in within {partner|Claude Partner Network} - the tier determines the discount on the $125 fee, (3) how many exam attempts the company sponsors.',
               },
               {
                 vi: 'Ý (3) quan trọng: nếu chỉ tài trợ 1 lần thì rớt là tự trả, ảnh hưởng trực tiếp tới việc bao giờ nên đặt lịch.',
@@ -226,16 +226,16 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['a'],
             steps: [
               {
-                vi: 'Mở {aca|anthropic.skilljar.com} rồi bấm Sign up. <strong>Bắt buộc dùng email công ty</strong> — email cá nhân không vào được Partner Academy và cũng không đăng ký thi được.',
-                en: "Open {aca|anthropic.skilljar.com} and click Sign up. <strong>You must use your company email</strong> — a personal email can't access Partner Academy and can't register for the exam either.",
+                vi: 'Mở {aca|anthropic.skilljar.com} rồi bấm Sign up. <strong>Bắt buộc dùng email công ty</strong> - email cá nhân không vào được Partner Academy và cũng không đăng ký thi được.',
+                en: "Open {aca|anthropic.skilljar.com} and click Sign up. <strong>You must use your company email</strong> - a personal email can't access Partner Academy and can't register for the exam either.",
               },
               {
                 vi: 'Xác thực email trong hộp thư, đăng nhập lại, vào mục danh sách khoá (Catalog).',
                 en: 'Verify the email in your inbox, log back in, and go to the course list (Catalog).',
               },
               {
-                vi: 'Bookmark trang này — cả tuần 1 sẽ quay lại mỗi ngày.',
-                en: "Bookmark this page — you'll come back to it every day of week 1.",
+                vi: 'Bookmark trang này - cả tuần 1 sẽ quay lại mỗi ngày.',
+                en: "Bookmark this page - you'll come back to it every day of week 1.",
               },
             ],
             doneWhen: {
@@ -246,26 +246,26 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w1-0-2',
             title: {
-              vi: 'Tải Exam Guide, đọc mục 1–5: đối tượng, format 60 câu/120 phút/720, blueprint 5 domain, 6 kịch bản',
-              en: 'Download the Exam Guide, read sections 1–5: audience, 60-question/120-minute/720 format, the 5-domain blueprint, 6 scenarios',
+              vi: 'Tải Exam Guide, đọc mục 1-5: đối tượng, format 60 câu/120 phút/720, blueprint 5 domain, 6 kịch bản',
+              en: 'Download the Exam Guide, read sections 1-5: audience, 60-question/120-minute/720 format, the 5-domain blueprint, 6 scenarios',
             },
             tags: ['a'],
             steps: [
               {
-                vi: 'Tải {guide|Exam Guide PDF} — 39 trang, bản v1.0 tháng 7/2026. Đây là tài liệu chuẩn duy nhất, mọi nguồn khác chỉ là diễn giải lại.',
-                en: 'Download the {guide|Exam Guide PDF} — 39 pages, v1.0 from July 2026. This is the only authoritative document; every other source is just a reinterpretation.',
+                vi: 'Tải {guide|Exam Guide PDF} - 39 trang, bản v1.0 tháng 7/2026. Đây là tài liệu chuẩn duy nhất, mọi nguồn khác chỉ là diễn giải lại.',
+                en: 'Download the {guide|Exam Guide PDF} - 39 pages, v1.0 from July 2026. This is the only authoritative document; every other source is just a reinterpretation.',
               },
               {
-                vi: 'Đọc mục 1–3 (khoảng 5 phút): đối tượng dự thi, format 60 câu / 120 phút / đậu 720.',
-                en: 'Read sections 1–3 (about 5 minutes): exam audience, 60 questions / 120 minutes / 720 to pass.',
+                vi: 'Đọc mục 1-3 (khoảng 5 phút): đối tượng dự thi, format 60 câu / 120 phút / đậu 720.',
+                en: 'Read sections 1-3 (about 5 minutes): exam audience, 60 questions / 120 minutes / 720 to pass.',
               },
               {
-                vi: 'Đọc mục 4–5 (khoảng 10 phút): bảng trọng số 5 domain và mô tả 6 kịch bản. Chép 6 tên kịch bản ra giấy — đề thi bốc ngẫu nhiên 4 trong 6 cái đó.',
-                en: 'Read sections 4–5 (about 10 minutes): the 5-domain weighting table and the descriptions of the 6 scenarios. Write the 6 scenario names down on paper — the exam draws 4 of those 6 at random.',
+                vi: 'Đọc mục 4-5 (khoảng 10 phút): bảng trọng số 5 domain và mô tả 6 kịch bản. Chép 6 tên kịch bản ra giấy - đề thi bốc ngẫu nhiên 4 trong 6 cái đó.',
+                en: 'Read sections 4-5 (about 10 minutes): the 5-domain weighting table and the descriptions of the 6 scenarios. Write the 6 scenario names down on paper - the exam draws 4 of those 6 at random.',
               },
               {
-                vi: '<strong>Chưa đọc mục 6</strong> (task statement chi tiết) — để dành tới khi đã build, đọc bây giờ chắc chắn quên.',
-                en: "<strong>Don't read section 6 yet</strong> (the detailed task statements) — save it until you have built something; reading it now means you'll definitely forget it.",
+                vi: '<strong>Chưa đọc mục 6</strong> (task statement chi tiết) - để dành tới khi đã build, đọc bây giờ chắc chắn quên.',
+                en: "<strong>Don't read section 6 yet</strong> (the detailed task statements) - save it until you have built something; reading it now means you'll definitely forget it.",
               },
             ],
             doneWhen: {
@@ -313,8 +313,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w1-1-1',
             title: {
-              vi: 'Mock <strong>Đề 1</strong> trong tab "Đề thi thử", chế độ 120 phút, chưa học gì — ghi vào Nhật ký bên phải',
-              en: 'Take <strong>Mock 1</strong> in the "Practice tests" tab, 120-minute mode, with no studying — record it in the Log on the right',
+              vi: 'Mock <strong>Đề 1</strong> trong tab "Đề thi thử", chế độ 120 phút, chưa học gì - ghi vào Nhật ký bên phải',
+              en: 'Take <strong>Mock 1</strong> in the "Practice tests" tab, 120-minute mode, with no studying - record it in the Log on the right',
             },
             tags: ['m'],
             steps: [
@@ -327,8 +327,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Take it seriously, like the real exam: no lookups, no pausing halfway. The point is to measure your starting point, not to get a nice score.',
               },
               {
-                vi: 'Được 40–55% ở giai đoạn này là bình thường, đừng nản.',
-                en: "40–55% is normal at this stage, don't get discouraged.",
+                vi: 'Được 40-55% ở giai đoạn này là bình thường, đừng nản.',
+                en: "40-55% is normal at this stage, don't get discouraged.",
               },
               {
                 vi: 'Nhập kết quả vào panel <strong>Nhật ký đề thi thử</strong> bên phải: số câu đúng và % từng domain.',
@@ -349,8 +349,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['m'],
             steps: [
               {
-                vi: 'Đọc giải thích tiếng Việt của <strong>mọi</strong> câu sai — và cả câu đoán mò mà may đúng.',
-                en: 'Read the Vietnamese explanation for <strong>every</strong> wrong answer — and for the ones you guessed and happened to get right.',
+                vi: 'Đọc giải thích tiếng Việt của <strong>mọi</strong> câu sai - và cả câu đoán mò mà may đúng.',
+                en: 'Read the Vietnamese explanation for <strong>every</strong> wrong answer - and for the ones you guessed and happened to get right.',
               },
               {
                 vi: 'Với mỗi câu sai, tự phân loại: (a) chưa biết kiến thức, hay (b) biết nhưng dính bẫy. Loại (b) mới là thứ cần luyện nhiều.',
@@ -402,8 +402,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w1-2-0',
             title: {
-              vi: 'Academy <em>Building with the Claude API</em> — bài <strong>1–12</strong> / 85',
-              en: 'Academy <em>Building with the Claude API</em> — lessons <strong>1–12</strong> / 85',
+              vi: 'Academy <em>Building with the Claude API</em> - bài <strong>1-12</strong> / 85',
+              en: 'Academy <em>Building with the Claude API</em> - lessons <strong>1-12</strong> / 85',
             },
             tags: ['d1', 'd4'],
             steps: [
@@ -412,12 +412,12 @@ export const WEEKS: RoadmapWeek[] = [
                 en: "Open {aca|Academy} → the <em>Building with the Claude API</em> course. You're at lesson 1/85.",
               },
               {
-                vi: 'Học tới hết bài 12 (≈1 giờ). Đây là phần mở đầu: cấu trúc request, messages, system prompt — đi nhanh được.',
-                en: 'Study through lesson 12 (≈1 hour). This is the opening part: request structure, messages, system prompt — you can move fast.',
+                vi: 'Học tới hết bài 12 (≈1 giờ). Đây là phần mở đầu: cấu trúc request, messages, system prompt - đi nhanh được.',
+                en: 'Study through lesson 12 (≈1 hour). This is the opening part: request structure, messages, system prompt - you can move fast.',
               },
               {
-                vi: 'Đã muộn thì dừng ở đâu cũng được — phần dư dồn sang mai, mai chỉ nặng thêm vài bài.',
-                en: "It's late, so stop wherever you get to — the remainder rolls into tomorrow, which only adds a few lessons.",
+                vi: 'Đã muộn thì dừng ở đâu cũng được - phần dư dồn sang mai, mai chỉ nặng thêm vài bài.',
+                en: "It's late, so stop wherever you get to - the remainder rolls into tomorrow, which only adds a few lessons.",
               },
             ],
             doneWhen: {
@@ -434,8 +434,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['a'],
             steps: [
               {
-                vi: 'Ô <strong>Ngày thi dự kiến</strong> ở khối tiêu đề — bấm vào ngày, chọn 27/09.',
-                en: 'The <strong>Planned exam date</strong> field in the header block — click the date and pick 27/09.',
+                vi: 'Ô <strong>Ngày thi dự kiến</strong> ở khối tiêu đề - bấm vào ngày, chọn 27/09.',
+                en: 'The <strong>Planned exam date</strong> field in the header block - click the date and pick 27/09.',
               },
               {
                 vi: 'Toàn bộ đếm ngược và ô "Ngày thi" trong Tuần thi sẽ tự đổi theo.',
@@ -454,15 +454,15 @@ export const WEEKS: RoadmapWeek[] = [
         date: '2026-09-07',
         hours: 3,
         title: {
-          vi: 'API bài 13–27 · tool use',
-          en: 'API lessons 13–27 · tool use',
+          vi: 'API bài 13-27 · tool use',
+          en: 'API lessons 13-27 · tool use',
         },
         tasks: [
           {
             id: 'w1-3-0',
             title: {
-              vi: 'Academy API — bài <strong>13–27</strong> (≈1,5 giờ): tool use, <code>stop_reason</code>',
-              en: 'Academy API — lessons <strong>13–27</strong> (≈1.5 hours): tool use, <code>stop_reason</code>',
+              vi: 'Academy API - bài <strong>13-27</strong> (≈1,5 giờ): tool use, <code>stop_reason</code>',
+              en: 'Academy API - lessons <strong>13-27</strong> (≈1.5 hours): tool use, <code>stop_reason</code>',
             },
             tags: ['d1', 'd4'],
             steps: [
@@ -498,8 +498,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w1-4-0',
             title: {
-              vi: 'Đọc lướt {n1|Domain 1 note} (25 phút) — đối chiếu với phần loop vừa học',
-              en: 'Skim the {n1|Domain 1 note} (25 minutes) — compare it with the loop you just learned',
+              vi: 'Đọc lướt {n1|Domain 1 note} (25 phút) - đối chiếu với phần loop vừa học',
+              en: 'Skim the {n1|Domain 1 note} (25 minutes) - compare it with the loop you just learned',
             },
             tags: ['d1'],
             steps: [
@@ -508,13 +508,13 @@ export const WEEKS: RoadmapWeek[] = [
                 en: "The heaviest domain (27%) and the one you were weakest in on Mock 1 (50%). Skim it to see what's there; no need to memorize yet.",
               },
               {
-                vi: 'Đánh dấu chỗ chưa hiểu về Task tool, <code>allowedTools</code>, <code>fork_session</code> — tuần 3 build xong sẽ tự sáng.',
-                en: "Mark whatever you don't understand about the Task tool, <code>allowedTools</code>, <code>fork_session</code> — it'll click on its own once you've built things in week 3.",
+                vi: 'Đánh dấu chỗ chưa hiểu về Task tool, <code>allowedTools</code>, <code>fork_session</code> - tuần 3 build xong sẽ tự sáng.',
+                en: "Mark whatever you don't understand about the Task tool, <code>allowedTools</code>, <code>fork_session</code> - it'll click on its own once you've built things in week 3.",
               },
             ],
             doneWhen: {
-              vi: 'Có danh sách 3–5 câu hỏi cụ thể về Domain 1.',
-              en: 'You have a list of 3–5 specific questions about Domain 1.',
+              vi: 'Có danh sách 3-5 câu hỏi cụ thể về Domain 1.',
+              en: 'You have a list of 3-5 specific questions about Domain 1.',
             },
           },
           {
@@ -530,8 +530,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: "Go to Partner Academy → the CCAR-F certification page → buy the exam (the price already reflects your company's tier discount). Follow the instruction email to create a {vue|Pearson VUE} account, pick <strong>27/09</strong>, online proctored or a test center.",
               },
               {
-                vi: 'Đặt sớm vì slot ngày cuối tuần hết nhanh. <strong>Đổi/huỷ miễn phí tới trước 24 giờ</strong> — nên đặt sớm không có rủi ro gì, chỉ có lợi.',
-                en: 'Book early because weekend slots fill up fast. <strong>Free reschedule/cancel up to 24 hours before</strong> — so booking early carries no risk, only upside.',
+                vi: 'Đặt sớm vì slot ngày cuối tuần hết nhanh. <strong>Đổi/huỷ miễn phí tới trước 24 giờ</strong> - nên đặt sớm không có rủi ro gì, chỉ có lợi.',
+                en: 'Book early because weekend slots fill up fast. <strong>Free reschedule/cancel up to 24 hours before</strong> - so booking early carries no risk, only upside.',
               },
               {
                 vi: 'Kiểm tra tên tài khoản Pearson VUE khớp <strong>từng ký tự</strong> với CMND/CCCD/hộ chiếu. Lệch thì email <code>certifications-support@anthropic.com</code> trước khi thi.',
@@ -550,15 +550,15 @@ export const WEEKS: RoadmapWeek[] = [
         date: '2026-09-09',
         hours: 3,
         title: {
-          vi: 'API bài 28–42 · structured output',
-          en: 'API lessons 28–42 · structured output',
+          vi: 'API bài 28-42 · structured output',
+          en: 'API lessons 28-42 · structured output',
         },
         tasks: [
           {
             id: 'w1-5-0',
             title: {
-              vi: 'Academy API — bài <strong>28–42</strong> (≈1,5 giờ): structured output, JSON schema, <code>tool_choice</code>',
-              en: 'Academy API — lessons <strong>28–42</strong> (≈1.5 hours): structured output, JSON schema, <code>tool_choice</code>',
+              vi: 'Academy API - bài <strong>28-42</strong> (≈1,5 giờ): structured output, JSON schema, <code>tool_choice</code>',
+              en: 'Academy API - lessons <strong>28-42</strong> (≈1.5 hours): structured output, JSON schema, <code>tool_choice</code>',
             },
             tags: ['d4'],
             steps: [
@@ -567,8 +567,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Study the next ≈15 lessons. Focus: forcing the model to return JSON matching a schema via tool_use, and the three <code>tool_choice</code> modes (<code>auto</code> / <code>any</code> / forcing a specific tool).',
               },
               {
-                vi: 'Ghi ngay vào note: khi nào dùng <code>any</code>, khi nào ép tool — đề hỏi đúng chỗ này.',
-                en: 'Write it into your notes immediately: when to use <code>any</code>, when to force a tool — the exam asks exactly this.',
+                vi: 'Ghi ngay vào note: khi nào dùng <code>any</code>, khi nào ép tool - đề hỏi đúng chỗ này.',
+                en: 'Write it into your notes immediately: when to use <code>any</code>, when to force a tool - the exam asks exactly this.',
               },
             ],
             doneWhen: {
@@ -583,8 +583,8 @@ export const WEEKS: RoadmapWeek[] = [
         date: '2026-09-10',
         hours: 2,
         title: {
-          vi: 'Domain 4 · sample 1–6',
-          en: 'Domain 4 · samples 1–6',
+          vi: 'Domain 4 · sample 1-6',
+          en: 'Domain 4 · samples 1-6',
         },
         tasks: [
           {
@@ -596,8 +596,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['d4'],
             steps: [
               {
-                vi: 'Bạn đã 100% domain này ở Đề 1 — chỉ lướt để chắc không có khái niệm lạ, không cần đào.',
-                en: "You scored 100% in this domain on Mock 1 — just skim to make sure there's no unfamiliar concept, no need to dig.",
+                vi: 'Bạn đã 100% domain này ở Đề 1 - chỉ lướt để chắc không có khái niệm lạ, không cần đào.',
+                en: "You scored 100% in this domain on Mock 1 - just skim to make sure there's no unfamiliar concept, no need to dig.",
               },
               {
                 vi: 'Để ý phần few-shot và validation-retry vì tuần 3 sẽ build đúng thứ đó.',
@@ -612,8 +612,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w1-6-1',
             title: {
-              vi: 'Giải <strong>sample question 1–6</strong> trong Exam Guide, che đáp án trước (30 phút)',
-              en: 'Work <strong>sample questions 1–6</strong> in the Exam Guide, covering the answers first (30 minutes)',
+              vi: 'Giải <strong>sample question 1-6</strong> trong Exam Guide, che đáp án trước (30 phút)',
+              en: 'Work <strong>sample questions 1-6</strong> in the Exam Guide, covering the answers first (30 minutes)',
             },
             tags: ['m'],
             steps: [
@@ -642,11 +642,11 @@ export const WEEKS: RoadmapWeek[] = [
       vi: 'Bắt kịp · khoá ngắn · Ex2',
       en: 'Catch up · short courses · Ex2',
     },
-    range: '11–17/09',
+    range: '11-17/09',
     span: 7,
     desc: {
-      vi: 'Hai ngày đầu tuần (11–12) là phần đuôi của khối nền tảng, đã xong. Chủ nhật 13/09 là ngày bắt kịp: đóng nốt khoá API, học Subagents và dựng repo lab — sau ngày này lộ trình hết nợ. Các tối 14–17 chỉ ≈3 giờ vì còn đi làm, dành cho ba khoá ngắn về Claude Code và hai bài config gõ thẳng trên máy.',
-      en: 'The first two days (11–12) are the tail of the foundations block and are already done. Sunday 13/09 is the catch-up day: finish the API course, take Subagents, and stand up the lab repo — after it the plan owes nothing. Evenings 14–17 are ≈3 hours each because they are work nights, spent on the three short Claude Code courses and two config exercises you do at the keyboard.',
+      vi: 'Hai ngày đầu tuần (11-12) là phần đuôi của khối nền tảng, đã xong. Chủ nhật 13/09 là ngày bắt kịp: đóng nốt khoá API, học Subagents và dựng repo lab - sau ngày này lộ trình hết nợ. Các tối 14-17 chỉ ≈3 giờ vì còn đi làm, dành cho ba khoá ngắn về Claude Code và hai bài config gõ thẳng trên máy.',
+      en: 'The first two days (11-12) are the tail of the foundations block and are already done. Sunday 13/09 is the catch-up day: finish the API course, take Subagents, and stand up the lab repo - after it the plan owes nothing. Evenings 14-17 are ≈3 hours each because they are work nights, spent on the three short Claude Code courses and two config exercises you do at the keyboard.',
     },
     days: [
       {
@@ -654,15 +654,15 @@ export const WEEKS: RoadmapWeek[] = [
         date: '2026-09-11',
         hours: 3,
         title: {
-          vi: 'API bài 43–57 · batch & context',
-          en: 'API lessons 43–57 · batch & context',
+          vi: 'API bài 43-57 · batch & context',
+          en: 'API lessons 43-57 · batch & context',
         },
         tasks: [
           {
             id: 'w2-0-0',
             title: {
-              vi: 'Academy API — bài <strong>43–57</strong> (≈1,5 giờ): Message Batches, context window',
-              en: 'Academy API — lessons <strong>43–57</strong> (≈1.5 hours): Message Batches, context window',
+              vi: 'Academy API - bài <strong>43-57</strong> (≈1,5 giờ): Message Batches, context window',
+              en: 'Academy API - lessons <strong>43-57</strong> (≈1.5 hours): Message Batches, context window',
             },
             tags: ['d4', 'd5'],
             steps: [
@@ -687,15 +687,15 @@ export const WEEKS: RoadmapWeek[] = [
         date: '2026-09-12',
         hours: 2.5,
         title: {
-          vi: 'Domain 5 · sample 7–12 · ngoài phạm vi',
-          en: 'Domain 5 · samples 7–12 · out of scope',
+          vi: 'Domain 5 · sample 7-12 · ngoài phạm vi',
+          en: 'Domain 5 · samples 7-12 · out of scope',
         },
         tasks: [
           {
             id: 'w2-1-0',
             title: {
-              vi: 'Đọc lướt {n5|Domain 5 note} (25 phút) — domain đòn bẩy',
-              en: 'Skim the {n5|Domain 5 note} (25 minutes) — the leverage domain',
+              vi: 'Đọc lướt {n5|Domain 5 note} (25 phút) - domain đòn bẩy',
+              en: 'Skim the {n5|Domain 5 note} (25 minutes) - the leverage domain',
             },
             tags: ['d5'],
             steps: [
@@ -716,8 +716,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-1-1',
             title: {
-              vi: 'Giải <strong>sample 7–12</strong> + đọc In-scope / Out-of-scope (35 phút)',
-              en: 'Work <strong>samples 7–12</strong> + read In-scope / Out-of-scope (35 minutes)',
+              vi: 'Giải <strong>sample 7-12</strong> + đọc In-scope / Out-of-scope (35 phút)',
+              en: 'Work <strong>samples 7-12</strong> + read In-scope / Out-of-scope (35 minutes)',
             },
             tags: ['m', 'a'],
             steps: [
@@ -726,8 +726,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'The remaining 6 questions: the Multi-Agent Research + CI scenarios. Cover the answers, pick, then compare with the rationale.',
               },
               {
-                vi: 'Mở mục 17 (Appendix): đọc <strong>Out-of-scope</strong> và gạch khỏi đầu — fine-tuning, RLHF, computer use, vision, streaming, rate limit, OAuth, cloud config.',
-                en: 'Open section 17 (Appendix): read <strong>Out-of-scope</strong> and strike it from your mind — fine-tuning, RLHF, computer use, vision, streaming, rate limits, OAuth, cloud config.',
+                vi: 'Mở mục 17 (Appendix): đọc <strong>Out-of-scope</strong> và gạch khỏi đầu - fine-tuning, RLHF, computer use, vision, streaming, rate limit, OAuth, cloud config.',
+                en: 'Open section 17 (Appendix): read <strong>Out-of-scope</strong> and strike it from your mind - fine-tuning, RLHF, computer use, vision, streaming, rate limits, OAuth, cloud config.',
               },
               {
                 vi: 'So với thẻ <em>Ngoài phạm vi</em> cuối trang này.',
@@ -753,14 +753,14 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-2-0',
             title: {
-              vi: 'Academy API — bài <strong>58–72</strong> (≈1,5 giờ)',
-              en: 'Academy API — lessons <strong>58–72</strong> (≈1.5 hours)',
+              vi: 'Academy API - bài <strong>58-72</strong> (≈1,5 giờ)',
+              en: 'Academy API - lessons <strong>58-72</strong> (≈1.5 hours)',
             },
             tags: ['d1', 'd4'],
             steps: [
               {
-                vi: 'Học ≈15 bài tiếp. Phần này thường là ví dụ ứng dụng / best practice — đi nhanh, nhưng dừng lại ở chỗ nào nhắc <code>stop_reason</code> hay error handling.',
-                en: 'Study the next ≈15 lessons. This part is usually application examples / best practices — move fast, but stop anywhere <code>stop_reason</code> or error handling comes up.',
+                vi: 'Học ≈15 bài tiếp. Phần này thường là ví dụ ứng dụng / best practice - đi nhanh, nhưng dừng lại ở chỗ nào nhắc <code>stop_reason</code> hay error handling.',
+                en: 'Study the next ≈15 lessons. This part is usually application examples / best practices - move fast, but stop anywhere <code>stop_reason</code> or error handling comes up.',
               },
             ],
             doneWhen: {
@@ -771,8 +771,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-2-1',
             title: {
-              vi: 'Academy API — bài <strong>73–85</strong>, <strong>hoàn thành khoá</strong> (≈1,2 giờ)',
-              en: 'Academy API — lessons <strong>73–85</strong>, <strong>finish the course</strong> (≈1.2 hours)',
+              vi: 'Academy API - bài <strong>73-85</strong>, <strong>hoàn thành khoá</strong> (≈1,2 giờ)',
+              en: 'Academy API - lessons <strong>73-85</strong>, <strong>finish the course</strong> (≈1.2 hours)',
             },
             tags: ['d1', 'd4'],
             steps: [
@@ -793,14 +793,14 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-2-2',
             title: {
-              vi: 'Academy <em>Introduction to Subagents</em> — 4 bài (30 phút)',
-              en: 'Academy <em>Introduction to Subagents</em> — 4 lessons (30 min)',
+              vi: 'Academy <em>Introduction to Subagents</em> - 4 bài (30 phút)',
+              en: 'Academy <em>Introduction to Subagents</em> - 4 lessons (30 min)',
             },
             tags: ['d1'],
             steps: [
               {
-                vi: 'Khoá ngắn. Ghi kỹ một câu: subagent <strong>không</strong> tự thừa kế context của agent cha — phải truyền trong prompt.',
-                en: "Short course. Write down one sentence carefully: a subagent does <strong>not</strong> inherit the parent agent's context — you have to pass it in the prompt.",
+                vi: 'Khoá ngắn. Ghi kỹ một câu: subagent <strong>không</strong> tự thừa kế context của agent cha - phải truyền trong prompt.',
+                en: "Short course. Write down one sentence carefully: a subagent does <strong>not</strong> inherit the parent agent's context - you have to pass it in the prompt.",
               },
               {
                 vi: 'Đây là câu hỏi kinh điển và cũng là nền của Ex4.',
@@ -815,8 +815,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-2-3',
             title: {
-              vi: 'Đọc lướt {n2|Domain 2 note} (25 phút) — domain yếu thứ 2',
-              en: 'Skim the {n2|Domain 2 note} (25 minutes) — your 2nd weakest domain',
+              vi: 'Đọc lướt {n2|Domain 2 note} (25 phút) - domain yếu thứ 2',
+              en: 'Skim the {n2|Domain 2 note} (25 minutes) - your 2nd weakest domain',
             },
             tags: ['d2'],
             steps: [
@@ -825,8 +825,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'You got 55% here on Mock 1. Pay special attention to <strong>tool descriptions</strong>: a poor description is the number 1 reason an agent calls the wrong tool.',
               },
               {
-                vi: 'Ghi ra một mô tả tool tốt gồm những gì — thứ Bảy 19/09 sẽ tự viết 4 tool.',
-                en: "Write down what a good tool description contains — on Saturday 19/09 you'll write 4 tools yourself.",
+                vi: 'Ghi ra một mô tả tool tốt gồm những gì - thứ Bảy 19/09 sẽ tự viết 4 tool.',
+                en: "Write down what a good tool description contains - on Saturday 19/09 you'll write 4 tools yourself.",
               },
             ],
             doneWhen: {
@@ -870,8 +870,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['a'],
             steps: [
               {
-                vi: 'So với lần chấm 05/09 — domain nào không nhúc nhích thì tuần 3 ưu tiên.',
-                en: "Compare against the 05/09 scoring — any domain that hasn't moved gets priority in week 3.",
+                vi: 'So với lần chấm 05/09 - domain nào không nhúc nhích thì tuần 3 ưu tiên.',
+                en: "Compare against the 05/09 scoring - any domain that hasn't moved gets priority in week 3.",
               },
               {
                 vi: 'Viết 3 câu hỏi cụ thể còn lấn cấn (vd: hook chạy lúc nào? subagent trả kết quả ra sao?). Build xong Ex1 ngày 20/09 phải tự trả lời được.',
@@ -897,14 +897,14 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-3-0',
             title: {
-              vi: 'Academy <em>Claude Code 101</em> — 13 bài (≈1,3 giờ), vừa học vừa gõ theo trên repo thật',
-              en: 'Academy <em>Claude Code 101</em> — 13 lessons (≈1.3 hours), typing along on a real repo',
+              vi: 'Academy <em>Claude Code 101</em> - 13 bài (≈1,3 giờ), vừa học vừa gõ theo trên repo thật',
+              en: 'Academy <em>Claude Code 101</em> - 13 lessons (≈1.3 hours), typing along on a real repo',
             },
             tags: ['d3'],
             steps: [
               {
-                vi: 'Mở terminal song song, gõ theo từng lệnh trên repo <code>ccaf-lab</code> — xem suông sẽ không nhớ.',
-                en: "Keep a terminal open alongside and type every command against the <code>ccaf-lab</code> repo — just watching won't stick.",
+                vi: 'Mở terminal song song, gõ theo từng lệnh trên repo <code>ccaf-lab</code> - xem suông sẽ không nhớ.',
+                en: "Keep a terminal open alongside and type every command against the <code>ccaf-lab</code> repo - just watching won't stick.",
               },
               {
                 vi: 'Tra {cc|code.claude.com/docs} khi gặp lệnh lạ.',
@@ -919,14 +919,14 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-3-1',
             title: {
-              vi: 'Academy <em>Introduction to Agent Skills</em> — 6 bài (40 phút)',
-              en: 'Academy <em>Introduction to Agent Skills</em> — 6 lessons (40 min)',
+              vi: 'Academy <em>Introduction to Agent Skills</em> - 6 bài (40 phút)',
+              en: 'Academy <em>Introduction to Agent Skills</em> - 6 lessons (40 min)',
             },
             tags: ['d3'],
             steps: [
               {
-                vi: 'Để ý frontmatter: <code>context: fork</code>, <code>allowed-tools</code>, <code>argument-hint</code> — tối thứ Tư 16/09 sẽ tự viết một skill.',
-                en: "Note the frontmatter: <code>context: fork</code>, <code>allowed-tools</code>, <code>argument-hint</code> — on Wednesday evening the 16th you'll write a skill yourself.",
+                vi: 'Để ý frontmatter: <code>context: fork</code>, <code>allowed-tools</code>, <code>argument-hint</code> - tối thứ Tư 16/09 sẽ tự viết một skill.',
+                en: "Note the frontmatter: <code>context: fork</code>, <code>allowed-tools</code>, <code>argument-hint</code> - on Wednesday evening the 16th you'll write a skill yourself.",
               },
             ],
             doneWhen: {
@@ -948,8 +948,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-4-0',
             title: {
-              vi: 'Academy <em>Claude Code in Action</em> — 10 bài (≈1,2 giờ)',
-              en: 'Academy <em>Claude Code in Action</em> — 10 lessons (≈1.2 hours)',
+              vi: 'Academy <em>Claude Code in Action</em> - 10 bài (≈1,2 giờ)',
+              en: 'Academy <em>Claude Code in Action</em> - 10 lessons (≈1.2 hours)',
             },
             tags: ['d3'],
             steps: [
@@ -959,8 +959,8 @@ export const WEEKS: RoadmapWeek[] = [
               },
             ],
             doneWhen: {
-              vi: 'Xong khoá, còn 2 khoá MCP để dành cho cuối tuần 19–20/09.',
-              en: 'Course done; the 2 MCP courses are left for the weekend of 19–20/09.',
+              vi: 'Xong khoá, còn 2 khoá MCP để dành cho cuối tuần 19-20/09.',
+              en: 'Course done; the 2 MCP courses are left for the weekend of 19-20/09.',
             },
           },
           {
@@ -976,8 +976,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'This domain is 20%. Read it to learn how many configuration layers Claude Code has and how they differ.',
               },
               {
-                vi: 'Đánh dấu 3 chỗ lạ nhất — Ex2 sẽ đụng hết.',
-                en: 'Mark the 3 most unfamiliar spots — Ex2 will hit all of them.',
+                vi: 'Đánh dấu 3 chỗ lạ nhất - Ex2 sẽ đụng hết.',
+                en: 'Mark the 3 most unfamiliar spots - Ex2 will hit all of them.',
               },
             ],
             doneWhen: {
@@ -1067,8 +1067,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w2-6-0',
             title: {
-              vi: 'Đọc task <strong>3.1–3.5 và 2.4–2.5</strong> đối chiếu với Ex2 (45 phút)',
-              en: 'Read tasks <strong>3.1–3.5 and 2.4–2.5</strong> against Ex2 (45 min)',
+              vi: 'Đọc task <strong>3.1-3.5 và 2.4-2.5</strong> đối chiếu với Ex2 (45 phút)',
+              en: 'Read tasks <strong>3.1-3.5 and 2.4-2.5</strong> against Ex2 (45 min)',
             },
             tags: ['d3', 'd2'],
             steps: [
@@ -1077,13 +1077,13 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Hierarchy, commands/skills, rules globs, plan mode, iterative refinement, MCP scoping, built-in tools (Grep/Glob/Read/Edit).',
               },
               {
-                vi: 'Dòng nào chưa làm — bổ sung vào repo lab ngay.',
-                en: 'Any line not done — add it to the lab repo now.',
+                vi: 'Dòng nào chưa làm - bổ sung vào repo lab ngay.',
+                en: 'Any line not done - add it to the lab repo now.',
               },
             ],
             doneWhen: {
-              vi: 'Không còn dòng nào trong 3.1–3.5 đọc thấy lạ.',
-              en: 'No line in 3.1–3.5 still reads as unfamiliar.',
+              vi: 'Không còn dòng nào trong 3.1-3.5 đọc thấy lạ.',
+              en: 'No line in 3.1-3.5 still reads as unfamiliar.',
             },
           },
           {
@@ -1121,14 +1121,14 @@ export const WEEKS: RoadmapWeek[] = [
     id: 'w3',
     label: { vi: 'Tuần 3', en: 'Week 3' },
     phase: {
-      vi: 'Cuối tuần build · Ex1–Ex4 · Đề 2–3',
-      en: 'Build weekend · Ex1–Ex4 · Mocks 2–3',
+      vi: 'Cuối tuần build · Ex1-Ex4 · Đề 2-3',
+      en: 'Build weekend · Ex1-Ex4 · Mocks 2-3',
     },
-    range: '18–24/09',
+    range: '18-24/09',
     span: 7,
     desc: {
-      vi: 'Tuần nặng nhất, ≈34 giờ. Đề 2 tối thứ Sáu 18, rồi 19 và 20 là cuối tuần cuối cùng còn build được — cả Exercise 1, hai khoá MCP, Ex2b và Đề 3 dồn vào hai ngày đó. Từ 21 đến 24 chỉ còn các tối đi làm ≈3 giờ: Ex3b, Ex3c, Ex4a, Ex4b và đọc nốt 29 task statement.',
-      en: 'The heaviest week, ≈34 hours. Mock 2 on Friday evening the 18th, then the 19th and 20th are the last weekend with room to build in — all of Exercise 1, both MCP courses, Ex2b and Mock 3 land on those two days. From the 21st to the 24th there are only ≈3-hour work nights: Ex3b, Ex3c, Ex4a, Ex4b, and the last of the 29 task statements.',
+      vi: 'Tuần nặng nhất, ≈34 giờ. Đề 2 tối thứ Sáu 18, rồi 19 và 20 là cuối tuần cuối cùng còn build được - cả Exercise 1, hai khoá MCP, Ex2b và Đề 3 dồn vào hai ngày đó. Từ 21 đến 24 chỉ còn các tối đi làm ≈3 giờ: Ex3b, Ex3c, Ex4a, Ex4b và đọc nốt 29 task statement.',
+      en: 'The heaviest week, ≈34 hours. Mock 2 on Friday evening the 18th, then the 19th and 20th are the last weekend with room to build in - all of Exercise 1, both MCP courses, Ex2b and Mock 3 land on those two days. From the 21st to the 24th there are only ≈3-hour work nights: Ex3b, Ex3c, Ex4a, Ex4b, and the last of the 29 task statements.',
     },
     days: [
       {
@@ -1136,8 +1136,8 @@ export const WEEKS: RoadmapWeek[] = [
         date: '2026-09-18',
         hours: 3,
         title: {
-          vi: 'Mock Đề 2 — lần timed đầu sau khi học',
-          en: 'Mock 2 — first timed run after studying',
+          vi: 'Mock Đề 2 - lần timed đầu sau khi học',
+          en: 'Mock 2 - first timed run after studying',
         },
         tasks: [
           {
@@ -1149,8 +1149,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['d4'],
             steps: [
               {
-                vi: 'Structured output qua tool_use, schema design, nullable để chống bịa. Dòng nào chưa làm — sửa.',
-                en: 'Structured output via tool_use, schema design, nullable to prevent fabrication. Any line you have not implemented — fix it.',
+                vi: 'Structured output qua tool_use, schema design, nullable để chống bịa. Dòng nào chưa làm - sửa.',
+                en: 'Structured output via tool_use, schema design, nullable to prevent fabrication. Any line you have not implemented - fix it.',
               },
             ],
             doneWhen: {
@@ -1161,14 +1161,14 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w3-0-1',
             title: {
-              vi: 'Mock <strong>Đề 2</strong> timed 120 phút — <strong>không F5, không rời tab</strong> tới màn hình kết quả (2 giờ)',
-              en: 'Mock <strong>2</strong>, timed 120 minutes — <strong>no refresh, do not leave the tab</strong> until the results screen (2 hours)',
+              vi: 'Mock <strong>Đề 2</strong> timed 120 phút - <strong>không F5, không rời tab</strong> tới màn hình kết quả (2 giờ)',
+              en: 'Mock <strong>2</strong>, timed 120 minutes - <strong>no refresh, do not leave the tab</strong> until the results screen (2 hours)',
             },
             tags: ['m'],
             steps: [
               {
-                vi: 'Tool đề thi thử <strong>không lưu đáp án</strong> — reload là mất hết (đã kiểm chứng). Làm một mạch.',
-                en: 'The practice test tool <strong>does not save answers</strong> — a reload wipes everything (verified). Do it in one sitting.',
+                vi: 'Tool đề thi thử <strong>không lưu đáp án</strong> - reload là mất hết (đã kiểm chứng). Làm một mạch.',
+                en: 'The practice test tool <strong>does not save answers</strong> - a reload wipes everything (verified). Do it in one sitting.',
               },
               {
                 vi: 'Canh nhịp: 15 câu / ≈30 phút. Câu mơ hồ flag, đi tiếp.',
@@ -1216,18 +1216,18 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w3-1-0',
             title: {
-              vi: 'Academy <em>Introduction to MCP</em> — 14 bài (≈1,5 giờ)',
-              en: 'Academy <em>Introduction to MCP</em> — 14 lessons (≈1.5 hours)',
+              vi: 'Academy <em>Introduction to MCP</em> - 14 bài (≈1,5 giờ)',
+              en: 'Academy <em>Introduction to MCP</em> - 14 lessons (≈1.5 hours)',
             },
             tags: ['d2'],
             steps: [
               {
-                vi: 'Học hết. Phân biệt <strong>tool</strong> (hành động) và <strong>resource</strong> (catalog nội dung) — đề hay hỏi khi nào dùng cái nào.',
-                en: 'Work through all of it. Distinguish a <strong>tool</strong> (an action) from a <strong>resource</strong> (a content catalog) — the exam often asks when to use which.',
+                vi: 'Học hết. Phân biệt <strong>tool</strong> (hành động) và <strong>resource</strong> (catalog nội dung) - đề hay hỏi khi nào dùng cái nào.',
+                en: 'Work through all of it. Distinguish a <strong>tool</strong> (an action) from a <strong>resource</strong> (a content catalog) - the exam often asks when to use which.',
               },
               {
-                vi: 'Để ý cờ <code>isError</code> — chiều nay sẽ dùng.',
-                en: "Note the <code>isError</code> flag — you'll use it this afternoon.",
+                vi: 'Để ý cờ <code>isError</code> - chiều nay sẽ dùng.',
+                en: "Note the <code>isError</code> flag - you'll use it this afternoon.",
               },
             ],
             doneWhen: {
@@ -1256,8 +1256,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: "Write the loop: <code>tool_use</code> → run the tool, append the result, call again; <code>end_turn</code> → stop. Don't use a loop counter as the stop condition, and don't inspect the text to guess it's done.",
               },
               {
-                vi: 'Hỏi agent kiểu mơ hồ ("kiểm tra đơn #12345 của tôi") 5 lần — gọi sai thì <strong>sửa mô tả</strong>, đừng vội few-shot.',
-                en: 'Ask the agent ambiguous questions ("check my order #12345") 5 times — if it calls the wrong tool, <strong>fix the description</strong>, don\'t jump to few-shot.',
+                vi: 'Hỏi agent kiểu mơ hồ ("kiểm tra đơn #12345 của tôi") 5 lần - gọi sai thì <strong>sửa mô tả</strong>, đừng vội few-shot.',
+                en: 'Ask the agent ambiguous questions ("check my order #12345") 5 times - if it calls the wrong tool, <strong>fix the description</strong>, don\'t jump to few-shot.',
               },
             ],
             doneWhen: {
@@ -1279,8 +1279,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Read both "Knowledge of" and "Skills in". For each line, ask yourself: does the code you just wrote actually do that?',
               },
               {
-                vi: 'Dòng nào chưa — sửa code ngay, đừng để sang ngày khác.',
-                en: "Any line it doesn't — fix the code now, don't leave it for another day.",
+                vi: 'Dòng nào chưa - sửa code ngay, đừng để sang ngày khác.',
+                en: "Any line it doesn't - fix the code now, don't leave it for another day.",
               },
             ],
             doneWhen: {
@@ -1331,8 +1331,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Write the prerequisite: without a customer ID from <code>get_customer</code>, <code>process_refund</code> does not run.',
               },
               {
-                vi: 'Bảo agent hoàn $600 — phải bị chặn <strong>bằng code</strong>, không phải nhờ prompt xin nó đừng làm. Đây là câu số 1 sample question và là nguyên tắc số 1 cả kỳ thi.',
-                en: 'Tell the agent to refund $600 — it must be blocked <strong>in code</strong>, not by a prompt asking it nicely not to. This is sample question number 1 and the number one principle of the whole exam.',
+                vi: 'Bảo agent hoàn $600 - phải bị chặn <strong>bằng code</strong>, không phải nhờ prompt xin nó đừng làm. Đây là câu số 1 sample question và là nguyên tắc số 1 cả kỳ thi.',
+                en: 'Tell the agent to refund $600 - it must be blocked <strong>in code</strong>, not by a prompt asking it nicely not to. This is sample question number 1 and the number one principle of the whole exam.',
               },
             ],
             doneWhen: {
@@ -1368,8 +1368,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Send one message containing 3 issues (order + shipping fee + refund): the agent splits them out, handles them, and returns <strong>one</strong> answer that misses nothing.',
               },
               {
-                vi: 'Khi escalate: kèm tóm tắt customer ID, nguyên nhân gốc, đề xuất — người nhận không đọc được lịch sử chat.',
-                en: 'On escalation: include a summary with the customer ID, root cause, and a recommendation — the recipient cannot read the chat history.',
+                vi: 'Khi escalate: kèm tóm tắt customer ID, nguyên nhân gốc, đề xuất - người nhận không đọc được lịch sử chat.',
+                en: 'On escalation: include a summary with the customer ID, root cause, and a recommendation - the recipient cannot read the chat history.',
               },
             ],
             doneWhen: {
@@ -1390,8 +1390,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Exactly the 5 task statements Ex1b touches: enforcement/handoff, hooks, structured errors, tool distribution, escalation.',
               },
               {
-                vi: 'Dòng nào code chưa làm — sửa ngay.',
-                en: "Any line the code doesn't do — fix it now.",
+                vi: 'Dòng nào code chưa làm - sửa ngay.',
+                en: "Any line the code doesn't do - fix it now.",
               },
             ],
             doneWhen: {
@@ -1402,8 +1402,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w3-2-2',
             title: {
-              vi: 'Academy <em>MCP: Advanced Topics</em> — 15 bài (≈1,8 giờ) — <strong>khoá Academy cuối cùng</strong>',
-              en: 'Academy <em>MCP: Advanced Topics</em> — 15 lessons (≈1.8 hours) — <strong>the last Academy course</strong>',
+              vi: 'Academy <em>MCP: Advanced Topics</em> - 15 bài (≈1,8 giờ) - <strong>khoá Academy cuối cùng</strong>',
+              en: 'Academy <em>MCP: Advanced Topics</em> - 15 lessons (≈1.8 hours) - <strong>the last Academy course</strong>',
             },
             tags: ['d2'],
             steps: [
@@ -1450,8 +1450,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w3-2-4',
             title: {
-              vi: 'Mock <strong>Đề 3</strong> timed 120 phút — một mạch tới màn kết quả (2 giờ)',
-              en: 'Mock <strong>3</strong>, timed 120 minutes — one sitting through to the results screen (2 hours)',
+              vi: 'Mock <strong>Đề 3</strong> timed 120 phút - một mạch tới màn kết quả (2 giờ)',
+              en: 'Mock <strong>3</strong>, timed 120 minutes - one sitting through to the results screen (2 hours)',
             },
             tags: ['m'],
             steps: [
@@ -1474,8 +1474,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['m'],
             steps: [
               {
-                vi: 'Sai câu nào ghi quy tắc vi phạm. Chỗ % thật lệch nhiều so với confidence tự chấm = bạn đang tự đánh giá sai — chỉnh thanh.',
-                en: 'For every wrong answer, note the rule you broke. Where the real % is far off your self-rated confidence, your self-assessment is wrong — adjust the bar.',
+                vi: 'Sai câu nào ghi quy tắc vi phạm. Chỗ % thật lệch nhiều so với confidence tự chấm = bạn đang tự đánh giá sai - chỉnh thanh.',
+                en: 'For every wrong answer, note the rule you broke. Where the real % is far off your self-rated confidence, your self-assessment is wrong - adjust the bar.',
               },
             ],
             doneWhen: {
@@ -1511,8 +1511,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Log it: which errors the retry fixes (formatting), which ones stay broken no matter how many retries (information absent from the source). Add <code>calculated_total</code> vs <code>stated_total</code> + <code>conflict_detected</code>.',
               },
               {
-                vi: 'Thêm 2–4 few-shot cho format đa dạng; đo tỉ lệ đúng trước/sau.',
-                en: 'Add 2–4 few-shot examples for varied formats; measure accuracy before and after.',
+                vi: 'Thêm 2-4 few-shot cho format đa dạng; đo tỉ lệ đúng trước/sau.',
+                en: 'Add 2-4 few-shot examples for varied formats; measure accuracy before and after.',
               },
             ],
             doneWhen: {
@@ -1563,8 +1563,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Have the model emit confidence <strong>per field</strong>; low confidence / conflicting sources → human review. Calibrate the threshold with a labeled validation set.',
               },
               {
-                vi: 'Stratified sampling theo loại tài liệu & trường — accuracy tổng 97% vẫn che được một loại đang sai 40%.',
-                en: 'Stratified sampling by document type and field — 97% overall accuracy can still hide one type sitting at 40% wrong.',
+                vi: 'Stratified sampling theo loại tài liệu & trường - accuracy tổng 97% vẫn che được một loại đang sai 40%.',
+                en: 'Stratified sampling by document type and field - 97% overall accuracy can still hide one type sitting at 40% wrong.',
               },
             ],
             doneWhen: {
@@ -1665,8 +1665,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w3-6-1',
             title: {
-              vi: 'Đọc task <strong>1.2, 1.3, 1.6, 1.7, 5.1, 5.3, 5.6, 3.6, 4.6</strong> — đối chiếu Ex4 + CI (30 phút)',
-              en: 'Read tasks <strong>1.2, 1.3, 1.6, 1.7, 5.1, 5.3, 5.6, 3.6, 4.6</strong> — cross-check against Ex4 + CI (30 minutes)',
+              vi: 'Đọc task <strong>1.2, 1.3, 1.6, 1.7, 5.1, 5.3, 5.6, 3.6, 4.6</strong> - đối chiếu Ex4 + CI (30 phút)',
+              en: 'Read tasks <strong>1.2, 1.3, 1.6, 1.7, 5.1, 5.3, 5.6, 3.6, 4.6</strong> - cross-check against Ex4 + CI (30 minutes)',
             },
             tags: ['d1', 'd5', 'd3', 'd4'],
             steps: [
@@ -1688,14 +1688,14 @@ export const WEEKS: RoadmapWeek[] = [
     id: 'w4',
     label: { vi: 'Tuần thi', en: 'Exam week' },
     phase: {
-      vi: 'Đề 4–5 · quyết định · thi 27/09',
-      en: 'Mocks 4–5 · the call · exam 27/09',
+      vi: 'Đề 4-5 · quyết định · thi 27/09',
+      en: 'Mocks 4-5 · the call · exam 27/09',
     },
-    range: '25–30/09',
+    range: '25-30/09',
     span: 6,
     desc: {
-      vi: 'Đề 4 tối thứ Sáu 25 và chốt giữ hay dời lịch ngay tối đó — hạn đổi miễn phí là 24 giờ trước giờ thi nên không để sang thứ Bảy. Thứ Bảy 26: tổng duyệt Đề 5 buổi sáng, chiều vá đúng lỗ hổng vừa lộ, không học khái niệm mới. Thi Chủ nhật 27. Ba ngày sau để chốt với L&D và đặt nhắc gia hạn.',
-      en: 'Mock 4 on Friday evening the 25th, and the keep-or-reschedule call that same evening — the free-change deadline is 24 hours before the exam slot, so it cannot wait for Saturday. Saturday the 26th: a dress rehearsal on Mock 5 in the morning, then patch exactly the gaps it exposes. No new material. Exam on Sunday the 27th, and the three days after are for wrapping up with L&D and setting a renewal reminder.',
+      vi: 'Đề 4 tối thứ Sáu 25 và chốt giữ hay dời lịch ngay tối đó - hạn đổi miễn phí là 24 giờ trước giờ thi nên không để sang thứ Bảy. Thứ Bảy 26: tổng duyệt Đề 5 buổi sáng, chiều vá đúng lỗ hổng vừa lộ, không học khái niệm mới. Thi Chủ nhật 27. Ba ngày sau để chốt với L&D và đặt nhắc gia hạn.',
+      en: 'Mock 4 on Friday evening the 25th, and the keep-or-reschedule call that same evening - the free-change deadline is 24 hours before the exam slot, so it cannot wait for Saturday. Saturday the 26th: a dress rehearsal on Mock 5 in the morning, then patch exactly the gaps it exposes. No new material. Exam on Sunday the 27th, and the three days after are for wrapping up with L&D and setting a renewal reminder.',
     },
     days: [
       {
@@ -1720,8 +1720,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'No refresh. Log it. Target: <strong>≥80%</strong>, no domain <70%.',
               },
               {
-                vi: 'Đây là <strong>đề quyết định</strong> — điểm của nó cùng với Đề 3 là căn cứ để giữ hay dời lịch ngay tối nay. Làm sớm, đừng bắt đầu sau 20h.',
-                en: 'This is <strong>the deciding mock</strong> — its score together with Mock 3 is what the keep-or-reschedule call rests on tonight. Start early; do not begin after 8pm.',
+                vi: 'Đây là <strong>đề quyết định</strong> - điểm của nó cùng với Đề 3 là căn cứ để giữ hay dời lịch ngay tối nay. Làm sớm, đừng bắt đầu sau 20h.',
+                en: 'This is <strong>the deciding mock</strong> - its score together with Mock 3 is what the keep-or-reschedule call rests on tonight. Start early; do not begin after 8pm.',
               },
               {
                 vi: 'Đây là đề làm sau một ngày đi làm, nên trừ hao: thấp hơn Đề 3 vài điểm là do mệt chứ chưa chắc là tụt.',
@@ -1760,7 +1760,7 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['a'],
             steps: [
               {
-                vi: 'Quyết tối nay chứ không đợi Đề 5 sáng mai: hạn đổi miễn phí là <strong>24 giờ trước giờ thi</strong>, mà giờ thi có thể là sáng Chủ nhật — lúc đó hạn đã trôi qua từ sáng thứ Bảy.',
+                vi: 'Quyết tối nay chứ không đợi Đề 5 sáng mai: hạn đổi miễn phí là <strong>24 giờ trước giờ thi</strong>, mà giờ thi có thể là sáng Chủ nhật - lúc đó hạn đã trôi qua từ sáng thứ Bảy.',
                 en: 'Decide tonight rather than waiting for Mock 5 tomorrow morning: the free-change window closes <strong>24 hours before the exam slot</strong>, and if that slot is Sunday morning the window is already gone by Saturday morning.',
               },
               {
@@ -1768,8 +1768,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Threshold met → rest. Not met → go into Pearson VUE and move it to next week (still before 01/10), then send L&D a one-liner.',
               },
               {
-                vi: 'Nhớ: rớt là tự trả $125 và chờ 14 ngày — dời 3–4 ngày rẻ hơn nhiều so với thi liều.',
-                en: 'Remember: a fail is $125 out of your own pocket plus a 14-day wait — pushing 3–4 days is far cheaper than sitting the exam unprepared.',
+                vi: 'Nhớ: rớt là tự trả $125 và chờ 14 ngày - dời 3-4 ngày rẻ hơn nhiều so với thi liều.',
+                en: 'Remember: a fail is $125 out of your own pocket plus a 14-day wait - pushing 3-4 days is far cheaper than sitting the exam unprepared.',
               },
             ],
             doneWhen: {
@@ -1791,8 +1791,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w4-1-0',
             title: {
-              vi: 'Mock <strong>Đề 5</strong> buổi sáng — tổng duyệt đúng khung giờ thi, 120 phút + review (2,5 giờ)',
-              en: '<strong>Mock 5</strong> in the morning — a dress rehearsal at the same hour as the exam, 120 minutes + review (2.5 hours)',
+              vi: 'Mock <strong>Đề 5</strong> buổi sáng - tổng duyệt đúng khung giờ thi, 120 phút + review (2,5 giờ)',
+              en: '<strong>Mock 5</strong> in the morning - a dress rehearsal at the same hour as the exam, 120 minutes + review (2.5 hours)',
             },
             tags: ['m'],
             steps: [
@@ -1805,8 +1805,8 @@ export const WEEKS: RoadmapWeek[] = [
                 en: 'Last practice test. No refreshing. Write it up in the log, then review for 30 minutes focused on the mistakes that keep repeating.',
               },
               {
-                vi: 'Quyết định giữ hay dời <strong>đã chốt tối qua</strong>. Đề này thấp hơn kỳ vọng cũng không lật lại quyết định đó — dùng nó để biết chiều nay vá gì, hết.',
-                en: 'The keep-or-reschedule call was <strong>settled last night</strong>. A lower-than-hoped score here does not reopen it — use it to decide what to patch this afternoon, nothing more.',
+                vi: 'Quyết định giữ hay dời <strong>đã chốt tối qua</strong>. Đề này thấp hơn kỳ vọng cũng không lật lại quyết định đó - dùng nó để biết chiều nay vá gì, hết.',
+                en: 'The keep-or-reschedule call was <strong>settled last night</strong>. A lower-than-hoped score here does not reopen it - use it to decide what to patch this afternoon, nothing more.',
               },
             ],
             doneWhen: {
@@ -1817,22 +1817,22 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w4-1-1',
             title: {
-              vi: 'Đào sâu domain thấp nhất theo Đề 3–5: đọc lại note + task statement + sửa code lab (1,5 giờ)',
-              en: 'Deep-dive the weakest domain from Mocks 3–5: re-read the notes + task statement + fix the lab code (1.5 hours)',
+              vi: 'Đào sâu domain thấp nhất theo Đề 3-5: đọc lại note + task statement + sửa code lab (1,5 giờ)',
+              en: 'Deep-dive the weakest domain from Mocks 3-5: re-read the notes + task statement + fix the lab code (1.5 hours)',
             },
             tags: ['d1', 'd2', 'd5'],
             steps: [
               {
-                vi: 'Lấy domain % thấp nhất qua 3 đề gần nhất. Đọc lại note tiếng Việt + đúng task statement của domain đó. <strong>Chỉ một domain</strong> — hôm nay không đủ thời gian cho hai.',
-                en: "Take the domain with the lowest % across the last 3 mocks. Re-read the Vietnamese notes + that domain's actual task statements. <strong>One domain only</strong> — there is no time for two today.",
+                vi: 'Lấy domain % thấp nhất qua 3 đề gần nhất. Đọc lại note tiếng Việt + đúng task statement của domain đó. <strong>Chỉ một domain</strong> - hôm nay không đủ thời gian cho hai.',
+                en: "Take the domain with the lowest % across the last 3 mocks. Re-read the Vietnamese notes + that domain's actual task statements. <strong>One domain only</strong> - there is no time for two today.",
               },
               {
                 vi: 'Nếu là D1 hay D2 (khả năng cao theo Đề 1): mở lại Ex1 và Ex4, làm lại đúng phần yếu.',
                 en: 'If it is D1 or D2 (likely, based on Mock 1): reopen Ex1 and Ex4 and redo exactly the weak part.',
               },
               {
-                vi: 'Nếu là D5: đọc lại 5.1–5.6 và chạy lại phần error propagation / provenance của Ex4b.',
-                en: 'If it is D5: re-read 5.1–5.6 and rerun the error propagation / provenance part of Ex4b.',
+                vi: 'Nếu là D5: đọc lại 5.1-5.6 và chạy lại phần error propagation / provenance của Ex4b.',
+                en: 'If it is D5: re-read 5.1-5.6 and rerun the error propagation / provenance part of Ex4b.',
               },
             ],
             doneWhen: {
@@ -1843,8 +1843,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w4-1-2',
             title: {
-              vi: 'Học <strong>Bảng chốt 6 nhóm</strong> lần 1 — che, viết lại ra giấy (30 phút)',
-              en: 'Study the <strong>6-group cheat sheet</strong>, pass 1 — cover it, write it out on paper (30 minutes)',
+              vi: 'Học <strong>Bảng chốt 6 nhóm</strong> lần 1 - che, viết lại ra giấy (30 phút)',
+              en: 'Study the <strong>6-group cheat sheet</strong>, pass 1 - cover it, write it out on paper (30 minutes)',
             },
             tags: ['a'],
             steps: [
@@ -1865,8 +1865,8 @@ export const WEEKS: RoadmapWeek[] = [
           {
             id: 'w4-1-3',
             title: {
-              vi: 'Luyện loại bẫy đáp án: gom câu sai Đề 2–5, gọi tên loại bẫy từng phương án (30 phút)',
-              en: 'Drill trap types: collect the wrong answers from Mocks 2–5, name the trap type in each option (30 minutes)',
+              vi: 'Luyện loại bẫy đáp án: gom câu sai Đề 2-5, gọi tên loại bẫy từng phương án (30 phút)',
+              en: 'Drill trap types: collect the wrong answers from Mocks 2-5, name the trap type in each option (30 minutes)',
             },
             tags: ['m'],
             steps: [
@@ -1941,8 +1941,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['a'],
             steps: [
               {
-                vi: 'Đọc lướt 6 nhóm trên điện thoại rồi cất — vào phòng không mang theo.',
-                en: 'Skim the 6 groups on your phone, then put it away — nothing comes into the room with you.',
+                vi: 'Đọc lướt 6 nhóm trên điện thoại rồi cất - vào phòng không mang theo.',
+                en: 'Skim the 6 groups on your phone, then put it away - nothing comes into the room with you.',
               },
             ],
             doneWhen: {
@@ -2036,8 +2036,8 @@ export const WEEKS: RoadmapWeek[] = [
             tags: ['a'],
             steps: [
               {
-                vi: 'Đây là dữ liệu công ty dùng cho mốc Partnership 01/10 — điền sớm.',
-                en: 'This is the data the company uses for the 01/10 Partnership milestone — fill it in early.',
+                vi: 'Đây là dữ liệu công ty dùng cho mốc Partnership 01/10 - điền sớm.',
+                en: 'This is the data the company uses for the 01/10 Partnership milestone - fill it in early.',
               },
             ],
             doneWhen: { vi: 'Sheet đã cập nhật.', en: 'Sheet updated.' },

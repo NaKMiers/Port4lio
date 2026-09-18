@@ -66,7 +66,7 @@ export default function ResumeSkillsSection({
       <div className='space-y-4'>
         <p className={helpTextCls}>
           Each row justifies edge to edge on the printed page, so row membership is a layout
-          decision, not a grouping one — nine short items fit a row comfortably, five long ones do
+          decision, not a grouping one - nine short items fit a row comfortably, five long ones do
           not. Separate items with commas or newlines. Blocks print in the order shown here.
         </p>
 

@@ -64,7 +64,7 @@ export const UI = {
   },
   pageTitle: { vi: 'Lộ trình CCA-F', en: 'The CCA-F roadmap' },
   ledeBefore: {
-    vi: 'Bốn tuần, 26 ngày, 68 việc — bám Exam Guide v1.0 của Anthropic, khối lượng dồn vào cuối tuần vì trong tuần còn đi làm. Mục tiêu không phải đậu 720, mà là ',
+    vi: 'Bốn tuần, 26 ngày, 68 việc - bám Exam Guide v1.0 của Anthropic, khối lượng dồn vào cuối tuần vì trong tuần còn đi làm. Mục tiêu không phải đậu 720, mà là ',
     en: "Four weeks, 26 days, 68 tasks, built around Anthropic's Exam Guide v1.0 and weighted toward the weekends, because the weekdays are work days. The target is not a 720 pass but ",
   },
   ledeAfter: {
@@ -73,8 +73,8 @@ export const UI = {
   },
   howToReadLabel: { vi: 'Cách đọc trang này.', en: 'How to read this page.' },
   howToRead: {
-    vi: 'Mỗi việc bấm vào để mở hướng dẫn từng bước: mở link nào, gõ lệnh gì, và dòng <em>Xong khi</em> cho biết thế nào là làm xong. Phần tham chiếu ở cuối trang — bảng chốt 6 nhóm kiến thức, 12 quy tắc phán đoán, bẫy đáp án — là thứ đọc lại trong năm phút cuối trước khi vào phòng thi.',
-    en: 'Click any task to open its steps: which link to open, which command to run, and a <em>Done when</em> line that says what finished actually looks like. The reference at the bottom — six fact groups, twelve judgment rules, the answer traps — is what gets re-read in the last five minutes before the exam.',
+    vi: 'Mỗi việc bấm vào để mở hướng dẫn từng bước: mở link nào, gõ lệnh gì, và dòng <em>Xong khi</em> cho biết thế nào là làm xong. Phần tham chiếu ở cuối trang - bảng chốt 6 nhóm kiến thức, 12 quy tắc phán đoán, bẫy đáp án - là thứ đọc lại trong năm phút cuối trước khi vào phòng thi.',
+    en: 'Click any task to open its steps: which link to open, which command to run, and a <em>Done when</em> line that says what finished actually looks like. The reference at the bottom - six fact groups, twelve judgment rules, the answer traps - is what gets re-read in the last five minutes before the exam.',
   },
 
   // --- tiles ----------------------------------------------------------------
@@ -117,8 +117,8 @@ export const UI = {
   statusSaving: { vi: 'Đang lưu…', en: 'Saving…' },
   statusSaved: { vi: 'Đã lưu', en: 'Saved' },
   statusError: {
-    vi: 'Chưa lưu được — thử lại sau',
-    en: 'Not saved — will retry',
+    vi: 'Chưa lưu được - thử lại sau',
+    en: 'Not saved - will retry',
   },
   statusReadonly: { vi: 'Chỉ xem', en: 'Read-only' },
 
@@ -147,8 +147,8 @@ export const UI = {
   // --- rail: readiness ------------------------------------------------------
   readinessTitle: { vi: 'Độ sẵn sàng theo domain', en: 'Readiness by domain' },
   readinessHelp: {
-    vi: 'Dải trên là đề thi chia theo trọng số; phần đậm của mỗi khối là mức bạn tự chấm, và cộng lại đúng bằng con số bên cạnh. Số <em>còn</em> ở mỗi dòng là điểm domain đó vẫn đang bỏ trên bàn — học chỗ nào có số lớn thì tổng lên nhanh nhất.',
-    en: 'The strip above is the exam split by weight; the solid part of each block is what you have rated yourself, and together they come to exactly the number beside it. The <em>left</em> figure on each row is what that domain is still leaving on the table — study where the figure is biggest and the total moves fastest.',
+    vi: 'Dải trên là đề thi chia theo trọng số; phần đậm của mỗi khối là mức bạn tự chấm, và cộng lại đúng bằng con số bên cạnh. Số <em>còn</em> ở mỗi dòng là điểm domain đó vẫn đang bỏ trên bàn - học chỗ nào có số lớn thì tổng lên nhanh nhất.',
+    en: 'The strip above is the exam split by weight; the solid part of each block is what you have rated yourself, and together they come to exactly the number beside it. The <em>left</em> figure on each row is what that domain is still leaving on the table - study where the figure is biggest and the total moves fastest.',
   },
   readinessTotal: {
     vi: 'Ước lượng theo trọng số đề thi',
@@ -160,8 +160,8 @@ export const UI = {
   // --- rail: mocks ----------------------------------------------------------
   mocksTitle: { vi: 'Nhật ký đề thi thử', en: 'Practice test log' },
   mocksHelp: {
-    vi: 'Chỉ đặt lịch thi khi <strong>2 đề liên tiếp ≥ 80%</strong> và không domain nào dưới 70%. Điểm scaled bên dưới chỉ là ước lượng tuyến tính — Anthropic không công bố công thức quy đổi.',
-    en: 'Only book the exam once <strong>two consecutive mocks clear 80%</strong> with no domain under 70%. The scaled score below is a linear stand-in — Anthropic does not publish the real scaling.',
+    vi: 'Chỉ đặt lịch thi khi <strong>2 đề liên tiếp ≥ 80%</strong> và không domain nào dưới 70%. Điểm scaled bên dưới chỉ là ước lượng tuyến tính - Anthropic không công bố công thức quy đổi.',
+    en: 'Only book the exam once <strong>two consecutive mocks clear 80%</strong> with no domain under 70%. The scaled score below is a linear stand-in - Anthropic does not publish the real scaling.',
   },
   mockDate: { vi: 'Ngày', en: 'Date' },
   mockLabel: { vi: 'Đề', en: 'Mock' },

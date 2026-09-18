@@ -159,7 +159,7 @@ export function renderGithubReadme(
     shipped(profile),
     experience(profile, ctx),
     certificates(profile),
-    '<sub>Generated from ' + siteUrl(ctx) + ' — edits there land here automatically.</sub>',
+    '<sub>Generated from ' + siteUrl(ctx) + ' - edits there land here automatically.</sub>',
   ])
 
   return { kind: 'file', path: 'README.md', content }

@@ -26,8 +26,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const { resume: stored, avatar } = await loadPublicResume()
   const resume = deriveResume({ resume: stored }, avatar)
 
-  const title = `${resume.name} — CV`
-  const description = `${resume.role} — curriculum vitae of ${resume.name}.`
+  const title = `${resume.name} - CV`
+  const description = `${resume.role} - curriculum vitae of ${resume.name}.`
 
   return {
     title,
@@ -75,8 +75,8 @@ export default async function CVPage() {
           '@type': 'ProfilePage',
           '@id': `${origin}/cv`,
           url: `${origin}/cv`,
-          name: `${resume.name} — CV`,
-          description: `${resume.role} — curriculum vitae of ${resume.name}.`,
+          name: `${resume.name} - CV`,
+          description: `${resume.role} - curriculum vitae of ${resume.name}.`,
           inLanguage: 'en',
           mainEntity: { '@id': personId },
           isPartOf: { '@id': `${origin}/#website` },

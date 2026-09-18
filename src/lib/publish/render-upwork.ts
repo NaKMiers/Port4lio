@@ -37,7 +37,7 @@ function overview(profile: PublicProfile, ctx: RenderContext): string {
     blocks.push(
       ['What I can do for you:', ...services.map(service => {
         const description = collapseWhitespace(service.description)
-        return `• ${collapseWhitespace(service.title)}${description ? ` — ${description}` : ''}`
+        return `• ${collapseWhitespace(service.title)}${description ? ` - ${description}` : ''}`
       })].join('\n')
     )
   } else if (brief.length > 0) {
@@ -54,7 +54,7 @@ function overview(profile: PublicProfile, ctx: RenderContext): string {
         const tech = (project.techStack ?? []).map(collapseWhitespace).filter(Boolean)
         const overviewText = collapseWhitespace(project.overview ?? '')
         const suffix = tech.length > 0 ? ` (${tech.slice(0, 8).join(', ')})` : ''
-        return `• ${collapseWhitespace(project.title)}${overviewText ? ` — ${overviewText}` : ''}${suffix}`
+        return `• ${collapseWhitespace(project.title)}${overviewText ? ` - ${overviewText}` : ''}${suffix}`
       })].join('\n')
     )
   }

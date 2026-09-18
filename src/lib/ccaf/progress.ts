@@ -245,7 +245,7 @@ export function overallProgress(doneTaskIds: readonly string[]): Progress {
  * Architecture (27%) costs nearly twice what the same shakiness costs on Context
  * Management (15%), and a flat mean hides exactly that.
  *
- * Returns `null` when nothing has been rated, so the UI can show "—" rather than a
+ * Returns `null` when nothing has been rated, so the UI can show "-" rather than a
  * confident-looking 0%.
  */
 export function readinessPercent(confidence: readonly number[]): number | null {

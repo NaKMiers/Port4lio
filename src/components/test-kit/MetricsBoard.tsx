@@ -173,7 +173,7 @@ function ProductSection({ label, metrics }: { label: string; metrics?: ProductMe
         <Row label='Arrivals from a share' value={metrics.attributions} />
         <Row
           label='Arrivals per share'
-          value={metrics.shareRate === null ? '—' : metrics.shareRate.toFixed(2)}
+          value={metrics.shareRate === null ? '-' : metrics.shareRate.toFixed(2)}
         />
       </Group>
 
@@ -182,7 +182,7 @@ function ProductSection({ label, metrics }: { label: string; metrics?: ProductMe
         footnote="Feeds each test's length and time limit, which are otherwise chosen by copying whoever we are modelling."
       >
         <Row label='Sessions that left unfinished' value={metrics.abandonment.sessions} />
-        <Row label='Median question reached' value={metrics.abandonment.medianFurthest ?? '—'} />
+        <Row label='Median question reached' value={metrics.abandonment.medianFurthest ?? '-'} />
       </Group>
     </section>
   )

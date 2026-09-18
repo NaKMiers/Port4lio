@@ -41,7 +41,7 @@ const FOOTER: Record<SyndicationTarget, (canonical: string) => string> = {
       '---',
       '',
       '*Mình là lập trình viên full stack, tự viết cả hai bài test tính cách trên trang cá',
-      'nhân — bài viết này ra đời từ quá trình đó. Nếu bạn muốn trao đổi về một dự án, cứ',
+      'nhân - bài viết này ra đời từ quá trình đó. Nếu bạn muốn trao đổi về một dự án, cứ',
       `nhắn cho mình: [portfolio và liên hệ](${canonical.replace(/\/blog\/.*$/, '/#contact')}).*`,
       '',
       `*[Bản tiếng Anh đầy đủ](${canonical}).*`,

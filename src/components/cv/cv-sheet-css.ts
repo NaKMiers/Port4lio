@@ -273,7 +273,7 @@ export const CV_ROUTE_CSS = `
 }
 
 /* Scale the sheet down on narrow viewports; the layout itself never changes.
-   Screen-only — print must always render the sheet at true A4. */
+   Screen-only - print must always render the sheet at true A4. */
 @media screen and (max-width: 900px) { .cv .sheet { zoom: 0.86; } }
 @media screen and (max-width: 780px) { .cv .sheet { zoom: 0.72; } }
 @media screen and (max-width: 660px) { .cv .sheet { zoom: 0.58; } }

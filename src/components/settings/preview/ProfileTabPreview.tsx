@@ -122,7 +122,7 @@ export default function ProfileTabPreview({
 
       <PreviewBlock title='Stat tiles' count={hero.stats.length}>
         {hero.stats.length === 0 ? (
-          <EmptyHint>No stats yet — the hero metric row and the “At a glance” band stay hidden.</EmptyHint>
+          <EmptyHint>No stats yet - the hero metric row and the “At a glance” band stay hidden.</EmptyHint>
         ) : (
           <>
             <div className='grid grid-cols-3 gap-2'>
@@ -147,7 +147,7 @@ export default function ProfileTabPreview({
 
       <PreviewBlock title='Social surfaces' count={socialProof.profiles.length}>
         {socialProof.profiles.length === 0 ? (
-          <EmptyHint>No usable links — the social strip is not rendered at all.</EmptyHint>
+          <EmptyHint>No usable links - the social strip is not rendered at all.</EmptyHint>
         ) : (
           <>
             <p className='text-[11px] text-pp-muted'>
@@ -163,7 +163,7 @@ export default function ProfileTabPreview({
         )}
         {socialDropped > 0 ? (
           <CutoffNote>
-            {socialDropped} link{socialDropped > 1 ? 's' : ''} hidden from the live site — each
+            {socialDropped} link{socialDropped > 1 ? 's' : ''} hidden from the live site - each
             needs an http(s), mailto, tel or root-relative URL.
           </CutoffNote>
         ) : null}
@@ -171,7 +171,7 @@ export default function ProfileTabPreview({
 
       <PreviewBlock title='Story' count={about.paragraphs.length}>
         {about.paragraphs.length === 0 ? (
-          <EmptyHint>About Me is empty — the story panel and the pull quote stay hidden.</EmptyHint>
+          <EmptyHint>About Me is empty - the story panel and the pull quote stay hidden.</EmptyHint>
         ) : (
           <PreviewCard>
             <p className='text-[13px] leading-relaxed text-pp-text'>{about.paragraphs[0]}</p>
@@ -191,10 +191,10 @@ export default function ProfileTabPreview({
             <p className='text-[13px] italic leading-relaxed text-pp-text'>
               “{founderProof.quote}”
             </p>
-            <p className={`mt-2 ${previewEyebrowCls}`}>— {founderProof.attributionName}</p>
+            <p className={`mt-2 ${previewEyebrowCls}`}>- {founderProof.attributionName}</p>
           </PreviewCard>
           <CutoffNote>
-            Lifted automatically from the last paragraph of About Me — edit that paragraph to
+            Lifted automatically from the last paragraph of About Me - edit that paragraph to
             change it.
           </CutoffNote>
         </PreviewBlock>

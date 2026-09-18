@@ -80,7 +80,7 @@ export default function OfferingTabPreview({
 
         {services.items.length === 0 ? (
           services.briefBullets.length === 0 ? (
-            <EmptyHint>No services or bullets — the whole capabilities section is hidden.</EmptyHint>
+            <EmptyHint>No services or bullets - the whole capabilities section is hidden.</EmptyHint>
           ) : (
             <CutoffNote>
               No service cards, so the bullets above render as the section&apos;s own cards instead.
@@ -125,7 +125,7 @@ export default function OfferingTabPreview({
           <CutoffNote>No work heading set, so the section prints “Selected work”.</CutoffNote>
         )}
         {featuredProjects.projects.length === 0 ? (
-          <EmptyHint>No renderable projects — the featured band is hidden.</EmptyHint>
+          <EmptyHint>No renderable projects - the featured band is hidden.</EmptyHint>
         ) : (
           <div className='space-y-2'>
             {featuredProjects.projects.map((project, index) => (
@@ -192,7 +192,7 @@ function FeaturedProjectCard({ project, index }: { project: ProjectItem; index: 
             <p className='mt-1 text-[11px] leading-relaxed text-pp-muted'>{project.overview}</p>
           ) : (
             <p className='mt-1 text-[11px] italic text-pp-muted'>
-              No overview — the Overview card is skipped.
+              No overview - the Overview card is skipped.
             </p>
           )}
         </div>

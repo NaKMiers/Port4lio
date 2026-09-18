@@ -1,3 +1,4 @@
+import { Minimize2, Maximize2 } from 'lucide-react'
 import Link from 'next/link'
 import React from 'react'
 
@@ -35,7 +36,7 @@ export default function SettingToolbar({
         title={fullWidth ? 'Return to the editorial column width' : 'Use the full browser width'}
         className='absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-pp-line bg-white/86 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_10px_24px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white sm:right-5 sm:top-5'
       >
-        <span aria-hidden>{fullWidth ? '⇥⇤' : '⇤⇥'}</span>
+        {fullWidth ? <Minimize2 aria-hidden size={12} /> : <Maximize2 aria-hidden size={12} />}
         {fullWidth ? 'Shrink' : 'Extend'}
       </button>
 

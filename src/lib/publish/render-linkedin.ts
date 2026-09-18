@@ -44,7 +44,7 @@ function about(profile: PublicProfile, ctx: RenderContext): string {
     blocks.push(
       ['What I have shipped:', ...projects.map(project => {
         const overview = collapseWhitespace(project.overview ?? '')
-        return `• ${collapseWhitespace(project.title)}${overview ? ` — ${overview}` : ''}`
+        return `• ${collapseWhitespace(project.title)}${overview ? ` - ${overview}` : ''}`
       })].join('\n')
     )
   }
