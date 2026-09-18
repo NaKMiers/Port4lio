@@ -224,6 +224,21 @@ export const CCAF_SAVE_LIMIT: RateLimitOptions = {
  * across sessions inside this limit; the kill criterion deliberately reads
  * `ContactMessage.sourceSlug` instead, which needs a human to have written a sentence.
  */
+/**
+ * Subscribing. Tight for the same reason `CONTACT_LIMIT` is: it sends mail.
+ *
+ * Each accepted submission emails a confirmation to an address the submitter typed, which
+ * means an unthrottled endpoint is a way to send our mail to somebody else's inbox - the
+ * classic double-opt-in abuse, where the confirmation email itself becomes the payload.
+ * Three an hour per IP, and the unique index on email means a repeat for an address already
+ * on the list does not send anything at all.
+ */
+export const SUBSCRIBE_LIMIT: RateLimitOptions = {
+  route: 'blog-subscribe',
+  limit: 3,
+  windowSeconds: 60 * 60,
+}
+
 export const BLOG_EVENT_LIMIT: RateLimitOptions = {
   route: 'blog-event',
   limit: 60,

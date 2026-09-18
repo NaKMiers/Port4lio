@@ -6,7 +6,8 @@ import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoading from '@/components/settings/SettingLoading'
-import { ghostBtnCls, inputCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
+import { buildDraftFromSourceComment } from '@/lib/blog/draft-template'
+import { ghostBtnCls, inputCls, primaryBtnCls, secondaryBtnCls, textareaCls } from '@/components/settings/settings-utils'
 
 /**
  * `/admin/blog` - every post, and the two numbers that decide whether this is working.
@@ -85,6 +86,8 @@ export default function BlogBoard() {
   const [error, setError] = useState<string | null>(null)
   const [newSlug, setNewSlug] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sourceComment, setSourceComment] = useState('')
+  const [sourceFile, setSourceFile] = useState('')
 
   const load = useCallback(async () => {
     setError(null)
@@ -116,6 +119,15 @@ export default function BlogBoard() {
     return () => window.clearTimeout(timer)
   }, [])
 
+  /**
+   * Create a draft, optionally pre-filled from a source comment.
+   *
+   * The two paths are one function because they differ by one field. A bare create makes an
+   * empty draft; pasting a comment makes one with the seven-step template already in it and
+   * the comment parked at the bottom - which is the whole of T20. See
+   * `lib/blog/draft-template.ts` for why this exists instead of the source-comment miner
+   * that was cut, and why a topic-to-post generator was refused outright.
+   */
   async function create() {
     const slug = newSlug.trim()
     if (!slug) return
@@ -128,9 +140,28 @@ export default function BlogBoard() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ slug, title: slug.replace(/-/g, ' ') }),
       })
-      const data = (await res.json()) as { error?: string }
+      const data = (await res.json()) as { error?: string; id?: string }
       if (!res.ok) throw new Error(data.error ?? 'Could not create the draft')
+
+      // Two requests rather than one: POST creates, PATCH renders the body through the
+      // markdown pipeline. Folding a body into the create would mean a second code path that
+      // also has to render, and rendering is what PATCH is already for.
+      if (sourceComment.trim() && data.id) {
+        await fetch(`/api/admin/blog/${data.id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            bodyMarkdown: buildDraftFromSourceComment({
+              comment: sourceComment,
+              sourceFile: sourceFile.trim() || undefined,
+            }),
+          }),
+        })
+      }
+
       setNewSlug('')
+      setSourceComment('')
+      setSourceFile('')
       await load()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create the draft')
@@ -220,9 +251,36 @@ export default function BlogBoard() {
               />
             </div>
             <button className={primaryBtnCls} onClick={() => void create()} disabled={busy}>
-              Create draft
+              {sourceComment.trim() ? 'Create from comment' : 'Create draft'}
             </button>
           </div>
+
+          {/*
+            T20. The 90% of the cut source-comment miner that had value: the miner was a
+            search engine over eight things already listed by name in docs/blog/authoring.md.
+            What "I do not want to spend four hours per post" actually meant is the blank
+            page and re-deriving the structure, not the writing - so paste the comment you
+            already wrote and the template arrives filled in.
+          */}
+          <details className='mt-4'>
+            <summary className='cursor-pointer text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+              Start from a source comment
+            </summary>
+            <div className='mt-3 space-y-3'>
+              <input
+                className={inputCls}
+                value={sourceFile}
+                onChange={event => setSourceFile(event.target.value)}
+                placeholder='src/lib/blog/revalidate.ts  (optional, for attribution)'
+              />
+              <textarea
+                className={`${textareaCls} min-h-[10rem] font-mono text-[13px]`}
+                value={sourceComment}
+                onChange={event => setSourceComment(event.target.value)}
+                placeholder='Paste the doc comment. The seven-step template and the title rule come with it.'
+              />
+            </div>
+          </details>
 
           <ul className='mt-8 space-y-2'>
             {(posts ?? []).map(post => (

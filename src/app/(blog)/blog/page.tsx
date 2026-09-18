@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import AvailabilityBlock from '@/components/blog/AvailabilityBlock'
 import PostCard from '@/components/blog/PostCard'
+import SubscribeForm from '@/components/blog/SubscribeForm'
 import { listPublishedPosts, type PostListItem } from '@/lib/blog/post-data'
 import { buildBlogIndexMetadata } from '@/lib/blog/seo'
 import { resolveSiteOrigin } from '@/lib/seo'
@@ -161,6 +162,12 @@ export default async function BlogIndexPage() {
             </div>
           </section>
         ) : null}
+        {/*
+          At the foot of the page and nowhere else. No modal, no scroll trigger, no article
+          wall - interrupting a reader to harvest an address trades the only thing this
+          surface has for a metric nobody is measured on.
+        */}
+        <SubscribeForm />
       </div>
 
       <AvailabilityBlock locale='en' />

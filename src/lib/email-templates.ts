@@ -244,3 +244,56 @@ ${row('Subject', escapeHtml(subject))}${attributionHtml ? `\n${attributionHtml}`
     text,
   }
 }
+
+/**
+ * The double opt-in confirmation.
+ *
+ * ## Why it says what the person is agreeing to, in the email itself
+ *
+ * The whole point of confirming is that the address might have been typed by somebody else.
+ * So this email has to be readable by a person who did NOT sign up and does not know what
+ * this site is: it names the site, says what arrives and how often, and makes ignoring it the
+ * action that results in nothing happening.
+ *
+ * There is no unsubscribe link, deliberately. A pending row is on no list, so an unsubscribe
+ * would be unsubscribing from nothing - and offering one implies they are already subscribed,
+ * which is exactly the impression double opt-in exists to avoid.
+ */
+export function renderSubscribeConfirmEmail({ confirmUrl }: { confirmUrl: string }): RenderedEmail {
+  const bodyHtml = `              <p style="margin:0 0 14px 0; font-size:15px; line-height:1.65; color:${COLOR.text};">
+                Somebody - hopefully you - asked to be told when a new post goes up on
+                ${escapeHtml(siteLabel())}. That is a handful of write-ups a year on things I
+                measured while shipping side projects. Nothing else, ever.
+              </p>
+              <p style="margin:0 0 20px 0; font-size:15px; line-height:1.65; color:${COLOR.text};">
+                Confirm and you are on the list. <strong>Ignore this and nothing happens</strong> -
+                you are not subscribed until you click, and I will not email you again.
+              </p>
+              <p style="margin:0 0 18px 0;">
+                <a href="${escapeHtml(confirmUrl)}" style="display:inline-block; padding:12px 22px; border-radius:999px; background-color:${COLOR.text}; color:#ffffff; font-weight:600; font-size:15px; text-decoration:none;">Yes, sign me up</a>
+              </p>
+              <p style="margin:0; color:${COLOR.muted}; font-size:13px; line-height:1.6;">
+                If the button does not work, paste this into your browser:<br />
+                <span style="word-break:break-all;">${escapeHtml(confirmUrl)}</span>
+              </p>`
+
+  const text = [
+    `Somebody - hopefully you - asked to be told when a new post goes up on ${siteLabel()}.`,
+    '',
+    'Confirm here:',
+    confirmUrl,
+    '',
+    'Ignore this and nothing happens. You are not subscribed until you click.',
+  ].join('\n')
+
+  return {
+    subject: 'Confirm your subscription',
+    html: shell({
+      preheader: 'Confirm and you are on the list. Ignore this and nothing happens.',
+      eyebrow: 'Subscribe',
+      heading: 'One click to confirm',
+      bodyHtml,
+    }),
+    text,
+  }
+}
