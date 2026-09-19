@@ -54,7 +54,7 @@ type Board = {
   Icon: typeof SlidersHorizontal
   /** Tailwind classes for the icon chip. Kept per-card so the grid is scannable by colour. */
   tint: string
-  secondary?: { href: string; label: string }
+  secondary?: { href: string; label: string }[]
 }
 
 const BOARDS: readonly Board[] = [
@@ -92,7 +92,10 @@ const BOARDS: readonly Board[] = [
     blurb: 'The certification tracker: roadmap, readiness and the reference deck.',
     Icon: GraduationCap,
     tint: 'border-pp-pink/30 bg-pp-pink/10 text-pp-pink',
-    secondary: { href: '/admin/ccaf/en', label: 'English' },
+    secondary: [
+      { href: '/admin/ccaf/en', label: 'English' },
+      { href: '/admin/ccaf/vocab', label: 'Vocab' },
+    ],
   },
 ]
 
@@ -138,12 +141,17 @@ export default function AdminHubPage() {
               </Link>
 
               {secondary ? (
-                <Link
-                  href={secondary.href}
-                  className='absolute right-6 top-6 rounded-full border border-pp-line bg-white/82 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-muted no-underline backdrop-blur-md transition-colors hover:text-pp-text'
-                >
-                  {secondary.label}
-                </Link>
+                <div className='absolute right-6 top-6 flex flex-col items-end gap-1.5'>
+                  {secondary.map(({ href, label }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className='rounded-full border border-pp-line bg-white/82 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-muted no-underline backdrop-blur-md transition-colors hover:text-pp-text'
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               ) : null}
             </div>
           ))}
