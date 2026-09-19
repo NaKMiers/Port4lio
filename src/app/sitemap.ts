@@ -108,9 +108,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         ...(post.coverImage ? { images: [post.coverImage] } : {}),
       })),
       {
-        // `/blog/privacy` was indexable - it declares its own canonical - and reachable only
-        // by link. A page worth having a canonical tag is a page worth listing, even at the
-        // priority the MBTI and IQ privacy notices already carry.
+        // `/blog/privacy` is indexable - it declares its own canonical - and this listing is
+        // now the ONLY way a crawler finds it. It used to be linked from the blog header's nav
+        // row; that row was removed, so there is no in-page link to it from anywhere. The page
+        // still has to exist and still has to be findable: `PostEvent`, `TestEvent` and
+        // `PostTracker` all point at it as the document that states what this site keeps and
+        // for how long. Listing it here at the priority the MBTI and IQ privacy notices carry
+        // is what keeps that promise reachable.
         url: `${origin}/blog/privacy`,
         lastModified: MBTI_CONTENT_UPDATED_AT,
         changeFrequency: 'yearly' as const,

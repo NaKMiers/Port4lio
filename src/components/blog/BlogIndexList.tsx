@@ -136,7 +136,7 @@ export default function BlogIndexList({
 
       {trimmed ? (
         <section className='mt-10' aria-live='polite'>
-          <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-muted'>
+          <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-ink-violet'>
             {matches.length === 0
               ? copy.resultsNone
               : matches.length === 1
@@ -158,7 +158,7 @@ export default function BlogIndexList({
         <>
           {pillars.length > 0 ? (
             <section className='mt-14'>
-              <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-muted'>
+              <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-ink-violet'>
                 {copy.startHere}
               </h2>
               <div className='mt-5 grid gap-5 sm:grid-cols-2'>
@@ -185,7 +185,16 @@ export default function BlogIndexList({
                 jump, which reads as having overshot by a section.
               */
               <section key={item.slug} id={item.slug} className='mt-14 scroll-mt-6'>
-                <h2 className='font-display text-xl font-semibold text-pp-text'>{item.title}</h2>
+                {/*
+                  Violet, the same ink a post's series eyebrow and the prose h2s use. A series
+                  is the one concept that appears on three surfaces - the cluster heading here,
+                  the "up" link on every post in it, and the section headings inside a post -
+                  so it gets one hue across all three.
+
+                  `More posts` below deliberately stays `--pp-text`. It is the bucket for posts
+                  that belong to NO series, and the absence of the colour is what says so.
+                */}
+                <h2 className='font-display text-xl font-semibold text-pp-ink-violet'>{item.title}</h2>
                 {item.blurb ? (
                   <p className='mt-1 max-w-[60ch] text-sm text-pp-muted'>{item.blurb}</p>
                 ) : null}

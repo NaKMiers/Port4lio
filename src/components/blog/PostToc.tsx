@@ -37,7 +37,7 @@ export default function PostToc({ entries }: { entries: TocEntry[] }) {
     >
       <h2
         id='post-toc-heading'
-        className='font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'
+        className='font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-ink-violet'
       >
         On this page
       </h2>
@@ -49,7 +49,9 @@ export default function PostToc({ entries }: { entries: TocEntry[] }) {
             // else - so the arithmetic cannot produce a class outside these three.
             style={{ paddingLeft: `${(entry.level - 2) * 0.9}rem` }}
           >
-            <a href={`#${entry.id}`} className='text-pp-muted no-underline hover:text-pp-blue'>
+            {/* `--pp-blue` is a 2.70:1 decoration colour - fine as a hover tint on a link
+                that is already legible, not fine as its resting state. `ink-blue` either way. */}
+            <a href={`#${entry.id}`} className='text-pp-muted no-underline hover:text-pp-ink-blue'>
               {entry.text}
             </a>
           </li>

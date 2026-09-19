@@ -2,6 +2,7 @@ import mongoose, { Schema } from 'mongoose'
 
 import {
   isReservedSlug,
+  MAX_IMAGE_PROMPTS,
   POST_STATUSES,
   SLUG_PATTERN,
   TAG_PATTERN,
@@ -110,6 +111,10 @@ export type PostDocument = {
   renderedWith: string
   coverImage: string | null
   coverCaption: string
+  /** A text-to-image prompt for the cover. Author working material, never public. */
+  coverImagePrompt: string
+  /** One prompt per `![image](imageN)` placeholder still in the body. Keyed by that `imageN`. */
+  imagePrompts: { key: string; prompt: string }[]
   tags: string[]
   relatedSlugs: string[]
   status: PostStatus
@@ -176,6 +181,45 @@ const postSchema = new Schema<PostDocument>(
      * compete with the excerpt would be a caption in the wrong place.
      */
     coverCaption: { type: String, default: '', maxlength: 140 },
+    /**
+     * Prompts for pictures that do not exist yet, and the reason they live on the document.
+     *
+     * The blog's generator writes posts and cannot draw - the router behind it has no image
+     * model - so what it produces instead is a brief: a cover prompt, plus one prompt per
+     * `![image](imageN)` placeholder it left in the body. Those are the author's raw material
+     * for whatever image tool they use, so they have to survive a reload, which rules out the
+     * obvious alternative of keeping them in editor state.
+     *
+     * NEITHER field is public, and neither is `select: false` either. Every public read names
+     * its fields explicitly (`LIST_FIELDS` in `post-data.ts`), so these cannot leak by
+     * default the way a `select: true` heavy field could - and `select: false` would mean the
+     * ADMIN read needed a `+` prefix to see them, which is a foot-gun pointed at the one
+     * caller that does need them.
+     *
+     * `contentUpdatedAt` is deliberately NOT bumped when these change - see the PATCH
+     * handler. A prompt is a note to the author about a picture; it is not text a reader ever
+     * sees, so telling the sitemap the post changed would be the same cry-wolf failure that
+     * separated `contentUpdatedAt` from `updatedAt` in the first place.
+     */
+    coverImagePrompt: { type: String, default: '', maxlength: 2000 },
+    imagePrompts: {
+      type: [
+        {
+          _id: false,
+          key: { type: String, required: true },
+          prompt: { type: String, default: '', maxlength: 2000 },
+        },
+      ],
+      default: [],
+      validate: {
+        // The editor only ever renders keys that are still present in the body, so a stale
+        // entry costs a row in this array and nothing on screen. This is the LAST line of
+        // defence, not the first: every writer caps itself at `MAX_IMAGE_PROMPTS` first,
+        // because failing here throws away a whole paid generation. See the constant.
+        validator: (value: { key: string }[]) => value.length <= MAX_IMAGE_PROMPTS,
+        message: `imagePrompts is capped at ${MAX_IMAGE_PROMPTS} entries`,
+      },
+    },
     tags: {
       type: [String],
       default: [],

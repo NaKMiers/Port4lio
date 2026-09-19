@@ -2,6 +2,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
+import { MAX_IMAGE_PROMPTS } from '@/lib/blog/constants'
 import { isReservedSlug, PostModel } from '@/models/Post'
 
 /**
@@ -188,6 +189,38 @@ describe('field constraints', () => {
     await expect(
       PostModel.create({ ...BASE, slug: 't', tags: Array.from({ length: 9 }, (_, i) => `t${i}`) })
     ).rejects.toThrow()
+  })
+
+  it(`caps imagePrompts at ${MAX_IMAGE_PROMPTS}, which is the backstop and not the first line`, async () => {
+    /*
+      The schema rejects the WHOLE document past the cap, which is why every writer stops short
+      of it first - the generator slices, the prompt route refuses before spending a completion,
+      and PATCH 409s. Reaching this validator at all means one of those was bypassed, so it is
+      worth pinning that it still catches.
+    */
+    await expect(
+      PostModel.create({
+        ...BASE,
+        slug: 'ip',
+        imagePrompts: Array.from({ length: MAX_IMAGE_PROMPTS + 1 }, (_, i) => ({
+          key: `image${i + 1}`,
+          prompt: 'x',
+        })),
+      })
+    ).rejects.toThrow(/capped at/)
+  })
+
+  it(`accepts exactly ${MAX_IMAGE_PROMPTS}, so the cap is not off by one`, async () => {
+    const saved = await PostModel.create({
+      ...BASE,
+      slug: 'ip-max',
+      imagePrompts: Array.from({ length: MAX_IMAGE_PROMPTS }, (_, i) => ({
+        key: `image${i + 1}`,
+        prompt: 'x',
+      })),
+    })
+
+    expect(saved.imagePrompts).toHaveLength(MAX_IMAGE_PROMPTS)
   })
 
   it('rejects a tag outside the charset', async () => {

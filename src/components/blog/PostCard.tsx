@@ -115,10 +115,23 @@ export default function PostCard({
         )
       ) : null}
 
+      {/*
+        The kind eyebrow - "NOTE" - in rose, which is the one accent the body prose uses for
+        inline code and therefore the one a card label cannot be misread as a heading in.
+
+        A `span.block` and NOT a `<p>`, which is what it was. `.portfolio-public-root p` sets
+        `color: var(--pp-muted)` at (0,2,0), and a Tailwind colour utility is (0,1,0) - so on a
+        `<p>` this class silently did nothing and the label rendered grey. Measured:
+        `rgb(109, 102, 97)` where `rgb(184, 50, 128)` was asked for.
+
+        Changing the element rather than reaching for `!important`, because a one-word label
+        above a title was never a paragraph. `.blog-prose p` solves the same collision inside
+        post bodies by source order; there is no third copy of this problem.
+      */}
       {showEyebrow ? (
-        <p className='text-[10px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+        <span className='block text-[10px] font-semibold uppercase tracking-[0.16em] text-pp-ink-rose'>
           {kind?.label}
-        </p>
+        </span>
       ) : null}
 
       <h3
@@ -185,7 +198,7 @@ export default function PostCard({
           {post.tags.slice(0, 4).map(tag => (
             <li
               key={tag}
-              className='rounded-full border border-pp-line px-2.5 py-0.5 text-[11px] text-pp-muted'
+              className='blog-tag'
             >
               {tag}
             </li>

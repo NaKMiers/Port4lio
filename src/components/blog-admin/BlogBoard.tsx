@@ -3,6 +3,9 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 
+import ConfirmDialog from '@/components/blog-admin/ConfirmDialog'
+import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
+import GenerateBlogDialog from '@/components/blog-admin/GenerateBlogDialog'
 import PostRowActions from '@/components/blog-admin/PostRowActions'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
@@ -16,12 +19,12 @@ import { inputCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/
  *   ┌────────────────────────────────────────────────────────────┐
  *   │  14 days since the last publish        ← the kill signal   │
  *   ├────────────────────────────────────────────────────────────┤
- *   │  new-slug ............................ [ Create draft ]    │
+ *   │  new-slug .......... [ Create draft ] [ ✨ Generate blog ]  │
  *   ├────────────────────────────────────────────────────────────┤
  *   │  ● published  five-things-next-16   edit · revalidate · ✕  │
  *   │  ○ draft      shipping-two-tests    edit · ✕               │
  *   │  ◌ archived   an-old-take           edit · revalidate · ✕  │
- *   │  ✕ deleted    gone-but-slug-held    (holds its slug)       │
+ *   │  ✕ deleted    gone-but-slug-held    restore · delete forever│
  *   └────────────────────────────────────────────────────────────┘
  * ```
  *
@@ -38,6 +41,15 @@ import { inputCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/
  * A soft-deleted post keeps its slug forever, so that a new post cannot inherit its contact
  * attributions. Hiding them would leave the owner unable to explain why a slug they deleted
  * last week is refused on create.
+ *
+ * ## Delete forever is on that row, and it is the one action that breaks the rule above
+ *
+ * Removing the document releases the slug, which is exactly what the soft delete existed to
+ * prevent. It is offered anyway, because a board that accumulates every mistake forever is a
+ * board nobody reads - but only from a row that is already deleted, and only after a confirm
+ * that names the consequence. If the slug is on real `ContactMessage` rows the server refuses
+ * the first press and returns the count, and the dialog shows it before asking again. See the
+ * DELETE handler for why the messages themselves are never touched.
  */
 
 type BoardPost = {
@@ -57,6 +69,15 @@ type BoardPost = {
    * worthless as a number to quote. The kill criterion reads ContactMessage.sourceSlug.
    */
   metrics: { views: number; shares: number; attributions: number }
+  /**
+   * How many `![image](imageN)` placeholders are still unresolved in the body.
+   *
+   * The board never receives the body itself, so this count is computed server-side. It exists
+   * because Publish here is one click with no confirm, and every generated post starts with
+   * unresolved placeholders - each of which publishes as a sourceless `<img>`, i.e. a
+   * broken-image icon on a live page.
+   */
+  unresolvedImages: number
 }
 
 const STATUS_MARK: Record<BoardPost['status'], string> = {
@@ -76,6 +97,33 @@ export default function BlogBoard() {
   const [error, setError] = useState<string | null>(null)
   const [newSlug, setNewSlug] = useState('')
   const [busy, setBusy] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null)
+  /**
+   * The permanent-delete confirm, and `contactMessages` is the two-stage part.
+   *
+   * `null` is the first press: "this frees the slug". A NUMBER means the server refused once
+   * because that slug is on real contact messages, and the dialog is now showing the count
+   * before the second, acknowledged press. One piece of state rather than two booleans, so
+   * the two stages cannot both be true.
+   */
+  const [pendingPurge, setPendingPurge] = useState<{
+    id: string
+    slug: string
+    title: string
+    contactMessages: number | null
+  } | null>(null)
+  /**
+   * The publish confirm, raised ONLY when the post still has unresolved image placeholders.
+   *
+   * A clean post publishes on the first click exactly as before - a confirm on every publish
+   * would be a dialog the owner learns to dismiss without reading, which is worse than none.
+   */
+  const [pendingPublish, setPendingPublish] = useState<{
+    id: string
+    title: string
+    unresolvedImages: number
+  } | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   const load = useCallback(async () => {
     setError(null)
@@ -157,6 +205,40 @@ export default function BlogBoard() {
     }
   }
 
+  /**
+   * Remove a soft-deleted post for good.
+   *
+   * Two passes by design. The first is refused with a count if the slug is on real contact
+   * messages - the refusal IS the warning, the same shape the series delete guard uses - and
+   * the second carries `acknowledge=true` to say the owner has seen it. A slug with nothing
+   * against it goes on the first press and never shows the second dialog at all.
+   */
+  async function purge(id: string, slug: string, title: string, acknowledge: boolean) {
+    setBusy(true)
+    setError(null)
+    try {
+      const query = `permanent=true${acknowledge ? '&acknowledge=true' : ''}`
+      const res = await fetch(`/api/admin/blog/${id}?${query}`, { method: 'DELETE' })
+      const data = (await res.json()) as { error?: string; contactMessages?: number }
+
+      if (res.status === 409 && typeof data.contactMessages === 'number') {
+        // Re-open the same dialog in its second stage rather than surfacing a banner: the
+        // decision is still in front of the owner, so the number belongs where the button is.
+        setPendingPurge({ id, slug, title, contactMessages: data.contactMessages })
+        return
+      }
+      if (!res.ok) throw new Error(data.error ?? 'Could not delete the post')
+
+      setPendingPurge(null)
+      await load()
+    } catch (cause) {
+      setPendingPurge(null)
+      setError(cause instanceof Error ? cause.message : 'Could not delete the post')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (posts === null && !error) {
     return (
       <OwnerAuthGate onAuthed={() => void load()}>
@@ -220,6 +302,12 @@ export default function BlogBoard() {
           <button className={primaryBtnCls} onClick={() => void create()} disabled={busy}>
             Create draft
           </button>
+          {/*
+            Beside Create draft, and second. The order is the reading order of what they do:
+            the left one makes an empty page to write on, the right one writes it. Putting the
+            expensive, animated control first would make it the default press.
+          */}
+          <GenerateBlogButton onClick={() => setGenerating(true)} disabled={busy} />
         </div>
 
         <ul className='mt-8 space-y-2'>
@@ -256,16 +344,13 @@ export default function BlogBoard() {
               <span className='sr-only'>{post.status}</span>
 
               {/*
-                A fixed-size slot whether or not there is an image, so the titles stay on one
-                vertical line down the board. A thumbnail that collapsed when absent would
-                indent every covered row relative to every uncovered one, which on a list you
-                scan is worse than a little empty space.
-
-                `alt=''`: the title is the next element and says the same thing.
+                `alt=''`: the title is the next element and says the same thing. No box at all
+                when there is no cover - an empty bordered slot read as a broken thumbnail
+                rather than as "no image".
               */}
-              <span className='hidden h-10 w-16 shrink-0 overflow-hidden rounded-[0.6rem] border border-pp-line bg-white/60 sm:block'>
-                {post.coverImage ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+              {post.coverImage ? (
+                <span className='hidden h-10 w-16 shrink-0 overflow-hidden rounded-[0.6rem] border border-pp-line bg-white/60 sm:block'>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={post.coverImage}
                     alt=''
@@ -273,8 +358,8 @@ export default function BlogBoard() {
                     loading='lazy'
                     className='h-full w-full object-cover'
                   />
-                ) : null}
-              </span>
+                </span>
+              ) : null}
 
               <span className='min-w-0 flex-1'>
                 <span className='block truncate font-display text-sm font-semibold'>
@@ -341,7 +426,14 @@ export default function BlogBoard() {
                             key: 'publish',
                             label: 'Publish',
                             disabled: busy,
-                            onSelect: () => void mutate(post._id, { status: 'published' }, 'PATCH'),
+                            onSelect: () =>
+                              post.unresolvedImages > 0
+                                ? setPendingPublish({
+                                    id: post._id,
+                                    title: post.title || post.slug,
+                                    unresolvedImages: post.unresolvedImages,
+                                  })
+                                : void mutate(post._id, { status: 'published' }, 'PATCH'),
                           },
                         ]),
                     {
@@ -349,12 +441,67 @@ export default function BlogBoard() {
                       label: 'Delete',
                       disabled: busy,
                       separated: true,
-                      onSelect: () => void mutate(post._id, {}, 'DELETE'),
+                      onSelect: () => setPendingDelete({ id: post._id, title: post.title || post.slug }),
                     },
                   ]}
                 />
               ) : (
-                <span className='text-xs text-pp-muted'>holds its slug</span>
+                <span className='flex items-center gap-3'>
+                  <span className='text-xs text-pp-muted'>holds its slug</span>
+                  <PostRowActions
+                    label={`Restore ${post.title || post.slug}`}
+                    actions={[
+                      {
+                        key: 'restore',
+                        label: 'Restore',
+                        disabled: busy,
+                        /*
+                          Restore NEVER republishes. `archived` when the post was public before
+                          it was deleted, `draft` when it never was.
+
+                          The obvious version of this - `publishedAt ? 'published' : 'draft'` -
+                          is wrong, and wrong in the direction that puts content in front of
+                          readers. `publishedAt` is write-once and SURVIVES archiving (see
+                          `models/Post.ts`), so it does not mean "was public when deleted", it
+                          means "was public at some point". A post that was published, then
+                          deliberately taken down, then deleted, came back LIVE on restore and
+                          `revalidatePublishedPost` pushed it out - undoing a takedown the owner
+                          chose, with one menu click and no confirm.
+
+                          Restoring to `archived` is recoverable in the direction that matters:
+                          the post is back on the board, out of the bin, and one deliberate
+                          Publish away from live. The status enum has four values and this
+                          branch only ever had two.
+                        */
+                        onSelect: () =>
+                          void mutate(
+                            post._id,
+                            { status: post.publishedAt ? 'archived' : 'draft' },
+                            'PATCH'
+                          ),
+                      },
+                      /*
+                        Offered only on a row that is ALREADY deleted, which is the server's
+                        precondition too - so reaching this needs two separate deletions with a
+                        confirm on each. Last and `separated`, the same position Delete holds on
+                        a live row, because it is the same "no way back" slot one step further.
+                      */
+                      {
+                        key: 'purge',
+                        label: 'Delete forever',
+                        disabled: busy,
+                        separated: true,
+                        onSelect: () =>
+                          setPendingPurge({
+                            id: post._id,
+                            slug: post.slug,
+                            title: post.title || post.slug,
+                            contactMessages: null,
+                          }),
+                      },
+                    ]}
+                  />
+                </span>
               )}
             </li>
           ))}
@@ -367,6 +514,117 @@ export default function BlogBoard() {
           </p>
         ) : null}
       </div>
+
+      {/*
+        Mounted only while open, rather than always-mounted behind an `open` prop. That is what
+        makes each opening start fresh: the dialog's spec is `useState` initialiser state, so a
+        dialog kept mounted would reopen holding the last run's settings and its stale result
+        card.
+      */}
+      {generating ? (
+        <GenerateBlogDialog
+          onClose={() => setGenerating(false)}
+          // The dialog stays open on success to show its warnings, so the board refreshes
+          // underneath it rather than waiting for a close that may not come for a minute.
+          onGenerated={() => void load()}
+        />
+      ) : null}
+
+      {/*
+        One dialog, two stages, keyed off `contactMessages`. The second stage is only ever
+        reached when the server has said the slug is on real messages, so the scarier copy is
+        never shown to somebody deleting a post that carried nothing.
+      */}
+      <ConfirmDialog
+        open={pendingPurge !== null}
+        title={
+          pendingPurge?.contactMessages
+            ? 'This slug is on real messages'
+            : 'Delete this post forever?'
+        }
+        message={
+          pendingPurge?.contactMessages ? (
+            <>
+              <p>
+                <strong className='font-semibold text-pp-text'>
+                  {pendingPurge.contactMessages} contact message
+                  {pendingPurge.contactMessages === 1 ? '' : 's'}
+                </strong>{' '}
+                came from <code>/blog/{pendingPurge.slug}</code>. The messages are kept either
+                way - they are not deleted with the post.
+              </p>
+              <p className='mt-2'>
+                What is released is the slug. A future post taking{' '}
+                <code>{pendingPurge.slug}</code> would inherit{' '}
+                {pendingPurge.contactMessages === 1 ? 'that attribution' : 'those attributions'},
+                which is the one number the blog is measured by.
+              </p>
+            </>
+          ) : (
+            <>
+              &quot;{pendingPurge?.title ?? ''}&quot; and its read counts will be removed from the
+              database. This cannot be undone, and <code>{pendingPurge?.slug}</code> becomes
+              available for a new post to take.
+            </>
+          )
+        }
+        confirmLabel={pendingPurge?.contactMessages ? 'Delete anyway' : 'Delete forever'}
+        busy={busy}
+        onCancel={() => setPendingPurge(null)}
+        onConfirm={() => {
+          if (!pendingPurge) return
+          const { id, slug, title, contactMessages } = pendingPurge
+          // The second press carries the acknowledgement. The first does not, which is what
+          // lets the server refuse it and hand back the count.
+          void purge(id, slug, title, contactMessages !== null)
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingPublish !== null}
+        title='This post has images that were never made'
+        message={
+          <>
+            <p>
+              &quot;{pendingPublish?.title ?? ''}&quot; still has{' '}
+              <strong className='font-semibold text-pp-text'>
+                {pendingPublish?.unresolvedImages}{' '}
+                {pendingPublish?.unresolvedImages === 1 ? 'placeholder' : 'placeholders'}
+              </strong>{' '}
+              in the body.
+            </p>
+            <p className='mt-2'>
+              A placeholder is refused by the renderer and published as an image with no source,
+              which every browser paints as a broken-image icon. Open the post and upload them,
+              or publish now and fix it after - the choice is yours, but it will be visible.
+            </p>
+          </>
+        }
+        confirmLabel='Publish anyway'
+        busy={busy}
+        onCancel={() => setPendingPublish(null)}
+        onConfirm={() => {
+          if (!pendingPublish) return
+          const { id } = pendingPublish
+          setPendingPublish(null)
+          void mutate(id, { status: 'published' }, 'PATCH')
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title='Delete this post?'
+        message={`"${pendingDelete?.title ?? ''}" will be soft-deleted. Its slug stays reserved and the row stays on this board, greyed out.`}
+        confirmLabel='Delete'
+        busy={busy}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (!pendingDelete) return
+          const { id } = pendingDelete
+          setPendingDelete(null)
+          void mutate(id, {}, 'DELETE')
+        }}
+      />
     </OwnerAuthGate>
   )
 }

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * All six owner handlers refuse an anonymous caller.
+ * All eight owner handlers refuse an anonymous caller.
  *
  * ## Why six tests and not one loop over a pattern
  *
@@ -44,6 +44,26 @@ test(`PATCH /api/admin/blog/[id] is 401`, async ({ request }) => {
 
 test(`DELETE /api/admin/blog/[id] is 401`, async ({ request }) => {
   expect((await request.delete(`/api/admin/blog/${FAKE_ID}`)).status()).toBe(401)
+})
+
+/*
+  The two routes that spend money.
+
+  Every other handler here costs a database round trip if it leaks. These two call a paid
+  model, so an ungated one is a stranger's billing account as well as a stranger's write - and
+  they are exactly the "handler somebody adds next month and forgets" the header describes.
+  They were added and forgotten; this review is what caught it.
+*/
+test('POST /api/admin/blog/generate is 401 - it spends money', async ({ request }) => {
+  const res = await request.post('/api/admin/blog/generate', { data: { spec: {} } })
+  expect(res.status(), 'the generate endpoint is ungated - anyone can spend the model budget').toBe(401)
+})
+
+test(`POST /api/admin/blog/[id]/image-prompt is 401 - it spends money`, async ({ request }) => {
+  const res = await request.post(`/api/admin/blog/${FAKE_ID}/image-prompt`, {
+    data: { target: 'cover' },
+  })
+  expect(res.status(), 'the image-prompt endpoint is ungated - anyone can spend the model budget').toBe(401)
 })
 
 test('POST /api/admin/blog/preview is 401 - the stored-XSS harness', async ({ request }) => {

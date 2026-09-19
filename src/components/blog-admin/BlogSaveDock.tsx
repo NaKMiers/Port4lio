@@ -7,17 +7,16 @@ import { primaryBtnCls } from '@/components/settings/settings-utils'
 /**
  * Save and save state, kept on screen after the toolbar has scrolled away.
  *
- * ## Why an autosaving editor needs a save button at all
+ * ## Why the editor needs a save button down here at all
  *
- * It does not need one to save - it needs one to say so. The editor commits 1.2s after the
- * last keystroke and reports that in the toolbar, which is at the very top of a page whose
- * markdown card alone is `min-h-[32rem]`. So the entire time anyone is actually writing, the
- * only evidence that their work is being kept is off screen, and the honest reading of a
- * blank corner is that nothing is happening.
+ * The toolbar's own Save button and status line live at the very top of a page whose markdown
+ * card alone is `min-h-[32rem]`. Save is manual, so the entire time anyone is actually writing,
+ * both the only way to commit their work and the only evidence of whether it is committed are
+ * off screen - and the honest reading of a blank corner is that nothing has been saved.
  *
- * The button is the smaller half of that. `Save now` cancels the pending debounce and flushes
- * immediately, which matters exactly once per session - the moment before closing the tab,
- * when "it saves by itself" is a claim rather than a receipt.
+ * This dock is a second copy of the same button and the same status, not a second way to
+ * save: `onSave` is the toolbar's own `saveNow`, so there is exactly one save path, mirrored
+ * wherever the author happens to be scrolled.
  *
  * ## Why this is not `FloatingSaveButton`
  *

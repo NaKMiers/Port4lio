@@ -39,10 +39,6 @@ export type BlogCopy = {
   postsCountOne: string
   postsCountMany: (n: number) => string
   mostlyAbout: string
-  navPortfolio: string
-  navCv: string
-  navRss: string
-  navPrivacy: string
   searchLabel: string
   searchPlaceholder: string
   searchClear: string
@@ -67,10 +63,6 @@ export const BLOG_COPY: Record<Locale, BlogCopy> = {
     postsCountOne: '1 post so far',
     postsCountMany: n => `${n} posts so far`,
     mostlyAbout: 'mostly',
-    navPortfolio: 'Portfolio',
-    navCv: 'CV',
-    navRss: 'RSS feed',
-    navPrivacy: 'Privacy',
     searchLabel: 'Search posts',
     searchPlaceholder: 'Search titles, tags and series',
     searchClear: 'Clear search',
@@ -94,10 +86,6 @@ export const BLOG_COPY: Record<Locale, BlogCopy> = {
     postsCountOne: 'Hiện có 1 bài',
     postsCountMany: n => `Hiện có ${n} bài`,
     mostlyAbout: 'chủ yếu về',
-    navPortfolio: 'Portfolio',
-    navCv: 'CV',
-    navRss: 'Nguồn RSS',
-    navPrivacy: 'Quyền riêng tư',
     searchLabel: 'Tìm bài viết',
     searchPlaceholder: 'Tìm theo tiêu đề, thẻ hoặc chuyên mục',
     searchClear: 'Xoá từ khoá',

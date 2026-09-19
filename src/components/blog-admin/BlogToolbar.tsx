@@ -21,10 +21,11 @@ import { ghostBtnCls, primaryBtnCls, secondaryBtnCls } from '@/components/settin
  *
  * ## Why saved state is a timestamp and not a spinner
  *
- * Autosave's failure mode is silence: the author keeps typing, nothing indicates anything is
- * wrong, and an hour is gone at the next reload. A spinner only says "something is happening
- * now". "Saved 14:32" says the last thing that happened succeeded and when - which is the
- * question an author actually has, and it goes stale visibly if saving stops working.
+ * Save is manual here, so the risk is not silent autosave failure but the opposite: an author
+ * who clicked Save a while ago and has no way to tell whether that click actually landed. A
+ * spinner only says "something is happening now". "Saved 14:32" says the last thing that
+ * happened succeeded and when - which is the question an author actually has, and it goes
+ * stale visibly (back to "Unsaved changes") the moment they type again.
  *
  * ## The heading is the post's own title
  *
@@ -79,6 +80,22 @@ export default function BlogToolbar({
         ? `Saved ${savedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
         : 'No changes yet'
 
+  /**
+   * Guards the two links that leave this page - `All posts` and `View live`.
+   *
+   * `beforeunload` (see `BlogEditor`) only fires on a real navigation away from the app - a
+   * closed tab, a refresh, a typed URL. A `next/link` click is a client-side transition, which
+   * unmounts this component without ever touching that event, so the one native safety net the
+   * editor has is silent on the single most common way to leave it. `window.confirm` is a
+   * second, narrower net for exactly those two links, not a replacement for the first.
+   */
+  function confirmLeave(event: React.MouseEvent) {
+    if (!dirty) return
+    if (!window.confirm('You have unsaved changes. Leave without saving?')) {
+      event.preventDefault()
+    }
+  }
+
   return (
     <div className='relative mb-6 rounded-[2rem] border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(255,250,246,0.78))] p-6 shadow-panel backdrop-blur-md sm:p-7'>
       {/* Top-right of this block, out of the way of the copy underneath - the same placement
@@ -123,7 +140,7 @@ export default function BlogToolbar({
 
           <div className='flex flex-wrap gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
             <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
-              Autosaves as you type
+              Manual save only
             </span>
             <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
               Preview rendered server-side
@@ -135,14 +152,14 @@ export default function BlogToolbar({
         </div>
 
         <div className='flex flex-wrap items-center gap-2.5 lg:justify-end'>
-          <Link className={secondaryBtnCls} href='/admin/blog'>
+          <Link className={secondaryBtnCls} href='/admin/blog' onClick={confirmLeave}>
             All posts
           </Link>
           {/*
-            Disabled when there is nothing pending, which is most of the time - autosave has
-            usually already run. That is deliberate: a Save button that is always clickable in
-            an editor that saves by itself teaches you to press it out of superstition, and
-            tells you nothing. Greyed out IS the message that your work is committed.
+            Disabled whenever there is nothing pending - right after load, and again right
+            after a save lands. A Save button that is always clickable in an editor with no
+            autosave teaches you to press it out of superstition, and tells you nothing.
+            Greyed out IS the message that your work is committed.
           */}
           <button
             ref={saveButtonRef}
@@ -156,7 +173,7 @@ export default function BlogToolbar({
           </button>
           {status === 'published' ? (
             <>
-              <Link className={secondaryBtnCls} href={`/blog/${slug}`}>
+              <Link className={secondaryBtnCls} href={`/blog/${slug}`} onClick={confirmLeave}>
                 View live
               </Link>
               <button className={ghostBtnCls} onClick={onArchive}>

@@ -73,21 +73,6 @@ export default function BlogIndexHeader({
           </>
         ) : null}
       </p>
-
-      <div className='mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm'>
-        <Link href='/' className='text-pp-muted no-underline hover:text-pp-text'>
-          {copy.navPortfolio}
-        </Link>
-        <Link href='/cv' className='text-pp-muted no-underline hover:text-pp-text'>
-          {copy.navCv}
-        </Link>
-        <Link href='/blog/rss.xml' className='text-pp-muted no-underline hover:text-pp-text'>
-          {copy.navRss}
-        </Link>
-        <Link href='/blog/privacy' className='text-pp-muted no-underline hover:text-pp-text'>
-          {copy.navPrivacy}
-        </Link>
-      </div>
     </header>
   )
 }

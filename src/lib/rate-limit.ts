@@ -251,6 +251,45 @@ export const BLOG_SAVE_LIMIT: RateLimitOptions = {
   windowSeconds: 60,
 }
 
+/**
+ * Generating a post with an LLM. Two orders of magnitude tighter than `BLOG_SAVE_LIMIT`, and
+ * it is guarding a different thing entirely.
+ *
+ * `requireOwner` already refused everyone else, so this is not an abuse control either - but
+ * unlike a save, one accepted request here spends real money at a third party and occupies a
+ * lambda for up to three minutes. The failure it bounds is a double-click on a button whose
+ * work takes 40 seconds and shows nothing for the first five: the natural response to that is
+ * to press it again, and without a bucket that is two posts generated and two bills.
+ *
+ * Ten in ten minutes is far above deliberate use - a generated post takes longer to READ than
+ * that - and low enough that a stuck retry loop costs a few requests rather than a few
+ * hundred. The window is long rather than per-minute for the same reason `CONTACT_LIMIT`'s
+ * is: a loop that fires once a minute stays under every short window and still runs all day.
+ */
+export const BLOG_GENERATE_LIMIT: RateLimitOptions = {
+  route: 'blog-generate',
+  limit: 10,
+  windowSeconds: 10 * 60,
+}
+
+/**
+ * Rewriting one image prompt. Its own bucket, deliberately not `BLOG_GENERATE_LIMIT`.
+ *
+ * Sharing that bucket was the obvious move and is the wrong one: a post with four placeholders
+ * invites four regenerates while the author reads the results, and at ten per ten minutes
+ * that is most of the allowance for writing an actual post spent on captions for pictures
+ * that do not exist yet. The two calls also cost different amounts - a prompt is a sentence,
+ * a post is two thousand words - so one limit priced for both is priced wrong for one.
+ *
+ * Forty in ten minutes: generous for a person clicking regenerate until a prompt reads well,
+ * and still a ceiling if a button ends up wired to a render loop.
+ */
+export const BLOG_IMAGE_PROMPT_LIMIT: RateLimitOptions = {
+  route: 'blog-image-prompt',
+  limit: 40,
+  windowSeconds: 10 * 60,
+}
+
 export const CONTACT_LIMIT: RateLimitOptions = {
   route: 'contact',
   limit: 3,

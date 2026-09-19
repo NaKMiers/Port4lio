@@ -20,3 +20,10 @@ Key routing rules:
 - Architecture review → `plan-eng-review`
 - Save progress, checkpoint, resume → `checkpoint`
 - Code quality, health check → `health`
+
+## Conventions
+
+- Dropdowns: use `SelectField` (`src/components/settings/SelectField.tsx`), not a native
+  `<select>`. Exception: a long/dynamic option list on a public, mobile-heavy page, where the
+  native picker is worth more than visual consistency. See `CLAUDE.md` and `SelectField`'s own
+  doc comment for the reasoning.

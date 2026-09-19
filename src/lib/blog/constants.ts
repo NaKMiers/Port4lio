@@ -115,3 +115,15 @@ export const RESERVED_SLUGS = new Set(['page', 'feed', 'rss', 'privacy'])
 export function isReservedSlug(slug: string): boolean {
   return RESERVED_SLUGS.has(slug)
 }
+
+/**
+ * How many image prompts one post may carry.
+ *
+ * Twelve is well past any post's illustration budget and short of a runaway model emitting a
+ * hundred placeholders. It lives here rather than in the schema because four places have to
+ * agree on it, and the schema is the LAST of the four to find out: `Post.ts` rejects the whole
+ * document past this number, so the generator, the prompt-rewrite route and the editor's PATCH
+ * all have to stop short of it or a paid generation dies as a ValidationError. A literal `12`
+ * in each of them is four numbers that drift.
+ */
+export const MAX_IMAGE_PROMPTS = 12

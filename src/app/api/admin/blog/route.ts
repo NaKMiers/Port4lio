@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError } from '@/lib/api-response'
 import { defaultKindSlug } from '@/lib/blog/kind-data'
 import { aggregatePostMetrics } from '@/lib/blog/post-events'
+import { findImagePlaceholders } from '@/lib/blog/image-placeholders'
 import { connectDatabase } from '@/lib/mongodb'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
@@ -36,10 +37,24 @@ export async function GET(request: NextRequest) {
   try {
     await connectDatabase()
 
-    // Both bodies are `select: false`, so the board cannot accidentally ship 30 posts'
-    // markdown to a browser that only renders their titles.
+    /*
+      Both bodies are `select: false`, so the board cannot accidentally ship 30 posts' markdown
+      to a browser that only renders their titles.
+
+      `+bodyMarkdown` is pulled back in anyway, and ONLY to count unresolved placeholders before
+      it is thrown away below. The board's Publish is a single click with no confirm, and it had
+      no way to know a post still contained `![image](image1)` - which is the state EVERY
+      generated post starts in. Publishing one puts a broken-image icon on a live page. The
+      editor's banner was the only warning in the product and it lives on a page the author
+      never has to open.
+
+      The alternative was an aggregation with `$regexFindAll`, which keeps the markdown in the
+      database but makes the count a second query that can fail independently of the list. Since
+      the bodies are already on the same documents, reading and discarding them is simpler and
+      cannot leave the board without a count.
+    */
     const posts = await PostModel.find({})
-      .select('slug title kind series isPillar status language coverImage publishedAt contentUpdatedAt updatedAt')
+      .select('slug title kind series isPillar status language coverImage publishedAt contentUpdatedAt updatedAt +bodyMarkdown')
       .sort({ updatedAt: -1 })
       .lean()
 
@@ -59,10 +74,16 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      posts: posts.map(post => ({
-        ...post,
-        metrics: metrics.get(post.slug) ?? { views: 0, shares: 0, attributions: 0 },
-      })),
+      posts: posts.map(post => {
+        // Destructured off so the markdown itself never reaches the browser - the count is the
+        // only thing the board needs, and shipping the bodies would undo `select: false`.
+        const { bodyMarkdown, ...rest } = post
+        return {
+          ...rest,
+          unresolvedImages: findImagePlaceholders(bodyMarkdown ?? '').length,
+          metrics: metrics.get(post.slug) ?? { views: 0, shares: 0, attributions: 0 },
+        }
+      }),
     })
   } catch (error) {
     console.error('[api/admin/blog] list failed', error)

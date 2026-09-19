@@ -19,6 +19,42 @@
   --pp-violet: #7b6dff;
   --pp-pink: #f38fd1;
   --pp-orange: #ff9f40;
+
+  /* -------------------------------------------------------------------------
+     Ink accents: the five above, darkened until they can carry text.
+
+     The bright tokens are decoration colours. They were chosen against white
+     panels for shapes, rings and washes, and they are genuinely unusable as
+     type on `--pp-bg` - measured rather than assumed:
+
+       #3398ff on #f7f3ee  ->  2.70:1      fails AA (needs 4.5)
+       #39be71 on #f7f3ee  ->  2.19:1      fails
+       #ff9f40 on #f7f3ee  ->  2.03:1      fails
+
+     `.blog-prose a` was already using `--pp-blue`, so every link in every post
+     has been sitting at 2.7:1 - readable only because it is underlined. Adding
+     more colour to a reading surface with those tokens would have multiplied
+     one accessibility defect into eight.
+
+     So there are two families and the split is a rule, not a preference:
+     BRIGHT for things with no text in them - rules, markers, borders, tinted
+     backgrounds - and INK for anything a reader has to read. Every value below
+     clears 4.5:1 on `--pp-bg`:
+
+       --pp-ink-blue    #1667c4   5.11:1
+       --pp-ink-violet  #5647cc   5.98:1
+       --pp-ink-green   #1f7a4d   4.81:1
+       --pp-ink-rose    #b83280   4.99:1
+       --pp-ink-amber   #a85a12   4.59:1
+
+     `tests/unit/blog-palette-contrast.test.ts` recomputes all five, so a future
+     "let's brighten these up" has to fail a test rather than a reader.
+     ------------------------------------------------------------------------- */
+  --pp-ink-blue: #1667c4;
+  --pp-ink-violet: #5647cc;
+  --pp-ink-green: #1f7a4d;
+  --pp-ink-rose: #b83280;
+  --pp-ink-amber: #a85a12;
   --pp-max: 1160px;
   --pp-gutter: clamp(1rem, 4vw, 2rem);
   --pp-section-y: clamp(4rem, 10vw, 7rem);
@@ -342,43 +378,174 @@
    `pre` deliberately sets no colour. Shiki writes inline `style` on every token span, and
    those survive because the pipeline runs it AFTER sanitize; a colour here would either be
    overridden invisibly or fight it.
+
+   ## Where the colour goes, and where it deliberately does not
+
+   Body paragraphs stay `--pp-text`. That is not timidity - it is the whole reason the rest of
+   this can be colourful. A reading surface can carry accent on its STRUCTURE (headings, rules,
+   markers, table chrome) and on high-frequency INLINE categories (links, code, bold) precisely
+   because the prose between them is a single high-contrast ink. Colour the paragraphs too and
+   every one of those signals stops meaning anything, because nothing is the baseline any more.
+
+   Everything here reads from the two token families in `:root`: BRIGHT for shapes with no text
+   in them, INK for anything a reader reads. See the note there for the measured contrast
+   ratios, and for why `--pp-blue` had to stop being the link colour.
    --------------------------------------------------------------------------- */
 .blog-prose {
   font-size: 1.0625rem;
   line-height: 1.75;
   color: var(--pp-text);
 }
+/*
+   Paragraphs, restated - and this is a fix, not a flourish.
+
+   `.blog-prose` already sets `color: var(--pp-text)` on the container, and every child was
+   inheriting it EXCEPT `<p>`, because `.portfolio-public-root p { color: var(--pp-muted) }`
+   further up this file is a (0,2,0) selector and inheritance loses to any rule at all.
+   Measured in the browser: an `li` in a post computed to `rgb(31, 28, 26)` and the paragraph
+   above it to `rgb(109, 102, 97)`.
+
+   So body copy was the LIGHTEST text in an article - lighter than its own bullet list - at
+   5.1:1 where the declared intent was 15:1. That rule is right for the one-page editorial
+   layout it was written for, where paragraphs are short marketing lines under a heading. It
+   is wrong for two thousand words somebody is actually reading.
+
+   It also quietly undermines everything else in this block: accent only reads as accent
+   against a plainer baseline, and the baseline was not plain, it was faint.
+
+   `.blog-prose p` is (0,2,0) too, so this wins on source order rather than on `!important` -
+   which is why this section has to stay below `.portfolio-public-root p` in this file.
+*/
+.blog-prose p { color: var(--pp-text); }
 .blog-prose > * + * { margin-top: 1.15em; }
+/*
+   The heading hierarchy is carried by HUE as well as by size: violet h2, blue h3.
+
+   Two levels that differ only in font-size have to be compared to be told apart, which is
+   exactly the work a skim is trying to avoid. A different hue is legible at a glance and at
+   any zoom, and it survives the case where an h3 at the top of the viewport has no h2 on
+   screen to be smaller than.
+*/
 .blog-prose h2 {
   font-family: var(--font-montserrat), system-ui, sans-serif;
   font-size: 1.5rem;
   font-weight: 600;
   margin-top: 2.2em;
   line-height: 1.3;
+  color: var(--pp-ink-violet);
+  position: relative;
+  padding-left: 0.72em;
+}
+/* The bar is decoration with no text in it, so it may use the BRIGHT tokens - and it is the
+   one place the two families meet, which is why it gradients between them. */
+.blog-prose h2::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.22em;
+  bottom: 0.16em;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--pp-violet), var(--pp-blue));
 }
 .blog-prose h3 {
   font-family: var(--font-montserrat), system-ui, sans-serif;
   font-size: 1.2rem;
   font-weight: 600;
   margin-top: 1.8em;
+  color: var(--pp-ink-blue);
 }
-.blog-prose a { color: var(--pp-blue); text-underline-offset: 2px; }
+/*
+   `--pp-ink-blue`, not `--pp-blue`, and this is a fix rather than a restyle: the old value
+   put every link in every post at 2.70:1. The underline is kept and thickened on hover, so
+   colour is still not the only thing marking a link - which it must not be for a reader who
+   cannot distinguish it.
+*/
+.blog-prose a {
+  color: var(--pp-ink-blue);
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--pp-ink-blue) 45%, transparent);
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+.blog-prose a:hover {
+  color: var(--pp-ink-violet);
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 2px;
+}
+/*
+   Bold gets a highlighter wash rather than a colour.
+
+   Colouring `strong` was the obvious move and it is wrong at this density: bold runs through
+   every paragraph on this blog, so coloured bold turns body copy into a ransom note and
+   competes with the headings for the same signal. A background tint adds the colour without
+   touching the text contrast at all - the letters stay `--pp-text` at 15:1.
+
+   `box-decoration-break` so a bold phrase wrapping across two lines gets the wash on both,
+   rather than one long box behind the line break.
+*/
+.blog-prose strong {
+  font-weight: 650;
+  background: linear-gradient(
+    180deg,
+    transparent 58%,
+    color-mix(in srgb, var(--pp-orange) 30%, transparent) 58%
+  );
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+/*
+   The wash is for bold in PROSE. A heading is already the loudest thing on its line, and
+   `## Why **this** matters` would otherwise get an amber band through a violet heading.
+*/
+.blog-prose h2 strong,
+.blog-prose h3 strong,
+.blog-prose h4 strong,
+.blog-prose thead strong {
+  background: none;
+  font-weight: inherit;
+}
 .blog-prose ul, .blog-prose ol { padding-left: 1.4em; }
 .blog-prose ul { list-style: disc; }
 .blog-prose ol { list-style: decimal; }
 .blog-prose li + li { margin-top: 0.4em; }
+/*
+   `::marker` takes colour and nothing else that matters here. Bullets and numbers are the
+   highest-frequency non-text glyphs in a technical post, so colouring them spreads accent
+   through the page for one declaration each - and a marker is not text a reader has to read,
+   which is why these may be the bright tokens.
+*/
+.blog-prose ul > li::marker { color: var(--pp-blue); }
+.blog-prose ol > li::marker { color: var(--pp-ink-violet); font-weight: 600; }
 .blog-prose blockquote {
-  border-left: 3px solid var(--pp-line);
-  padding-left: 1em;
-  color: var(--pp-muted);
+  border-left: 3px solid var(--pp-violet);
+  padding: 0.6em 1em;
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--pp-violet) 8%, transparent);
+  /*
+     `--pp-text`, not `--pp-muted` as before. A pull quote is the line the author most wants
+     read, and it was the lowest-contrast text on the page - the styling said "skip this".
+  */
+  color: var(--pp-text);
 }
+/*
+   Inline code is where most of the colour on this blog actually lands.
+
+   It is the highest-frequency inline element in these posts - API names, flags, paths - so
+   it is the one change that tints a whole page rather than its headings. Rose because it has
+   to be distinct from both the link blue and the heading violet at a glance, or a reader
+   learns nothing from the difference.
+*/
 .blog-prose code {
   font-size: 0.9em;
-  background: var(--pp-panel);
-  border: 1px solid var(--pp-line);
+  color: var(--pp-ink-rose);
+  background: color-mix(in srgb, var(--pp-pink) 15%, var(--pp-panel));
+  border: 1px solid color-mix(in srgb, var(--pp-ink-rose) 18%, transparent);
   border-radius: 6px;
   padding: 0.1em 0.35em;
 }
+/* A link that is also code keeps the link's colour - the affordance outranks the category. */
+.blog-prose a code { color: inherit; }
 .blog-prose pre {
   overflow-x: auto;
   padding: 1em 1.1em;
@@ -387,21 +554,116 @@
   font-size: 0.9rem;
   line-height: 1.6;
 }
-/* The inner `code` must not re-apply the inline-code chrome inside a highlighted block. */
+/*
+   The inner `code` must not re-apply the inline-code chrome inside a highlighted block.
+
+   `color: inherit` is the line that was added with the rose inline-code colour and it is
+   load-bearing. Shiki writes an inline `style` on every token span it creates, but the text
+   BETWEEN those spans - newlines, indentation, anything its grammar did not tokenise - has no
+   span and would inherit the rose. On a dark Shiki theme that is pink whitespace, and on a
+   fence Shiki downgraded to `language-text` it is the entire block.
+*/
 .blog-prose pre code {
   background: none;
   border: 0;
   padding: 0;
   font-size: inherit;
+  color: inherit;
 }
 .blog-prose img { max-width: 100%; height: auto; border-radius: 12px; }
-.blog-prose table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.blog-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  overflow: hidden;
+  border-radius: 10px;
+}
 .blog-prose th, .blog-prose td {
   border: 1px solid var(--pp-line);
   padding: 0.5em 0.7em;
   text-align: left;
 }
-.blog-prose hr { border: 0; border-top: 1px solid var(--pp-line); margin: 2.5em 0; }
+/* The header row is the table's own heading, so it takes the same violet the h2s do. */
+.blog-prose thead th {
+  color: var(--pp-ink-violet);
+  background: color-mix(in srgb, var(--pp-violet) 10%, transparent);
+  font-weight: 650;
+}
+/*
+   Zebra striping, at 4%. Enough to follow a row across a wide table and far too faint to read
+   as a highlight on the rows that have it - which is the failure of every striped table that
+   picks a visible tint: half the rows look selected.
+*/
+.blog-prose tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--pp-blue) 4%, transparent);
+}
+/*
+   The rule between sections, as the whole palette.
+
+   A 1px line in `--pp-line` is the most invisible element on the page, and it only ever
+   appears at a deliberate section break - so it is free surface for colour that cannot
+   compete with anything, because nothing is next to it.
+*/
+.blog-prose hr {
+  border: 0;
+  height: 2px;
+  border-radius: 999px;
+  margin: 2.5em 0;
+  background: linear-gradient(
+    90deg,
+    var(--pp-violet),
+    var(--pp-blue),
+    var(--pp-green),
+    var(--pp-orange),
+    var(--pp-pink)
+  );
+  opacity: 0.55;
+}
+/*
+   Tag chips, cycling the five accents by position.
+
+   A class rather than Tailwind utilities on each `li`, because the colour is chosen by
+   POSITION - `nth-child` has no Tailwind equivalent that reads better than this - and because
+   the same chip appears on `/blog` cards and at the foot of a post. One rule, both surfaces.
+
+   Cycling by position rather than hashing the tag text: a hash would keep `nextjs` the same
+   colour everywhere, which sounds better and is worse. Two adjacent tags can hash to the same
+   hue, so the row loses its rhythm at random, and the colour would imply a taxonomy that does
+   not exist - nothing about `nextjs` is blue. Position guarantees neighbours always differ.
+*/
+.blog-tag {
+  border-radius: 999px;
+  padding: 0.15em 0.7em;
+  font-size: 11px;
+  line-height: 1.7;
+  border: 1px solid transparent;
+}
+.blog-tag:nth-child(5n + 1) {
+  color: var(--pp-ink-blue);
+  background: color-mix(in srgb, var(--pp-blue) 11%, transparent);
+  border-color: color-mix(in srgb, var(--pp-ink-blue) 20%, transparent);
+}
+.blog-tag:nth-child(5n + 2) {
+  color: var(--pp-ink-violet);
+  background: color-mix(in srgb, var(--pp-violet) 11%, transparent);
+  border-color: color-mix(in srgb, var(--pp-ink-violet) 20%, transparent);
+}
+.blog-tag:nth-child(5n + 3) {
+  color: var(--pp-ink-green);
+  background: color-mix(in srgb, var(--pp-green) 12%, transparent);
+  border-color: color-mix(in srgb, var(--pp-ink-green) 20%, transparent);
+}
+.blog-tag:nth-child(5n + 4) {
+  color: var(--pp-ink-amber);
+  background: color-mix(in srgb, var(--pp-orange) 13%, transparent);
+  border-color: color-mix(in srgb, var(--pp-ink-amber) 20%, transparent);
+}
+.blog-tag:nth-child(5n + 5) {
+  color: var(--pp-ink-rose);
+  background: color-mix(in srgb, var(--pp-pink) 15%, transparent);
+  border-color: color-mix(in srgb, var(--pp-ink-rose) 20%, transparent);
+}
+
 /* GFM task lists: the checkbox is decorative here, the text carries the meaning. */
 .blog-prose input[type='checkbox'] { margin-right: 0.5em; }
 .blog-prose .footnotes { font-size: 0.9rem; color: var(--pp-muted); }

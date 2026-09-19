@@ -207,10 +207,12 @@ export default async function BlogPostPage({ params }: PageProps) {
                 model, which previously existed only as a heading on `/blog` with no way back
                 to it from a post.
               */
-              <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+              <p className='text-[11px] font-semibold uppercase tracking-[0.16em]'>
+                {/* Violet, the same ink the body's h2s use. This line and those headings are
+                    the two things on the page that say "where am I", so they match. */}
                 <Link
                   href={`/blog#${series.slug}`}
-                  className='text-pp-muted no-underline hover:text-pp-text'
+                  className='text-pp-ink-violet no-underline hover:underline'
                 >
                   {series.title}
                 </Link>
@@ -311,10 +313,9 @@ export default async function BlogPostPage({ params }: PageProps) {
               className='mt-10 flex flex-wrap gap-2 border-t border-pp-line pt-6'
             >
               {post.tags.map(tag => (
-                <li
-                  key={tag}
-                  className='rounded-full border border-pp-line px-2.5 py-0.5 text-[11px] text-pp-muted'
-                >
+                /* `blog-tag` carries the whole chip, including a colour chosen by its
+                   position in the row - see the rule in `styles/globals.css`. */
+                <li key={tag} className='blog-tag'>
                   {tag}
                 </li>
               ))}

@@ -1,8 +1,13 @@
 'use client'
 
+import { ImageOff } from 'lucide-react'
 import React, { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 
 import BlogSaveDock from '@/components/blog-admin/BlogSaveDock'
+import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
+import GenerateBlogDialog from '@/components/blog-admin/GenerateBlogDialog'
+import ImagePromptField from '@/components/blog-admin/ImagePromptField'
+import MissingImagesPanel from '@/components/blog-admin/MissingImagesPanel'
 import TaxonomyDialog, { type TaxonomyResource } from '@/components/blog-admin/TaxonomyDialog'
 import BlogToolbar from '@/components/blog-admin/BlogToolbar'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
@@ -22,6 +27,12 @@ import {
 } from '@/components/settings/settings-utils'
 import { uploadAssetToCloudinary } from '@/components/settings/settings-utils'
 import { MAX_RAIL_WIDTH, MIN_RAIL_WIDTH } from '@/components/settings/useRailWidth'
+import { presetSpecFromPost } from '@/lib/blog/generation-fields'
+import {
+  countBodyImages,
+  findImagePlaceholders,
+  replacePlaceholder,
+} from '@/lib/blog/image-placeholders'
 import { buildSyndicationBundle, type SyndicationTarget } from '@/lib/blog/syndication'
 
 /**
@@ -34,7 +45,7 @@ import { buildSyndicationBundle, type SyndicationTarget } from '@/lib/blog/syndi
  *   │  Section  Classification                │  POST /api/admin/    │
  *   │  Section  Cover image                   │       blog/preview   │
  *   │  Section  Markdown  (the textarea)      │  sticky, resizable   │
- *   │  autosave, 1.2s debounce                │  debounced with it   │
+ *   │  manual save only - Save now / dock     │  refreshed with it   │
  *   └─────────────────────────────────────────┴──────────────────────┘
  *                                             ^ RailResizeHandle
  * ```
@@ -86,16 +97,22 @@ import { buildSyndicationBundle, type SyndicationTarget } from '@/lib/blog/syndi
  * So the preview posts to `/api/admin/blog/preview` - the sixth gated handler - and renders
  * exactly the HTML the save path would produce, from the same function.
  *
- * ## Why autosave and preview share one debounce
+ * ## Save is manual; the preview is not
  *
- * They are the same keystroke. Two timers would mean two requests per pause, each paying
- * Shiki, and the preview would sometimes show a render of text that had already been
- * superseded by the save. One timer, two requests, in order.
+ * These two used to share one debounce, back when there was an autosave to share it with.
+ * Save is manual now - every PATCH happens because the author clicked Save, never because they
+ * paused typing - but the preview kept its own 1.2s-debounced timer, firing on every edit to
+ * `bodyMarkdown` regardless of whether anything is ever saved. A split-pane editor whose right
+ * pane goes stale until a deliberate click is a worse product than the save behaviour is worth;
+ * "what you see is what publishes" has to be true while typing, not just after Save.
  *
- * The debounce is 1.2s rather than the more usual 300ms because each save re-renders the
- * whole document through Shiki server-side. `BLOG_SAVE_LIMIT` is the backstop if this is ever
- * wrong - it is generous enough that a person cannot hit it and tight enough that a broken
- * retry loop can.
+ * `flush` still re-fetches the preview once after a successful save, which is close to
+ * redundant now - the debounced timer has usually already caught up - but cheap, and it is the
+ * thing that resyncs the pane if a keystroke landed exactly inside the debounce window.
+ *
+ * `BLOG_SAVE_LIMIT` gates PATCH; the preview endpoint has no rate limit of its own (see its own
+ * file) because it is read-only and owner-gated - the debounce here is about not paying Shiki
+ * on every keystroke, not about a backend guard.
  *
  * ## The slug field disappears after publishing
  *
@@ -115,6 +132,8 @@ type EditorPost = {
   bodyMarkdown: string
   coverImage: string | null
   coverCaption: string
+  coverImagePrompt: string
+  imagePrompts: { key: string; prompt: string }[]
   tags: string[]
   relatedSlugs: string[]
   language: 'vi' | 'en'
@@ -122,7 +141,16 @@ type EditorPost = {
   publishedAt: string | null
 }
 
-const DEBOUNCE_MS = 1200
+/**
+ * How long the markdown pane waits after a keystroke before re-rendering the preview.
+ *
+ * Not 300ms: every call pays Shiki server-side, on an endpoint with no rate limit of its own
+ * (see `api/admin/blog/preview/route.ts`) because it is trusted to the owner gate instead. 1.2s
+ * is the same figure the old combined autosave-and-preview debounce used, for the same reason -
+ * it is long enough that a fast typist's pause reads as "done with this thought" rather than
+ * "between two keystrokes", and short enough that the pane never feels like it is ignoring you.
+ */
+const PREVIEW_DEBOUNCE_MS = 1200
 
 /** Remembered so a wide-screen setup does not have to be re-chosen on the next post. */
 const FULL_WIDTH_STORAGE_KEY = 'portfolio:blog-editor:full-width'
@@ -187,14 +215,20 @@ export default function BlogEditor({ id }: { id: string }) {
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [uploading, setUploading] = useState(false)
+  /** Which image prompt has a rewrite in flight: a placeholder key, or `cover`. */
+  const [promptBusy, setPromptBusy] = useState<string | null>(null)
+  /** Which placeholder has a file upload in flight. Separate from `uploading`, which is the cover's. */
+  const [imageUploading, setImageUploading] = useState<string | null>(null)
+  /** Whether the regeneration dialog is up. The dialog is mounted only while this is true. */
+  const [regenerating, setRegenerating] = useState(false)
   const [copied, setCopied] = useState<SyndicationTarget | null>(null)
   /**
    * Whether an edit has been made that the server has not acknowledged yet.
    *
-   * The toolbar used to derive its whole status from `saving` and `savedAt`, which left a
-   * real state unrepresented: during the 1.2s debounce nothing is in flight and nothing has
-   * been saved, so a freshly typed paragraph reported "No changes yet". That is the one
-   * sentence an autosave editor must never say while holding unsaved work.
+   * Save is manual, so this is the only thing standing between the toolbar and "No changes
+   * yet" while a whole paragraph sits typed and unsaved. `saving` and `savedAt` alone cannot
+   * tell that story: neither is true the instant after a keystroke and before Save is clicked,
+   * which is exactly the state an editor must never describe as nothing pending.
    */
   const [dirty, setDirty] = useState(false)
   /**
@@ -219,9 +253,42 @@ export default function BlogEditor({ id }: { id: string }) {
   const [fullWidth, setFullWidth] = useState(readStoredFullWidth)
   const [railWidth, setRailWidth] = useState(readStoredRailWidth)
 
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const layoutRef = useRef<HTMLDivElement | null>(null)
   const saveButtonRef = useRef<HTMLButtonElement | null>(null)
+  /** The pending debounced preview re-render, if a keystroke is still waiting one out. */
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cancels a pending preview render on unmount, so a `setPreview` never fires after this
+  // component is gone - the confirm-leave guards make that a narrow window, not a closed one.
+  useEffect(() => {
+    return () => {
+      if (previewTimer.current) clearTimeout(previewTimer.current)
+    }
+  }, [])
+
+  /**
+   * The browser's own "leave site?" prompt, gated on `dirty`.
+   *
+   * Save being manual means a closed tab is the one exit this editor cannot recover from - the
+   * toolbar and the dock can say "Unsaved changes" all they like, but neither does anything if
+   * the page is already gone. `beforeunload` is the one hook that can still stop that, and only
+   * `preventDefault` plus setting `returnValue` reaches it in every engine; every modern browser
+   * ignores whatever string is assigned and shows its own fixed wording anyway, which is a
+   * deliberate anti-annoyance measure on their end, not a bug on this one.
+   *
+   * Registered unconditionally, gated on `dirty` inside the handler: `dirty` flips on every
+   * keystroke, and re-subscribing an event listener that often is wasted work a plain closure
+   * check avoids.
+   */
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (!dirty) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [dirty])
 
   useEffect(() => {
     try {
@@ -307,9 +374,33 @@ export default function BlogEditor({ id }: { id: string }) {
     return () => window.clearTimeout(timer)
   }, [])
 
-  /** Save, then refresh the preview from the same text. Order matters - see the header. */
+  /** Render markdown through the same pipeline the save path uses, without saving anything. */
+  const refreshPreview = useCallback(async (markdown: string, slug: string) => {
+    const res = await fetch('/api/admin/blog/preview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ markdown, slug }),
+    })
+    if (res.ok) setPreview(((await res.json()) as { html?: string }).html ?? '')
+  }, [])
+
+  /**
+   * Save, then resync the preview from what was just saved. Order matters - see the header.
+   *
+   * Returns whether the save landed. It used to return nothing while swallowing its own error
+   * into the banner, which meant no caller could tell - so `regenerateImagePrompt` would go on
+   * to ask the server for a prompt against a body that had just failed to save, and the 409 it
+   * got back ("that placeholder is no longer in the post body") overwrote the real message. The
+   * author was told a placeholder had vanished and never learned the save had failed.
+   */
   const flush = useCallback(
-    async (next: EditorPost) => {
+    async (next: EditorPost): Promise<boolean> => {
+      // Whatever the debounce below was about to fetch, this is about to fetch too, from
+      // definitely-current text - so the pending one is now wasted work, not a second answer.
+      if (previewTimer.current) {
+        clearTimeout(previewTimer.current)
+        previewTimer.current = null
+      }
       setSaving(true)
       setError(null)
       try {
@@ -317,6 +408,18 @@ export default function BlogEditor({ id }: { id: string }) {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
+            /*
+              `status` is in this body, and its absence was a real bug rather than a deliberate
+              omission. Publish and Archive commit through `applyStatus` now, which is what
+              actually fixed the button - but this field is what makes that possible, and it is
+              also what stops a plain Save from silently reverting a transition that happened
+              while the editor was open.
+
+              Safe to send unconditionally because the route ignores a status equal to the
+              current one and refuses the two transitions that must not happen here
+              (`archived -> draft`, and `deleted` at all, which is DELETE's job).
+            */
+            status: next.status,
             slug: next.slug,
             title: next.title,
             excerpt: next.excerpt,
@@ -326,6 +429,8 @@ export default function BlogEditor({ id }: { id: string }) {
             bodyMarkdown: next.bodyMarkdown,
             coverImage: next.coverImage,
             coverCaption: next.coverCaption,
+            coverImagePrompt: next.coverImagePrompt,
+            imagePrompts: next.imagePrompts,
             tags: next.tags,
             relatedSlugs: next.relatedSlugs,
             language: next.language,
@@ -336,63 +441,98 @@ export default function BlogEditor({ id }: { id: string }) {
         setSavedAt(new Date())
         setDirty(false)
 
-        const previewRes = await fetch('/api/admin/blog/preview', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ markdown: next.bodyMarkdown, slug: next.slug }),
-        })
-        const previewData = (await previewRes.json()) as { html?: string }
-        if (previewRes.ok) setPreview(previewData.html ?? '')
+        await refreshPreview(next.bodyMarkdown, next.slug)
+        return true
       } catch (cause) {
-        // Surfaced, never swallowed. A silent autosave failure is how an hour of writing is
-        // lost - the author has no reason to suspect anything until they reload.
+        // Surfaced, never swallowed. A silent save failure is how an hour of writing is lost -
+        // the author clicked Save, believes it worked, and has no reason to suspect anything
+        // until they reload.
         setError(cause instanceof Error ? cause.message : 'Save failed')
+        return false
       } finally {
         setSaving(false)
       }
     },
-    [id]
+    [id, refreshPreview]
   )
 
+  /**
+   * Update the in-memory post. Nothing is written to the server until Save is clicked - but a
+   * change to the body still schedules a debounced preview render, because the preview is not
+   * "what was saved", it is "what is on screen right now".
+   */
   function patch(changes: Partial<EditorPost>) {
     setPost(current => {
       if (!current) return current
       const next = { ...current, ...changes }
 
-      if (timer.current) clearTimeout(timer.current)
-      timer.current = setTimeout(() => void flush(next), DEBOUNCE_MS)
+      if (changes.bodyMarkdown !== undefined) {
+        if (previewTimer.current) clearTimeout(previewTimer.current)
+        previewTimer.current = setTimeout(
+          () => void refreshPreview(next.bodyMarkdown, next.slug),
+          PREVIEW_DEBOUNCE_MS
+        )
+      }
 
       return next
     })
     setDirty(true)
   }
 
-  /**
-   * Commit now rather than in `DEBOUNCE_MS`.
-   *
-   * Not a second way to save - the same `flush`, with the pending timer cancelled so the
-   * debounced call cannot land a second, identical PATCH behind it. It exists because
-   * "it saves by itself" and "I am about to close this tab" are not the same confidence:
-   * autosave answers the first and nothing answered the second.
-   */
+  /** The only path to the server: `flush` on the post as it stands right now. */
   const saveNow = useCallback(() => {
     if (!post) return
-    if (timer.current) {
-      clearTimeout(timer.current)
-      timer.current = null
-    }
     void flush(post)
   }, [post, flush])
 
+  /**
+   * Publish / Archive - a transition that happens NOW, not one that is staged for later.
+   *
+   * ## Why these do not go through `patch`
+   *
+   * They used to, and `patch` only writes to local state: "Nothing is written to the server
+   * until Save is clicked". So pressing Publish repainted the badge to PUBLISHED, flipped the
+   * editor to dirty, and saved nothing. The author had done the thing the button is named
+   * after, could see it had worked, and the post was still archived - until they happened to
+   * press Save as well, or navigated away and lost it.
+   *
+   * Every other mutating control in this product commits on click: the board's Publish PATCHes
+   * directly, Delete PATCHes directly. A button labelled with a verb has to do the verb.
+   *
+   * ## Why it flushes the WHOLE post rather than just the status
+   *
+   * Publishing with unsaved edits in the textarea and having them not go live is the same
+   * surprise one level down - the author pressed Publish, the page is public, and it is public
+   * with yesterday's text. `flush` already sends every field, so publishing saves the pending
+   * work with it, which is what "make this live" means.
+   *
+   * ## Why the local state is rolled back on failure
+   *
+   * The optimistic update is what makes the badge feel instant, but a PATCH can legitimately
+   * refuse - `archived -> draft` on a post that was once public is a 409 by design. Leaving the
+   * badge on the state the server rejected would be the original bug wearing a different hat:
+   * the screen claiming something the database does not agree with.
+   */
+  const applyStatus = useCallback(
+    async (status: EditorPost['status']) => {
+      if (!post || post.status === status) return
+
+      const previous = post
+      const next = { ...post, status }
+      setPost(next)
+
+      if (!(await flush(next))) {
+        // `flush` has already put the reason in the banner. Put the badge back so the toolbar
+        // is not showing a state the save was refused.
+        setPost(previous)
+        setDirty(true)
+      }
+    },
+    [post, flush]
+  )
+
   const renderInitialPreview = useEffectEvent((current: EditorPost) => {
-    void (async () => {
-      const res = await fetch('/api/admin/blog/preview', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ markdown: current.bodyMarkdown, slug: current.slug }),
-      })
-      if (res.ok) setPreview(((await res.json()) as { html?: string }).html ?? '')
-    })()
+    void refreshPreview(current.bodyMarkdown, current.slug)
   })
 
   // Render the preview once on load, so opening an existing post does not show a blank pane
@@ -407,8 +547,8 @@ export default function BlogEditor({ id }: { id: string }) {
    * Copy a channel-ready bundle to the clipboard.
    *
    * Built from the CURRENT editor state rather than from what was last saved, so the author
-   * can copy without waiting on the debounce - the bundle is for pasting elsewhere and never
-   * touches the stored document.
+   * can copy without saving first - the bundle is for pasting elsewhere and never touches the
+   * stored document.
    */
   async function copyBundle(target: SyndicationTarget) {
     if (!post) return
@@ -427,6 +567,99 @@ export default function BlogEditor({ id }: { id: string }) {
       window.setTimeout(() => setCopied(null), 2000)
     } catch {
       setError('Could not reach the clipboard. Copy the markdown pane instead.')
+    }
+  }
+
+  /**
+   * Ask the server to write a new prompt, for the cover or for one placeholder.
+   *
+   * Flushes first, on purpose. The route reads the post from the database - the body, and the
+   * paragraph around the placeholder - and save is manual now, so whatever is typed since the
+   * last click of Save otherwise never reaches it. For a placeholder typed by hand a moment
+   * ago, an unsaved key is not in the SAVED body yet and the route refuses it with a 409 that
+   * would read as a bug.
+   *
+   * The response is merged with `setPost` rather than `patch`, because the route already saved
+   * the prompt to the document `flush` just wrote. Routing it through `patch` instead would
+   * only mark the editor dirty again over a field the server already has.
+   */
+  async function regenerateImagePrompt(key: string | null) {
+    if (!post) return
+
+    const slot = key ?? 'cover'
+    setPromptBusy(slot)
+    setError(null)
+    try {
+      // Bail if the pre-save did not land. The route reads the STORED body, so continuing here
+      // asks for a prompt against text the server never received - and for a placeholder the
+      // author has just typed that is a 409 ("no longer in the post body") which overwrites the
+      // real "Save failed" message in the banner. The author would be told a placeholder had
+      // vanished and never learn their save had failed.
+      if (!(await flush(post))) return
+
+      const res = await fetch(`/api/admin/blog/${id}/image-prompt`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(key ? { target: 'body', key } : { target: 'cover' }),
+      })
+      const data = (await res.json()) as { prompt?: string; error?: string }
+      if (!res.ok || !data.prompt) throw new Error(data.error ?? 'Could not write a prompt')
+
+      const prompt = data.prompt
+      setPost(current => {
+        if (!current) return current
+        if (!key) return { ...current, coverImagePrompt: prompt }
+
+        const existing = current.imagePrompts.some(entry => entry.key === key)
+        return {
+          ...current,
+          imagePrompts: existing
+            ? current.imagePrompts.map(entry => (entry.key === key ? { key, prompt } : entry))
+            : [...current.imagePrompts, { key, prompt }],
+        }
+      })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not write a prompt')
+    } finally {
+      setPromptBusy(null)
+    }
+  }
+
+  /** Edit a stored prompt by hand. Goes through `patch`, so it saves on the next Save click like anything else. */
+  function setImagePrompt(key: string, prompt: string) {
+    if (!post) return
+    const existing = post.imagePrompts.some(entry => entry.key === key)
+    patch({
+      imagePrompts: existing
+        ? post.imagePrompts.map(entry => (entry.key === key ? { key, prompt } : entry))
+        : [...post.imagePrompts, { key, prompt }],
+    })
+  }
+
+  /**
+   * Put a real URL where a placeholder was.
+   *
+   * The prompt is deliberately LEFT in `imagePrompts` afterwards rather than pruned. The card
+   * disappears either way - it is derived from the body - but the body is a textarea, so the
+   * most likely next action after a wrong URL is ctrl-Z. Keeping the prompt means the undo
+   * brings the card back complete; pruning would bring back an empty one and cost another
+   * model call to refill. Orphans are capped at twelve by the schema and swept at generation.
+   */
+  function resolvePlaceholder(key: string, url: string) {
+    if (!post) return
+    patch({ bodyMarkdown: replacePlaceholder(post.bodyMarkdown, key, url) })
+  }
+
+  async function uploadPlaceholderImage(key: string, file: File) {
+    setImageUploading(key)
+    setError(null)
+    try {
+      const url = await uploadAssetToCloudinary(file, 'post')
+      resolvePlaceholder(key, url)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Upload failed')
+    } finally {
+      setImageUploading(null)
     }
   }
 
@@ -454,6 +687,16 @@ export default function BlogEditor({ id }: { id: string }) {
   }
 
   const isPublished = post.publishedAt !== null
+
+  /**
+   * The placeholders still in the body, derived every render rather than held in state.
+   *
+   * It is a regex over a string the author is typing into, so the cost is real but small, and
+   * the alternative is worse in a way that shows: a `useState` list would need an effect to
+   * follow `bodyMarkdown`, which means one render where the cards on screen disagree with the
+   * text above them. Deleting a placeholder should remove its card in the same frame.
+   */
+  const missingImages = findImagePlaceholders(post.bodyMarkdown)
 
   /**
    * The fetched options, plus this post's own series if it is not among them.
@@ -493,8 +736,8 @@ export default function BlogEditor({ id }: { id: string }) {
           onToggleFullWidth={() => setFullWidth(value => !value)}
           onSave={saveNow}
           saveButtonRef={saveButtonRef}
-          onPublish={() => patch({ status: 'published' })}
-          onArchive={() => patch({ status: 'archived' })}
+          onPublish={() => void applyStatus('published')}
+          onArchive={() => void applyStatus('archived')}
         />
 
         <SettingErrorBanner message={error} />
@@ -679,8 +922,9 @@ export default function BlogEditor({ id }: { id: string }) {
                   which is why it is bound to `post.coverImage` directly and not to a separate
                   piece of state that would then need reconciling.
 
-                  `onChange`, not `onBlur`: `patch` already debounces at 1.2s, so per-keystroke
-                  costs nothing extra and the preview below tracks a pasted URL as it is typed.
+                  `onChange`, not `onBlur`: `patch` is a local state update with no network
+                  call of its own, so per-keystroke costs nothing and the share-card preview
+                  below tracks a pasted URL as it is typed, well before Save is ever clicked.
                 */}
                 <div className='mt-3'>
                   <label className={labelCls} htmlFor='cover-url'>
@@ -694,6 +938,34 @@ export default function BlogEditor({ id }: { id: string }) {
                     onChange={event => patch({ coverImage: event.target.value.trim() || null })}
                   />
                 </div>
+
+                {/*
+                  Below the URL, and only once there is a post to describe.
+
+                  Hidden on an empty body rather than shown disabled, for the same reason the
+                  slug field disappears after publishing: a prompt is written FROM the post, so
+                  on a blank one the rewrite button has nothing to read and the field would be
+                  an input whose only honest state is "not yet". The condition is the body
+                  rather than the title, because a title alone produces a prompt about a
+                  sentence.
+
+                  It stays visible after a cover has been set. The prompt is what produced the
+                  picture, and the most common reason to want it again is that the first
+                  attempt was not good enough.
+                */}
+                {post.bodyMarkdown.trim() ? (
+                  <div className='mt-3'>
+                    <ImagePromptField
+                      id='cover-image-prompt'
+                      label='Image prompt'
+                      prompt={post.coverImagePrompt}
+                      busy={promptBusy === 'cover'}
+                      help='Copy this into an image tool, then paste the result into the URL field above. Nothing here is ever published.'
+                      onChange={value => patch({ coverImagePrompt: value })}
+                      onRegenerate={() => void regenerateImagePrompt(null)}
+                    />
+                  </div>
+                ) : null}
 
                 {/*
                   Under the preview rather than beside the URL, because that is where it
@@ -789,6 +1061,60 @@ export default function BlogEditor({ id }: { id: string }) {
               </Section>
 
               <Section id='blog-markdown' eyebrow='Blog editor' title='Markdown' defaultOpen>
+                {/*
+                  Above the textarea, because the consequence of missing it lands on readers.
+
+                  `rehypeRestrictImageHosts` refuses every `src` that is not a real Cloudinary
+                  URL by deleting the ATTRIBUTE and keeping the node, so `![image](image1)`
+                  publishes as `<img alt="image">` - measured, not assumed: the preview endpoint
+                  returns exactly `<p><img alt="a chart"></p>` for it. Every browser paints that
+                  as a broken-image icon.
+
+                  So the failure is visible damage on the live post rather than a quiet
+                  omission, and it is also the kind that is easy to scroll past in the preview
+                  rail: a sourceless img fetches nothing, so there is no console error and no
+                  network entry either. A banner on the surface being typed into is the only
+                  place it cannot be missed.
+                */}
+                {/*
+                  At the top of the Markdown card rather than up in the toolbar beside Publish.
+
+                  It replaces the post's whole body, so it belongs adjacent to the body - the
+                  author decides this is the wrong post while reading the wrong post, and a
+                  destructive control sitting next to the thing it destroys is one a misclick
+                  cannot confuse with a different class of action. In the toolbar it would be
+                  one button along from Publish, where the two worst possible mistakes on this
+                  page would be neighbours.
+                */}
+                <div className='mb-3 flex flex-wrap items-center justify-between gap-3'>
+                  <p className={`${helpTextCls} max-w-[46ch]`}>
+                    Not what you meant? Regenerate opens the same dialog the board uses, with
+                    this post&apos;s own properties already filled in.
+                  </p>
+                  <GenerateBlogButton
+                    label='Regenerate post'
+                    onClick={() => setRegenerating(true)}
+                    disabled={saving}
+                  />
+                </div>
+
+                {missingImages.length > 0 ? (
+                  <div className='mb-3 flex gap-2.5 rounded-[1.15rem] border border-[rgba(163,120,47,0.22)] bg-[rgba(224,176,92,0.13)] px-3.5 py-2.5 text-sm text-[#6b4d1c]'>
+                    <ImageOff aria-hidden size={16} className='mt-0.5 shrink-0' />
+                    <span>
+                      <strong className='font-semibold'>
+                        {missingImages.length} image{missingImages.length === 1 ? '' : 's'} still
+                        missing.
+                      </strong>{' '}
+                      {missingImages.map(item => item.key).join(', ')}{' '}
+                      {missingImages.length === 1 ? 'is a placeholder' : 'are placeholders'}. Published
+                      as {missingImages.length === 1 ? 'it is' : 'they are'}, {missingImages.length === 1 ? 'it shows' : 'they show'}{' '}
+                      a reader a broken image with the alt text beside it. The prompts below the
+                      editor are for making them.
+                    </span>
+                  </div>
+                ) : null}
+
                 <label className='sr-only' htmlFor='body'>
                   Markdown
                 </label>
@@ -797,6 +1123,17 @@ export default function BlogEditor({ id }: { id: string }) {
                   className={`${inputCls} min-h-[32rem] font-mono text-[13px] leading-relaxed`}
                   value={post.bodyMarkdown}
                   onChange={event => patch({ bodyMarkdown: event.target.value })}
+                />
+
+                <MissingImagesPanel
+                  placeholders={missingImages}
+                  promptFor={key => post.imagePrompts.find(entry => entry.key === key)?.prompt ?? ''}
+                  busyKey={promptBusy === 'cover' ? null : promptBusy}
+                  uploadingKey={imageUploading}
+                  onPromptChange={setImagePrompt}
+                  onRegenerate={key => void regenerateImagePrompt(key)}
+                  onResolve={resolvePlaceholder}
+                  onUpload={(key, file) => void uploadPlaceholderImage(key, file)}
                 />
               </Section>
 
@@ -841,7 +1178,7 @@ export default function BlogEditor({ id }: { id: string }) {
                 */}
                 {preview ? (
                   <div
-                    className='blog-prose rounded-[1.75rem] border border-pp-line bg-white/72 p-5 shadow-panel backdrop-blur-md'
+                    className='blog-prose rounded-[1.75rem] border border-pp-line bg-white/85 p-5 shadow-panel backdrop-blur-md'
                     dangerouslySetInnerHTML={{ __html: preview }}
                   />
                 ) : (
@@ -872,6 +1209,48 @@ export default function BlogEditor({ id }: { id: string }) {
           onClose={() => setTaxonomyDialog(null)}
           onChanged={() => void loadKinds()}
         />
+
+        {/*
+          Mounted only while open, so the preset is read fresh each time. It is `useState`
+          initialiser state inside the dialog, so a dialog kept mounted behind an `open` prop
+          would reopen describing the post as it was before the last rewrite.
+
+          `onGenerated` reloads from the server rather than merging the response into local
+          state: the rewrite touched eleven fields, and re-reading the document is both shorter
+          than listing them and immune to the next field being forgotten here.
+        */}
+        {regenerating ? (
+          <GenerateBlogDialog
+            onClose={() => setRegenerating(false)}
+            onGenerated={() => void load()}
+            preset={presetSpecFromPost({
+              title: post.title,
+              slug: post.slug,
+              excerpt: post.excerpt,
+              kind: post.kind,
+              series: post.series,
+              isPillar: post.isPillar,
+              language: post.language,
+              tags: post.tags,
+              relatedSlugs: post.relatedSlugs,
+              /*
+                `countBodyImages`, NOT `missingImages.length`. The two answer different
+                questions and using the wrong one here meant a post whose images had already
+                been uploaded had zero OUTSTANDING placeholders, preset itself to "no images",
+                and regenerated with none.
+              */
+              imageCount: countBodyImages(post.bodyMarkdown),
+            })}
+            replaceTarget={{
+              id,
+              title: post.title,
+              status: post.status,
+              // Whitespace-split on the markdown, so it counts fences and syntax too. It is
+              // there to convey scale before an irreversible press, not to be quoted.
+              wordCount: post.bodyMarkdown.trim() ? post.bodyMarkdown.trim().split(/\s+/).length : 0,
+            }}
+          />
+        ) : null}
 
         <BlogSaveDock
           anchorRef={saveButtonRef}

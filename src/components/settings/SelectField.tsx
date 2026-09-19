@@ -21,8 +21,12 @@ import { useEffect, useId, useRef, useState } from 'react'
  * form integration for free. Replacing it means re-implementing all of that - which is what
  * the rest of this file is - and the mobile picker is simply lost.
  *
- * So this is only worth it where the list is short and the surface is heavily designed. It
- * is used by the blog editor's two fields; it is deliberately not a codebase-wide swap.
+ * So this is only worth it where the list is short and the surface is heavily designed. It is
+ * used by the blog editor's Kind and Series fields and by the generic `select` control in
+ * `GenerateBlogDialog` - three admin-only surfaces, every option list a handful of entries.
+ * It is still deliberately not a codebase-wide swap: nothing else in the app currently pairs a
+ * long or dynamic option list with a public, mobile-heavy surface, and the day one does, that
+ * field keeps the native `<select>` rather than paying this component's cost for no benefit.
  *
  * ## The keyboard contract
  *
@@ -66,14 +70,16 @@ export default function SelectField({
   onChange,
   ariaLabel,
   className,
+  disabled = false,
 }: {
   id: string
   value: string
-  options: SelectOption[]
+  options: readonly SelectOption[]
   onChange: (value: string) => void
   /** Used when the field's `<label htmlFor>` is not adjacent - otherwise the label wins. */
   ariaLabel?: string
   className?: string
+  disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -188,9 +194,10 @@ export default function SelectField({
         aria-haspopup='listbox'
         aria-label={ariaLabel}
         aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        disabled={disabled}
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={onKeyDown}
-        className='flex w-full items-center justify-between gap-2 rounded-[1.05rem] border border-pp-line bg-white/78 px-4 py-3 text-left text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition hover:bg-white focus-visible:border-pp-blue/55 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-pp-blue/10'
+        className='flex w-full items-center justify-between gap-2 rounded-[1.05rem] border border-pp-line bg-white/78 px-4 py-3 text-left text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition hover:bg-white focus-visible:border-pp-blue/55 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-pp-blue/10 disabled:cursor-not-allowed disabled:opacity-60'
       >
         <span className='truncate'>{selected?.label ?? ''}</span>
         <ChevronDown

@@ -75,6 +75,23 @@ const config: Config = {
           violet: ppColor('violet'),
           pink: ppColor('pink'),
           orange: ppColor('orange'),
+          /*
+            The ink family: the five above, darkened until they clear 4.5:1 on `--pp-bg`.
+
+            Exposed to Tailwind as well as to CSS because the blog's chrome - a series
+            eyebrow, a kind label, a TOC heading - is styled in components while the prose is
+            styled in `globals.css`, and both have to reach the same five values. See the
+            block in `styles/globals.css` for the measured ratios and for why the bright
+            tokens cannot be used on text.
+
+            Through `ppColor` like everything else here, so `text-pp-ink-violet/70` resolves
+            to a `color-mix` instead of silently compiling to nothing.
+          */
+          'ink-blue': ppColor('ink-blue'),
+          'ink-violet': ppColor('ink-violet'),
+          'ink-green': ppColor('ink-green'),
+          'ink-rose': ppColor('ink-rose'),
+          'ink-amber': ppColor('ink-amber'),
         },
       },
       /**
@@ -102,6 +119,33 @@ const config: Config = {
       },
       boxShadow: {
         panel: 'var(--pp-shadow)',
+      },
+      /**
+       * Two keyframes, both owned by the "Generate blog" button on `/admin/blog`.
+       *
+       * They live here rather than in a `<style>` tag because that is the only place a
+       * Tailwind utility can come from - `animate-[name_1s]` with an inline keyframe is not a
+       * thing, and a raw `<style jsx>` in a client component would put the definition a file
+       * away from the class that uses it.
+       *
+       * `sheen-sweep` runs ONCE per hover, not infinitely. A button that shimmers forever is
+       * an advertisement; one that answers a hover is a button. `aurora-drift` is the slow
+       * background travel underneath it, and both are switched off under
+       * `prefers-reduced-motion` at the call site.
+       */
+      keyframes: {
+        'sheen-sweep': {
+          '0%': { transform: 'translateX(-130%) skewX(-18deg)' },
+          '100%': { transform: 'translateX(240%) skewX(-18deg)' },
+        },
+        'aurora-drift': {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+      },
+      animation: {
+        'sheen-sweep': 'sheen-sweep 1.05s cubic-bezier(0.22, 1, 0.36, 1)',
+        'aurora-drift': 'aurora-drift 7s ease-in-out infinite',
       },
     },
   },
