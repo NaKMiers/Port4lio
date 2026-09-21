@@ -26,30 +26,51 @@ export default async function OpenGraphImage() {
   const name = vm.meta.displayName
   const subtitle =
     collapseWhitespace(vm.hero.jobTitles.slice(0, 3).join(' · ')) ||
-    excerptText(collapseWhitespace(profile.description || vm.hero.description || vm.hero.headline), 128)
+    excerptText(
+      collapseWhitespace(
+        profile.description || vm.hero.description || vm.hero.headline
+      ),
+      128
+    )
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '64px',
+        background:
+          'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
+        color: '#f8fafc',
+        fontFamily:
+          '"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+      }}
+    >
       <div
         style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '64px',
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)',
-          color: '#f8fafc',
-          fontFamily:
-            '"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+          fontSize: 54,
+          fontWeight: 700,
+          lineHeight: 1.08,
+          letterSpacing: '-0.03em',
         }}
       >
-        <div style={{ fontSize: 54, fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.03em' }}>{name}</div>
-        <div style={{ marginTop: 28, fontSize: 26, color: '#e2e8f0', lineHeight: 1.35, maxWidth: 960 }}>
-          {subtitle}
-        </div>
+        {name}
       </div>
-    ),
-    { ...size },
+      <div
+        style={{
+          marginTop: 28,
+          fontSize: 26,
+          color: '#e2e8f0',
+          lineHeight: 1.35,
+          maxWidth: 960,
+        }}
+      >
+        {subtitle}
+      </div>
+    </div>,
+    { ...size }
   )
 }

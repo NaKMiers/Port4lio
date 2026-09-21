@@ -28,15 +28,22 @@ export default function CertificatesSection({
   }
 
   const addCertificates = () =>
-    setProfile(p => ({ ...p, certificates: [...p.certificates, { name: '', link: '' }] }))
+    setProfile(p => ({
+      ...p,
+      certificates: [...p.certificates, { name: '', link: '' }],
+    }))
 
   return (
-    <Section id='certificates' title='Certificates' badge='links & names'>
-      <div className='space-y-4'>
-        <div className='flex items-center justify-between'>
-          <h2 className='text-sm font-semibold'>Certificates</h2>
+    <Section
+      id="certificates"
+      title="Certificates"
+      badge="links & names"
+    >
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Certificates</h2>
           <button
-            type='button'
+            type="button"
             className={secondaryBtnCls}
             onClick={addCertificates}
           >
@@ -49,28 +56,42 @@ export default function CertificatesSection({
         ) : null}
 
         {profile.certificates.map((c, idx) => (
-          <div key={idx} className={itemCardCls}>
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-              <div className='space-y-2'>
+          <div
+            key={idx}
+            className={itemCardCls}
+          >
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-2">
                 <label className={labelCls}>Name</label>
-                <input className={inputCls} value={c.name} onChange={e => updateCertificate(idx, { name: e.target.value })} />
+                <input
+                  className={inputCls}
+                  value={c.name}
+                  onChange={e =>
+                    updateCertificate(idx, { name: e.target.value })
+                  }
+                />
               </div>
-              <div className='space-y-2'>
+              <div className="space-y-2">
                 <label className={labelCls}>Link</label>
                 <input
                   className={inputCls}
                   value={c.link}
-                  onChange={e => updateCertificate(idx, { link: e.target.value })}
-                  placeholder='https://...'
+                  onChange={e =>
+                    updateCertificate(idx, { link: e.target.value })
+                  }
+                  placeholder="https://..."
                 />
               </div>
             </div>
-            <div className='mt-3 flex justify-end'>
+            <div className="mt-3 flex justify-end">
               <button
-                type='button'
+                type="button"
                 className={ghostBtnCls}
                 onClick={() =>
-                  setProfile(p => ({ ...p, certificates: p.certificates.filter((_, i) => i !== idx) }))
+                  setProfile(p => ({
+                    ...p,
+                    certificates: p.certificates.filter((_, i) => i !== idx),
+                  }))
                 }
               >
                 Remove
@@ -80,7 +101,10 @@ export default function CertificatesSection({
         ))}
 
         {profile.certificates.length > 0 ? (
-          <AddMoreButton label='+ Add certificate' onClick={addCertificates} />
+          <AddMoreButton
+            label="+ Add certificate"
+            onClick={addCertificates}
+          />
         ) : null}
       </div>
     </Section>

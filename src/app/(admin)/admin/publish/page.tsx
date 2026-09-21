@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PublishPage() {
   return (
-    <div className='mx-auto w-full max-w-editorial px-gutter py-10'>
+    <div className="mx-auto w-full max-w-editorial px-gutter py-10">
       <OwnerAuthGate>
         <PublishBoard />
       </OwnerAuthGate>

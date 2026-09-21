@@ -3,7 +3,11 @@ import React from 'react'
 import AddMoreButton from '@/components/settings/AddMoreButton'
 import DragList from '@/components/settings/DragList'
 import Section from '@/components/settings/Section'
-import { replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
+import {
+  replaceAt,
+  resumeOf,
+  updateResume,
+} from '@/components/settings/resume-utils'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -35,7 +39,10 @@ export default function ResumeCertificationsSection({
       },
     }))
 
-  const updateGroup = (idx: number, patch: Partial<ResumeCertificationGroup>) => {
+  const updateGroup = (
+    idx: number,
+    patch: Partial<ResumeCertificationGroup>
+  ) => {
     updateResume(setProfile, r => ({
       ...r,
       certifications: {
@@ -45,7 +52,11 @@ export default function ResumeCertificationsSection({
     }))
   }
 
-  const updateCert = (groupIdx: number, certIdx: number, patch: Partial<Certificate>) => {
+  const updateCert = (
+    groupIdx: number,
+    certIdx: number,
+    patch: Partial<Certificate>
+  ) => {
     updateResume(setProfile, r => {
       const group = r.certifications.groups[groupIdx]
       return {
@@ -63,7 +74,10 @@ export default function ResumeCertificationsSection({
   const moveGroup = (from: number, to: number) => {
     updateResume(setProfile, r => ({
       ...r,
-      certifications: { ...r.certifications, groups: moveItem(r.certifications.groups, from, to) },
+      certifications: {
+        ...r.certifications,
+        groups: moveItem(r.certifications.groups, from, to),
+      },
     }))
     onFitPageBreak?.()
   }
@@ -86,35 +100,43 @@ export default function ResumeCertificationsSection({
 
   return (
     <Section
-      id='cv-certifications'
-      title='CV Certifications'
-      badge='drag to reorder'
+      id="cv-certifications"
+      title="CV Certifications"
+      badge="drag to reorder"
       handle={handle}
     >
-      <div className='space-y-4'>
+      <div className="space-y-4">
         <p className={helpTextCls}>
-          Each group prints as one line: the issuer in bold, then its certificates separated by
-          dots. Groups and the certificates inside them print in the order shown here.
+          Each group prints as one line: the issuer in bold, then its
+          certificates separated by dots. Groups and the certificates inside
+          them print in the order shown here.
         </p>
 
-        <div className='space-y-2'>
+        <div className="space-y-2">
           <label className={labelCls}>Heading</label>
           <input
             className={inputCls}
-            placeholder='CERTIFICATIONS'
+            placeholder="CERTIFICATIONS"
             value={resume.certifications.heading}
             onChange={e =>
               updateResume(setProfile, r => ({
                 ...r,
-                certifications: { ...r.certifications, heading: e.target.value },
+                certifications: {
+                  ...r.certifications,
+                  heading: e.target.value,
+                },
               }))
             }
           />
         </div>
 
-        <div className='flex items-center justify-between'>
-          <h2 className='text-sm font-semibold'>Certification groups</h2>
-          <button type='button' className={secondaryBtnCls} onClick={addGroup}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Certification groups</h2>
+          <button
+            type="button"
+            className={secondaryBtnCls}
+            onClick={addGroup}
+          >
             + Add group
           </button>
         </div>
@@ -126,67 +148,75 @@ export default function ResumeCertificationsSection({
         <DragList
           ids={resume.certifications.groups.map((_, idx) => `group-${idx}`)}
           onReorder={moveGroup}
-          itemLabel='certification group'
+          itemLabel="certification group"
         >
           {(groupIdx, groupHandle) => {
             const group = resume.certifications.groups[groupIdx]
             return (
               <div className={itemCardCls}>
-                <div className='flex items-end gap-2'>
-                  <div className='min-w-0 flex-1 space-y-2'>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <label className={labelCls}>Issuer</label>
                     <input
                       className={inputCls}
-                      placeholder='Anthropic, 2026'
+                      placeholder="Anthropic, 2026"
                       value={group.issuer}
-                      onChange={e => updateGroup(groupIdx, { issuer: e.target.value })}
+                      onChange={e =>
+                        updateGroup(groupIdx, { issuer: e.target.value })
+                      }
                     />
                   </div>
-                  <div className='pb-2'>{groupHandle}</div>
+                  <div className="pb-2">{groupHandle}</div>
                 </div>
 
-                <div className='mt-4'>
+                <div className="mt-4">
                   <DragList
                     ids={group.items.map((_, idx) => `cert-${idx}`)}
                     onReorder={(from, to) => moveCert(groupIdx, from, to)}
-                    itemLabel='certificate'
+                    itemLabel="certificate"
                   >
                     {(certIdx, certHandle) => {
                       const cert = group.items[certIdx]
                       return (
                         <div className={nestedItemCardCls}>
-                          <div className='flex items-start gap-2'>
-                            <div className='grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2'>
-                              <div className='space-y-2'>
+                          <div className="flex items-start gap-2">
+                            <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
+                              <div className="space-y-2">
                                 <label className={labelCls}>Name</label>
                                 <input
                                   className={inputCls}
                                   value={cert.name}
                                   onChange={e =>
-                                    updateCert(groupIdx, certIdx, { name: e.target.value })
+                                    updateCert(groupIdx, certIdx, {
+                                      name: e.target.value,
+                                    })
                                   }
                                 />
                               </div>
-                              <div className='space-y-2'>
+                              <div className="space-y-2">
                                 <label className={labelCls}>Link</label>
                                 <input
                                   className={inputCls}
                                   value={cert.link}
                                   onChange={e =>
-                                    updateCert(groupIdx, certIdx, { link: e.target.value })
+                                    updateCert(groupIdx, certIdx, {
+                                      link: e.target.value,
+                                    })
                                   }
                                 />
                               </div>
                             </div>
-                            <div className='pt-6'>{certHandle}</div>
+                            <div className="pt-6">{certHandle}</div>
                           </div>
-                          <div className='mt-3 flex justify-end'>
+                          <div className="mt-3 flex justify-end">
                             <button
-                              type='button'
+                              type="button"
                               className={ghostBtnCls}
                               onClick={() =>
                                 updateGroup(groupIdx, {
-                                  items: group.items.filter((_, i) => i !== certIdx),
+                                  items: group.items.filter(
+                                    (_, i) => i !== certIdx
+                                  ),
                                 })
                               }
                             >
@@ -199,25 +229,29 @@ export default function ResumeCertificationsSection({
                   </DragList>
                 </div>
 
-                <div className='mt-3 flex justify-between'>
+                <div className="mt-3 flex justify-between">
                   <button
-                    type='button'
+                    type="button"
                     className={secondaryBtnCls}
                     onClick={() =>
-                      updateGroup(groupIdx, { items: [...group.items, { name: '', link: '' }] })
+                      updateGroup(groupIdx, {
+                        items: [...group.items, { name: '', link: '' }],
+                      })
                     }
                   >
                     + Add certificate
                   </button>
                   <button
-                    type='button'
+                    type="button"
                     className={ghostBtnCls}
                     onClick={() =>
                       updateResume(setProfile, r => ({
                         ...r,
                         certifications: {
                           ...r.certifications,
-                          groups: r.certifications.groups.filter((_, i) => i !== groupIdx),
+                          groups: r.certifications.groups.filter(
+                            (_, i) => i !== groupIdx
+                          ),
                         },
                       }))
                     }
@@ -231,7 +265,10 @@ export default function ResumeCertificationsSection({
         </DragList>
 
         {resume.certifications.groups.length > 0 ? (
-          <AddMoreButton label='+ Add certification group' onClick={addGroup} />
+          <AddMoreButton
+            label="+ Add certification group"
+            onClick={addGroup}
+          />
         ) : null}
       </div>
     </Section>

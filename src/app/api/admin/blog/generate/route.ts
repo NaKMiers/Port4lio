@@ -12,7 +12,12 @@ import {
   type GeneratedDraft,
   type GenerationContext,
 } from '@/lib/blog/generate'
-import { DEFAULT_MODEL, manualList, manualString, normaliseSpec } from '@/lib/blog/generation-fields'
+import {
+  DEFAULT_MODEL,
+  manualList,
+  manualString,
+  normaliseSpec,
+} from '@/lib/blog/generation-fields'
 import { carryForwardImages } from '@/lib/blog/image-placeholders'
 import { listKinds } from '@/lib/blog/kind-data'
 import { chatCompletion, extractJsonObject, LlmError } from '@/lib/blog/llm'
@@ -20,7 +25,11 @@ import { BLOG_PIPELINE_VERSION, renderMarkdown } from '@/lib/blog/markdown'
 import { listSeries } from '@/lib/blog/series-data'
 import { revalidatePublishedPost } from '@/lib/blog/revalidate'
 import { connectDatabase } from '@/lib/mongodb'
-import { BLOG_GENERATE_LIMIT, checkRateLimit, clientIpFrom } from '@/lib/rate-limit'
+import {
+  BLOG_GENERATE_LIMIT,
+  checkRateLimit,
+  clientIpFrom,
+} from '@/lib/rate-limit'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { PostModel, type PostDocument } from '@/models/Post'
@@ -122,16 +131,24 @@ export async function POST(request: NextRequest) {
   }
 
   const limit = await checkRateLimit(clientIpFrom(request), BLOG_GENERATE_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
-      { error: 'That is a lot of generating. Give it a few minutes - each one costs a model call.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        error:
+          'That is a lot of generating. Give it a few minutes - each one costs a model call.',
+      },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
-  const parsed = await readJsonBody<{ spec?: unknown; postId?: unknown }>(request, {
-    maxBytes: MAX_BODY_BYTES,
-  })
+  const parsed = await readJsonBody<{ spec?: unknown; postId?: unknown }>(
+    request,
+    {
+      maxBytes: MAX_BODY_BYTES,
+    }
+  )
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
   const { spec, dropped } = normaliseSpec(parsed.body?.spec)
@@ -150,10 +167,10 @@ export async function POST(request: NextRequest) {
     seconds, which is ninety seconds of window for the version in hand to go stale against an
     editor tab that is still saving.
   */
-  const postId = typeof parsed.body?.postId === 'string' ? parsed.body.postId.trim() : ''
-  if (postId && !mongoose.Types.ObjectId.isValid(postId)) {
+  const postId =
+    typeof parsed.body?.postId === 'string' ? parsed.body.postId.trim() : ''
+  if (postId && !mongoose.Types.ObjectId.isValid(postId))
     return jsonError('Post not found.', 404)
-  }
 
   let context: GenerationContext
   try {
@@ -164,7 +181,11 @@ export async function POST(request: NextRequest) {
       // the post being rewritten sits in its own candidate list, the model can validly pick it,
       // `resolveRelated` accepts it (it IS a published slug), and the live page renders a
       // "related" link back to the page you are already on.
-      PostModel.find(postId ? { status: 'published', _id: { $ne: postId } } : { status: 'published' })
+      PostModel.find(
+        postId
+          ? { status: 'published', _id: { $ne: postId } }
+          : { status: 'published' }
+      )
         .select('slug title')
         .sort({ publishedAt: -1 })
         .limit(RELATED_CANDIDATE_LIMIT)
@@ -197,23 +218,31 @@ export async function POST(request: NextRequest) {
       : []
 
     const bySlug = new Map<string, { slug: string; title: string }>()
-    for (const post of [...published, ...verified]) {
+    for (const post of [...published, ...verified])
       bySlug.set(post.slug, { slug: post.slug, title: post.title })
-    }
 
     context = {
       kinds: kinds.map(kind => ({ slug: kind.slug, label: kind.label })),
-      series: series.map(entry => ({ slug: entry.slug, title: entry.title, blurb: entry.blurb })),
+      series: series.map(entry => ({
+        slug: entry.slug,
+        title: entry.title,
+        blurb: entry.blurb,
+      })),
       relatedCandidates: Array.from(bySlug.values()),
     }
   } catch (error) {
-    console.error('[api/admin/blog/generate] could not read the taxonomies', error)
+    console.error(
+      '[api/admin/blog/generate] could not read the taxonomies',
+      error
+    )
     return jsonError('Unable to read the kinds and series right now.', 500)
   }
 
-  if (context.kinds.length === 0) {
-    return jsonError('No post kinds exist. Create one before generating a post.', 409)
-  }
+  if (context.kinds.length === 0)
+    return jsonError(
+      'No post kinds exist. Create one before generating a post.',
+      409
+    )
 
   /*
     Everything the author pinned by hand is checked HERE, before a model call is paid for.
@@ -243,11 +272,11 @@ export async function POST(request: NextRequest) {
       temperature: generationTemperature(spec),
     })
   } catch (error) {
-    if (error instanceof LlmError) {
+    if (error instanceof LlmError)
       // 502 rather than 500: the failure is upstream of us and the owner can act on it -
       // retry, pick another model, or fix the key. A 500 would say "this site is broken".
       return jsonError(error.message, error.status === 429 ? 429 : 502)
-    }
+
     console.error('[api/admin/blog/generate] unexpected model failure', error)
     return jsonError('The model call failed.', 502)
   }
@@ -259,13 +288,13 @@ export async function POST(request: NextRequest) {
     draft = result.draft
     warnings.push(...result.warnings)
   } catch (error) {
-    if (error instanceof GenerationError || error instanceof LlmError) {
+    if (error instanceof GenerationError || error instanceof LlmError)
       // 422: the request was fine and the answer was not. Distinguishing it from the 502
       // above is what tells the owner whether to retry the same brief or change it.
       return jsonError(error.message, 422)
-    }
+
     console.error('[api/admin/blog/generate] could not parse the reply', error)
-    return jsonError('Could not read the model\'s reply as a post.', 422)
+    return jsonError("Could not read the model's reply as a post.", 422)
   }
 
   try {
@@ -285,23 +314,26 @@ export async function POST(request: NextRequest) {
       the board, and the contact attributions that slug carries would then belong to text
       nobody chose to publish.
     */
-    const target = postId ? await PostModel.findById(postId).select('+bodyMarkdown') : null
+    const target = postId
+      ? await PostModel.findById(postId).select('+bodyMarkdown')
+      : null
     if (postId && !target) return jsonError('Post not found.', 404)
-    if (target?.status === 'deleted') {
-      return jsonError('That post is deleted. Its slug is held against reuse and it cannot be rewritten.', 409)
-    }
+    if (target?.status === 'deleted')
+      return jsonError(
+        'That post is deleted. Its slug is held against reuse and it cannot be rewritten.',
+        409
+      )
 
     /*
       A published post's slug is frozen, the same rule and the same predicate as PATCH:
       `publishedAt !== null`, never `status !== 'draft'`. The preset fills this field with the
       post's own slug, so reaching this needs the author to have edited it deliberately.
     */
-    if (target && draft.slug !== target.slug && target.publishedAt !== null) {
+    if (target && draft.slug !== target.slug && target.publishedAt !== null)
       return jsonError(
         'This post has been published, so its slug is frozen. Changing it would 404 every link and feed entry pointing at the old URL.',
         409
       )
-    }
 
     const slugWasChosen = manualString(spec, 'slug') !== undefined
     /*
@@ -313,17 +345,19 @@ export async function POST(request: NextRequest) {
       target && draft.slug === target.slug
         ? target.slug
         : await findFreeSlug(draft.slug, slugWasChosen)
-    if (!unique) {
+    if (!unique)
       return jsonError(
         slugWasChosen
           ? `The slug "${draft.slug}" is already taken. A deleted post can still be holding it.`
           : `Could not find a free slug near "${draft.slug}".`,
         409
       )
-    }
-    if (unique !== draft.slug) {
-      warnings.push(`"${draft.slug}" was taken, so this post is at "${unique}".`)
-    }
+
+    if (unique !== draft.slug)
+      warnings.push(
+        `"${draft.slug}" was taken, so this post is at "${unique}".`
+      )
+
     draft.slug = unique
 
     /*
@@ -368,12 +402,12 @@ export async function POST(request: NextRequest) {
     if (target) {
       const carry = carryForwardImages(draft.bodyMarkdown, target.bodyMarkdown)
       draft.bodyMarkdown = carry.markdown
-      if (carry.carried > 0) {
+      if (carry.carried > 0)
         warnings.push(
           `Kept ${carry.carried} image${carry.carried === 1 ? '' : 's'} from the old body, matched by position. Check they still fit the new text.`
         )
-      }
-      if (carry.dropped.length > 0) {
+
+      if (carry.dropped.length > 0)
         /*
           Quoted in FULL, not through `summariseList`.
 
@@ -386,7 +420,6 @@ export async function POST(request: NextRequest) {
         warnings.push(
           `The new body has fewer images than the old one, so ${carry.dropped.length} picture${carry.dropped.length === 1 ? ' is' : 's are'} no longer used: ${carry.dropped.join(', ')}.`
         )
-      }
     }
 
     // Rendered here, at save time, for the same reason PATCH does it (D9): Shiki costs a
@@ -428,14 +461,18 @@ export async function POST(request: NextRequest) {
       has already replaced a live article. The author would regenerate again over their own
       successful result.
     */
-    if (target) {
+    if (target)
       try {
         revalidatePublishedPost(saved.slug)
       } catch (error) {
-        console.error('[api/admin/blog/generate] saved but could not revalidate', error)
-        warnings.push('The post was saved, but the live page may serve the old text until its cache expires.')
+        console.error(
+          '[api/admin/blog/generate] saved but could not revalidate',
+          error
+        )
+        warnings.push(
+          'The post was saved, but the live page may serve the old text until its cache expires.'
+        )
       }
-    }
 
     return NextResponse.json(
       {
@@ -452,12 +489,15 @@ export async function POST(request: NextRequest) {
       { status: target ? 200 : 201 }
     )
   } catch (error) {
-    if (error instanceof mongoose.Error.ValidationError) {
+    if (error instanceof mongoose.Error.ValidationError)
       return jsonError(error.message, 422)
-    }
-    if ((error as { code?: number }).code === 11000) {
-      return jsonError('That slug or pillar slot was taken while the post was being written.', 409)
-    }
+
+    if ((error as { code?: number }).code === 11000)
+      return jsonError(
+        'That slug or pillar slot was taken while the post was being written.',
+        409
+      )
+
     console.error('[api/admin/blog/generate] save failed', error)
     return jsonError('The post was written but could not be saved.', 500)
   }
@@ -470,7 +510,10 @@ export async function POST(request: NextRequest) {
  * soft-deleted post still holds its slug against reuse, which is the whole point of the soft
  * delete. `exact` stops after the first check for an author-chosen slug.
  */
-async function findFreeSlug(base: string, exact: boolean): Promise<string | null> {
+async function findFreeSlug(
+  base: string,
+  exact: boolean
+): Promise<string | null> {
   const taken = await PostModel.findOne({ slug: base }).select('_id').lean()
   if (!taken) return base
   if (exact) return null
@@ -479,7 +522,9 @@ async function findFreeSlug(base: string, exact: boolean): Promise<string | null
     // Truncated so `base-12` still fits `^[a-z0-9-]{1,80}$` when `base` is already at 80.
     const suffix = `-${n}`
     const candidate = `${base.slice(0, 80 - suffix.length)}${suffix}`
-    const clash = await PostModel.findOne({ slug: candidate }).select('_id').lean()
+    const clash = await PostModel.findOne({ slug: candidate })
+      .select('_id')
+      .lean()
     if (!clash) return candidate
   }
 

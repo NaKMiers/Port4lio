@@ -55,7 +55,8 @@ import {
  */
 
 /** Where an element sits. Enumerated - see the note above about floats. */
-export type Anchor = 'center' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
+export type Anchor =
+  'center' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
 export type CornerAnchor = Extract<Anchor, 'ne' | 'se' | 'sw' | 'nw'>
 
 export const ANCHORS: readonly Anchor[] = [
@@ -78,7 +79,16 @@ export const ANCHORS: readonly Anchor[] = [
  * solver reads it as movement - a "step" that teleported across the cell would not be
  * discoverable as a step.
  */
-export const PERIMETER: readonly Anchor[] = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']
+export const PERIMETER: readonly Anchor[] = [
+  'n',
+  'ne',
+  'e',
+  'se',
+  's',
+  'sw',
+  'w',
+  'nw',
+]
 
 export const CORNERS: readonly CornerAnchor[] = ['ne', 'se', 'sw', 'nw']
 
@@ -108,7 +118,8 @@ export const ANCHOR_POINTS: Record<Anchor, readonly [number, number]> = {
  * rule wanting visibly different sizes must move by at least two entries.
  */
 export const SIZE_STEPS: readonly number[] = [
-  0.16, 0.22, 0.28, 0.34, 0.4, 0.46, 0.52, 0.58, 0.64, 0.7, 0.76, 0.82, 0.88, 0.94,
+  0.16, 0.22, 0.28, 0.34, 0.4, 0.46, 0.52, 0.58, 0.64, 0.7, 0.76, 0.82, 0.88,
+  0.94,
 ]
 
 /**
@@ -155,11 +166,7 @@ export type TallyElement = {
 }
 
 export type Element =
-  | FrameElement
-  | InnerElement
-  | MarkElement
-  | FieldElement
-  | TallyElement
+  FrameElement | InnerElement | MarkElement | FieldElement | TallyElement
 
 export type Cell = {
   frame?: FrameElement
@@ -231,7 +238,8 @@ function maxRadiusAt(cx: number, cy: number): number {
  * identically, so the option panel collides and verification rejects the item.
  */
 function radiusOf(sizeStep: number, cx: number, cy: number): number {
-  const fraction = SIZE_STEPS[sizeStep] ?? SIZE_STEPS[SIZE_STEPS.length - 1] ?? 0.78
+  const fraction =
+    SIZE_STEPS[sizeStep] ?? SIZE_STEPS[SIZE_STEPS.length - 1] ?? 0.78
   return Math.min((CELL / 2) * fraction, maxRadiusAt(cx, cy))
 }
 
@@ -254,8 +262,8 @@ function fieldDraws(element: FieldElement): Draw[] {
   const r = Math.min(gap * 0.3, 7)
   const on = new Set(element.filled)
   const out: Draw[] = []
-  for (let row = 0; row < element.size; row += 1) {
-    for (let col = 0; col < element.size; col += 1) {
+  for (let row = 0; row < element.size; row += 1)
+    for (let col = 0; col < element.size; col += 1)
       out.push({
         form: 'dot',
         cx: gap * (col + 1),
@@ -263,8 +271,7 @@ function fieldDraws(element: FieldElement): Draw[] {
         r,
         filled: on.has(row * element.size + col),
       })
-    }
-  }
+
   return out
 }
 
@@ -330,7 +337,13 @@ function fillFor(shading: Shading): string {
   return shading === 'filled' ? INK : 'none'
 }
 
-function pointsFor(kind: ShapeKind, r: number, rotationDeg: number, cx: number, cy: number): string {
+function pointsFor(
+  kind: ShapeKind,
+  r: number,
+  rotationDeg: number,
+  cx: number,
+  cy: number
+): string {
   const stars = STAR_POINTS[kind as 'star4' | 'star5' | 'star6']
   if (stars) return starPoints(stars, r, rotationDeg, cx, cy)
   const sides = POLYGON_SIDES[kind]
@@ -354,28 +367,32 @@ function pointsFor(kind: ShapeKind, r: number, rotationDeg: number, cx: number, 
  * cross-clip - which looks like a rendering glitch and is actually a wrong answer on screen.
  */
 export function drawSvg(draw: Draw, uid: string): string {
-  if (draw.form === 'dot') {
+  if (draw.form === 'dot')
     return `<circle cx="${draw.cx.toFixed(2)}" cy="${draw.cy.toFixed(2)}" r="${draw.r.toFixed(2)}" fill="${draw.filled ? INK : 'none'}" stroke="${INK}" stroke-width="1.5"/>`
-  }
 
-  if (draw.form === 'stroke') {
+  if (draw.form === 'stroke')
     return `<rect x="${(draw.cx - draw.w / 2).toFixed(2)}" y="${(draw.cy - draw.h / 2).toFixed(2)}" width="${draw.w.toFixed(2)}" height="${draw.h.toFixed(2)}" fill="${INK}"/>`
-  }
 
   const stroke = `stroke="${INK}" stroke-width="${STROKE_WIDTH}" stroke-linejoin="round"`
 
   if (draw.kind === 'circle') {
     const body = `cx="${draw.cx.toFixed(2)}" cy="${draw.cy.toFixed(2)}" r="${draw.r.toFixed(2)}"`
-    if (draw.shading !== 'half') {
+    if (draw.shading !== 'half')
       return `<circle ${body} fill="${fillFor(draw.shading)}" ${stroke}/>`
-    }
+
     return `<clipPath id="h-${uid}"><rect x="0" y="${(draw.cy - draw.r).toFixed(2)}" width="${draw.cx.toFixed(2)}" height="${(draw.r * 2).toFixed(2)}"/></clipPath><circle ${body} fill="${INK}" clip-path="url(#h-${uid})"/><circle ${body} fill="none" ${stroke}/>`
   }
 
-  const points = pointsFor(draw.kind, draw.r, draw.rotationDeg, draw.cx, draw.cy)
-  if (draw.shading !== 'half') {
+  const points = pointsFor(
+    draw.kind,
+    draw.r,
+    draw.rotationDeg,
+    draw.cx,
+    draw.cy
+  )
+  if (draw.shading !== 'half')
     return `<polygon points="${points}" fill="${fillFor(draw.shading)}" ${stroke}/>`
-  }
+
   return `<clipPath id="h-${uid}"><rect x="0" y="${(draw.cy - draw.r).toFixed(2)}" width="${draw.cx.toFixed(2)}" height="${(draw.r * 2).toFixed(2)}"/></clipPath><polygon points="${points}" fill="${INK}" clip-path="url(#h-${uid})"/><polygon points="${points}" fill="none" ${stroke}/>`
 }
 
@@ -476,23 +493,31 @@ function paintsSolid(draw: Draw): boolean {
 type Box = { x0: number; y0: number; x1: number; y1: number }
 
 function boxOfDraw(draw: Draw): Box {
-  if (draw.form === 'stroke') {
+  if (draw.form === 'stroke')
     return {
       x0: draw.cx - draw.w / 2,
       y0: draw.cy - draw.h / 2,
       x1: draw.cx + draw.w / 2,
       y1: draw.cy + draw.h / 2,
     }
-  }
+
   // The circumscribed circle's box for a rotated polygon. Conservative in the safe
   // direction: it over-estimates coverage, so borderline cells are rejected rather than
   // shipped.
-  return { x0: draw.cx - draw.r, y0: draw.cy - draw.r, x1: draw.cx + draw.r, y1: draw.cy + draw.r }
+  return {
+    x0: draw.cx - draw.r,
+    y0: draw.cy - draw.r,
+    x1: draw.cx + draw.r,
+    y1: draw.cy + draw.r,
+  }
 }
 
 function contains(outer: Box, inner: Box): boolean {
   return (
-    outer.x0 <= inner.x0 && outer.y0 <= inner.y0 && outer.x1 >= inner.x1 && outer.y1 >= inner.y1
+    outer.x0 <= inner.x0 &&
+    outer.y0 <= inner.y0 &&
+    outer.x1 >= inner.x1 &&
+    outer.y1 >= inner.y1
   )
 }
 
@@ -515,7 +540,9 @@ export function noHiddenLayers(cell: Cell): boolean {
   return draws.every((over, i) => {
     if (!paintsSolid(over)) return true
     const overBox = boxOfDraw(over)
-    return draws.every((under, j) => i === j || !contains(overBox, boxOfDraw(under)))
+    return draws.every(
+      (under, j) => i === j || !contains(overBox, boxOfDraw(under))
+    )
   })
 }
 
@@ -539,14 +566,21 @@ const ROTATION_FLOOR_DEG = 15
  */
 const RADIUS_FLOOR = 5.5
 
-function shapesNoticeablyDiffer(a: ShapeBody, b: ShapeBody, anchorA: Anchor, anchorB: Anchor): boolean {
+function shapesNoticeablyDiffer(
+  a: ShapeBody,
+  b: ShapeBody,
+  anchorA: Anchor,
+  anchorB: Anchor
+): boolean {
   if (a.kind !== b.kind || a.shading !== b.shading) return true
 
   const [ax, ay] = ANCHOR_POINTS[anchorA]
   const [bx, by] = ANCHOR_POINTS[anchorB]
-  if (Math.abs(radiusOf(a.sizeStep, ax, ay) - radiusOf(b.sizeStep, bx, by)) >= RADIUS_FLOOR) {
+  if (
+    Math.abs(radiusOf(a.sizeStep, ax, ay) - radiusOf(b.sizeStep, bx, by)) >=
+    RADIUS_FLOOR
+  )
     return true
-  }
 
   // Circular distance under the shape's own symmetry: a square at 5 and at 95 degrees are
   // ten degrees apart, not ninety.
@@ -591,9 +625,12 @@ export function perceptuallyDistinct(a: Cell, b: Cell): boolean {
       // Anchors are 26 units apart, far beyond any confusion at these sizes.
       const anchorA: Anchor = ea.class === 'frame' ? 'center' : ea.anchor
       const anchorB: Anchor =
-        eb.class === 'frame' ? 'center' : (eb as InnerElement | MarkElement).anchor
+        eb.class === 'frame'
+          ? 'center'
+          : (eb as InnerElement | MarkElement).anchor
       if (anchorA !== anchorB) return true
-      if (shapesNoticeablyDiffer(ea, eb as ShapeBody, anchorA, anchorB)) return true
+      if (shapesNoticeablyDiffer(ea, eb as ShapeBody, anchorA, anchorB))
+        return true
     }
   }
   return false

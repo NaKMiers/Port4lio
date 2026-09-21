@@ -7,7 +7,11 @@ import { isLocale, LOCALES } from '@/lib/i18n'
 import JsonLd from '@/components/JsonLd'
 import { bandTableRows, IQ_METHOD, iqUi } from '@/lib/iq/content'
 import { isEffortWaiverEnabled } from '@/lib/test-kit/effort'
-import { alternateIqLanguages, iqBreadcrumbJsonLd, iqMethodJsonLd } from '@/lib/iq/seo'
+import {
+  alternateIqLanguages,
+  iqBreadcrumbJsonLd,
+  iqMethodJsonLd,
+} from '@/lib/iq/seo'
 
 /**
  * How scoring works.
@@ -45,7 +49,11 @@ export async function generateMetadata({
   }
 }
 
-export default async function IqMethodPage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function IqMethodPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
   const { lang } = await params
   if (!isLocale(lang)) notFound()
 
@@ -67,7 +75,8 @@ export default async function IqMethodPage({ params }: { params: Promise<{ lang:
    */
   const waiverOn = isEffortWaiverEnabled()
   const sections = copy.sections.filter(
-    section => waiverOn || !('requiresWaiver' in section && section.requiresWaiver)
+    section =>
+      waiverOn || !('requiresWaiver' in section && section.requiresWaiver)
   )
 
   return (
@@ -87,62 +96,89 @@ export default async function IqMethodPage({ params }: { params: Promise<{ lang:
       />
 
       <SectionFrame
-        aria-labelledby='method-heading'
+        aria-labelledby="method-heading"
         disableReveal
-        className='border-b border-pp-line pb-section-sm pt-10 md:pt-14'
-        innerClassName='max-w-2xl'
+        className="border-b border-pp-line pb-section-sm pt-10 md:pt-14"
+        innerClassName="max-w-2xl"
       >
         <h1
-          id='method-heading'
-          className='font-display text-[clamp(2.2rem,5vw,3.2rem)] font-semibold leading-tight tracking-tight text-pp-text'
+          id="method-heading"
+          className="font-display text-[clamp(2.2rem,5vw,3.2rem)] font-semibold leading-tight tracking-tight text-pp-text"
         >
           {copy.title}
         </h1>
-        <p className='mt-5 text-base leading-relaxed text-pp-muted md:text-lg'>{copy.intro}</p>
+        <p className="mt-5 text-base leading-relaxed text-pp-muted md:text-lg">
+          {copy.intro}
+        </p>
       </SectionFrame>
 
-      <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
-        <div className='space-y-8'>
+      <SectionFrame
+        className="py-section-sm"
+        innerClassName="max-w-2xl"
+      >
+        <div className="space-y-8">
           {sections.map(section => (
             <section key={section.heading}>
-              <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
                 {section.heading}
               </h2>
-              <p className='mt-3 text-pp-muted'>{section.body}</p>
+              <p className="mt-3 text-pp-muted">{section.body}</p>
             </section>
           ))}
         </div>
 
-        <EditorialPanel variant='strong' className='mt-10 overflow-x-auto p-6 md:p-7'>
-          <table className='w-full min-w-[24rem] border-collapse text-sm'>
-            <caption className='pb-4 text-left font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+        <EditorialPanel
+          variant="strong"
+          className="mt-10 overflow-x-auto p-6 md:p-7"
+        >
+          <table className="w-full min-w-[24rem] border-collapse text-sm">
+            <caption className="pb-4 text-left font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
               {isVi ? 'Bảng điểm đầy đủ' : 'The complete band table'}
             </caption>
             <thead>
-              <tr className='border-b border-pp-line text-left text-pp-muted'>
-                <th scope='col' className='py-2 pr-4 font-normal'>
+              <tr className="border-b border-pp-line text-left text-pp-muted">
+                <th
+                  scope="col"
+                  className="py-2 pr-4 font-normal"
+                >
                   {isVi ? 'Điểm thô' : 'Raw correct'}
                 </th>
-                <th scope='col' className='py-2 pr-4 font-normal'>
+                <th
+                  scope="col"
+                  className="py-2 pr-4 font-normal"
+                >
                   {isVi ? 'Điểm' : 'Score'}
                 </th>
-                <th scope='col' className='py-2 pr-4 font-normal'>
+                <th
+                  scope="col"
+                  className="py-2 pr-4 font-normal"
+                >
                   {isVi ? 'Phân vị' : 'Percentile'}
                 </th>
-                <th scope='col' className='py-2 font-normal'>
+                <th
+                  scope="col"
+                  className="py-2 font-normal"
+                >
                   {isVi ? 'Xếp loại' : 'Band'}
                 </th>
               </tr>
             </thead>
             <tbody>
               {rows.map(row => (
-                <tr key={row.score} className='border-b border-pp-line/60'>
-                  <td className='py-2 pr-4 tabular-nums text-pp-text'>{row.raw}+</td>
-                  <td className='py-2 pr-4 font-display font-semibold tabular-nums text-pp-text'>
+                <tr
+                  key={row.score}
+                  className="border-b border-pp-line/60"
+                >
+                  <td className="py-2 pr-4 tabular-nums text-pp-text">
+                    {row.raw}+
+                  </td>
+                  <td className="py-2 pr-4 font-display font-semibold tabular-nums text-pp-text">
                     {row.score}
                   </td>
-                  <td className='py-2 pr-4 tabular-nums text-pp-muted'>{row.percentile}%</td>
-                  <td className='py-2 text-pp-muted'>{row.label}</td>
+                  <td className="py-2 pr-4 tabular-nums text-pp-muted">
+                    {row.percentile}%
+                  </td>
+                  <td className="py-2 text-pp-muted">{row.label}</td>
                 </tr>
               ))}
             </tbody>

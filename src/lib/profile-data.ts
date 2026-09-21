@@ -22,7 +22,10 @@ class PublicProfileDataError extends Error {
  * Reads the singleton profile with the public field projection applied at the query, so
  * private fields never enter this process. See `profile-public.ts` for the allowlist.
  */
-async function readPublicProfileDocument(): Promise<Record<string, unknown> | null> {
+async function readPublicProfileDocument(): Promise<Record<
+  string,
+  unknown
+> | null> {
   try {
     await connectDatabase()
     const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
@@ -31,15 +34,16 @@ async function readPublicProfileDocument(): Promise<Record<string, unknown> | nu
     return doc ? (doc as Record<string, unknown>) : null
   } catch (error) {
     console.error('Failed to load public profile from MongoDB.', error)
-    throw new PublicProfileDataError('Failed to load public profile from MongoDB.', { cause: error })
+    throw new PublicProfileDataError(
+      'Failed to load public profile from MongoDB.',
+      { cause: error }
+    )
   }
 }
 
 async function loadPublicProfileUncached(): Promise<PublicProfile> {
   const doc = await readPublicProfileDocument()
-  if (!doc) {
-    return toPublicProfile(makeEmptyProfile())
-  }
+  if (!doc) return toPublicProfile(makeEmptyProfile())
 
   return toPublicProfile(normalizeProfile(doc))
 }
@@ -64,10 +68,14 @@ async function loadPublicProfileUncached(): Promise<PublicProfile> {
  */
 export { loadPublicProfileUncached }
 
-export const loadPublicProfile = unstable_cache(loadPublicProfileUncached, ['public-profile'], {
-  revalidate: PUBLIC_PROFILE_REVALIDATE_SECONDS,
-  tags: [PUBLIC_PROFILE_CACHE_TAG],
-})
+export const loadPublicProfile = unstable_cache(
+  loadPublicProfileUncached,
+  ['public-profile'],
+  {
+    revalidate: PUBLIC_PROFILE_REVALIDATE_SECONDS,
+    tags: [PUBLIC_PROFILE_CACHE_TAG],
+  }
+)
 
 export type PublicResumeSource = {
   /** Absent when the document has never had a CV block written - see `deriveResume`. */
@@ -82,7 +90,9 @@ async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
     // `avatar` rides along on the same query: the CV masthead inherits it whenever no
     // CV-specific photo was uploaded, and a second round trip for one string would only
     // add a way for the two reads to disagree.
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).select('resume avatar').lean()
+    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
+      .select('resume avatar')
+      .lean()
     const record = doc as Record<string, unknown> | null
     const raw = record?.resume
 
@@ -92,7 +102,9 @@ async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
     }
   } catch (error) {
     console.error('Failed to load resume from MongoDB.', error)
-    throw new PublicProfileDataError('Failed to load resume from MongoDB.', { cause: error })
+    throw new PublicProfileDataError('Failed to load resume from MongoDB.', {
+      cause: error,
+    })
   }
 }
 
@@ -104,25 +116,37 @@ async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
  * which is what makes them cheap to harvest at scale. `avatar` is on the allowlist
  * already, so including it here exposes nothing new.
  */
-export const loadPublicResume = unstable_cache(loadPublicResumeUncached, ['public-resume'], {
-  revalidate: PUBLIC_PROFILE_REVALIDATE_SECONDS,
-  tags: [PUBLIC_PROFILE_CACHE_TAG],
-})
+export const loadPublicResume = unstable_cache(
+  loadPublicResumeUncached,
+  ['public-resume'],
+  {
+    revalidate: PUBLIC_PROFILE_REVALIDATE_SECONDS,
+    tags: [PUBLIC_PROFILE_CACHE_TAG],
+  }
+)
 
 /** Its own query - `updatedAt` is not on the public projection. */
 async function getPublicProfileUpdatedAtUncached(): Promise<Date | null> {
   try {
     await connectDatabase()
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).select('updatedAt').lean()
+    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
+      .select('updatedAt')
+      .lean()
     const raw = (doc as Record<string, unknown> | null)?.updatedAt
     if (raw instanceof Date) return raw
     if (typeof raw === 'string' || typeof raw === 'number') return new Date(raw)
     return null
   } catch (error) {
-    console.error('Failed to load public profile timestamp from MongoDB.', error)
-    throw new PublicProfileDataError('Failed to load public profile timestamp from MongoDB.', {
-      cause: error,
-    })
+    console.error(
+      'Failed to load public profile timestamp from MongoDB.',
+      error
+    )
+    throw new PublicProfileDataError(
+      'Failed to load public profile timestamp from MongoDB.',
+      {
+        cause: error,
+      }
+    )
   }
 }
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_LOCALE, isLocale, LOCALE_LABELS, LOCALES, negotiateLocale, swapLocale } from '@/lib/i18n'
+import {
+  DEFAULT_LOCALE,
+  isLocale,
+  LOCALE_LABELS,
+  LOCALES,
+  negotiateLocale,
+  swapLocale,
+} from '@/lib/i18n'
 
 /**
  * Locale negotiation decides which language a first-time visitor lands in, and a wrong
@@ -80,7 +87,9 @@ describe('swapLocale', () => {
     // The whole point: switching language must not cost someone the result they just
     // finished sixty questions for.
     const token = 'AbCd1234EfGh5678IjKl90'
-    expect(swapLocale(`/vi/mbti/result/${token}`, 'en')).toBe(`/en/mbti/result/${token}`)
+    expect(swapLocale(`/vi/mbti/result/${token}`, 'en')).toBe(
+      `/en/mbti/result/${token}`
+    )
   })
 
   it('is a no-op when the target already matches', () => {
@@ -102,8 +111,10 @@ describe('swapLocale', () => {
 
 describe('locale labels', () => {
   it('names every locale in its own language', () => {
-    for (const locale of LOCALES) {
-      expect(LOCALE_LABELS[locale]?.length, `label for ${locale}`).toBeGreaterThan(0)
-    }
+    for (const locale of LOCALES)
+      expect(
+        LOCALE_LABELS[locale]?.length,
+        `label for ${locale}`
+      ).toBeGreaterThan(0)
   })
 })

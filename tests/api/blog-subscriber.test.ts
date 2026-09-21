@@ -35,26 +35,38 @@ describe('double opt-in', () => {
     const row = await SubscriberModel.create({ email: 'a@b.co', token: 't1' })
 
     expect(row.status).toBe('pending')
-    expect(row.confirmedAt, 'a pending row must carry no consent timestamp').toBeNull()
+    expect(
+      row.confirmedAt,
+      'a pending row must carry no consent timestamp'
+    ).toBeNull()
   })
 
   it('refuses a second row for the same address', async () => {
     // What makes `unsubscribed` terminal. Without it, a later form submission creates a
     // second pending row and starts emailing somebody who already left.
     await SubscriberModel.create({ email: 'a@b.co', token: 't1' })
-    await expect(SubscriberModel.create({ email: 'a@b.co', token: 't2' })).rejects.toThrow()
+    await expect(
+      SubscriberModel.create({ email: 'a@b.co', token: 't2' })
+    ).rejects.toThrow()
   })
 
   it('refuses a duplicate token', async () => {
     // Confirm and unsubscribe both look a row up by token alone, so a collision would act on
     // the wrong person's subscription.
     await SubscriberModel.create({ email: 'a@b.co', token: 'shared' })
-    await expect(SubscriberModel.create({ email: 'c@d.co', token: 'shared' })).rejects.toThrow()
+    await expect(
+      SubscriberModel.create({ email: 'c@d.co', token: 'shared' })
+    ).rejects.toThrow()
   })
 
   it('builds both unique indexes', async () => {
-    const indexes = (await SubscriberModel.collection.indexes()) as Record<string, unknown>[]
-    const unique = indexes.filter(index => index.unique === true).map(index => JSON.stringify(index.key))
+    const indexes = (await SubscriberModel.collection.indexes()) as Record<
+      string,
+      unknown
+    >[]
+    const unique = indexes
+      .filter(index => index.unique === true)
+      .map(index => JSON.stringify(index.key))
 
     expect(unique).toContain(JSON.stringify({ email: 1 }))
     expect(unique).toContain(JSON.stringify({ token: 1 }))
@@ -73,9 +85,9 @@ describe('retention', () => {
      *
      * Asserted so nobody restores symmetry with Attempt/TestEvent/PostEvent by pattern-match.
      */
-    const ttl = ((await SubscriberModel.collection.indexes()) as Record<string, unknown>[]).find(
-      index => index.expireAfterSeconds !== undefined
-    )
+    const ttl = (
+      (await SubscriberModel.collection.indexes()) as Record<string, unknown>[]
+    ).find(index => index.expireAfterSeconds !== undefined)
 
     expect(
       ttl,

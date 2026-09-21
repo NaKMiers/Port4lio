@@ -3,7 +3,9 @@
 import { Check, ImageUp, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
-import ImagePromptField, { iconBtnCls } from '@/components/blog-admin/ImagePromptField'
+import ImagePromptField, {
+  iconBtnCls,
+} from '@/components/blog-admin/ImagePromptField'
 import { inputCls } from '@/components/settings/settings-utils'
 import type { ImagePlaceholder } from '@/lib/blog/image-placeholders'
 
@@ -66,8 +68,8 @@ export default function MissingImagesPanel({
   if (placeholders.length === 0) return null
 
   return (
-    <div className='mt-4 space-y-3'>
-      <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+    <div className="mt-4 space-y-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
         Images to make ({placeholders.length})
       </p>
 
@@ -117,30 +119,30 @@ function PlaceholderCard({
   }
 
   return (
-    <div className='rounded-[1.2rem] border border-pp-line bg-white/62 p-3.5'>
-      <div className='mb-2 flex items-baseline gap-2'>
-        <code className='rounded-full bg-pp-text/8 px-2 py-0.5 font-mono text-[11px] text-pp-text'>
+    <div className="bg-white/62 rounded-[1.2rem] border border-pp-line p-3.5">
+      <div className="mb-2 flex items-baseline gap-2">
+        <code className="bg-pp-text/8 rounded-full px-2 py-0.5 font-mono text-[11px] text-pp-text">
           {placeholder.key}
         </code>
-        <span className='truncate text-xs text-pp-muted'>
+        <span className="truncate text-xs text-pp-muted">
           {placeholder.alt ? `alt: ${placeholder.alt}` : 'no alt text'}
         </span>
       </div>
 
       <ImagePromptField
         id={`image-prompt-${placeholder.key}`}
-        label='Image prompt'
+        label="Image prompt"
         prompt={prompt}
         busy={busy}
         onChange={onPromptChange}
         onRegenerate={onRegenerate}
       />
 
-      <div className='mt-2.5 flex items-center gap-1.5'>
+      <div className="mt-2.5 flex items-center gap-1.5">
         <input
           className={`${inputCls} py-2 text-[13px]`}
           value={url}
-          placeholder='Paste a res.cloudinary.com URL, or upload'
+          placeholder="Paste a res.cloudinary.com URL, or upload"
           disabled={uploading}
           onChange={event => setUrl(event.target.value)}
           // Enter as well as the tick. This input's entire content is a pasted string
@@ -153,14 +155,17 @@ function PlaceholderCard({
           }}
         />
         <button
-          type='button'
+          type="button"
           onClick={apply}
           disabled={!ready || uploading}
           aria-label={`Use this URL for ${placeholder.key}`}
-          title='Use this URL'
+          title="Use this URL"
           className={iconBtnCls}
         >
-          <Check aria-hidden size={14} />
+          <Check
+            aria-hidden
+            size={14}
+          />
         </button>
 
         {/*
@@ -171,18 +176,25 @@ function PlaceholderCard({
         */}
         <label
           className={`${iconBtnCls} ${uploading ? 'pointer-events-none opacity-40' : 'cursor-pointer'}`}
-          title='Upload an image'
+          title="Upload an image"
         >
           {uploading ? (
-            <Loader2 aria-hidden size={14} className='animate-spin' />
+            <Loader2
+              aria-hidden
+              size={14}
+              className="animate-spin"
+            />
           ) : (
-            <ImageUp aria-hidden size={14} />
+            <ImageUp
+              aria-hidden
+              size={14}
+            />
           )}
-          <span className='sr-only'>Upload an image for {placeholder.key}</span>
+          <span className="sr-only">Upload an image for {placeholder.key}</span>
           <input
-            type='file'
-            className='sr-only'
-            accept='image/jpeg,image/png,image/webp,image/gif,image/avif'
+            type="file"
+            className="sr-only"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
             disabled={uploading}
             onChange={event => {
               const file = event.target.files?.[0]

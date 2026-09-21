@@ -52,31 +52,40 @@ describe('scoreAttempt', () => {
   it('always produces one of the 16 valid types', () => {
     // Deterministic pseudo-random sweep: no Math.random, so a failure is reproducible.
     for (let seed = 0; seed < 200; seed += 1) {
-      const answers = answersFor(index => ((index * 7 + seed * 13) % 3 === 0 ? 'a' : 'b'))
+      const answers = answersFor(index =>
+        (index * 7 + seed * 13) % 3 === 0 ? 'a' : 'b'
+      )
       expect(MBTI_TYPES).toContain(scoreAttempt(answers).type)
     }
   })
 
   it('never ties on an axis, whatever the input', () => {
     for (let seed = 0; seed < 200; seed += 1) {
-      const answers = answersFor(index => ((index * 11 + seed * 5) % 2 === 0 ? 'a' : 'b'))
+      const answers = answersFor(index =>
+        (index * 11 + seed * 5) % 2 === 0 ? 'a' : 'b'
+      )
       const { scores } = scoreAttempt(answers)
-      for (const axis of AXES) {
-        expect(scores[axis].a).not.toBe(scores[axis].b)
-      }
+      for (const axis of AXES) expect(scores[axis].a).not.toBe(scores[axis].b)
     }
   })
 
   it('counts every answer exactly once', () => {
-    const { scores } = scoreAttempt(answersFor(index => (index % 2 === 0 ? 'a' : 'b')))
-    const counted = AXES.reduce((sum, axis) => sum + scores[axis].a + scores[axis].b, 0)
+    const { scores } = scoreAttempt(
+      answersFor(index => (index % 2 === 0 ? 'a' : 'b'))
+    )
+    const counted = AXES.reduce(
+      (sum, axis) => sum + scores[axis].a + scores[axis].b,
+      0
+    )
     expect(counted).toBe(QUESTIONS.length)
   })
 
   it('flips a single axis when only that axis flips', () => {
     // All 'a' is ESTJ. Flip only the E/I questions and the type must become ISTJ, with
     // every other letter unchanged - this catches an axis-mapping mixup in a content file.
-    const answers = answersFor(index => (QUESTIONS[index].axis === 'EI' ? 'b' : 'a'))
+    const answers = answersFor(index =>
+      QUESTIONS[index].axis === 'EI' ? 'b' : 'a'
+    )
     expect(scoreAttempt(answers).type).toBe('ISTJ')
   })
 
@@ -99,7 +108,9 @@ describe('parseAnswers', () => {
 
   it('rejects the wrong length in both directions', () => {
     expect(() => parseAnswers(['a'])).toThrow(/Expected 60 answers/)
-    expect(() => parseAnswers(Array(61).fill('a'))).toThrow(/Expected 60 answers/)
+    expect(() => parseAnswers(Array(61).fill('a'))).toThrow(
+      /Expected 60 answers/
+    )
   })
 
   it('rejects values that are not "a" or "b"', () => {

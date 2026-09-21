@@ -45,15 +45,20 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return denied
 
-  const parsed = await readJsonBody<{ markdown?: unknown; slug?: unknown }>(request, {
-    maxBytes: PREVIEW_MAX_BODY_BYTES,
-  })
+  const parsed = await readJsonBody<{ markdown?: unknown; slug?: unknown }>(
+    request,
+    {
+      maxBytes: PREVIEW_MAX_BODY_BYTES,
+    }
+  )
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
-  const markdown = typeof parsed.body?.markdown === 'string' ? parsed.body.markdown : ''
+  const markdown =
+    typeof parsed.body?.markdown === 'string' ? parsed.body.markdown : ''
   // Only ever used in a log line if a fence fails to highlight. The editor sends the real
   // slug so those logs are attributable; a missing one is not worth a 400.
-  const slug = typeof parsed.body?.slug === 'string' ? parsed.body.slug : '(preview)'
+  const slug =
+    typeof parsed.body?.slug === 'string' ? parsed.body.slug : '(preview)'
 
   try {
     const html = await renderMarkdown(markdown, slug)

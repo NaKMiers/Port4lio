@@ -15,20 +15,21 @@ type SectionOpenController = {
 const SectionOpenContext = createContext<SectionOpenController | null>(null)
 
 function readStored(): SectionOpenMap {
-  if (typeof window === 'undefined') {
-    return {}
-  }
+  if (typeof window === 'undefined') return {}
 
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null')
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) ?? 'null'
+    )
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
       return {}
-    }
 
     // Drop anything that is not a boolean rather than trusting the whole blob: this value
     // is user-writable and a stale shape should degrade to defaults, not throw.
     return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>).filter(([, v]) => typeof v === 'boolean')
+      Object.entries(parsed as Record<string, unknown>).filter(
+        ([, v]) => typeof v === 'boolean'
+      )
     ) as SectionOpenMap
   } catch {
     return {}
@@ -48,7 +49,11 @@ function readStored(): SectionOpenMap {
  * "Checking access..." card until an effect resolves, so this subtree never exists during
  * hydration and cannot mismatch the server's markup.
  */
-export function SectionOpenProvider({ children }: { children: React.ReactNode }) {
+export function SectionOpenProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const [openMap, setOpenMap] = useState<SectionOpenMap>(readStored)
 
   useEffect(() => {
@@ -70,7 +75,11 @@ export function SectionOpenProvider({ children }: { children: React.ReactNode })
       }),
   }
 
-  return <SectionOpenContext.Provider value={controller}>{children}</SectionOpenContext.Provider>
+  return (
+    <SectionOpenContext.Provider value={controller}>
+      {children}
+    </SectionOpenContext.Provider>
+  )
 }
 
 /**

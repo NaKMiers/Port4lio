@@ -89,7 +89,9 @@ export type PublishedPost = PostListItem & {
  * no business in a public response. The page renders `bodyHtml`, which was sanitized and
  * highlighted at save time (D9).
  */
-export async function readPublishedPost(slug: string): Promise<PublishedPost | null> {
+export async function readPublishedPost(
+  slug: string
+): Promise<PublishedPost | null> {
   await connectDatabase()
 
   // `relatedSlugs` is here and NOT in `LIST_FIELDS`: only the post page resolves them, and
@@ -138,7 +140,11 @@ export async function listSeriesPeers(
 
   await connectDatabase()
 
-  return PostModel.find({ status: 'published', series, slug: { $ne: excludeSlug } })
+  return PostModel.find({
+    status: 'published',
+    series,
+    slug: { $ne: excludeSlug },
+  })
     .select(LIST_FIELDS)
     .sort({ publishedAt: -1 })
     .limit(limit)
@@ -163,17 +169,24 @@ export async function listSeriesPeers(
  * Misses are dropped, not reported. A missing related post is a link that is not drawn, which
  * is correct and invisible; the author sees it in the editor, where the list is theirs.
  */
-export async function resolveRelatedSlugs(slugs: string[]): Promise<PostListItem[]> {
+export async function resolveRelatedSlugs(
+  slugs: string[]
+): Promise<PostListItem[]> {
   if (slugs.length === 0) return []
 
   await connectDatabase()
 
-  const found = await PostModel.find({ slug: { $in: slugs }, status: 'published' })
+  const found = await PostModel.find({
+    slug: { $in: slugs },
+    status: 'published',
+  })
     .select(LIST_FIELDS)
     .lean<PostListItem[]>()
 
   // Returned in the author's stated order rather than the database's. The order is an
   // editorial decision - the first related link is the one most people click.
   const bySlug = new Map(found.map(post => [post.slug, post]))
-  return slugs.map(slug => bySlug.get(slug)).filter((post): post is PostListItem => Boolean(post))
+  return slugs
+    .map(slug => bySlug.get(slug))
+    .filter((post): post is PostListItem => Boolean(post))
 }

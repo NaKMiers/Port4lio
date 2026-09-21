@@ -48,12 +48,15 @@ export type ScoreResult = {
  */
 for (const axis of AXES) {
   const count = QUESTIONS.filter(question => question.axis === axis).length
-  if (count !== QUESTIONS_PER_AXIS) {
-    throw new Error(`Axis ${axis} has ${count} questions, expected ${QUESTIONS_PER_AXIS}`)
-  }
-  if (count % 2 === 0) {
-    throw new Error(`Axis ${axis} has an even question count (${count}); ties would be possible`)
-  }
+  if (count !== QUESTIONS_PER_AXIS)
+    throw new Error(
+      `Axis ${axis} has ${count} questions, expected ${QUESTIONS_PER_AXIS}`
+    )
+
+  if (count % 2 === 0)
+    throw new Error(
+      `Axis ${axis} has an even question count (${count}); ties would be possible`
+    )
 }
 
 export function isAnswer(value: unknown): value is Answer {
@@ -67,20 +70,20 @@ export function isAnswer(value: unknown): value is Answer {
  * instead of catching an exception thrown from deep inside scoring.
  */
 export function parseAnswers(input: unknown): Answer[] {
-  if (!Array.isArray(input)) {
+  if (!Array.isArray(input))
     throw new InvalidAnswersError('Answers must be an array')
-  }
 
-  if (input.length !== QUESTIONS.length) {
-    throw new InvalidAnswersError(`Expected ${QUESTIONS.length} answers, received ${input.length}`)
-  }
+  if (input.length !== QUESTIONS.length)
+    throw new InvalidAnswersError(
+      `Expected ${QUESTIONS.length} answers, received ${input.length}`
+    )
 
   const answers: Answer[] = []
   for (let index = 0; index < input.length; index += 1) {
     const value = input[index]
-    if (!isAnswer(value)) {
+    if (!isAnswer(value))
       throw new InvalidAnswersError(`Answer ${index} must be "a" or "b"`)
-    }
+
     answers.push(value)
   }
 
@@ -95,7 +98,9 @@ export function parseAnswers(input: unknown): Answer[] {
  * carries no question ids of its own to keep the stored answer vector small.
  */
 export function scoreAttempt(answers: Answer[]): ScoreResult {
-  const scores = Object.fromEntries(AXES.map(axis => [axis, { a: 0, b: 0 }])) as AxisScores
+  const scores = Object.fromEntries(
+    AXES.map(axis => [axis, { a: 0, b: 0 }])
+  ) as AxisScores
 
   answers.forEach((answer, index) => {
     scores[QUESTIONS[index].axis][answer] += 1

@@ -44,7 +44,10 @@ export const PUBLIC_PROFILE_FIELDS = [
  * rather than {@link Profile}, so a newly added private field cannot reach them even by
  * accident - it is not in the `Pick`.
  */
-export type PublicProfile = Pick<Profile, (typeof PUBLIC_PROFILE_FIELDS)[number]>
+export type PublicProfile = Pick<
+  Profile,
+  (typeof PUBLIC_PROFILE_FIELDS)[number]
+>
 
 /** Mongo projection, so private fields never enter the Node process at all. */
 export const PUBLIC_PROFILE_PROJECTION = PUBLIC_PROFILE_FIELDS.join(' ')
@@ -57,8 +60,7 @@ export const PUBLIC_PROFILE_PROJECTION = PUBLIC_PROFILE_FIELDS.join(' ')
  */
 export function toPublicProfile(profile: Profile): PublicProfile {
   const out = {} as Record<string, unknown>
-  for (const key of PUBLIC_PROFILE_FIELDS) {
-    out[key] = profile[key]
-  }
+  for (const key of PUBLIC_PROFILE_FIELDS) out[key] = profile[key]
+
   return out as PublicProfile
 }

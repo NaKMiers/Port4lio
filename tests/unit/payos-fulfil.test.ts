@@ -53,7 +53,9 @@ function payment(overrides: Record<string, unknown> = {}) {
 
 /** `findOne(...).lean()` */
 function findOneReturns(value: unknown) {
-  paymentModel.findOne.mockReturnValueOnce({ lean: () => Promise.resolve(value) })
+  paymentModel.findOne.mockReturnValueOnce({
+    lean: () => Promise.resolve(value),
+  })
 }
 
 beforeEach(() => {
@@ -65,10 +67,15 @@ beforeEach(() => {
 describe('fulfilMbtiPayment', () => {
   it('fulfils a pending payment and delivers the result', async () => {
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
     const deliver = vi.fn().mockResolvedValue(undefined)
 
-    const result = await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, deliver)
+    const result = await fulfilMbtiPayment(
+      { orderCode: ORDER_CODE, amount: 2000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('fulfilled')
     expect(deliver).toHaveBeenCalledOnce()
@@ -78,7 +85,9 @@ describe('fulfilMbtiPayment', () => {
     // A row we optimistically marked cancelled or expired must still be claimable: money
     // confirmed by the bank outranks our own guess about whether the link was alive.
     findOneReturns(payment({ status: 'cancelled' }))
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
 
     await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, vi.fn())
 
@@ -91,7 +100,9 @@ describe('fulfilMbtiPayment', () => {
 
   it('clears the payment TTL so a paid record is kept', async () => {
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
 
     await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, vi.fn())
 
@@ -102,7 +113,9 @@ describe('fulfilMbtiPayment', () => {
 
   it('unlocks the attempt without extending its retention', async () => {
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
 
     await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, vi.fn())
 
@@ -124,7 +137,10 @@ describe('fulfilMbtiPayment', () => {
     // PayOS posts a test payload when the webhook URL is registered. It must get a 2XX.
     findOneReturns(null)
 
-    const result = await fulfilMbtiPayment({ orderCode: 1, amount: 2000 }, vi.fn())
+    const result = await fulfilMbtiPayment(
+      { orderCode: 1, amount: 2000 },
+      vi.fn()
+    )
 
     expect(result.outcome).toBe('unknown-order-code')
     expect(paymentModel.findOneAndUpdate).not.toHaveBeenCalled()
@@ -135,7 +151,10 @@ describe('fulfilMbtiPayment', () => {
     findOneReturns(payment({ amount: 2000 }))
     const deliver = vi.fn()
 
-    const result = await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 1 }, deliver)
+    const result = await fulfilMbtiPayment(
+      { orderCode: ORDER_CODE, amount: 1 },
+      deliver
+    )
 
     expect(result.outcome).toBe('amount-mismatch')
     expect(paymentModel.findOneAndUpdate).not.toHaveBeenCalled()
@@ -146,7 +165,10 @@ describe('fulfilMbtiPayment', () => {
     findOneReturns(payment({ status: 'paid' }))
     const deliver = vi.fn()
 
-    const result = await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, deliver)
+    const result = await fulfilMbtiPayment(
+      { orderCode: ORDER_CODE, amount: 2000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('already-processed')
     // The buyer must not get a second copy because PayOS retried.
@@ -159,7 +181,10 @@ describe('fulfilMbtiPayment', () => {
     paymentModel.findOneAndUpdate.mockResolvedValueOnce(null)
     const deliver = vi.fn()
 
-    const result = await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, deliver)
+    const result = await fulfilMbtiPayment(
+      { orderCode: ORDER_CODE, amount: 2000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('already-processed')
     expect(deliver).not.toHaveBeenCalled()
@@ -170,10 +195,15 @@ describe('fulfilMbtiPayment', () => {
     // finds the row already paid and reports success - so the payment reads as delivered
     // while the buyer got nothing and nobody was told.
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
     const deliver = vi.fn().mockRejectedValue(new Error('SMTP down'))
 
-    const result = await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, deliver)
+    const result = await fulfilMbtiPayment(
+      { orderCode: ORDER_CODE, amount: 2000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('delivery-failed')
     expect(result.message).toContain('SMTP down')
@@ -186,11 +216,16 @@ describe('fulfilMbtiPayment', () => {
     // Paid for a result that expired between checkout and settlement. Real money, nothing
     // to unlock - a refund conversation, not something to swallow.
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
     attemptModel.findByIdAndUpdate.mockResolvedValueOnce(null)
     const deliver = vi.fn()
 
-    const result = await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, deliver)
+    const result = await fulfilMbtiPayment(
+      { orderCode: ORDER_CODE, amount: 2000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('delivery-failed')
     expect(deliver).not.toHaveBeenCalled()
@@ -198,10 +233,17 @@ describe('fulfilMbtiPayment', () => {
 
   it('never throws, whatever the database does', async () => {
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
-    attemptModel.findByIdAndUpdate.mockRejectedValueOnce(new Error('connection lost'))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
+    attemptModel.findByIdAndUpdate.mockRejectedValueOnce(
+      new Error('connection lost')
+    )
 
-    const result = await fulfilMbtiPayment({ orderCode: ORDER_CODE, amount: 2000 }, vi.fn())
+    const result = await fulfilMbtiPayment(
+      { orderCode: ORDER_CODE, amount: 2000 },
+      vi.fn()
+    )
 
     expect(result.outcome).toBe('delivery-failed')
   })

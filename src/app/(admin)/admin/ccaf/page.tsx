@@ -36,10 +36,10 @@ export default async function CcafPage() {
   return (
     <CcafGate>
       {state ? (
-        <main className='relative pb-[5.25rem] md:pb-0'>
+        <main className="relative pb-[5.25rem] md:pb-0">
           <CcafTracker
             initialState={state}
-            locale='vi'
+            locale="vi"
           />
         </main>
       ) : null}

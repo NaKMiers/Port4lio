@@ -57,7 +57,8 @@ export const CAREERS_EN: Record<MbtiType, CareerContent> = {
       'Litigation, contract negotiation',
       'Content, media, podcasting',
     ],
-    thrivesIn: 'New problems, colleagues who will argue, and permission to try something untested.',
+    thrivesIn:
+      'New problems, colleagues who will argue, and permission to try something untested.',
     drainedBy:
       'Rigid process nobody may question, long maintenance work, and meetings whose conclusion was settled beforehand.',
   },
@@ -235,7 +236,8 @@ export const CAREERS_EN: Record<MbtiType, CareerContent> = {
       'Automotive engineering, fabrication',
       'Forensic and technical investigation',
     ],
-    thrivesIn: 'Hands-on problems, good tools, and being left alone once you understand the job.',
+    thrivesIn:
+      'Hands-on problems, good tools, and being left alone once you understand the job.',
     drainedBy:
       'Long meetings with no conclusion, heavy paperwork, and environments that require talking about feelings often.',
   },

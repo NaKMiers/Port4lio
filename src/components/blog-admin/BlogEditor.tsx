@@ -1,18 +1,28 @@
 'use client'
 
 import { ImageOff } from 'lucide-react'
-import React, { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react'
 
 import BlogSaveDock from '@/components/blog-admin/BlogSaveDock'
 import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
 import GenerateBlogDialog from '@/components/blog-admin/GenerateBlogDialog'
 import ImagePromptField from '@/components/blog-admin/ImagePromptField'
 import MissingImagesPanel from '@/components/blog-admin/MissingImagesPanel'
-import TaxonomyDialog, { type TaxonomyResource } from '@/components/blog-admin/TaxonomyDialog'
+import TaxonomyDialog, {
+  type TaxonomyResource,
+} from '@/components/blog-admin/TaxonomyDialog'
 import BlogToolbar from '@/components/blog-admin/BlogToolbar'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import RailResizeHandle from '@/components/settings/RailResizeHandle'
-import SelectField, { type SelectOption } from '@/components/settings/SelectField'
+import SelectField, {
+  type SelectOption,
+} from '@/components/settings/SelectField'
 import Section from '@/components/settings/Section'
 import { SectionOpenProvider } from '@/components/settings/SectionOpenContext'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
@@ -26,14 +36,20 @@ import {
   uploadInputCls,
 } from '@/components/settings/settings-utils'
 import { uploadAssetToCloudinary } from '@/components/settings/settings-utils'
-import { MAX_RAIL_WIDTH, MIN_RAIL_WIDTH } from '@/components/settings/useRailWidth'
+import {
+  MAX_RAIL_WIDTH,
+  MIN_RAIL_WIDTH,
+} from '@/components/settings/useRailWidth'
 import { presetSpecFromPost } from '@/lib/blog/generation-fields'
 import {
   countBodyImages,
   findImagePlaceholders,
   replacePlaceholder,
 } from '@/lib/blog/image-placeholders'
-import { buildSyndicationBundle, type SyndicationTarget } from '@/lib/blog/syndication'
+import {
+  buildSyndicationBundle,
+  type SyndicationTarget,
+} from '@/lib/blog/syndication'
 
 /**
  * The split-pane editor.
@@ -249,7 +265,9 @@ export default function BlogEditor({ id }: { id: string }) {
   /** Same story as `seriesOptions`, minus the `none` - a post must always have a kind. */
   const [kindOptions, setKindOptions] = useState<SelectOption[]>([])
   /** Which taxonomy dialog is open, if any. One slot: they are modal, so never both. */
-  const [taxonomyDialog, setTaxonomyDialog] = useState<TaxonomyResource | null>(null)
+  const [taxonomyDialog, setTaxonomyDialog] = useState<TaxonomyResource | null>(
+    null
+  )
   const [fullWidth, setFullWidth] = useState(readStoredFullWidth)
   const [railWidth, setRailWidth] = useState(readStoredRailWidth)
 
@@ -292,7 +310,10 @@ export default function BlogEditor({ id }: { id: string }) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(FULL_WIDTH_STORAGE_KEY, JSON.stringify(fullWidth))
+      window.localStorage.setItem(
+        FULL_WIDTH_STORAGE_KEY,
+        JSON.stringify(fullWidth)
+      )
     } catch {
       // A blocked or full storage quota costs the preference, nothing more.
     }
@@ -313,7 +334,10 @@ export default function BlogEditor({ id }: { id: string }) {
   const resizeRail = useCallback((next: number, containerWidth: number) => {
     const ceiling =
       containerWidth > 0
-        ? Math.min(MAX_RAIL_WIDTH, Math.max(MIN_RAIL_WIDTH, containerWidth - MIN_EDITOR_WIDTH))
+        ? Math.min(
+            MAX_RAIL_WIDTH,
+            Math.max(MIN_RAIL_WIDTH, containerWidth - MIN_EDITOR_WIDTH)
+          )
         : MAX_RAIL_WIDTH
     setRailWidth(Math.round(Math.min(ceiling, Math.max(MIN_RAIL_WIDTH, next))))
   }, [])
@@ -330,7 +354,9 @@ export default function BlogEditor({ id }: { id: string }) {
       if (!res.ok) throw new Error(data.error ?? 'Could not load the post')
       if (data.post) setPost(data.post)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not load the post')
+      setError(
+        cause instanceof Error ? cause.message : 'Could not load the post'
+      )
     }
   }, [id])
 
@@ -338,10 +364,15 @@ export default function BlogEditor({ id }: { id: string }) {
     try {
       const res = await fetch('/api/admin/blog/series', { cache: 'no-store' })
       if (!res.ok) return
-      const data = (await res.json()) as { series?: { slug: string; title: string }[] }
+      const data = (await res.json()) as {
+        series?: { slug: string; title: string }[]
+      }
       setSeriesOptions([
         { value: '', label: 'none' },
-        ...(data.series ?? []).map(item => ({ value: item.slug, label: item.title })),
+        ...(data.series ?? []).map(item => ({
+          value: item.slug,
+          label: item.title,
+        })),
       ])
     } catch {
       // Silent: the dropdown keeps whatever it has. A failed series fetch must not stop
@@ -353,8 +384,15 @@ export default function BlogEditor({ id }: { id: string }) {
     try {
       const res = await fetch('/api/admin/blog/kinds', { cache: 'no-store' })
       if (!res.ok) return
-      const data = (await res.json()) as { kinds?: { slug: string; label: string }[] }
-      setKindOptions((data.kinds ?? []).map(item => ({ value: item.slug, label: item.label })))
+      const data = (await res.json()) as {
+        kinds?: { slug: string; label: string }[]
+      }
+      setKindOptions(
+        (data.kinds ?? []).map(item => ({
+          value: item.slug,
+          label: item.label,
+        }))
+      )
     } catch {
       // Silent, same as series: a failed taxonomy fetch must not stop someone writing.
     }
@@ -600,10 +638,13 @@ export default function BlogEditor({ id }: { id: string }) {
       const res = await fetch(`/api/admin/blog/${id}/image-prompt`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(key ? { target: 'body', key } : { target: 'cover' }),
+        body: JSON.stringify(
+          key ? { target: 'body', key } : { target: 'cover' }
+        ),
       })
       const data = (await res.json()) as { prompt?: string; error?: string }
-      if (!res.ok || !data.prompt) throw new Error(data.error ?? 'Could not write a prompt')
+      if (!res.ok || !data.prompt)
+        throw new Error(data.error ?? 'Could not write a prompt')
 
       const prompt = data.prompt
       setPost(current => {
@@ -614,12 +655,16 @@ export default function BlogEditor({ id }: { id: string }) {
         return {
           ...current,
           imagePrompts: existing
-            ? current.imagePrompts.map(entry => (entry.key === key ? { key, prompt } : entry))
+            ? current.imagePrompts.map(entry =>
+                entry.key === key ? { key, prompt } : entry
+              )
             : [...current.imagePrompts, { key, prompt }],
         }
       })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not write a prompt')
+      setError(
+        cause instanceof Error ? cause.message : 'Could not write a prompt'
+      )
     } finally {
       setPromptBusy(null)
     }
@@ -631,7 +676,9 @@ export default function BlogEditor({ id }: { id: string }) {
     const existing = post.imagePrompts.some(entry => entry.key === key)
     patch({
       imagePrompts: existing
-        ? post.imagePrompts.map(entry => (entry.key === key ? { key, prompt } : entry))
+        ? post.imagePrompts.map(entry =>
+            entry.key === key ? { key, prompt } : entry
+          )
         : [...post.imagePrompts, { key, prompt }],
     })
   }
@@ -678,13 +725,15 @@ export default function BlogEditor({ id }: { id: string }) {
     }
   }
 
-  if (!post) {
+  if (!post)
     return (
       <OwnerAuthGate onAuthed={() => void load()}>
-        <SettingLoading title='Loading post...' subtitle='Opening the editor.' />
+        <SettingLoading
+          title="Loading post..."
+          subtitle="Opening the editor."
+        />
       </OwnerAuthGate>
     )
-  }
 
   const isPublished = post.publishedAt !== null
 
@@ -707,12 +756,19 @@ export default function BlogEditor({ id }: { id: string }) {
    * re-picking - and on the second case there is nothing to re-pick, so the honest thing is
    * to keep showing the orphaned value and say what it is.
    */
-  const seriesChoices: SelectOption[] = seriesOptions.some(o => o.value === (post.series ?? ''))
+  const seriesChoices: SelectOption[] = seriesOptions.some(
+    o => o.value === (post.series ?? '')
+  )
     ? seriesOptions
-    : [...seriesOptions, { value: post.series ?? '', label: `${post.series} (deleted)` }]
+    : [
+        ...seriesOptions,
+        { value: post.series ?? '', label: `${post.series} (deleted)` },
+      ]
 
   /** Same splice as `seriesChoices`, and it matters more: a kind cannot be cleared to none. */
-  const kindChoices: SelectOption[] = kindOptions.some(o => o.value === post.kind)
+  const kindChoices: SelectOption[] = kindOptions.some(
+    o => o.value === post.kind
+  )
     ? kindOptions
     : [...kindOptions, { value: post.kind, label: `${post.kind} (deleted)` }]
 
@@ -748,18 +804,26 @@ export default function BlogEditor({ id }: { id: string }) {
               below `xl` stays a plain Tailwind class rather than an inline override. */}
           <div
             ref={layoutRef}
-            className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,var(--rail-width))] lg:gap-8'
+            className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,var(--rail-width))] lg:gap-8"
             style={{ '--rail-width': `${railWidth}px` } as React.CSSProperties}
           >
-            <div className='space-y-5'>
-              <Section id='blog-post' eyebrow='Blog editor' title='Post' defaultOpen>
-                <div className='space-y-4'>
+            <div className="space-y-5">
+              <Section
+                id="blog-post"
+                eyebrow="Blog editor"
+                title="Post"
+                defaultOpen
+              >
+                <div className="space-y-4">
                   <div>
-                    <label className={labelCls} htmlFor='title'>
+                    <label
+                      className={labelCls}
+                      htmlFor="title"
+                    >
                       Title
                     </label>
                     <input
-                      id='title'
+                      id="title"
                       className={inputCls}
                       value={post.title}
                       onChange={event => patch({ title: event.target.value })}
@@ -768,17 +832,20 @@ export default function BlogEditor({ id }: { id: string }) {
 
                   {isPublished ? (
                     <p className={helpTextCls}>
-                      Slug is <code>{post.slug}</code> and is now frozen. This URL has been
-                      public, so renaming it would 404 every inbound link and feed entry
-                      pointing at it.
+                      Slug is <code>{post.slug}</code> and is now frozen. This
+                      URL has been public, so renaming it would 404 every
+                      inbound link and feed entry pointing at it.
                     </p>
                   ) : (
                     <div>
-                      <label className={labelCls} htmlFor='slug'>
+                      <label
+                        className={labelCls}
+                        htmlFor="slug"
+                      >
                         Slug
                       </label>
                       <input
-                        id='slug'
+                        id="slug"
                         className={inputCls}
                         value={post.slug}
                         onChange={event => patch({ slug: event.target.value })}
@@ -787,51 +854,64 @@ export default function BlogEditor({ id }: { id: string }) {
                   )}
 
                   <div>
-                    <label className={labelCls} htmlFor='excerpt'>
+                    <label
+                      className={labelCls}
+                      htmlFor="excerpt"
+                    >
                       Excerpt
                     </label>
                     <input
-                      id='excerpt'
+                      id="excerpt"
                       className={inputCls}
                       value={post.excerpt}
                       onChange={event => patch({ excerpt: event.target.value })}
-                      placeholder='Optional for a note. Used as the meta description, cut at 155.'
+                      placeholder="Optional for a note. Used as the meta description, cut at 155."
                     />
                   </div>
                 </div>
               </Section>
 
-              <Section id='blog-classification' eyebrow='Blog editor' title='Classification'>
-                <div className='space-y-4'>
-                  <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <Section
+                id="blog-classification"
+                eyebrow="Blog editor"
+                title="Classification"
+              >
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <div className='mb-1.5 flex items-baseline justify-between gap-2'>
-                        <label className={`${labelCls} mb-0`} htmlFor='kind'>
+                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                        <label
+                          className={`${labelCls} mb-0`}
+                          htmlFor="kind"
+                        >
                           Kind
                         </label>
                         <button
-                          type='button'
-                          className='text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline'
+                          type="button"
+                          className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
                           onClick={() => setTaxonomyDialog('kinds')}
                         >
                           Manage
                         </button>
                       </div>
                       <SelectField
-                        id='kind'
+                        id="kind"
                         value={post.kind}
                         options={kindChoices}
                         onChange={next => patch({ kind: next })}
                       />
                     </div>
                     <div>
-                      <div className='mb-1.5 flex items-baseline justify-between gap-2'>
-                        <label className={`${labelCls} mb-0`} htmlFor='series'>
+                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                        <label
+                          className={`${labelCls} mb-0`}
+                          htmlFor="series"
+                        >
                           Series
                         </label>
                         <button
-                          type='button'
-                          className='text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline'
+                          type="button"
+                          className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
                           onClick={() => setTaxonomyDialog('series')}
                         >
                           Manage
@@ -840,7 +920,7 @@ export default function BlogEditor({ id }: { id: string }) {
                       {/* `''` is the wire value for "no series"; the model stores `null`. The
                           empty string exists only so the option has a value at all. */}
                       <SelectField
-                        id='series'
+                        id="series"
                         value={post.series ?? ''}
                         options={seriesChoices}
                         onChange={next => patch({ series: next || null })}
@@ -848,22 +928,29 @@ export default function BlogEditor({ id }: { id: string }) {
                     </div>
                   </div>
 
-                  <label className='flex items-center gap-2 text-sm'>
+                  <label className="flex items-center gap-2 text-sm">
                     <input
-                      type='checkbox'
+                      type="checkbox"
                       checked={post.isPillar}
-                      onChange={event => patch({ isPillar: event.target.checked })}
+                      onChange={event =>
+                        patch({ isPillar: event.target.checked })
+                      }
                     />
                     Pillar post for this series
-                    <span className='text-xs text-pp-muted'>(at most one per series)</span>
+                    <span className="text-xs text-pp-muted">
+                      (at most one per series)
+                    </span>
                   </label>
 
                   <div>
-                    <label className={labelCls} htmlFor='tags'>
+                    <label
+                      className={labelCls}
+                      htmlFor="tags"
+                    >
                       Tags
                     </label>
                     <input
-                      id='tags'
+                      id="tags"
                       className={inputCls}
                       value={post.tags.join(', ')}
                       onChange={event =>
@@ -874,16 +961,19 @@ export default function BlogEditor({ id }: { id: string }) {
                             .filter(Boolean),
                         })
                       }
-                      placeholder='nextjs, caching'
+                      placeholder="nextjs, caching"
                     />
                   </div>
 
                   <div>
-                    <label className={labelCls} htmlFor='related'>
+                    <label
+                      className={labelCls}
+                      htmlFor="related"
+                    >
                       Related slugs
                     </label>
                     <input
-                      id='related'
+                      id="related"
                       className={inputCls}
                       value={post.relatedSlugs.join(', ')}
                       onChange={event =>
@@ -894,20 +984,27 @@ export default function BlogEditor({ id }: { id: string }) {
                             .filter(Boolean),
                         })
                       }
-                      placeholder='Resolved on read - unpublished ones simply render no link.'
+                      placeholder="Resolved on read - unpublished ones simply render no link."
                     />
                   </div>
                 </div>
               </Section>
 
-              <Section id='blog-cover' eyebrow='Blog editor' title='Cover image'>
-                <label className={labelCls} htmlFor='cover'>
+              <Section
+                id="blog-cover"
+                eyebrow="Blog editor"
+                title="Cover image"
+              >
+                <label
+                  className={labelCls}
+                  htmlFor="cover"
+                >
                   Upload
                 </label>
                 <input
-                  id='cover'
-                  type='file'
-                  accept='image/jpeg,image/png,image/webp,image/gif,image/avif'
+                  id="cover"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                   className={uploadInputCls}
                   onChange={event => {
                     const file = event.target.files?.[0]
@@ -926,16 +1023,21 @@ export default function BlogEditor({ id }: { id: string }) {
                   call of its own, so per-keystroke costs nothing and the share-card preview
                   below tracks a pasted URL as it is typed, well before Save is ever clicked.
                 */}
-                <div className='mt-3'>
-                  <label className={labelCls} htmlFor='cover-url'>
+                <div className="mt-3">
+                  <label
+                    className={labelCls}
+                    htmlFor="cover-url"
+                  >
                     Image URL
                   </label>
                   <input
-                    id='cover-url'
+                    id="cover-url"
                     className={inputCls}
                     value={post.coverImage ?? ''}
-                    placeholder='https://... or upload a file above'
-                    onChange={event => patch({ coverImage: event.target.value.trim() || null })}
+                    placeholder="https://... or upload a file above"
+                    onChange={event =>
+                      patch({ coverImage: event.target.value.trim() || null })
+                    }
                   />
                 </div>
 
@@ -954,13 +1056,13 @@ export default function BlogEditor({ id }: { id: string }) {
                   attempt was not good enough.
                 */}
                 {post.bodyMarkdown.trim() ? (
-                  <div className='mt-3'>
+                  <div className="mt-3">
                     <ImagePromptField
-                      id='cover-image-prompt'
-                      label='Image prompt'
+                      id="cover-image-prompt"
+                      label="Image prompt"
                       prompt={post.coverImagePrompt}
                       busy={promptBusy === 'cover'}
-                      help='Copy this into an image tool, then paste the result into the URL field above. Nothing here is ever published.'
+                      help="Copy this into an image tool, then paste the result into the URL field above. Nothing here is ever published."
                       onChange={value => patch({ coverImagePrompt: value })}
                       onRegenerate={() => void regenerateImagePrompt(null)}
                     />
@@ -976,21 +1078,26 @@ export default function BlogEditor({ id }: { id: string }) {
                   a field for text that has nothing to caption.
                 */}
                 {post.coverImage ? (
-                  <div className='mt-3'>
-                    <label className={labelCls} htmlFor='cover-caption'>
+                  <div className="mt-3">
+                    <label
+                      className={labelCls}
+                      htmlFor="cover-caption"
+                    >
                       Caption
                     </label>
                     <input
-                      id='cover-caption'
+                      id="cover-caption"
                       className={inputCls}
                       value={post.coverCaption}
                       maxLength={140}
-                      placeholder='Credit or context, e.g. Photo: Anh Khoa Nguyen'
-                      onChange={event => patch({ coverCaption: event.target.value })}
+                      placeholder="Credit or context, e.g. Photo: Anh Khoa Nguyen"
+                      onChange={event =>
+                        patch({ coverCaption: event.target.value })
+                      }
                     />
                     <p className={`${helpTextCls} mt-1`}>
-                      Printed under the thumbnail in the post list. Leave empty and the image
-                      is treated as decoration.
+                      Printed under the thumbnail in the post list. Leave empty
+                      and the image is treated as decoration.
                     </p>
                   </div>
                 ) : null}
@@ -1006,8 +1113,8 @@ export default function BlogEditor({ id }: { id: string }) {
                   says "in the list" rather than "on the post" for that reason.
                 */}
                 <p className={`${helpTextCls} mt-2`}>
-                  The share card on LinkedIn, DEV and Twitter, and the thumbnail in the post
-                  list. The post page itself does not render it.
+                  The share card on LinkedIn, DEV and Twitter, and the thumbnail
+                  in the post list. The post page itself does not render it.
                 </p>
 
                 {uploading ? (
@@ -1018,8 +1125,8 @@ export default function BlogEditor({ id }: { id: string }) {
                     real URL - and an `<img src='h'>` is a request to the current page that
                     fails and paints a broken-image icon on every keystroke.
                   */
-                  isLikelyImageUrl(post.coverImage) ? (
-                  <div className='mt-3 space-y-2'>
+                isLikelyImageUrl(post.coverImage) ? (
+                  <div className="mt-3 space-y-2">
                     {/*
                       Framed at 1200x630 with `object-cover`, which is the OG card ratio - so
                       what is cropped out here is what will be cropped out there. `PostCard`
@@ -1034,14 +1141,18 @@ export default function BlogEditor({ id }: { id: string }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={post.coverImage ?? ''}
-                      alt='Share card preview'
-                      className='aspect-[1200/630] w-full rounded-[1.1rem] border border-pp-line bg-white/60 object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]'
+                      alt="Share card preview"
+                      className="aspect-[1200/630] w-full rounded-[1.1rem] border border-pp-line bg-white/60 object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]"
                     />
-                    <p className='truncate text-xs text-pp-muted'>{post.coverImage}</p>
+                    <p className="truncate text-xs text-pp-muted">
+                      {post.coverImage}
+                    </p>
                     <button
-                      type='button'
+                      type="button"
                       className={ghostBtnCls}
-                      onClick={() => patch({ coverImage: null, coverCaption: '' })}
+                      onClick={() =>
+                        patch({ coverImage: null, coverCaption: '' })
+                      }
                     >
                       {/*
                         Clears the caption too. A credit line left behind after its picture is
@@ -1060,7 +1171,12 @@ export default function BlogEditor({ id }: { id: string }) {
                 )}
               </Section>
 
-              <Section id='blog-markdown' eyebrow='Blog editor' title='Markdown' defaultOpen>
+              <Section
+                id="blog-markdown"
+                eyebrow="Blog editor"
+                title="Markdown"
+                defaultOpen
+              >
                 {/*
                   Above the textarea, because the consequence of missing it lands on readers.
 
@@ -1086,59 +1202,78 @@ export default function BlogEditor({ id }: { id: string }) {
                   one button along from Publish, where the two worst possible mistakes on this
                   page would be neighbours.
                 */}
-                <div className='mb-3 flex flex-wrap items-center justify-between gap-3'>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <p className={`${helpTextCls} max-w-[46ch]`}>
-                    Not what you meant? Regenerate opens the same dialog the board uses, with
-                    this post&apos;s own properties already filled in.
+                    Not what you meant? Regenerate opens the same dialog the
+                    board uses, with this post&apos;s own properties already
+                    filled in.
                   </p>
                   <GenerateBlogButton
-                    label='Regenerate post'
+                    label="Regenerate post"
                     onClick={() => setRegenerating(true)}
                     disabled={saving}
                   />
                 </div>
 
                 {missingImages.length > 0 ? (
-                  <div className='mb-3 flex gap-2.5 rounded-[1.15rem] border border-[rgba(163,120,47,0.22)] bg-[rgba(224,176,92,0.13)] px-3.5 py-2.5 text-sm text-[#6b4d1c]'>
-                    <ImageOff aria-hidden size={16} className='mt-0.5 shrink-0' />
+                  <div className="mb-3 flex gap-2.5 rounded-[1.15rem] border border-[rgba(163,120,47,0.22)] bg-[rgba(224,176,92,0.13)] px-3.5 py-2.5 text-sm text-[#6b4d1c]">
+                    <ImageOff
+                      aria-hidden
+                      size={16}
+                      className="mt-0.5 shrink-0"
+                    />
                     <span>
-                      <strong className='font-semibold'>
-                        {missingImages.length} image{missingImages.length === 1 ? '' : 's'} still
-                        missing.
+                      <strong className="font-semibold">
+                        {missingImages.length} image
+                        {missingImages.length === 1 ? '' : 's'} still missing.
                       </strong>{' '}
                       {missingImages.map(item => item.key).join(', ')}{' '}
-                      {missingImages.length === 1 ? 'is a placeholder' : 'are placeholders'}. Published
-                      as {missingImages.length === 1 ? 'it is' : 'they are'}, {missingImages.length === 1 ? 'it shows' : 'they show'}{' '}
-                      a reader a broken image with the alt text beside it. The prompts below the
-                      editor are for making them.
+                      {missingImages.length === 1
+                        ? 'is a placeholder'
+                        : 'are placeholders'}
+                      . Published as{' '}
+                      {missingImages.length === 1 ? 'it is' : 'they are'},{' '}
+                      {missingImages.length === 1 ? 'it shows' : 'they show'} a
+                      reader a broken image with the alt text beside it. The
+                      prompts below the editor are for making them.
                     </span>
                   </div>
                 ) : null}
 
-                <label className='sr-only' htmlFor='body'>
+                <label
+                  className="sr-only"
+                  htmlFor="body"
+                >
                   Markdown
                 </label>
                 <textarea
-                  id='body'
+                  id="body"
                   className={`${inputCls} min-h-[32rem] font-mono text-[13px] leading-relaxed`}
                   value={post.bodyMarkdown}
-                  onChange={event => patch({ bodyMarkdown: event.target.value })}
+                  onChange={event =>
+                    patch({ bodyMarkdown: event.target.value })
+                  }
                 />
 
                 <MissingImagesPanel
                   placeholders={missingImages}
-                  promptFor={key => post.imagePrompts.find(entry => entry.key === key)?.prompt ?? ''}
+                  promptFor={key =>
+                    post.imagePrompts.find(entry => entry.key === key)
+                      ?.prompt ?? ''
+                  }
                   busyKey={promptBusy === 'cover' ? null : promptBusy}
                   uploadingKey={imageUploading}
                   onPromptChange={setImagePrompt}
                   onRegenerate={key => void regenerateImagePrompt(key)}
                   onResolve={resolvePlaceholder}
-                  onUpload={(key, file) => void uploadPlaceholderImage(key, file)}
+                  onUpload={(key, file) =>
+                    void uploadPlaceholderImage(key, file)
+                  }
                 />
               </Section>
 
-              <div className='flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line bg-white/72 px-4 py-3'>
-                <span className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+              <div className="bg-white/72 flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line px-4 py-3">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
                   Cross-post
                 </span>
                 {/*
@@ -1147,23 +1282,29 @@ export default function BlogEditor({ id }: { id: string }) {
                   page almost nobody reads - the audience is on these two channels, which is
                   the whole reason for cross-posting at all.
                 */}
-                <button className={ghostBtnCls} onClick={() => void copyBundle('devto')}>
+                <button
+                  className={ghostBtnCls}
+                  onClick={() => void copyBundle('devto')}
+                >
                   {copied === 'devto' ? 'Copied' : 'DEV.to (EN)'}
                 </button>
-                <button className={ghostBtnCls} onClick={() => void copyBundle('viblo')}>
+                <button
+                  className={ghostBtnCls}
+                  onClick={() => void copyBundle('viblo')}
+                >
                   {copied === 'viblo' ? 'Copied' : 'Viblo (VI)'}
                 </button>
               </div>
             </div>
 
-            <div className='relative lg:pl-2'>
+            <div className="relative lg:pl-2">
               <RailResizeHandle
                 width={railWidth}
                 onResize={resizeRail}
                 onReset={() => setRailWidth(DEFAULT_RAIL_WIDTH)}
                 containerRef={layoutRef}
               />
-              <div className='lg:sticky lg:top-6 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto'>
+              <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
                 <p className={labelCls}>Preview</p>
                 {/*
                   Rendered by the SAME function the save path uses, on the server. Not a
@@ -1178,11 +1319,11 @@ export default function BlogEditor({ id }: { id: string }) {
                 */}
                 {preview ? (
                   <div
-                    className='blog-prose rounded-[1.75rem] border border-pp-line bg-white/85 p-5 shadow-panel backdrop-blur-md'
+                    className="blog-prose rounded-[1.75rem] border border-pp-line bg-white/85 p-5 shadow-panel backdrop-blur-md"
                     dangerouslySetInnerHTML={{ __html: preview }}
                   />
                 ) : (
-                  <div className='rounded-[1.75rem] border border-dashed border-pp-line bg-white/50 p-5'>
+                  <div className="rounded-[1.75rem] border border-dashed border-pp-line bg-white/50 p-5">
                     <p className={helpTextCls}>
                       {post.bodyMarkdown.trim()
                         ? 'Rendering...'
@@ -1198,13 +1339,13 @@ export default function BlogEditor({ id }: { id: string }) {
         {/* Takes over the moment the toolbar's own button leaves the viewport - which on this
             page is almost immediately, and stays true for the entire time anyone is writing. */}
         <TaxonomyDialog
-          resource='series'
+          resource="series"
           open={taxonomyDialog === 'series'}
           onClose={() => setTaxonomyDialog(null)}
           onChanged={() => void loadSeries()}
         />
         <TaxonomyDialog
-          resource='kinds'
+          resource="kinds"
           open={taxonomyDialog === 'kinds'}
           onClose={() => setTaxonomyDialog(null)}
           onChanged={() => void loadKinds()}
@@ -1247,7 +1388,9 @@ export default function BlogEditor({ id }: { id: string }) {
               status: post.status,
               // Whitespace-split on the markdown, so it counts fences and syntax too. It is
               // there to convey scale before an irreversible press, not to be quoted.
-              wordCount: post.bodyMarkdown.trim() ? post.bodyMarkdown.trim().split(/\s+/).length : 0,
+              wordCount: post.bodyMarkdown.trim()
+                ? post.bodyMarkdown.trim().split(/\s+/).length
+                : 0,
             }}
           />
         ) : null}

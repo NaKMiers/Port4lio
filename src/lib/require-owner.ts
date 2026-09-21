@@ -39,11 +39,10 @@ import { getAuthCookieName } from '@/lib/auth'
 export function requireOwner(request: NextRequest) {
   const token = request.cookies.get(getAuthCookieName())?.value
 
-  if (!hasOwnerAccess(token)) {
+  if (!hasOwnerAccess(token))
     // Deliberately the same opaque string for "no cookie" and "bad cookie". Distinguishing
     // them tells an unauthenticated caller which half of the guess was right.
     return jsonError('Unauthorized', 401)
-  }
 
   return null
 }

@@ -46,11 +46,14 @@ export async function generateMetadata({
 
   await connectDatabase()
   const attempt = await IqAttemptModel.findOne({ certificateId: id }).lean()
-  if (!attempt?.certificateName) return { title: iqUi(lang).certificateNotFound }
+  if (!attempt?.certificateName)
+    return { title: iqUi(lang).certificateNotFound }
 
   const copy = iqUi(lang)
   const title = `${attempt.certificateName} - ${copy.scoreLabel} ${attempt.score}`
-  const description = fill(copy.percentileLabel, { percentile: attempt.percentile ?? 0 })
+  const description = fill(copy.percentileLabel, {
+    percentile: attempt.percentile ?? 0,
+  })
 
   return {
     title,
@@ -58,7 +61,12 @@ export async function generateMetadata({
     // Indexed, unlike the result page. The whole point is that a stranger can find and
     // check this.
     alternates: { canonical: `/${lang}/iq/certificate/${id}` },
-    openGraph: { title, description, url: `/${lang}/iq/certificate/${id}`, type: 'profile' },
+    openGraph: {
+      title,
+      description,
+      url: `/${lang}/iq/certificate/${id}`,
+      type: 'profile',
+    },
   }
 }
 
@@ -81,39 +89,51 @@ export default async function CertificatePage({
 
   return (
     <main>
-      <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
-        <EditorialPanel variant='strong' className='p-8 text-center md:p-12'>
-          <p className='font-display text-xs font-semibold uppercase tracking-[0.22em] text-pp-muted'>
+      <SectionFrame
+        className="py-section-sm"
+        innerClassName="max-w-2xl"
+      >
+        <EditorialPanel
+          variant="strong"
+          className="p-8 text-center md:p-12"
+        >
+          <p className="font-display text-xs font-semibold uppercase tracking-[0.22em] text-pp-muted">
             {copy.certificateTitle}
           </p>
 
-          <p className='mt-7 font-display text-2xl font-semibold text-pp-text md:text-3xl'>
+          <p className="mt-7 font-display text-2xl font-semibold text-pp-text md:text-3xl">
             {attempt.certificateName}
           </p>
 
-          <p className='mt-8 font-display text-[clamp(4rem,14vw,7rem)] font-semibold leading-none tracking-tight text-pp-text tabular-nums'>
+          <p className="mt-8 font-display text-[clamp(4rem,14vw,7rem)] font-semibold tabular-nums leading-none tracking-tight text-pp-text">
             {attempt.score}
           </p>
-          <p className='mt-3 font-display text-lg font-semibold text-pp-text'>{bandLabel}</p>
-          <p className='mt-2 text-pp-muted'>
-            {fill(copy.percentileLabel, { percentile: attempt.percentile ?? 0 })}
+          <p className="mt-3 font-display text-lg font-semibold text-pp-text">
+            {bandLabel}
+          </p>
+          <p className="mt-2 text-pp-muted">
+            {fill(copy.percentileLabel, {
+              percentile: attempt.percentile ?? 0,
+            })}
           </p>
 
-          <div className='mt-9 border-t border-pp-line pt-6 text-sm text-pp-muted'>
+          <div className="mt-9 border-t border-pp-line pt-6 text-sm text-pp-muted">
             <p>
               {copy.certificateIssued}{' '}
               <time dateTime={new Date(issued).toISOString()}>
-                {new Date(issued).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-GB')}
+                {new Date(issued).toLocaleDateString(
+                  lang === 'vi' ? 'vi-VN' : 'en-GB'
+                )}
               </time>
             </p>
-            <p className='mt-1 font-mono text-xs'>{id}</p>
+            <p className="mt-1 font-mono text-xs">{id}</p>
           </div>
         </EditorialPanel>
 
-        <div className='mt-8 flex flex-wrap items-center justify-center gap-5 text-sm'>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-5 text-sm">
           <Link
             href={`/${lang}/iq/verify/${id}`}
-            className='font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue'
+            className="font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue"
           >
             {copy.verifyThis}
           </Link>
@@ -125,7 +145,7 @@ export default async function CertificatePage({
           */}
           <Link
             href={`/${lang}/iq/test`}
-            className='font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue'
+            className="font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue"
           >
             {copy.startTest}
           </Link>

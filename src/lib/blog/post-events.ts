@@ -1,5 +1,9 @@
 import { connectDatabase } from '@/lib/mongodb'
-import { PostEventModel, postEventExpiryFrom, type PostEventKind } from '@/models/PostEvent'
+import {
+  PostEventModel,
+  postEventExpiryFrom,
+  type PostEventKind,
+} from '@/models/PostEvent'
 
 /**
  * Write one blog event. Never throws.
@@ -54,7 +58,10 @@ export async function recordPostEvent(input: {
       { upsert: true }
     )
   } catch (error) {
-    console.error(`[blog] could not record ${kind} for ${slug} - continuing`, error)
+    console.error(
+      `[blog] could not record ${kind} for ${slug} - continuing`,
+      error
+    )
   }
 }
 
@@ -78,14 +85,18 @@ export type PostMetrics = {
  * The rule is inherited from `TestEvent.ts` and is stated there too, because it is the kind
  * of thing that looks like a missed optimisation to whoever reads the aggregation next.
  */
-export async function aggregatePostMetrics(): Promise<Map<string, PostMetrics>> {
+export async function aggregatePostMetrics(): Promise<
+  Map<string, PostMetrics>
+> {
   await connectDatabase()
 
   const rows = await PostEventModel.aggregate<{
     _id: { slug: string; kind: PostEventKind }
     documents: number
   }>([
-    { $group: { _id: { slug: '$slug', kind: '$kind' }, documents: { $sum: 1 } } },
+    {
+      $group: { _id: { slug: '$slug', kind: '$kind' }, documents: { $sum: 1 } },
+    },
   ])
 
   const metrics = new Map<string, PostMetrics>()

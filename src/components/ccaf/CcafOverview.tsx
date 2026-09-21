@@ -62,18 +62,18 @@ function Tile({
   children?: React.ReactNode
 }) {
   return (
-    <div className='flex flex-col gap-1 rounded-panel border border-pp-line bg-pp-panel-strong px-4 py-3 shadow-[0_12px_40px_rgba(46,35,28,0.06)] sm:px-5 sm:py-4'>
-      <span className='text-xs font-semibold uppercase tracking-[0.14em] text-pp-muted'>
+    <div className="flex flex-col gap-1 rounded-panel border border-pp-line bg-pp-panel-strong px-4 py-3 shadow-[0_12px_40px_rgba(46,35,28,0.06)] sm:px-5 sm:py-4">
+      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-pp-muted">
         {label}
       </span>
       {value ? (
-        <span className='font-display text-2xl font-semibold tracking-tight text-pp-text'>
+        <span className="font-display text-2xl font-semibold tracking-tight text-pp-text">
           {value}
         </span>
       ) : null}
       {children}
       {hint ? (
-        <span className='text-xs leading-snug text-pp-muted'>{hint}</span>
+        <span className="text-xs leading-snug text-pp-muted">{hint}</span>
       ) : null}
     </div>
   )
@@ -109,34 +109,34 @@ export default function CcafOverview({
 
   return (
     <SectionFrame
-      id='ccaf-overview'
-      aria-labelledby='ccaf-overview-heading'
-      className='scroll-mt-24 border-b border-pp-line pb-8 pt-8 md:scroll-mt-28 md:pb-12 md:pt-10'
+      id="ccaf-overview"
+      aria-labelledby="ccaf-overview-heading"
+      className="scroll-mt-24 border-b border-pp-line pb-8 pt-8 md:scroll-mt-28 md:pb-12 md:pt-10"
     >
-      <div className='space-y-6 md:space-y-8'>
-        <div className='flex items-start justify-between gap-4'>
-          <header className='max-w-3xl space-y-3'>
+      <div className="space-y-6 md:space-y-8">
+        <div className="flex items-start justify-between gap-4">
+          <header className="max-w-3xl space-y-3">
             <p className={eyebrowCls}>{t(UI.eyebrow, locale)}</p>
             <h1
-              id='ccaf-overview-heading'
-              className='text-pretty font-display text-[clamp(2rem,4.6vw,3.1rem)] font-semibold leading-[1.08] tracking-tight text-pp-text'
+              id="ccaf-overview-heading"
+              className="text-pretty font-display text-[clamp(2rem,4.6vw,3.1rem)] font-semibold leading-[1.08] tracking-tight text-pp-text"
             >
               {t(UI.pageTitle, locale)}
             </h1>
-            <p className='text-pretty text-base leading-[1.75] text-pp-muted md:text-[1.0625rem]'>
+            <p className="text-pretty text-base leading-[1.75] text-pp-muted md:text-[1.0625rem]">
               {t(UI.ledeBefore, locale)}
-              <strong className='font-semibold text-pp-text'>
+              <strong className="font-semibold text-pp-text">
                 ≥ {TARGET_SCALED_SCORE}/1000
               </strong>
               {t(UI.ledeAfter, locale)}
             </p>
           </header>
-          <div className='shrink-0 pt-1'>
+          <div className="shrink-0 pt-1">
             <CcafLocaleSwitcher current={locale} />
           </div>
         </div>
 
-        <div className='grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3'>
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           <Tile
             label={t(UI.tileGoal, locale)}
             value={`≥ ${TARGET_SCALED_SCORE}`}
@@ -154,7 +154,7 @@ export default function CcafOverview({
             }
           >
             <input
-              type='date'
+              type="date"
               value={state.examDate}
               disabled={!editable}
               onChange={event => onExamDateChange(event.target.value)}
@@ -176,11 +176,11 @@ export default function CcafOverview({
             hint={`${progress.done}/${progress.total} ${t(UI.tasksSuffix, locale)}`}
           >
             <div
-              className='h-1.5 overflow-hidden rounded-full bg-pp-line'
-              role='presentation'
+              className="h-1.5 overflow-hidden rounded-full bg-pp-line"
+              role="presentation"
             >
               <div
-                className='h-full rounded-full bg-pp-text transition-[width] duration-300'
+                className="h-full rounded-full bg-pp-text transition-[width] duration-300"
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
@@ -191,13 +191,13 @@ export default function CcafOverview({
             hint={t(UI.tileReadinessHint, locale)}
           />
           <Tile label={t(UI.tileStatus, locale)}>
-            <span className='inline-flex items-center gap-2 font-display text-lg font-semibold text-pp-text'>
+            <span className="inline-flex items-center gap-2 font-display text-lg font-semibold text-pp-text">
               <span
                 className={cx(
                   'h-2 w-2 shrink-0 rounded-full',
                   STATUS_DOT[status]
                 )}
-                aria-hidden='true'
+                aria-hidden="true"
               />
               {t(UI[STATUS_KEY[status]], locale)}
             </span>
@@ -210,11 +210,11 @@ export default function CcafOverview({
         </div>
 
         <EditorialPanel
-          variant='strong'
-          className='p-5 sm:p-6'
+          variant="strong"
+          className="p-5 sm:p-6"
         >
-          <p className='text-sm leading-relaxed text-pp-muted'>
-            <strong className='font-semibold text-pp-text'>
+          <p className="text-sm leading-relaxed text-pp-muted">
+            <strong className="font-semibold text-pp-text">
               {t(UI.howToReadLabel, locale)}
             </strong>{' '}
             <RichText>{t(UI.howToRead, locale)}</RichText>

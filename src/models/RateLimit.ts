@@ -39,9 +39,11 @@ rateLimitSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
 // Same reasoning as Attempt: a silent index failure here means counter documents pile up
 // forever instead of expiring. Less severe than the retention promise, same blind spot.
 rateLimitSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[RateLimit] TTL index build failed - counters will not expire', error)
-  }
+  if (error)
+    console.error(
+      '[RateLimit] TTL index build failed - counters will not expire',
+      error
+    )
 })
 
 export const RateLimitModel: mongoose.Model<RateLimitDocument> =

@@ -35,7 +35,10 @@ export default async function MbtiPlainLayout({
   if (!isLocale(lang)) notFound()
 
   return (
-    <TestProductShell locale={lang} product='mbti'>
+    <TestProductShell
+      locale={lang}
+      product="mbti"
+    >
       {children}
     </TestProductShell>
   )

@@ -38,7 +38,7 @@ afterEach(() => {
 
 describe('metadata copy', () => {
   it('fills every placeholder in both locales, free and paid', () => {
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       for (const price of [0, 2000]) {
         const strings = [
           landingTitle(locale, price),
@@ -51,22 +51,23 @@ describe('metadata copy', () => {
           expect(value.length).toBeGreaterThan(20)
         }
       }
-    }
   })
 
   it('keeps descriptions inside the length Google will actually render', () => {
     // Google truncates around 155-160 characters. An earlier version of this test allowed
     // 320, which passed happily while the live descriptions ran to 226 and had their tail
     // cut off in the SERP - so the bound is the real one now.
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       for (const price of [0, 2000, 50_000]) {
-        expect(landingDescription(locale, price).length, `${locale} landing @ ${price}`).toBeLessThanOrEqual(160)
+        expect(
+          landingDescription(locale, price).length,
+          `${locale} landing @ ${price}`
+        ).toBeLessThanOrEqual(160)
         expect(
           typeDescription(locale, 'INFJ', price).length,
           `${locale} type @ ${price}`
         ).toBeLessThanOrEqual(160)
       }
-    }
   })
 
   /**
@@ -78,8 +79,8 @@ describe('metadata copy', () => {
    * the metadata, which is exactly what an innocent-looking copy edit would do.
    */
   it('never names an amount in metadata, whatever the price is', () => {
-    for (const locale of LOCALES) {
-      for (const price of [2000, 50_000]) {
+    for (const locale of LOCALES)
+      for (const price of [2000, 50_000])
         for (const text of [
           priceLine(locale, price),
           landingDescription(locale, price),
@@ -88,16 +89,14 @@ describe('metadata copy', () => {
           expect(text, `${locale} @ ${price}`).not.toMatch(/[\d.,]+\s*₫/)
           expect(text, `${locale} @ ${price}`).not.toMatch(/\d{3,}/)
         }
-      }
-    }
   })
 
   it('still distinguishes a free product from a paid one', () => {
     // Withholding the figure is a sequencing choice; implying there is no figure would be a
     // lie discovered at the worst moment. So the two modes must not read identically.
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       expect(priceLine(locale, 0)).not.toBe(priceLine(locale, 2000))
-    }
+
     expect(priceLine('vi', 0)).toContain('miễn phí')
     expect(priceLine('en', 0).toLowerCase()).toContain('free')
   })
@@ -113,7 +112,9 @@ describe('metadata copy', () => {
         typeTitle(locale, 'INFJ'),
         typeDescription(locale, 'INFJ', 2000),
       ].join(' ')
-      expect(all).not.toMatch(/chính xác nhất|rẻ nhất|tốt nhất|số 1|most accurate|cheapest|best ever/i)
+      expect(all).not.toMatch(
+        /chính xác nhất|rẻ nhất|tốt nhất|số 1|most accurate|cheapest|best ever/i
+      )
     }
   })
 
@@ -126,9 +127,9 @@ describe('hreflang', () => {
   it('includes every locale plus an x-default pointing at Vietnamese', () => {
     const languages = alternateLanguages(locale => `/${locale}/mbti`)
 
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       expect(languages[locale]).toBe(`/${locale}/mbti`)
-    }
+
     // Without x-default a crawler picks arbitrarily for everyone else; Vietnamese is the
     // primary audience.
     expect(languages['x-default']).toBe('/vi/mbti')
@@ -161,10 +162,14 @@ describe('structured data', () => {
   it('says whether the result is free without naming a figure', () => {
     // What `isAccessibleForFree` buys over silence: "there is a paid unlock" is answerable
     // without the number, and answering it late is how someone finds out twenty minutes in.
-    expect((quizJsonLd('vi', 0) as { isAccessibleForFree: boolean }).isAccessibleForFree).toBe(true)
-    expect((quizJsonLd('vi', 2000) as { isAccessibleForFree: boolean }).isAccessibleForFree).toBe(
-      false
-    )
+    expect(
+      (quizJsonLd('vi', 0) as { isAccessibleForFree: boolean })
+        .isAccessibleForFree
+    ).toBe(true)
+    expect(
+      (quizJsonLd('vi', 2000) as { isAccessibleForFree: boolean })
+        .isAccessibleForFree
+    ).toBe(false)
     const serialised = JSON.stringify(quizJsonLd('vi', 2000))
     expect(serialised).not.toContain('2000')
   })
@@ -172,7 +177,10 @@ describe('structured data', () => {
   it('states a duration that matches the FAQ on the same page', () => {
     // A structured-data figure that disagrees with the prose beside it is worse than not
     // stating one, and these are two separate claims that could drift apart.
-    const quiz = quizJsonLd('en', 0) as { timeRequired: string; numberOfQuestions: number }
+    const quiz = quizJsonLd('en', 0) as {
+      timeRequired: string
+      numberOfQuestions: number
+    }
     const minutes = Number(/^PT(\d+)M$/.exec(quiz.timeRequired)?.[1])
     expect(Number.isInteger(minutes)).toBe(true)
     expect(quiz.numberOfQuestions).toBe(QUESTION_COUNT)
@@ -199,7 +207,11 @@ describe('structured data', () => {
     }
     expect(list.numberOfItems).toBe(16)
     expect(list.itemListElement).toHaveLength(16)
-    expect(list.itemListElement.every(i => i.url.startsWith('https://example.com/vi/mbti/'))).toBe(true)
+    expect(
+      list.itemListElement.every(i =>
+        i.url.startsWith('https://example.com/vi/mbti/')
+      )
+    ).toBe(true)
   })
 
   it('produces a question and a non-empty answer for every FAQ entry', () => {

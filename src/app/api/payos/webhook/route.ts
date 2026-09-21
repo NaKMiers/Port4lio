@@ -43,9 +43,8 @@ export async function POST(request: NextRequest) {
   const orderCode = Number(data?.orderCode)
   const amount = Number(data?.amount)
 
-  if (!Number.isFinite(orderCode) || !Number.isFinite(amount)) {
+  if (!Number.isFinite(orderCode) || !Number.isFinite(amount))
     return NextResponse.json({ message: 'Invalid payload' }, { status: 400 })
-  }
 
   try {
     await connectDatabase()
@@ -114,10 +113,14 @@ export async function POST(request: NextRequest) {
           // Already logged in full by fulfilIqPayment, which is the only place that knows
           // a claimed payment failed to unlock or deliver.
           case 'delivery-failed':
-            console.error(`[PayOS Webhook] IQ paid but undelivered: ${orderCode}`)
+            console.error(
+              `[PayOS Webhook] IQ paid but undelivered: ${orderCode}`
+            )
             break
           case 'unknown-order-code':
-            console.info(`[PayOS Webhook] No payment for ${orderCode} (registration ping?)`)
+            console.info(
+              `[PayOS Webhook] No payment for ${orderCode} (registration ping?)`
+            )
             break
         }
         break
@@ -126,7 +129,9 @@ export async function POST(request: NextRequest) {
       // Someone paid an amount we never asked for. Not fulfilled, and loud: this is either
       // a bug in our own amount handling or someone probing the endpoint.
       case 'amount-mismatch':
-        console.error(`[PayOS Webhook] AMOUNT MISMATCH on ${orderCode}: ${result.message}`)
+        console.error(
+          `[PayOS Webhook] AMOUNT MISMATCH on ${orderCode}: ${result.message}`
+        )
         break
 
       // Already logged in full by fulfilMbtiPayment, which is the only place that knows a

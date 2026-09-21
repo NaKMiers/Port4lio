@@ -151,13 +151,15 @@ function downgradeUnknownFences(slug: string) {
   return (tree: Root) => {
     visit(tree, 'element', (node: Element, _index, parent) => {
       if (node.tagName !== 'code') return
-      if (!parent || parent.type !== 'element' || parent.tagName !== 'pre') return
+      if (!parent || parent.type !== 'element' || parent.tagName !== 'pre')
+        return
 
       const classNames = node.properties?.className
       if (!Array.isArray(classNames)) return
 
       const languageClass = classNames.find(
-        (value): value is string => typeof value === 'string' && value.startsWith('language-')
+        (value): value is string =>
+          typeof value === 'string' && value.startsWith('language-')
       )
       if (!languageClass) return
 
@@ -182,7 +184,10 @@ function downgradeUnknownFences(slug: string) {
  * so that a caller cannot accidentally produce unattributable logs - there are only two call
  * sites and both have it.
  */
-export async function renderMarkdown(markdown: string, slug: string): Promise<string> {
+export async function renderMarkdown(
+  markdown: string,
+  slug: string
+): Promise<string> {
   const file = await unified()
     .use(remarkParse)
     .use(remarkGfm)

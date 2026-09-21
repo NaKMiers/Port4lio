@@ -1,4 +1,9 @@
-import { collapseWhitespace, dedupeJobTitles, excerptText, splitAboutParagraphs } from '@/lib/profile-copy'
+import {
+  collapseWhitespace,
+  dedupeJobTitles,
+  excerptText,
+  splitAboutParagraphs,
+} from '@/lib/profile-copy'
 import type { PublicProfile } from '@/lib/profile-public'
 
 import { PLATFORM_LIMITS } from './limits'
@@ -12,7 +17,10 @@ import type { GithubBioArtifact, RenderContext } from './types'
  * `company` is intentionally left empty unless the profile states one - GitHub renders it
  * as an affiliation, and guessing wrong there is worse than leaving it blank.
  */
-export function renderGithubBio(profile: PublicProfile, ctx: RenderContext): GithubBioArtifact {
+export function renderGithubBio(
+  profile: PublicProfile,
+  ctx: RenderContext
+): GithubBioArtifact {
   const titles = dedupeJobTitles(profile.jobTitle)
   const description = collapseWhitespace(profile.description)
   const firstParagraph = splitAboutParagraphs(profile.aboutMe)[0] ?? ''

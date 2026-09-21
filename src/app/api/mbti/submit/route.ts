@@ -38,19 +38,19 @@ const MAX_BODY_BYTES = 8 * 1024
  */
 export async function POST(request: NextRequest) {
   const contentLength = Number(request.headers.get('content-length') ?? 0)
-  if (contentLength > MAX_BODY_BYTES) {
-    return jsonError('Payload too large', 413)
-  }
+  if (contentLength > MAX_BODY_BYTES) return jsonError('Payload too large', 413)
 
   await connectDatabase()
 
   const limit = await checkRateLimit(clientIpFrom(request), SUBMIT_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
   let body: unknown
   try {
@@ -68,7 +68,9 @@ export async function POST(request: NextRequest) {
   // `isLocale(cond ? x : undefined)` refines the expression, NOT `x`, so `rawLocale` would
   // stay `unknown` and an arbitrary client string would reach the database.
   const localeCandidate = typeof rawLocale === 'string' ? rawLocale : undefined
-  const locale: Locale = isLocale(localeCandidate) ? localeCandidate : DEFAULT_LOCALE
+  const locale: Locale = isLocale(localeCandidate)
+    ? localeCandidate
+    : DEFAULT_LOCALE
 
   let answers: Answer[]
   let result: ScoreResult
@@ -76,11 +78,11 @@ export async function POST(request: NextRequest) {
     answers = parseAnswers(rawAnswers)
     result = scoreAttempt(answers)
   } catch (error) {
-    if (error instanceof InvalidAnswersError) {
+    if (error instanceof InvalidAnswersError)
       // The message names which answer was bad, which is useful to a developer and
       // harmless to a user - it describes their own submitted payload, nothing internal.
       return jsonError(error.message, 400)
-    }
+
     throw error
   }
 
@@ -119,9 +121,7 @@ export async function POST(request: NextRequest) {
   // Counted here rather than at render, because this is where the decision is made. IQ
   // does the same, so the two products' waiver rates are measured the same way - and a
   // waived unlock never touches `paid`, which is the counter revenue is read from.
-  if (waived) {
-    recordFunnelDetached('mbti', FUNNEL_EVENTS.waived)
-  }
+  if (waived) recordFunnelDetached('mbti', FUNNEL_EVENTS.waived)
 
   /**
    * The token only - deliberately NOT the type.

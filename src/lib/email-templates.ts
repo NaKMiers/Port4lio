@@ -21,7 +21,8 @@ const COLOR = {
   codeBg: '#f7f4ef',
 } as const
 
-const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+const FONT =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 
 export type RenderedEmail = {
   subject: string
@@ -51,7 +52,10 @@ function escapeHtmlMultiline(value: string): string {
 }
 
 function siteOrigin(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://anhkhoa.info').replace(/\/+$/, '')
+  return (process.env.NEXT_PUBLIC_SITE_URL || 'https://anhkhoa.info').replace(
+    /\/+$/,
+    ''
+  )
 }
 
 function siteLabel(): string {
@@ -205,8 +209,12 @@ export function renderContactEmail({
   // that say nothing. Reading "Heard about: -" on every message trains the eye to skip the
   // line, which loses the one message where it is filled in.
   const attributionHtml = [
-    sourceSlug ? row('Came from', `<code>/blog/${escapeHtml(sourceSlug)}</code>`) : '',
-    heardAbout ? row('Heard about me via', escapeHtmlMultiline(heardAbout)) : '',
+    sourceSlug
+      ? row('Came from', `<code>/blog/${escapeHtml(sourceSlug)}</code>`)
+      : '',
+    heardAbout
+      ? row('Heard about me via', escapeHtmlMultiline(heardAbout))
+      : '',
   ]
     .filter(Boolean)
     .join('\n')
@@ -259,7 +267,11 @@ ${row('Subject', escapeHtml(subject))}${attributionHtml ? `\n${attributionHtml}`
  * would be unsubscribing from nothing - and offering one implies they are already subscribed,
  * which is exactly the impression double opt-in exists to avoid.
  */
-export function renderSubscribeConfirmEmail({ confirmUrl }: { confirmUrl: string }): RenderedEmail {
+export function renderSubscribeConfirmEmail({
+  confirmUrl,
+}: {
+  confirmUrl: string
+}): RenderedEmail {
   const bodyHtml = `              <p style="margin:0 0 14px 0; font-size:15px; line-height:1.65; color:${COLOR.text};">
                 Somebody - hopefully you - asked to be told when a new post goes up on
                 ${escapeHtml(siteLabel())}. That is a handful of write-ups a year on things I
@@ -289,7 +301,8 @@ export function renderSubscribeConfirmEmail({ confirmUrl }: { confirmUrl: string
   return {
     subject: 'Confirm your subscription',
     html: shell({
-      preheader: 'Confirm and you are on the list. Ignore this and nothing happens.',
+      preheader:
+        'Confirm and you are on the list. Ignore this and nothing happens.',
       eyebrow: 'Subscribe',
       heading: 'One click to confirm',
       bodyHtml,

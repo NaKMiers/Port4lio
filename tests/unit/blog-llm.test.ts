@@ -21,7 +21,9 @@ describe('extractJsonObject', () => {
   })
 
   it('reads the fenced form the live endpoint actually returns', () => {
-    expect(extractJsonObject('```json\n{"title":"a"}\n```')).toEqual({ title: 'a' })
+    expect(extractJsonObject('```json\n{"title":"a"}\n```')).toEqual({
+      title: 'a',
+    })
   })
 
   it('reads an unlabelled fence', () => {
@@ -29,7 +31,8 @@ describe('extractJsonObject', () => {
   })
 
   it('reads an object wrapped in prose', () => {
-    const text = 'Here is the post you asked for:\n\n{"title":"a"}\n\nLet me know what you think.'
+    const text =
+      'Here is the post you asked for:\n\n{"title":"a"}\n\nLet me know what you think.'
 
     expect(extractJsonObject(text)).toEqual({ title: 'a' })
   })
@@ -37,18 +40,26 @@ describe('extractJsonObject', () => {
   it('keeps a body containing braces intact', () => {
     // The first-`{`-to-last-`}` span, not the first-to-first. A post about JavaScript is full
     // of braces, and a lazy scan would cut the body at the first code block.
-    const payload = extractJsonObject('```json\n{"bodyMarkdown":"use `{ a: 1 }` here"}\n```')
+    const payload = extractJsonObject(
+      '```json\n{"bodyMarkdown":"use `{ a: 1 }` here"}\n```'
+    )
 
     expect(payload.bodyMarkdown).toBe('use `{ a: 1 }` here')
   })
 
   it('refuses a truncated object rather than repairing it', () => {
-    expect(() => extractJsonObject('{"bodyMarkdown":"half a post')).toThrow(LlmError)
-    expect(() => extractJsonObject('{"bodyMarkdown":"half a post')).toThrow(/token limit/)
+    expect(() => extractJsonObject('{"bodyMarkdown":"half a post')).toThrow(
+      LlmError
+    )
+    expect(() => extractJsonObject('{"bodyMarkdown":"half a post')).toThrow(
+      /token limit/
+    )
   })
 
   it('refuses a reply with no object in it', () => {
-    expect(() => extractJsonObject('I cannot write that post.')).toThrow(LlmError)
+    expect(() => extractJsonObject('I cannot write that post.')).toThrow(
+      LlmError
+    )
   })
 
   it('unwraps the single-element array a model returns when it reads "object" as "result"', () => {
@@ -93,12 +104,21 @@ describe('chatCompletion', () => {
     return calls
   }
 
-  function ok(body: unknown, headers: Record<string, string> = { 'content-type': 'application/json' }) {
+  function ok(
+    body: unknown,
+    headers: Record<string, string> = { 'content-type': 'application/json' }
+  ) {
     return new Response(JSON.stringify(body), { status: 200, headers })
   }
 
-  const REPLY = { choices: [{ message: { content: '{"title":"x"}' } }], model: 'ag/claude-sonnet-4-6' }
-  const ARGS = { model: 'ag/claude-sonnet-4-6', messages: [{ role: 'user' as const, content: 'hi' }] }
+  const REPLY = {
+    choices: [{ message: { content: '{"title":"x"}' } }],
+    model: 'ag/claude-sonnet-4-6',
+  }
+  const ARGS = {
+    model: 'ag/claude-sonnet-4-6',
+    messages: [{ role: 'user' as const, content: 'hi' }],
+  }
 
   beforeEach(() => {
     process.env.LLM_API_KEY = 'test-key'
@@ -193,11 +213,14 @@ describe('chatCompletion', () => {
     [403, /LLM_API_KEY/],
     [429, /rate limiting/],
     [500, /returned 500/],
-  ])('maps a %i from the router to a message the author can act on', async (status, message) => {
-    stubFetch(new Response('nope', { status }))
+  ])(
+    'maps a %i from the router to a message the author can act on',
+    async (status, message) => {
+      stubFetch(new Response('nope', { status }))
 
-    await expect(chatCompletion(ARGS)).rejects.toThrow(message)
-  })
+      await expect(chatCompletion(ARGS)).rejects.toThrow(message)
+    }
+  )
 
   it('carries the upstream status on the error, so the route can re-emit a 429 as a 429', async () => {
     stubFetch(new Response('slow down', { status: 429 }))
@@ -217,16 +240,24 @@ describe('chatCompletion', () => {
       for that reason, and this pins it: a fetch rejection must not put the hostname in a
       message that reaches the browser.
     */
-    globalThis.fetch = (() => Promise.reject(new Error('connect ECONNREFUSED router.example'))) as unknown as typeof fetch
+    globalThis.fetch = (() =>
+      Promise.reject(
+        new Error('connect ECONNREFUSED router.example')
+      )) as unknown as typeof fetch
 
-    await expect(chatCompletion(ARGS)).rejects.toThrow('Could not reach the model endpoint.')
+    await expect(chatCompletion(ARGS)).rejects.toThrow(
+      'Could not reach the model endpoint.'
+    )
   })
 
   it('reports a timeout as a timeout, with the budget in seconds', async () => {
     const timeout = new Error('timed out')
     timeout.name = 'TimeoutError'
-    globalThis.fetch = (() => Promise.reject(timeout)) as unknown as typeof fetch
+    globalThis.fetch = (() =>
+      Promise.reject(timeout)) as unknown as typeof fetch
 
-    await expect(chatCompletion({ ...ARGS, timeoutMs: 60_000 })).rejects.toThrow(/within 60s/)
+    await expect(
+      chatCompletion({ ...ARGS, timeoutMs: 60_000 })
+    ).rejects.toThrow(/within 60s/)
   })
 })

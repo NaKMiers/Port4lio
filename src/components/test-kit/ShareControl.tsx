@@ -109,7 +109,10 @@ export default function ShareControl({
     const shareUrl = new URL(url, window.location.origin).toString()
     setAbsolute(shareUrl)
 
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    if (
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function'
+    )
       try {
         await navigator.share({ title, text, url: shareUrl })
         record()
@@ -123,7 +126,6 @@ export default function ShareControl({
           return
         }
       }
-    }
 
     try {
       await navigator.clipboard.writeText(shareUrl)
@@ -148,27 +150,30 @@ export default function ShareControl({
   return (
     <div className={className}>
       <button
-        type='button'
+        type="button"
         onClick={onClick}
         disabled={state === 'busy'}
-        aria-live='polite'
-        className='inline-flex items-center gap-2.5 rounded-full border border-pp-line px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text transition hover:-translate-y-0.5 disabled:opacity-60 motion-reduce:hover:translate-y-0'
+        aria-live="polite"
+        className="inline-flex items-center gap-2.5 rounded-full border border-pp-line px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text transition hover:-translate-y-0.5 disabled:opacity-60 motion-reduce:hover:translate-y-0"
       >
         {state === 'copied' ? copy.copied : copy.share}
       </button>
 
       {state === 'manual' ? (
-        <div className='mt-3'>
-          <label className='block text-xs text-pp-muted' htmlFor='share-url'>
+        <div className="mt-3">
+          <label
+            className="block text-xs text-pp-muted"
+            htmlFor="share-url"
+          >
             {copy.copyManually}
           </label>
           <input
             ref={inputRef}
-            id='share-url'
+            id="share-url"
             readOnly
             value={absolute}
             onFocus={event => event.currentTarget.select()}
-            className='mt-1 w-full rounded-lg border border-pp-line bg-transparent px-3 py-2 text-sm text-pp-text'
+            className="mt-1 w-full rounded-lg border border-pp-line bg-transparent px-3 py-2 text-sm text-pp-text"
           />
         </div>
       ) : null}

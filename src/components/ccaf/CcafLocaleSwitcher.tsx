@@ -39,8 +39,8 @@ const SHORT_LABELS: Record<Locale, string> = {
 export default function CcafLocaleSwitcher({ current }: { current: Locale }) {
   return (
     <div
-      className='inline-flex items-center gap-0.5 rounded-full border border-pp-line bg-white/70 p-0.5 shadow-[0_8px_18px_rgba(46,35,28,0.05)] backdrop-blur-md'
-      role='group'
+      className="inline-flex items-center gap-0.5 rounded-full border border-pp-line bg-white/70 p-0.5 shadow-[0_8px_18px_rgba(46,35,28,0.05)] backdrop-blur-md"
+      role="group"
       aria-label={t(UI.languageGroup, current)}
     >
       {LOCALES.map(locale => {
@@ -62,7 +62,7 @@ export default function CcafLocaleSwitcher({ current }: { current: Locale }) {
             )}
           >
             {SHORT_LABELS[locale]}
-            <span className='sr-only'> - {LOCALE_LABELS[locale]}</span>
+            <span className="sr-only"> - {LOCALE_LABELS[locale]}</span>
           </Link>
         )
       })}

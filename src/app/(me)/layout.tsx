@@ -23,7 +23,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildPortfolioMetadata(profile, viewModel)
 }
 
-export default async function SiteLayout({ children }: { children: React.ReactNode }) {
+export default async function SiteLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const profile = await loadPublicProfile()
 
   return (

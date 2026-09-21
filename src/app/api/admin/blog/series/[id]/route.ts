@@ -63,19 +63,20 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const denied = requireOwner(request)
   if (denied) return denied
 
-  const parsed = await readJsonBody<{ title?: unknown; blurb?: unknown; order?: unknown; slug?: unknown }>(
-    request,
-    { maxBytes: MAX_BODY_BYTES }
-  )
+  const parsed = await readJsonBody<{
+    title?: unknown
+    blurb?: unknown
+    order?: unknown
+    slug?: unknown
+  }>(request, { maxBytes: MAX_BODY_BYTES })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
   const body = parsed.body ?? {}
 
-  if ('slug' in body && body.slug !== undefined) {
+  if ('slug' in body && body.slug !== undefined)
     return jsonError(
       'A series slug cannot be changed - posts reference it. Create the new series, move the posts, then delete the old one.',
       400
     )
-  }
 
   try {
     await connectDatabase()
@@ -90,9 +91,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       series.title = title
     }
     if (typeof body.blurb === 'string') series.blurb = body.blurb.trim()
-    if (typeof body.order === 'number' && Number.isFinite(body.order)) {
+    if (typeof body.order === 'number' && Number.isFinite(body.order))
       series.order = Math.round(body.order)
-    }
 
     await series.save()
     revalidatePath('/blog')
@@ -107,9 +107,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       },
     })
   } catch (error) {
-    if (error instanceof Error && error.name === 'ValidationError') {
+    if (error instanceof Error && error.name === 'ValidationError')
       return jsonError(error.message, 400)
-    }
+
     return jsonError('Unable to save the series right now.', 500)
   }
 }
@@ -126,7 +126,7 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     if (!series) return jsonError('Series not found.', 404)
 
     const inUse = await postsUsingSeries(series.slug)
-    if (inUse.length > 0) {
+    if (inUse.length > 0)
       return NextResponse.json(
         {
           error: `"${series.title}" is still used by ${inUse.length} post${inUse.length === 1 ? '' : 's'}. Move them to another series first.`,
@@ -134,7 +134,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
         },
         { status: 409 }
       )
-    }
 
     await series.deleteOne()
     revalidatePath('/blog')

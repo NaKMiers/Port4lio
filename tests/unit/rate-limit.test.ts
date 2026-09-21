@@ -20,24 +20,35 @@ describe('clientIpFrom', () => {
   it('takes the leftmost entry of x-forwarded-for', () => {
     // Proxies append; the client is first. Taking the last entry would key every
     // request to the proxy itself, collapsing all visitors into one bucket.
-    expect(clientIpFrom(requestWith({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1, 10.0.0.2' }))).toBe(
-      '203.0.113.7'
-    )
+    expect(
+      clientIpFrom(
+        requestWith({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1, 10.0.0.2' })
+      )
+    ).toBe('203.0.113.7')
   })
 
   it('trims surrounding whitespace', () => {
-    expect(clientIpFrom(requestWith({ 'x-forwarded-for': '  203.0.113.7  , 10.0.0.1' }))).toBe(
-      '203.0.113.7'
-    )
+    expect(
+      clientIpFrom(
+        requestWith({ 'x-forwarded-for': '  203.0.113.7  , 10.0.0.1' })
+      )
+    ).toBe('203.0.113.7')
   })
 
   it('falls back to x-real-ip', () => {
-    expect(clientIpFrom(requestWith({ 'x-real-ip': '203.0.113.9' }))).toBe('203.0.113.9')
+    expect(clientIpFrom(requestWith({ 'x-real-ip': '203.0.113.9' }))).toBe(
+      '203.0.113.9'
+    )
   })
 
   it('prefers x-forwarded-for over x-real-ip', () => {
     expect(
-      clientIpFrom(requestWith({ 'x-forwarded-for': '203.0.113.7', 'x-real-ip': '203.0.113.9' }))
+      clientIpFrom(
+        requestWith({
+          'x-forwarded-for': '203.0.113.7',
+          'x-real-ip': '203.0.113.9',
+        })
+      )
     ).toBe('203.0.113.7')
   })
 
@@ -72,9 +83,9 @@ describe('checkRateLimit with no identifiable caller', () => {
 
   it('stays open across repeated calls, never accumulating a shared count', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    for (let i = 0; i < 25; i += 1) {
+    for (let i = 0; i < 25; i += 1)
       expect((await checkRateLimit(null, SUBMIT_LIMIT)).ok).toBe(true)
-    }
+
     vi.restoreAllMocks()
   })
 })

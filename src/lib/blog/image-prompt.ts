@@ -43,7 +43,7 @@ export const IMAGE_PROMPT_RULES = [
   'Describe a concrete scene or object, not an abstraction. "A single desk lamp lighting a stack of printed server logs" beats "the concept of observability".',
   'Name the medium and the palette: photograph, isometric 3D render, ink illustration, matte painting - then two or three colours.',
   'Name the composition and the lighting: what is in the foreground, what is behind it, where the light comes from.',
-  'No people\'s faces. A hand, a silhouette or a figure from behind is fine; a portrait dates the post and makes it about someone.',
+  "No people's faces. A hand, a silhouette or a figure from behind is fine; a portrait dates the post and makes it about someone.",
   'One paragraph, under 60 words. A prompt longer than that is a prompt where the model picks which half to follow.',
 ]
 
@@ -92,7 +92,7 @@ export function buildImagePromptRequest({
           clip(bodyMarkdown, BODY_CLIP_CHARS),
           '',
           '# The picture',
-          'The cover image. It is the share card on LinkedIn and DEV and the thumbnail in the post list, so it has to read at thumbnail size and carry the post\'s subject rather than its mood.',
+          "The cover image. It is the share card on LinkedIn and DEV and the thumbnail in the post list, so it has to read at thumbnail size and carry the post's subject rather than its mood.",
           COVER_FRAMING,
           '',
           'Return the JSON object now.',

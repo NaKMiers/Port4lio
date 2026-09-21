@@ -34,9 +34,12 @@ export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin
   const token = request.nextUrl.searchParams.get('token') ?? ''
 
-  const done = NextResponse.redirect(`${origin}/blog/subscribed?state=unsubscribed`, {
-    status: 303,
-  })
+  const done = NextResponse.redirect(
+    `${origin}/blog/subscribed?state=unsubscribed`,
+    {
+      status: 303,
+    }
+  )
 
   if (!token) return done
 
@@ -50,7 +53,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     // Logged, but the reader is still told they are unsubscribed, because retrying is not
     // something they can usefully do. The log is how this gets noticed and fixed by hand.
-    console.error('[api/blog/unsubscribe] FAILED - this person still receives the digest', error)
+    console.error(
+      '[api/blog/unsubscribe] FAILED - this person still receives the digest',
+      error
+    )
   }
 
   return done

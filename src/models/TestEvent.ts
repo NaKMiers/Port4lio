@@ -88,18 +88,25 @@ export function dayBucket(now: Date): string {
 }
 
 export const testEventId = {
-  share: (product: string, shareToken: string) => `${product}:share:${shareToken}`,
+  share: (product: string, shareToken: string) =>
+    `${product}:share:${shareToken}`,
   attribute: (product: string, shareToken: string, sessionId: string) =>
     `${product}:attribute:${shareToken}:${sessionId}`,
-  progress: (product: string, sessionId: string) => `${product}:progress:${sessionId}`,
-  funnel: (product: string, event: string, day: string) => `${product}:funnel:${event}:${day}`,
+  progress: (product: string, sessionId: string) =>
+    `${product}:progress:${sessionId}`,
+  funnel: (product: string, event: string, day: string) =>
+    `${product}:funnel:${event}:${day}`,
 }
 
 const testEventSchema = new Schema(
   {
     _id: { type: String, required: true },
     product: { type: String, required: true },
-    kind: { type: String, required: true, enum: ['share', 'attribute', 'progress', 'funnel'] },
+    kind: {
+      type: String,
+      required: true,
+      enum: ['share', 'attribute', 'progress', 'funnel'],
+    },
     event: { type: String, default: null },
     count: { type: Number, required: true, default: 0 },
     clientReported: { type: Boolean, required: true, default: false },
@@ -131,9 +138,11 @@ testEventSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
  * the index exists rather than trusting this alone.
  */
 testEventSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[TestEvent] TTL index build FAILED - retention is not being enforced', error)
-  }
+  if (error)
+    console.error(
+      '[TestEvent] TTL index build FAILED - retention is not being enforced',
+      error
+    )
 })
 
 export const TestEventModel: mongoose.Model<TestEventDocument> =

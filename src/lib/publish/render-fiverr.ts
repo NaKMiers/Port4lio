@@ -27,7 +27,8 @@ function description(profile: PublicProfile, ctx: RenderContext): string {
   const brief = sanitizeBriefServices(profile.briefServices)
   const offers = services.length > 0 ? services : brief
 
-  if (offers.length > 0) blocks.push(`I build: ${offers.slice(0, 6).join(', ')}.`)
+  if (offers.length > 0)
+    blocks.push(`I build: ${offers.slice(0, 6).join(', ')}.`)
 
   blocks.push(`Portfolio: ${siteUrl(ctx)}`)
 
@@ -43,7 +44,7 @@ function skills(profile: PublicProfile): string {
   const seen = new Set<string>()
   const names: string[] = []
 
-  for (const group of sanitizeSkillGroups(profile.skills)) {
+  for (const group of sanitizeSkillGroups(profile.skills))
     for (const item of group.items) {
       const name = collapseWhitespace(item.name)
       const key = name.toLowerCase()
@@ -51,17 +52,25 @@ function skills(profile: PublicProfile): string {
       seen.add(key)
       names.push(name)
     }
-  }
 
   return names.slice(0, SKILL_LIMIT).join(', ')
 }
 
 /** Fiverr publishes no seller API at all, so this is a copy-paste kit by necessity. */
-export function renderFiverr(profile: PublicProfile, ctx: RenderContext): ManualArtifact {
+export function renderFiverr(
+  profile: PublicProfile,
+  ctx: RenderContext
+): ManualArtifact {
   return {
     kind: 'fields',
     fields: [
-      manualField('tagline', 'Tagline', 120, tagline(profile), 'Seller profile → Description'),
+      manualField(
+        'tagline',
+        'Tagline',
+        120,
+        tagline(profile),
+        'Seller profile → Description'
+      ),
       manualBlockField(
         'description',
         'Description',
@@ -69,7 +78,13 @@ export function renderFiverr(profile: PublicProfile, ctx: RenderContext): Manual
         description(profile, ctx),
         'Seller profile → Description'
       ),
-      manualField('skills', 'Skills', 200, skills(profile), `Up to ${SKILL_LIMIT} skills.`),
+      manualField(
+        'skills',
+        'Skills',
+        200,
+        skills(profile),
+        `Up to ${SKILL_LIMIT} skills.`
+      ),
     ],
   }
 }

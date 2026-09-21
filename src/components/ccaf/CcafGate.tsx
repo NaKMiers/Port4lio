@@ -21,8 +21,8 @@ export default function CcafGate({ children }: { children?: ReactNode }) {
   return (
     <OwnerAuthGate onAuthed={() => router.refresh()}>
       {children ?? (
-        <div className='relative mx-auto max-w-editorial px-gutter py-10'>
-          <div className='rounded-panel border border-pp-line bg-pp-panel-strong p-6 text-sm font-medium text-pp-muted shadow-panel'>
+        <div className="relative mx-auto max-w-editorial px-gutter py-10">
+          <div className="rounded-panel border border-pp-line bg-pp-panel-strong p-6 text-sm font-medium text-pp-muted shadow-panel">
             Loading the plan...
           </div>
         </div>

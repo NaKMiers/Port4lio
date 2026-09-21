@@ -10,8 +10,14 @@ export default async function HomePage() {
 
   return (
     <>
-      <PortfolioStructuredData profile={profile} viewModel={viewModel} />
-      <PortfolioShell profile={profile} viewModel={viewModel} />
+      <PortfolioStructuredData
+        profile={profile}
+        viewModel={viewModel}
+      />
+      <PortfolioShell
+        profile={profile}
+        viewModel={viewModel}
+      />
     </>
   )
 }

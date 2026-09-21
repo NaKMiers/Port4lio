@@ -59,7 +59,8 @@ export const CAREERS_VI: Record<MbtiType, CareerContent> = {
       'Luật sư tranh tụng, đàm phán hợp đồng',
       'Sáng tạo nội dung, podcast, truyền thông',
     ],
-    thrivesIn: 'Vấn đề mới, đồng nghiệp chịu tranh luận, và quyền thử một thứ chưa ai làm.',
+    thrivesIn:
+      'Vấn đề mới, đồng nghiệp chịu tranh luận, và quyền thử một thứ chưa ai làm.',
     drainedBy:
       'Quy trình cứng không được đặt câu hỏi, công việc bảo trì kéo dài, và những cuộc họp mà kết luận đã được chốt từ trước.',
   },

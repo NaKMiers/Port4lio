@@ -11,7 +11,13 @@ type CopyState = 'idle' | 'copied' | 'failed'
  * Surfacing that is the point - silently showing "Copied" on a copy that did not happen
  * is exactly the sort of thing that makes you paste stale text into LinkedIn.
  */
-export default function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
+export default function CopyButton({
+  value,
+  label = 'Copy',
+}: {
+  value: string
+  label?: string
+}) {
   const [state, setState] = useState<CopyState>('idle')
 
   useEffect(() => {
@@ -31,13 +37,21 @@ export default function CopyButton({ value, label = 'Copy' }: { value: string; l
 
   return (
     <button
-      type='button'
+      type="button"
       className={secondaryBtnCls}
       onClick={() => void copy()}
       disabled={!value}
-      title={state === 'failed' ? 'Clipboard blocked - select the text and copy manually' : undefined}
+      title={
+        state === 'failed'
+          ? 'Clipboard blocked - select the text and copy manually'
+          : undefined
+      }
     >
-      {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy blocked' : label}
+      {state === 'copied'
+        ? 'Copied'
+        : state === 'failed'
+          ? 'Copy blocked'
+          : label}
     </button>
   )
 }

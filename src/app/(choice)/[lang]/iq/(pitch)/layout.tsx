@@ -35,7 +35,11 @@ export default async function IqPitchLayout({
   if (!isLocale(lang)) notFound()
 
   return (
-    <TestProductShell locale={lang} product='iq' footerSlot={<AvailabilityBlock locale={lang} />}>
+    <TestProductShell
+      locale={lang}
+      product="iq"
+      footerSlot={<AvailabilityBlock locale={lang} />}
+    >
       {children}
     </TestProductShell>
   )

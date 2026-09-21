@@ -113,7 +113,9 @@ export default function SelectField({
   // has started scrolling.
   useEffect(() => {
     if (!open) return
-    listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' })
+    listRef.current
+      ?.querySelector('[data-active="true"]')
+      ?.scrollIntoView({ block: 'nearest' })
   }, [open, active])
 
   useEffect(() => {
@@ -169,12 +171,21 @@ export default function SelectField({
         return
     }
 
-    if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
+    if (
+      event.key.length === 1 &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey
+    ) {
       const now = Date.now()
-      const text = (now - typed.current.at < 600 ? typed.current.text : '') + event.key.toLowerCase()
+      const text =
+        (now - typed.current.at < 600 ? typed.current.text : '') +
+        event.key.toLowerCase()
       typed.current = { text, at: now }
 
-      const found = options.findIndex(option => option.label.toLowerCase().startsWith(text))
+      const found = options.findIndex(option =>
+        option.label.toLowerCase().startsWith(text)
+      )
       if (found >= 0) {
         event.preventDefault()
         setActive(found)
@@ -183,23 +194,26 @@ export default function SelectField({
   }
 
   return (
-    <div ref={rootRef} className={`relative ${className ?? ''}`}>
+    <div
+      ref={rootRef}
+      className={`relative ${className ?? ''}`}
+    >
       <button
         ref={triggerRef}
         id={id}
-        type='button'
-        role='combobox'
+        type="button"
+        role="combobox"
         aria-controls={listId}
         aria-expanded={open}
-        aria-haspopup='listbox'
+        aria-haspopup="listbox"
         aria-label={ariaLabel}
         aria-activedescendant={open ? `${listId}-${active}` : undefined}
         disabled={disabled}
         onClick={() => (open ? setOpen(false) : openList())}
         onKeyDown={onKeyDown}
-        className='flex w-full items-center justify-between gap-2 rounded-[1.05rem] border border-pp-line bg-white/78 px-4 py-3 text-left text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition hover:bg-white focus-visible:border-pp-blue/55 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-pp-blue/10 disabled:cursor-not-allowed disabled:opacity-60'
+        className="bg-white/78 flex w-full items-center justify-between gap-2 rounded-[1.05rem] border border-pp-line px-4 py-3 text-left text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition hover:bg-white focus-visible:border-pp-blue/55 focus-visible:bg-white focus-visible:ring-4 focus-visible:ring-pp-blue/10 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <span className='truncate'>{selected?.label ?? ''}</span>
+        <span className="truncate">{selected?.label ?? ''}</span>
         <ChevronDown
           aria-hidden
           size={15}
@@ -211,9 +225,9 @@ export default function SelectField({
         <div
           ref={listRef}
           id={listId}
-          role='listbox'
+          role="listbox"
           aria-label={ariaLabel}
-          className='absolute left-0 right-0 z-30 mt-2 max-h-64 overflow-y-auto rounded-[1.05rem] border border-pp-line bg-[rgba(255,253,250,0.98)] p-1.5 shadow-[0_24px_48px_rgba(46,35,28,0.18)] backdrop-blur-xl'
+          className="absolute left-0 right-0 z-30 mt-2 max-h-64 overflow-y-auto rounded-[1.05rem] border border-pp-line bg-[rgba(255,253,250,0.98)] p-1.5 shadow-[0_24px_48px_rgba(46,35,28,0.18)] backdrop-blur-xl"
         >
           {options.map((option, index) => {
             const isSelected = option.value === value
@@ -223,7 +237,7 @@ export default function SelectField({
               <div
                 key={option.value}
                 id={`${listId}-${index}`}
-                role='option'
+                role="option"
                 aria-selected={isSelected}
                 data-active={isActive}
                 // The pointer moves the highlight so the hovered row and the keyboard row are
@@ -234,8 +248,14 @@ export default function SelectField({
                   isActive ? 'bg-pp-blue/10 text-pp-text' : 'text-pp-muted'
                 }`}
               >
-                <span className='truncate'>{option.label}</span>
-                {isSelected ? <Check aria-hidden size={14} className='shrink-0 text-pp-blue' /> : null}
+                <span className="truncate">{option.label}</span>
+                {isSelected ? (
+                  <Check
+                    aria-hidden
+                    size={14}
+                    className="shrink-0 text-pp-blue"
+                  />
+                ) : null}
               </div>
             )
           })}

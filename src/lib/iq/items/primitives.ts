@@ -288,7 +288,7 @@ export function dotGridSvg(size: number, filled: readonly number[]): string {
   const r = Math.min(gap * 0.3, 7)
   const set = new Set(filled)
   const dots: string[] = []
-  for (let row = 0; row < size; row += 1) {
+  for (let row = 0; row < size; row += 1)
     for (let col = 0; col < size; col += 1) {
       const index = row * size + col
       const cx = gap * (col + 1)
@@ -297,7 +297,7 @@ export function dotGridSvg(size: number, filled: readonly number[]): string {
         `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${set.has(index) ? INK : 'none'}" stroke="${INK}" stroke-width="1.5"/>`
       )
     }
-  }
+
   return dots.join('')
 }
 

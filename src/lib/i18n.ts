@@ -24,7 +24,9 @@ export type Locale = (typeof LOCALES)[number]
 export const DEFAULT_LOCALE: Locale = 'vi'
 
 export function isLocale(value: string | undefined): value is Locale {
-  return typeof value === 'string' && (LOCALES as readonly string[]).includes(value)
+  return (
+    typeof value === 'string' && (LOCALES as readonly string[]).includes(value)
+  )
 }
 
 /** Human-readable name for the language switcher, written in the language itself. */
@@ -58,7 +60,8 @@ export function swapLocale(pathname: string, target: Locale): string {
   // `/mbti`, which would have sent an IQ visitor to the MBTI landing page on a language
   // switch. The happy path above never needed changing - it is a segment swap and has
   // always been product-agnostic - so only this fallback carried the assumption.
-  const product = PRODUCTS.find(candidate => segments[1] === candidate) ?? DEFAULT_PRODUCT
+  const product =
+    PRODUCTS.find(candidate => segments[1] === candidate) ?? DEFAULT_PRODUCT
   return `/${target}/${product}`
 }
 
@@ -75,7 +78,9 @@ const DEFAULT_PRODUCT = PRODUCTS[0]
  * (`en-US,en;q=0.9,vi;q=0.8`), and ignoring them picks the wrong language for anyone whose
  * second choice is listed first alphabetically.
  */
-export function negotiateLocale(acceptLanguage: string | null | undefined): Locale {
+export function negotiateLocale(
+  acceptLanguage: string | null | undefined
+): Locale {
   if (!acceptLanguage) return DEFAULT_LOCALE
 
   const ranked = acceptLanguage
@@ -93,9 +98,7 @@ export function negotiateLocale(acceptLanguage: string | null | undefined): Loca
     .filter(entry => entry.q > 0)
     .sort((a, b) => b.q - a.q)
 
-  for (const entry of ranked) {
-    if (isLocale(entry.base)) return entry.base
-  }
+  for (const entry of ranked) if (isLocale(entry.base)) return entry.base
 
   return DEFAULT_LOCALE
 }

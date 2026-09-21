@@ -12,11 +12,17 @@ import ResumeSummarySection from '@/components/settings/ResumeSummarySection'
 import { resumeOf, updateResume } from '@/components/settings/resume-utils'
 import { useCvPageBreakFit } from '@/components/settings/useCvPageBreakFit'
 import { helpTextCls } from '@/components/settings/settings-utils'
-import type { CvSectionProps, UploadingState } from '@/components/settings/types'
+import type {
+  CvSectionProps,
+  UploadingState,
+} from '@/components/settings/types'
 import { moveItem, normalizeResumeSectionOrder } from '@/lib/resume-sections'
 import type { Profile, ResumeSectionKey } from '@/types/profile'
 
-const SECTION_COMPONENTS: Record<ResumeSectionKey, React.ComponentType<CvSectionProps>> = {
+const SECTION_COMPONENTS: Record<
+  ResumeSectionKey,
+  React.ComponentType<CvSectionProps>
+> = {
   summary: ResumeSummarySection,
   education: ResumeEducationSection,
   skills: ResumeSkillsSection,
@@ -61,13 +67,17 @@ export default function CvTabSections({
   const moveSection = (from: number, to: number) => {
     updateResume(setProfile, r => ({
       ...r,
-      sectionOrder: moveItem(normalizeResumeSectionOrder(r.sectionOrder), from, to),
+      sectionOrder: moveItem(
+        normalizeResumeSectionOrder(r.sectionOrder),
+        from,
+        to
+      ),
     }))
     requestFit()
   }
 
   return (
-    <div className='space-y-5'>
+    <div className="space-y-5">
       <ResumeMastheadSection
         profile={profile}
         setProfile={setProfile}
@@ -78,12 +88,18 @@ export default function CvTabSections({
 
       <p className={`${helpTextCls} px-1`}>
         Drag a card by its grip to change the order these blocks print in on{' '}
-        <strong>/cv</strong> - the preview follows immediately. Arrow keys work too once the grip
-        has focus. The masthead above is the page header and always prints first. Every reorder
-        re-measures the sheets and moves the page break to wherever sheet 1 now ends.
+        <strong>/cv</strong> - the preview follows immediately. Arrow keys work
+        too once the grip has focus. The masthead above is the page header and
+        always prints first. Every reorder re-measures the sheets and moves the
+        page break to wherever sheet 1 now ends.
       </p>
 
-      <DragList ids={order} onReorder={moveSection} itemLabel='CV section' className='space-y-5'>
+      <DragList
+        ids={order}
+        onReorder={moveSection}
+        itemLabel="CV section"
+        className="space-y-5"
+      >
         {(index, handle) => {
           const SectionComponent = SECTION_COMPONENTS[order[index]]
           return (

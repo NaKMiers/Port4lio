@@ -99,8 +99,13 @@ export async function listSeriesWithCounts(): Promise<SeriesRecord[]> {
 }
 
 /** Titles of the posts still pointing at a slug, for the delete guard's error message. */
-export async function postsUsingSeries(slug: string): Promise<{ id: string; title: string }[]> {
-  const rows = await PostModel.find({ series: slug }).select('title').limit(20).lean()
+export async function postsUsingSeries(
+  slug: string
+): Promise<{ id: string; title: string }[]> {
+  const rows = await PostModel.find({ series: slug })
+    .select('title')
+    .limit(20)
+    .lean()
   return rows.map(row => ({ id: String(row._id), title: row.title }))
 }
 

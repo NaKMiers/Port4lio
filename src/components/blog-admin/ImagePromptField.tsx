@@ -75,32 +75,49 @@ export default function ImagePromptField({
 
   return (
     <div>
-      <div className='mb-1.5 flex items-center justify-between gap-2'>
-        <label className={`${labelCls} mb-0`} htmlFor={id}>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <label
+          className={`${labelCls} mb-0`}
+          htmlFor={id}
+        >
           {label}
         </label>
-        <span className='flex items-center gap-1'>
+        <span className="flex items-center gap-1">
           <button
-            type='button'
+            type="button"
             onClick={() => void copy()}
             // Nothing to put on the clipboard, and a button that silently copies an empty
             // string is a button that reports success for nothing.
             disabled={!prompt}
             aria-label={`Copy ${label.toLowerCase()}`}
-            title='Copy'
+            title="Copy"
             className={iconBtnCls}
           >
-            {copied ? <Check aria-hidden size={14} /> : <Copy aria-hidden size={14} />}
+            {copied ? (
+              <Check
+                aria-hidden
+                size={14}
+              />
+            ) : (
+              <Copy
+                aria-hidden
+                size={14}
+              />
+            )}
           </button>
           <button
-            type='button'
+            type="button"
             onClick={onRegenerate}
             disabled={busy}
             aria-label={`Write a new ${label.toLowerCase()}`}
-            title='Write a new prompt'
+            title="Write a new prompt"
             className={iconBtnCls}
           >
-            <RefreshCw aria-hidden size={14} className={busy ? 'animate-spin' : ''} />
+            <RefreshCw
+              aria-hidden
+              size={14}
+              className={busy ? 'animate-spin' : ''}
+            />
           </button>
         </span>
       </div>
@@ -111,17 +128,21 @@ export default function ImagePromptField({
         value={prompt}
         disabled={busy}
         onChange={event => onChange(event.target.value)}
-        placeholder='No prompt yet. Press the rewrite button to have one written from the post.'
-        className='block w-full resize-y rounded-[1.05rem] border border-pp-line bg-white/78 px-4 py-2.5 font-mono text-[12px] leading-relaxed text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition placeholder:font-sans placeholder:text-pp-muted/75 focus:border-pp-blue/55 focus:bg-white focus:ring-4 focus:ring-pp-blue/10 disabled:opacity-60'
+        placeholder="No prompt yet. Press the rewrite button to have one written from the post."
+        className="bg-white/78 block w-full resize-y rounded-[1.05rem] border border-pp-line px-4 py-2.5 font-mono text-[12px] leading-relaxed text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition placeholder:font-sans placeholder:text-pp-muted/75 focus:border-pp-blue/55 focus:bg-white focus:ring-4 focus:ring-pp-blue/10 disabled:opacity-60"
       />
 
       {busy ? (
-        <p className='mt-1 flex items-center gap-1.5 text-xs text-pp-muted'>
-          <Loader2 aria-hidden size={12} className='animate-spin' />
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-pp-muted">
+          <Loader2
+            aria-hidden
+            size={12}
+            className="animate-spin"
+          />
           Writing a prompt from the post...
         </p>
       ) : help ? (
-        <p className='mt-1 text-xs leading-relaxed text-pp-muted'>{help}</p>
+        <p className="mt-1 text-xs leading-relaxed text-pp-muted">{help}</p>
       ) : null}
     </div>
   )

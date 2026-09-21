@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState } from 'react'
 
-import { hasActiveUploads, primaryBtnCls } from '@/components/settings/settings-utils'
+import {
+  hasActiveUploads,
+  primaryBtnCls,
+} from '@/components/settings/settings-utils'
 import type { UploadingState } from '@/components/settings/types'
 
 /**
@@ -53,9 +56,9 @@ export default function FloatingSaveButton({
 
   return (
     // Under the icon picker (z-60) and every other overlay, above the editor itself.
-    <div className='fixed bottom-6 right-6 z-[55] print:hidden'>
+    <div className="fixed bottom-6 right-6 z-[55] print:hidden">
       <button
-        type='button'
+        type="button"
         onClick={onSave}
         disabled={saving || hasUploads}
         title={hasUploads ? 'Waiting for uploads to finish' : 'Save profile'}

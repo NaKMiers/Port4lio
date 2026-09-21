@@ -1,4 +1,9 @@
-import { ALL_SHAPE_KINDS, POLYGON_SIDES, type Shading, type ShapeKind } from '@/lib/iq/items/primitives'
+import {
+  ALL_SHAPE_KINDS,
+  POLYGON_SIDES,
+  type Shading,
+  type ShapeKind,
+} from '@/lib/iq/items/primitives'
 import type { RungProfile } from '@/lib/iq/items/v2/ladder'
 import type { LayoutSpec } from '@/lib/iq/items/v2/layout'
 import {
@@ -41,7 +46,8 @@ import {
  * check the answer - so none of the three can drift from the others.
  */
 
-export type DimId = 'shading' | 'kind' | 'sides' | 'rotation' | 'size' | 'anchor' | 'count'
+export type DimId =
+  'shading' | 'kind' | 'sides' | 'rotation' | 'size' | 'anchor' | 'count'
 
 /** Which slot a track drives. */
 export type Target = Extract<Slot, 'frame' | 'inner' | 'mark' | 'tally'>
@@ -74,7 +80,13 @@ const SHADINGS: readonly Shading[] = ['outline', 'half', 'filled']
  * does have a next element, which is why this is the only shape dimension allowed in a
  * sequence.
  */
-const SIDE_LADDER: readonly ShapeKind[] = ['triangle', 'square', 'pentagon', 'hexagon', 'heptagon']
+const SIDE_LADDER: readonly ShapeKind[] = [
+  'triangle',
+  'square',
+  'pentagon',
+  'hexagon',
+  'heptagon',
+]
 
 /** Cyclic shape set, for matrix layouts where two axes pin the reading. */
 const KIND_RING: readonly ShapeKind[] = ALL_SHAPE_KINDS
@@ -90,10 +102,19 @@ const DIM_SIZES: Record<DimId, number> = {
 }
 
 /** Dimensions whose values wrap. A cyclic dimension alone cannot determine a sequence. */
-export const CYCLIC: ReadonlySet<DimId> = new Set<DimId>(['shading', 'kind', 'anchor'])
+export const CYCLIC: ReadonlySet<DimId> = new Set<DimId>([
+  'shading',
+  'kind',
+  'anchor',
+])
 
 /** Dimensions with a signed direction a solver can extend. */
-export const ORDINAL: ReadonlySet<DimId> = new Set<DimId>(['sides', 'rotation', 'size', 'count'])
+export const ORDINAL: ReadonlySet<DimId> = new Set<DimId>([
+  'sides',
+  'rotation',
+  'size',
+  'count',
+])
 
 /**
  * The raw value a track takes at a grid position.
@@ -124,26 +145,41 @@ function clamp(value: number, size: number): number {
  * already exist - a track drives an element, it does not create one, so composition depth is
  * decided once by the rule rather than emerging from whichever tracks happen to be active.
  */
-export function applyTrack(cell: Cell, track: Track, row: number, col: number): Cell {
+export function applyTrack(
+  cell: Cell,
+  track: Track,
+  row: number,
+  col: number
+): Cell {
   const raw = valueAt(track, row, col)
   const next: Cell = { ...cell }
 
   if (track.dim === 'count') {
     const tally = next.tally
     if (!tally) return next
-    next.tally = { ...tally, count: clamp(tally.count - 1 + raw, MAX_TALLY) + 1 }
+    next.tally = {
+      ...tally,
+      count: clamp(tally.count - 1 + raw, MAX_TALLY) + 1,
+    }
     return next
   }
 
   if (track.dim === 'anchor') {
     const element = next[track.target]
-    if (!element || (element.class !== 'inner' && element.class !== 'mark')) return next
+    if (!element || (element.class !== 'inner' && element.class !== 'mark'))
+      return next
     if (element.class === 'mark') {
       const from = Math.max(0, CORNERS.indexOf(element.anchor as CornerAnchor))
-      next.mark = { ...element, anchor: CORNERS[wrap(from + raw, CORNERS.length)] as CornerAnchor }
+      next.mark = {
+        ...element,
+        anchor: CORNERS[wrap(from + raw, CORNERS.length)] as CornerAnchor,
+      }
     } else {
       const from = Math.max(0, PERIMETER.indexOf(element.anchor))
-      next.inner = { ...element, anchor: PERIMETER[wrap(from + raw, PERIMETER.length)] as Anchor }
+      next.inner = {
+        ...element,
+        anchor: PERIMETER[wrap(from + raw, PERIMETER.length)] as Anchor,
+      }
     }
     return next
   }
@@ -190,7 +226,11 @@ export function applyTrack(cell: Cell, track: Track, row: number, col: number): 
  * RELATIONSHIP between cells - which is the thing a solver has to find - so nothing about the
  * puzzle gets easier.
  */
-function shapePatch(dim: DimId, raw: number, from: ShapeBody): Partial<ShapeBody> {
+function shapePatch(
+  dim: DimId,
+  raw: number,
+  from: ShapeBody
+): Partial<ShapeBody> {
   switch (dim) {
     case 'shading': {
       const at = Math.max(0, SHADINGS.indexOf(from.shading))
@@ -204,7 +244,9 @@ function shapePatch(dim: DimId, raw: number, from: ShapeBody): Partial<ShapeBody
       // The base is normalised into the side ladder by `buildTracked` before this runs, so
       // `indexOf` is a real position rather than a fallback to zero.
       const at = Math.max(0, SIDE_LADDER.indexOf(from.kind))
-      return { kind: SIDE_LADDER[clamp(at + raw, SIDE_LADDER.length)] as ShapeKind }
+      return {
+        kind: SIDE_LADDER[clamp(at + raw, SIDE_LADDER.length)] as ShapeKind,
+      }
     }
     case 'rotation':
       // Multiples of 15 degrees. Below that, two steps are inside the perceptual floor and
@@ -246,7 +288,10 @@ export function enumerate(
   stepStyle: RungProfile['stepStyle']
 ): Track[] {
   const size = DIM_SIZES[dim]
-  const span = layout.id === '1x3-sequence' ? layout.cols - 1 : Math.max(layout.cols, layout.rows) - 1
+  const span =
+    layout.id === '1x3-sequence'
+      ? layout.cols - 1
+      : Math.max(layout.cols, layout.rows) - 1
   const axes: Track['axis'][] = layout.rows > 1 ? ['col', 'row'] : ['col']
   const out: Track[] = []
 
@@ -337,9 +382,7 @@ export function trackIsWitnessed(
   cells: readonly (Cell | null)[]
 ): boolean {
   const seen = new Set<string>()
-  for (const cell of cells) {
-    if (cell) seen.add(drivenValue(cell, track))
-  }
+  for (const cell of cells) if (cell) seen.add(drivenValue(cell, track))
 
   /**
    * Three samples for a cyclic dimension, but only where the layout HAS three.

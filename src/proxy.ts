@@ -51,4 +51,3 @@ export const config = {
    */
   matcher: ['/mbti', '/mbti/:path*', '/iq', '/iq/:path*'],
 }
-

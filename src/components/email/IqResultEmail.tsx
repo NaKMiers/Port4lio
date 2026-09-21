@@ -11,7 +11,11 @@ import {
   Text,
 } from '@react-email/components'
 
-import { EMAIL_CARD_WIDTH, EMAIL_COLOR, EMAIL_FONT } from '@/components/email/theme'
+import {
+  EMAIL_CARD_WIDTH,
+  EMAIL_COLOR,
+  EMAIL_FONT,
+} from '@/components/email/theme'
 import type { Locale } from '@/lib/i18n'
 import { ATTEMPT_TTL_DAYS } from '@/models/Attempt'
 
@@ -79,9 +83,21 @@ const COPY = {
  * A padded anchor inside a table cell rather than react-email's `<Button>`: Outlook ignores
  * padding on an `<a>`, and a table-cell button is the standard workaround.
  */
-function PillLink({ href, label, filled }: { href: string; label: string; filled: boolean }) {
+function PillLink({
+  href,
+  label,
+  filled,
+}: {
+  href: string
+  label: string
+  filled: boolean
+}) {
   return (
-    <table cellPadding={0} cellSpacing={0} role='presentation'>
+    <table
+      cellPadding={0}
+      cellSpacing={0}
+      role="presentation"
+    >
       <tbody>
         <tr>
           <td
@@ -164,7 +180,7 @@ export default function IqResultEmail({
           </Text>
 
           <Heading
-            as='h1'
+            as="h1"
             style={{
               fontFamily: EMAIL_FONT.display,
               fontSize: '64px',
@@ -191,18 +207,34 @@ export default function IqResultEmail({
           </Text>
 
           <Text
-            style={{ fontSize: '16px', lineHeight: 1.6, color: EMAIL_COLOR.muted, margin: '14px 0 0' }}
+            style={{
+              fontSize: '16px',
+              lineHeight: 1.6,
+              color: EMAIL_COLOR.muted,
+              margin: '14px 0 0',
+            }}
           >
             {copy.percentile.replace('{percentile}', String(percentile))}
           </Text>
           <Text
-            style={{ fontSize: '14px', lineHeight: 1.6, color: EMAIL_COLOR.muted, margin: '4px 0 0' }}
+            style={{
+              fontSize: '14px',
+              lineHeight: 1.6,
+              color: EMAIL_COLOR.muted,
+              margin: '4px 0 0',
+            }}
           >
-            {copy.raw.replace('{raw}', String(raw)).replace('{total}', String(total))}
+            {copy.raw
+              .replace('{raw}', String(raw))
+              .replace('{total}', String(total))}
           </Text>
 
           <Section style={{ margin: '28px 0 0' }}>
-            <PillLink href={resultUrl} label={copy.cta} filled />
+            <PillLink
+              href={resultUrl}
+              label={copy.cta}
+              filled
+            />
           </Section>
 
           <Hr style={{ borderColor: EMAIL_COLOR.line, margin: '28px 0' }} />
@@ -221,21 +253,44 @@ export default function IqResultEmail({
             {copy.certificateHeading}
           </Text>
           <Text
-            style={{ fontSize: '15px', lineHeight: 1.7, color: EMAIL_COLOR.muted, margin: '0 0 18px' }}
+            style={{
+              fontSize: '15px',
+              lineHeight: 1.7,
+              color: EMAIL_COLOR.muted,
+              margin: '0 0 18px',
+            }}
           >
             {copy.certificateBody.replace('{name}', certificateName)}
           </Text>
-          <PillLink href={certificateUrl} label={copy.certificateCta} filled={false} />
+          <PillLink
+            href={certificateUrl}
+            label={copy.certificateCta}
+            filled={false}
+          />
 
           <Text
-            style={{ fontSize: '13px', lineHeight: 1.6, color: EMAIL_COLOR.muted, margin: '24px 0 0' }}
+            style={{
+              fontSize: '13px',
+              lineHeight: 1.6,
+              color: EMAIL_COLOR.muted,
+              margin: '24px 0 0',
+            }}
           >
             {copy.keepLink.replace('{days}', String(ATTEMPT_TTL_DAYS))}
           </Text>
 
-          <Hr style={{ borderColor: EMAIL_COLOR.line, margin: '28px 0 16px' }} />
+          <Hr
+            style={{ borderColor: EMAIL_COLOR.line, margin: '28px 0 16px' }}
+          />
 
-          <Text style={{ fontSize: '12px', lineHeight: 1.6, color: EMAIL_COLOR.muted, margin: 0 }}>
+          <Text
+            style={{
+              fontSize: '12px',
+              lineHeight: 1.6,
+              color: EMAIL_COLOR.muted,
+              margin: 0,
+            }}
+          >
             {copy.footer}
           </Text>
         </Container>

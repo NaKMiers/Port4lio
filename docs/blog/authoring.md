@@ -10,12 +10,12 @@ target means five flagship attempts, which is exactly how this stalls.
 
 ## The two tiers
 
-| | `article` | `note` |
-|---|---|---|
-| Length | 800-2000 words | 150-500 words |
-| Needs | cover image, excerpt, series | nothing but a title and a body |
-| Template | the full one below | one observation, one code block, done |
-| Target | 2 in 6 weeks | 8 in 6 weeks |
+|          | `article`                    | `note`                                |
+| -------- | ---------------------------- | ------------------------------------- |
+| Length   | 800-2000 words               | 150-500 words                         |
+| Needs    | cover image, excerpt, series | nothing but a title and a body        |
+| Template | the full one below           | one observation, one code block, done |
+| Target   | 2 in 6 weeks                 | 8 in 6 weeks                          |
 
 The `note` tier is not a lesser article. It is the tier that keeps the blog alive between
 articles, and a blog with only the expensive format is the one that goes quiet - of 27 blogs
@@ -34,7 +34,7 @@ the database enforces it with a partial unique index, so a second one fails at s
 Things you tested against a real build where the result contradicted the documentation. This
 is the cluster with the strongest claim, because almost nobody publishes measurements.
 
-**Pillar:** *"Five things Next.js 16 did that its docs didn't say."*
+**Pillar:** _"Five things Next.js 16 did that its docs didn't say."_
 
 Already in this repo's comments, ready to be written:
 
@@ -60,13 +60,13 @@ Already in this repo's comments, ready to be written:
 
 MBTI, IQ, the share loop, the traffic, and the zero.
 
-**Pillar:** *"Two viral tests, 0 job offers: what I actually learned."*
+**Pillar:** _"Two viral tests, 0 job offers: what I actually learned."_
 
 ### 3. `dev-career-vn`
 
 Personal story and advice, through exactly one lens: a Vietnamese developer getting work.
 
-**Pillar:** *"How I actually get hired (and why the portfolio didn't help)."*
+**Pillar:** _"How I actually get hired (and why the portfolio didn't help)."_
 
 **Cut deliberately:** "interesting IT things" is the `note` tier, not a cluster. General life
 advice is cut - scattered life advice converts nobody.
@@ -109,8 +109,8 @@ Vietnamese. Three roles, and only three:
 1. **Translator** - write the draft in Vietnamese, have the model translate it.
 2. **Editor** - have it tighten the English. Then read every sentence and put your own words
    back where it flattened them.
-3. **Interrogator** - give it your draft and ask: *what number is missing? what alternative
-   did I not name? where am I asserting instead of showing?*
+3. **Interrogator** - give it your draft and ask: _what number is missing? what alternative
+   did I not name? where am I asserting instead of showing?_
 
 **Never author.** The blog's entire job is to make a reader believe you think well, and in
 2026 AI-generated prose is a negative credibility signal to exactly the senior-engineer
@@ -122,11 +122,11 @@ audience that matters. A post that reads as generated fails at its only task.
 
 The canonical URL is always `anhkhoa.info/blog/<slug>`.
 
-| Channel | Language | Notes |
-|---|---|---|
-| DEV.to | English | `canonical_url` in the front matter, pointing here |
-| Viblo | Vietnamese | a **native post**, not a translation - see below |
-| LinkedIn | English | excerpt + link, never the full text |
+| Channel  | Language   | Notes                                              |
+| -------- | ---------- | -------------------------------------------------- |
+| DEV.to   | English    | `canonical_url` in the front matter, pointing here |
+| Viblo    | Vietnamese | a **native post**, not a translation - see below   |
+| LinkedIn | English    | excerpt + link, never the full text                |
 
 **Viblo is the native home of the Vietnamese version (D7).** Write it as a Vietnamese post
 for a Vietnamese audience, ending with the availability line in Vietnamese and a link to the

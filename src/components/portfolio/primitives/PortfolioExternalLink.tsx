@@ -1,6 +1,7 @@
 import type { AnchorHTMLAttributes, ReactNode } from 'react'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 function isExternalHttpUrl(href: string): boolean {
   return /^https?:\/\//i.test(href.trim())
@@ -12,7 +13,10 @@ export type PortfolioExternalLinkProps = {
   className?: string
   /** Announced when opening in a new tab */
   newTabHint?: boolean
-} & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href' | 'className' | 'children'>
+} & Omit<
+  AnchorHTMLAttributes<HTMLAnchorElement>,
+  'href' | 'className' | 'children'
+>
 
 /**
  * External https links open in a new tab with noreferrer; same-origin / relative stay in-page.
@@ -33,7 +37,9 @@ export function PortfolioExternalLink({
       {...rest}
     >
       {children}
-      {external && newTabHint ? <span className='sr-only'> (opens in a new tab)</span> : null}
+      {external && newTabHint ? (
+        <span className="sr-only"> (opens in a new tab)</span>
+      ) : null}
     </a>
   )
 }

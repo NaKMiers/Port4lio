@@ -2,7 +2,14 @@
 
 import { Profile } from '@/types/profile'
 import { normalizeProfile } from '@/lib/profile'
-import { createContext, ReactNode, useContext, useEffect, useEffectEvent, useState } from 'react'
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useState,
+} from 'react'
 
 interface AppContextProps {
   profile: Profile | null
@@ -29,7 +36,9 @@ function AppProvider({
    */
   endpoint?: string
 }) {
-  const [profile, setProfileState] = useState<Profile | null>(initialProfile ?? null)
+  const [profile, setProfileState] = useState<Profile | null>(
+    initialProfile ?? null
+  )
   const [loading, setLoading] = useState(!initialProfile && !!bootstrapOnMount)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,9 +50,8 @@ function AppProvider({
     const shouldBlock = options?.blocking ?? !profile
 
     try {
-      if (shouldBlock) {
-        setLoading(true)
-      }
+      if (shouldBlock) setLoading(true)
+
       setError(null)
       const response = await fetch(endpoint)
       const data = await response.json()
@@ -53,19 +61,15 @@ function AppProvider({
         setProfileState(null)
         return
       }
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(data?.error || 'Failed to fetch profile')
-      }
+
       setProfileState(data?.profile ? normalizeProfile(data.profile) : null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch profile')
-      if (shouldBlock) {
-        setProfileState(null)
-      }
+      if (shouldBlock) setProfileState(null)
     } finally {
-      if (shouldBlock) {
-        setLoading(false)
-      }
+      if (shouldBlock) setLoading(false)
     }
   }
 
@@ -74,9 +78,7 @@ function AppProvider({
   })
 
   useEffect(() => {
-    if (!bootstrapOnMount || initialProfile) {
-      return
-    }
+    if (!bootstrapOnMount || initialProfile) return
 
     const timer = window.setTimeout(() => {
       runBootstrapFetch()
@@ -86,7 +88,9 @@ function AppProvider({
   }, [bootstrapOnMount, initialProfile])
 
   return (
-    <AppContext.Provider value={{ profile, setProfile, loading, error, refetchProfile }}>
+    <AppContext.Provider
+      value={{ profile, setProfile, loading, error, refetchProfile }}
+    >
       {children}
     </AppContext.Provider>
   )
@@ -96,8 +100,8 @@ export default AppProvider
 
 export const useApp = () => {
   const context = useContext(AppContext)
-  if (!context) {
+  if (!context)
     throw new Error('useAppContext must be used within an AppProvider')
-  }
+
   return context
 }

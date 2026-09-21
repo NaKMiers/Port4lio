@@ -90,7 +90,10 @@ export function blogEntityId(origin: string): string {
 }
 
 /** Absolute URL for a stored image path. Cloudinary URLs are already absolute; a root-relative one is not. */
-function absoluteImage(origin: string, value: string | null | undefined): string | undefined {
+function absoluteImage(
+  origin: string,
+  value: string | null | undefined
+): string | undefined {
   const raw = collapseWhitespace(value ?? '')
   if (!raw || /\s/.test(raw)) return undefined
   if (/^https:\/\//i.test(raw)) return raw
@@ -148,9 +151,13 @@ function twitterHandle(profile: PublicProfile): string | undefined {
 
     const handle = url.pathname.split('/').filter(Boolean)[0]
     // `/i/...`, `/home`, `/intent/tweet` - paths on the same host that are not profiles.
-    if (!handle || !/^[A-Za-z0-9_]{1,15}$/.test(handle) || handle === 'i' || handle === 'home') {
+    if (
+      !handle ||
+      !/^[A-Za-z0-9_]{1,15}$/.test(handle) ||
+      handle === 'i' ||
+      handle === 'home'
+    )
       continue
-    }
 
     return `@${handle}`
   }
@@ -161,12 +168,17 @@ function twitterHandle(profile: PublicProfile): string | undefined {
 /** `Title | Brand`, or just `Title` when the pair would be truncated. See {@link TITLE_BUDGET}. */
 function titleWithBrand(title: string, brand: string): string {
   const suffix = ` | ${brand}`
-  return title.length + suffix.length <= TITLE_BUDGET ? `${title}${suffix}` : title
+  return title.length + suffix.length <= TITLE_BUDGET
+    ? `${title}${suffix}`
+    : title
 }
 
 // MARK: Metadata
 
-export function buildBlogIndexMetadata(origin: string, posts: PostListItem[] = []): Metadata {
+export function buildBlogIndexMetadata(
+  origin: string,
+  posts: PostListItem[] = []
+): Metadata {
   const url = blogIndexUrl(origin)
   const title = 'Writing - notes from shipping Next.js side projects'
   const description =
@@ -210,9 +222,9 @@ export function buildBlogIndexMetadata(origin: string, posts: PostListItem[] = [
  */
 function topTags(posts: PostListItem[]): string[] {
   const counts = new Map<string, number>()
-  for (const post of posts) {
-    for (const tag of post.tags ?? []) counts.set(tag, (counts.get(tag) ?? 0) + 1)
-  }
+  for (const post of posts)
+    for (const tag of post.tags ?? [])
+      counts.set(tag, (counts.get(tag) ?? 0) + 1)
 
   return Array.from(counts.entries())
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
@@ -240,7 +252,8 @@ export function buildPostMetadata(
     labelled "The probe build output". The post title is the honest description of a card that
     is about the post rather than about a picture.
   */
-  const shareImageAlt = cover && post.coverCaption ? post.coverCaption : post.title
+  const shareImageAlt =
+    cover && post.coverCaption ? post.coverCaption : post.title
 
   return {
     title: titleWithBrand(headline, name),
@@ -366,7 +379,9 @@ function blogNode(
             '@id': `${postUrl(origin, post.slug)}#post`,
             headline: excerptText(post.title, 110),
             url: postUrl(origin, post.slug),
-            ...(post.publishedAt ? { datePublished: post.publishedAt.toISOString() } : {}),
+            ...(post.publishedAt
+              ? { datePublished: post.publishedAt.toISOString() }
+              : {}),
             author: person,
           })),
         }
@@ -374,7 +389,10 @@ function blogNode(
   }
 }
 
-function breadcrumbNode(id: string, trail: { name: string; url: string }[]): JsonLdThing {
+function breadcrumbNode(
+  id: string,
+  trail: { name: string; url: string }[]
+): JsonLdThing {
   return {
     '@type': 'BreadcrumbList',
     '@id': id,
@@ -483,8 +501,12 @@ export function buildPostJsonLd({
     isPartOf: { '@id': blogEntityId(origin) },
     breadcrumb: { '@id': breadcrumbId },
     mainEntity: { '@id': `${url}#post` },
-    ...(post.publishedAt ? { datePublished: post.publishedAt.toISOString() } : {}),
-    ...(post.contentUpdatedAt ? { dateModified: post.contentUpdatedAt.toISOString() } : {}),
+    ...(post.publishedAt
+      ? { datePublished: post.publishedAt.toISOString() }
+      : {}),
+    ...(post.contentUpdatedAt
+      ? { dateModified: post.contentUpdatedAt.toISOString() }
+      : {}),
     ...(image ? { primaryImageOfPage: image } : {}),
     // The related posts an author chose, which are real links rendered on the page. This is
     // the internal-linking signal made explicit rather than left for a crawler to infer from
@@ -499,11 +521,17 @@ export function buildPostJsonLd({
     description: excerptText(post.excerpt || post.title, 155),
     url,
     mainEntityOfPage: { '@id': url },
-    ...(post.publishedAt ? { datePublished: post.publishedAt.toISOString() } : {}),
-    ...(post.contentUpdatedAt ? { dateModified: post.contentUpdatedAt.toISOString() } : {}),
+    ...(post.publishedAt
+      ? { datePublished: post.publishedAt.toISOString() }
+      : {}),
+    ...(post.contentUpdatedAt
+      ? { dateModified: post.contentUpdatedAt.toISOString() }
+      : {}),
     inLanguage: post.language,
     ...(image ? { image } : {}),
-    ...(seriesTitle || post.series ? { articleSection: seriesTitle || post.series } : {}),
+    ...(seriesTitle || post.series
+      ? { articleSection: seriesTitle || post.series }
+      : {}),
     ...(post.tags.length ? { keywords: post.tags.join(', ') } : {}),
     /*
       `about` as well as `keywords`, from the same tags. They are not redundant: `keywords` is
@@ -512,7 +540,11 @@ export function buildPostJsonLd({
       weaker one is leaving the signal on the floor.
     */
     ...(post.tags.length
-      ? { about: post.tags.slice(0, 8).map(tag => ({ '@type': 'Thing', name: tag })) }
+      ? {
+          about: post.tags
+            .slice(0, 8)
+            .map(tag => ({ '@type': 'Thing', name: tag })),
+        }
       : {}),
     ...(typeof wordCount === 'number' && wordCount > 0 ? { wordCount } : {}),
     ...(typeof readingMinutes === 'number' && readingMinutes > 0

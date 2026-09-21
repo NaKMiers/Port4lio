@@ -65,18 +65,19 @@ export default function DragList({
     <div className={className}>
       {ids.map((id, index) => {
         const isDragging = dragIndex === index
-        const isTarget = dragIndex !== null && overIndex === index && !isDragging
+        const isTarget =
+          dragIndex !== null && overIndex === index && !isDragging
 
         const handle = (
           <button
-            type='button'
+            type="button"
             ref={node => {
               handleRefs.current[index] = node
             }}
             draggable
             aria-label={`Reorder ${itemLabel}, position ${index + 1} of ${ids.length}. Drag, or use the arrow keys.`}
-            title='Drag to reorder'
-            className='inline-flex h-8 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-[0.7rem] border border-transparent text-pp-muted transition hover:border-pp-line hover:bg-white/78 hover:text-pp-text focus-visible:border-pp-line focus-visible:bg-white focus-visible:text-pp-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-pp-blue/15 active:cursor-grabbing'
+            title="Drag to reorder"
+            className="hover:bg-white/78 inline-flex h-8 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-[0.7rem] border border-transparent text-pp-muted transition hover:border-pp-line hover:text-pp-text focus-visible:border-pp-line focus-visible:bg-white focus-visible:text-pp-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-pp-blue/15 active:cursor-grabbing"
             onDragStart={event => {
               event.stopPropagation()
               event.dataTransfer.effectAllowed = 'move'
@@ -102,7 +103,10 @@ export default function DragList({
               if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
                 event.preventDefault()
                 moveByKeyboard(index, index - 1)
-              } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+              } else if (
+                event.key === 'ArrowDown' ||
+                event.key === 'ArrowRight'
+              ) {
                 event.preventDefault()
                 moveByKeyboard(index, index + 1)
               } else if (event.key === 'Home') {
@@ -114,7 +118,10 @@ export default function DragList({
               }
             }}
           >
-            <GripVertical aria-hidden className='h-4 w-4' />
+            <GripVertical
+              aria-hidden
+              className="h-4 w-4"
+            />
           </button>
         )
 
@@ -150,7 +157,10 @@ export default function DragList({
         )
       })}
 
-      <span aria-live='polite' className='sr-only'>
+      <span
+        aria-live="polite"
+        className="sr-only"
+      >
         {announcement}
       </span>
     </div>

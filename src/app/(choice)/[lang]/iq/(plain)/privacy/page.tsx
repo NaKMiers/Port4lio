@@ -60,7 +60,8 @@ const COPY = {
   },
   en: {
     title: 'Privacy',
-    intro: 'This IQ test collects very little. Here is everything that is stored, why, and for how long.',
+    intro:
+      'This IQ test collects very little. Here is everything that is stored, why, and for how long.',
     sections: [
       {
         heading: 'What is stored',
@@ -123,7 +124,11 @@ export async function generateMetadata({
   }
 }
 
-export default async function IqPrivacyPage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function IqPrivacyPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
   const { lang } = await params
   if (!isLocale(lang)) notFound()
   const copy = COPY[lang]
@@ -131,28 +136,33 @@ export default async function IqPrivacyPage({ params }: { params: Promise<{ lang
   return (
     <main>
       <SectionFrame
-        aria-labelledby='iq-privacy-heading'
+        aria-labelledby="iq-privacy-heading"
         disableReveal
-        className='border-b border-pp-line pb-section-sm pt-10 md:pt-14'
-        innerClassName='max-w-2xl'
+        className="border-b border-pp-line pb-section-sm pt-10 md:pt-14"
+        innerClassName="max-w-2xl"
       >
         <h1
-          id='iq-privacy-heading'
-          className='font-display text-[clamp(2.2rem,5vw,3.2rem)] font-semibold leading-tight tracking-tight text-pp-text'
+          id="iq-privacy-heading"
+          className="font-display text-[clamp(2.2rem,5vw,3.2rem)] font-semibold leading-tight tracking-tight text-pp-text"
         >
           {copy.title}
         </h1>
-        <p className='mt-5 text-base leading-relaxed text-pp-muted md:text-lg'>{copy.intro}</p>
+        <p className="mt-5 text-base leading-relaxed text-pp-muted md:text-lg">
+          {copy.intro}
+        </p>
       </SectionFrame>
 
-      <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
-        <div className='space-y-8'>
+      <SectionFrame
+        className="py-section-sm"
+        innerClassName="max-w-2xl"
+      >
+        <div className="space-y-8">
           {copy.sections.map(section => (
             <section key={section.heading}>
-              <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
                 {section.heading}
               </h2>
-              <p className='mt-3 text-pp-muted'>{section.body}</p>
+              <p className="mt-3 text-pp-muted">{section.body}</p>
             </section>
           ))}
         </div>

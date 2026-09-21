@@ -112,9 +112,7 @@ function claimMailBudget(nowMs: number): boolean {
     mailsSentInWindow = 0
   }
 
-  if (mailsSentInWindow >= MAIL_BUDGET_PER_HOUR) {
-    return false
-  }
+  if (mailsSentInWindow >= MAIL_BUDGET_PER_HOUR) return false
 
   mailsSentInWindow += 1
   return true
@@ -157,7 +155,10 @@ export async function POST(request: NextRequest) {
     // Nothing downstream can work without this: the limiter would be silently off and the
     // message would have nowhere to go. Fail loudly rather than fall through to mail-only,
     // which is the behaviour this handler was rewritten to remove.
-    console.error('[api/contact] database unreachable - submission refused', error)
+    console.error(
+      '[api/contact] database unreachable - submission refused',
+      error
+    )
     return jsonError(
       'Unable to accept your message right now. Please email me directly at the address on this page.',
       503
@@ -165,22 +166,32 @@ export async function POST(request: NextRequest) {
   }
 
   const limit = await checkRateLimit(clientIpFrom(request), CONTACT_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
-      { error: 'Too many messages from this connection. Please try again later.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        error:
+          'Too many messages from this connection. Please try again later.',
+      },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
   const parsed = await readJsonBody<Record<string, unknown>>(request, {
     maxBytes: CONTACT_MAX_BODY_BYTES,
   })
-  if (!parsed.ok) {
-    return jsonError(parsed.error, parsed.status)
-  }
+  if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
-  const { email, firstname, lastname, subject, message, sourceSlug, heardAbout } =
-    parsed.body ?? {}
+  const {
+    email,
+    firstname,
+    lastname,
+    subject,
+    message,
+    sourceSlug,
+    heardAbout,
+  } = parsed.body ?? {}
 
   if (
     !isNonEmptyString(email) ||
@@ -188,9 +199,8 @@ export async function POST(request: NextRequest) {
     !isNonEmptyString(lastname) ||
     !isNonEmptyString(subject) ||
     !isNonEmptyString(message)
-  ) {
+  )
     return jsonError('Please complete all contact form fields.', 400)
-  }
 
   const fields = {
     email: email.trim(),
@@ -204,19 +214,19 @@ export async function POST(request: NextRequest) {
   // field the visitor typed and can see, so an error that says which one is too long is
   // something they can act on - whereas silently storing 5000 of their 6000 characters
   // sends a message that ends mid-sentence and looks like our bug.
-  for (const [name, max] of Object.entries(FIELD_MAX)) {
-    if (fields[name as keyof typeof fields].length > max) {
-      return jsonError(`The ${name} field is too long (maximum ${max} characters).`, 400)
-    }
-  }
+  for (const [name, max] of Object.entries(FIELD_MAX))
+    if (fields[name as keyof typeof fields].length > max)
+      return jsonError(
+        `The ${name} field is too long (maximum ${max} characters).`,
+        400
+      )
 
   const heardAboutText = isNonEmptyString(heardAbout) ? heardAbout.trim() : null
-  if (heardAboutText !== null && heardAboutText.length > HEARD_ABOUT_MAX) {
+  if (heardAboutText !== null && heardAboutText.length > HEARD_ABOUT_MAX)
     return jsonError(
       `The "how did you hear about me" field is too long (maximum ${HEARD_ABOUT_MAX} characters).`,
       400
     )
-  }
 
   /**
    * A malformed `sourceSlug` is DROPPED, not rejected - the one asymmetry in this handler.
@@ -233,11 +243,11 @@ export async function POST(request: NextRequest) {
   let slug: string | null = null
   if (isNonEmptyString(sourceSlug)) {
     const candidate = sourceSlug.trim()
-    if (SOURCE_SLUG.test(candidate)) {
-      slug = candidate
-    } else {
-      console.warn('[api/contact] dropped a malformed sourceSlug - message kept')
-    }
+    if (SOURCE_SLUG.test(candidate)) slug = candidate
+    else
+      console.warn(
+        '[api/contact] dropped a malformed sourceSlug - message kept'
+      )
   }
 
   let savedId: unknown
@@ -262,11 +272,11 @@ export async function POST(request: NextRequest) {
   // decided. A throw in this block must not reach the visitor, so it is caught and logged
   // rather than allowed to turn a saved message into a 500 - the exact bug this file had.
   try {
-    if (!claimMailBudget(Date.now())) {
+    if (!claimMailBudget(Date.now()))
       console.error(
         `[api/contact] mail budget exhausted (${MAIL_BUDGET_PER_HOUR}/hour in this process) - message ${String(savedId)} saved but NOT emailed`
       )
-    } else {
+    else {
       // The renderer escapes every one of these - they are anonymous visitor input, and
       // they used to be interpolated into the email HTML raw.
       const rendered = renderContactEmail({
@@ -301,7 +311,10 @@ export async function POST(request: NextRequest) {
        * has to.
        */
       try {
-        await ContactMessageModel.updateOne({ _id: savedId }, { $set: { mailed: true } })
+        await ContactMessageModel.updateOne(
+          { _id: savedId },
+          { $set: { mailed: true } }
+        )
       } catch (error) {
         console.error(
           `[api/contact] message ${String(savedId)} WAS emailed but the mailed flag did not persist - the row understates delivery`,

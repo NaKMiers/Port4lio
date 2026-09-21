@@ -15,7 +15,12 @@ import {
 import type { PublicProfile } from '@/lib/profile-public'
 
 import { joinSections, mdLink, mdTable } from './markdown'
-import { displayName, formatPublishPeriod, publishableSocials, siteUrl } from './shared'
+import {
+  displayName,
+  formatPublishPeriod,
+  publishableSocials,
+  siteUrl,
+} from './shared'
 import type { GithubReadmeArtifact, RenderContext } from './types'
 
 const PROJECT_LIMIT = 4
@@ -43,7 +48,12 @@ function links(profile: PublicProfile, ctx: RenderContext): string {
         return false
       }
     })
-    .map(social => mdLink(collapseWhitespace(social.name) || labelOutboundHttpsUrl(social.link), social.link))
+    .map(social =>
+      mdLink(
+        collapseWhitespace(social.name) || labelOutboundHttpsUrl(social.link),
+        social.link
+      )
+    )
 
   const all = [mdLink('Portfolio', siteUrl(ctx)), ...socials]
   return all.length > 0 ? all.join(' · ') : ''
@@ -53,18 +63,26 @@ function stats(profile: PublicProfile): string {
   const items = sanitizeStats(profile.stats)
   if (items.length === 0) return ''
   return items
-    .map(stat => `**${stat.value.toLocaleString('en-US')}** ${collapseWhitespace(stat.label)}`)
+    .map(
+      stat =>
+        `**${stat.value.toLocaleString('en-US')}** ${collapseWhitespace(stat.label)}`
+    )
     .join(' · ')
 }
 
 function about(profile: PublicProfile): string {
-  const paragraphs = splitAboutParagraphs(profile.aboutMe).slice(0, ABOUT_PARAGRAPH_LIMIT)
+  const paragraphs = splitAboutParagraphs(profile.aboutMe).slice(
+    0,
+    ABOUT_PARAGRAPH_LIMIT
+  )
   if (paragraphs.length === 0) return ''
   return joinSections(['## About', ...paragraphs])
 }
 
 function skills(profile: PublicProfile): string {
-  const groups = sanitizeSkillGroups(profile.skills).filter(group => group.items.length > 0)
+  const groups = sanitizeSkillGroups(profile.skills).filter(
+    group => group.items.length > 0
+  )
   if (groups.length === 0) return ''
 
   const rows = groups.map(group => [
@@ -87,7 +105,9 @@ function projects(profile: PublicProfile): string {
     const overview = collapseWhitespace(project.overview ?? '')
     if (overview) lines.push('', overview)
 
-    const tech = (project.techStack ?? []).map(collapseWhitespace).filter(Boolean)
+    const tech = (project.techStack ?? [])
+      .map(collapseWhitespace)
+      .filter(Boolean)
     if (tech.length > 0) lines.push('', `\`${tech.join('` · `')}\``)
 
     const outbound = projectOutboundLinks(project)
@@ -102,8 +122,8 @@ function projects(profile: PublicProfile): string {
 }
 
 function shipped(profile: PublicProfile): string {
-  const storeLinks = extractStoreLinksFromProjects(profile.projects).filter(link =>
-    /^https:\/\//i.test(link.url)
+  const storeLinks = extractStoreLinksFromProjects(profile.projects).filter(
+    link => /^https:\/\//i.test(link.url)
   )
   if (storeLinks.length === 0) return ''
 
@@ -112,7 +132,10 @@ function shipped(profile: PublicProfile): string {
     mdLink(labelOutboundHttpsUrl(link.url), link.url),
   ])
 
-  return joinSections(['## Live on stores', mdTable(['Product', 'Where'], rows)])
+  return joinSections([
+    '## Live on stores',
+    mdTable(['Product', 'Where'], rows),
+  ])
 }
 
 function experience(profile: PublicProfile, ctx: RenderContext): string {
@@ -125,15 +148,22 @@ function experience(profile: PublicProfile, ctx: RenderContext): string {
     collapseWhitespace(item.companyName),
   ])
 
-  return joinSections(['## Experience', mdTable(['When', 'Role', 'Where'], rows)])
+  return joinSections([
+    '## Experience',
+    mdTable(['When', 'Role', 'Where'], rows),
+  ])
 }
 
 function certificates(profile: PublicProfile): string {
-  const items = sanitizeCertificates(profile.certificates).filter(item => trimText(item.name))
+  const items = sanitizeCertificates(profile.certificates).filter(item =>
+    trimText(item.name)
+  )
   if (items.length === 0) return ''
 
   const list = items.map(item =>
-    item.link ? `- ${mdLink(item.name, item.link)}` : `- ${collapseWhitespace(item.name)}`
+    item.link
+      ? `- ${mdLink(item.name, item.link)}`
+      : `- ${collapseWhitespace(item.name)}`
   )
 
   return joinSections(['## Certifications', list.join('\n')])
@@ -159,7 +189,9 @@ export function renderGithubReadme(
     shipped(profile),
     experience(profile, ctx),
     certificates(profile),
-    '<sub>Generated from ' + siteUrl(ctx) + ' - edits there land here automatically.</sub>',
+    '<sub>Generated from ' +
+      siteUrl(ctx) +
+      ' - edits there land here automatically.</sub>',
   ])
 
   return { kind: 'file', path: 'README.md', content }

@@ -44,31 +44,37 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return denied
 
-  const parsed = await readJsonBody<{ slug?: unknown; title?: unknown; blurb?: unknown }>(
-    request,
-    { maxBytes: MAX_BODY_BYTES }
-  )
+  const parsed = await readJsonBody<{
+    slug?: unknown
+    title?: unknown
+    blurb?: unknown
+  }>(request, { maxBytes: MAX_BODY_BYTES })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
-  const slug = typeof parsed.body?.slug === 'string' ? parsed.body.slug.trim() : ''
-  const title = typeof parsed.body?.title === 'string' ? parsed.body.title.trim() : ''
-  const blurb = typeof parsed.body?.blurb === 'string' ? parsed.body.blurb.trim() : ''
+  const slug =
+    typeof parsed.body?.slug === 'string' ? parsed.body.slug.trim() : ''
+  const title =
+    typeof parsed.body?.title === 'string' ? parsed.body.title.trim() : ''
+  const blurb =
+    typeof parsed.body?.blurb === 'string' ? parsed.body.blurb.trim() : ''
 
-  if (!SERIES_SLUG_PATTERN.test(slug)) {
+  if (!SERIES_SLUG_PATTERN.test(slug))
     return jsonError('Series slug must match ^[a-z0-9-]{1,48}$.', 400)
-  }
+
   if (!title) return jsonError('A title is required.', 400)
 
   try {
     await connectDatabase()
 
-    if (await SeriesModel.exists({ slug })) {
+    if (await SeriesModel.exists({ slug }))
       return jsonError(`The series "${slug}" already exists.`, 409)
-    }
 
     // Appended, not prepended. A new series is the least established one, and the index
     // order is editorial - putting it first would silently demote the pillar clusters.
-    const last = await SeriesModel.findOne({}).sort({ order: -1 }).select('order').lean()
+    const last = await SeriesModel.findOne({})
+      .sort({ order: -1 })
+      .select('order')
+      .lean()
     const created = await SeriesModel.create({
       slug,
       title,

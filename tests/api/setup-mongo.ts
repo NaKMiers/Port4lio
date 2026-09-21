@@ -44,7 +44,9 @@ export async function stopMongo(): Promise<void> {
  * loudly, which is the whole point here. Returns the raw index list so a test can assert on
  * `expireAfterSeconds` rather than on Mongoose's in-memory idea of the schema.
  */
-export async function builtIndexes(model: mongoose.Model<never>): Promise<Record<string, unknown>[]> {
+export async function builtIndexes(
+  model: mongoose.Model<never>
+): Promise<Record<string, unknown>[]> {
   await model.syncIndexes()
   return model.collection.indexes() as Promise<Record<string, unknown>[]>
 }

@@ -40,22 +40,24 @@ export default function MethodTease({
       href={href}
       className={`group block rounded-2xl border border-pp-line bg-pp-panel p-6 no-underline transition hover:-translate-y-0.5 hover:border-pp-blue/60 hover:shadow-[0_18px_36px_rgba(31,28,26,0.10)] motion-reduce:hover:translate-y-0 md:p-7 ${className ?? ''}`}
     >
-      <div className='flex items-start gap-4'>
+      <div className="flex items-start gap-4">
         <span
           aria-hidden
-          className='mt-0.5 grid h-9 w-9 flex-none place-items-center rounded-full bg-[linear-gradient(135deg,var(--pp-violet),var(--pp-blue))] font-display text-lg font-semibold text-white'
+          className="mt-0.5 grid h-9 w-9 flex-none place-items-center rounded-full bg-[linear-gradient(135deg,var(--pp-violet),var(--pp-blue))] font-display text-lg font-semibold text-white"
         >
           ?
         </span>
-        <div className='min-w-0'>
-          <h2 className='font-display text-lg font-semibold leading-snug text-pp-text md:text-xl'>
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold leading-snug text-pp-text md:text-xl">
             {title}
           </h2>
-          <p className='mt-2 text-sm leading-relaxed text-pp-muted md:text-base'>{body}</p>
-          <span className='mt-4 inline-flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text'>
+          <p className="mt-2 text-sm leading-relaxed text-pp-muted md:text-base">
+            {body}
+          </p>
+          <span className="mt-4 inline-flex items-center gap-2 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text">
             {cta}
-            <span className='transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none'>
-              <Chevron direction='right' />
+            <span className="transition-transform group-hover:translate-x-0.5 motion-reduce:transform-none">
+              <Chevron direction="right" />
             </span>
           </span>
         </div>

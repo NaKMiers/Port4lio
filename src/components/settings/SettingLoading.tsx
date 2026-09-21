@@ -25,12 +25,12 @@ export default function SettingLoading({
   subtitle?: string
 } = {}) {
   return (
-    <div className='mx-auto w-full max-w-editorial px-gutter py-10'>
-      <div className='rounded-[1.8rem] border border-pp-line bg-white/78 p-6 shadow-panel backdrop-blur-md'>
-        <h2 className='font-display text-2xl font-semibold tracking-tight text-pp-text'>
+    <div className="mx-auto w-full max-w-editorial px-gutter py-10">
+      <div className="bg-white/78 rounded-[1.8rem] border border-pp-line p-6 shadow-panel backdrop-blur-md">
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-pp-text">
           {title}
         </h2>
-        <p className='mt-2 text-sm leading-relaxed text-pp-muted'>{subtitle}</p>
+        <p className="mt-2 text-sm leading-relaxed text-pp-muted">{subtitle}</p>
       </div>
     </div>
   )

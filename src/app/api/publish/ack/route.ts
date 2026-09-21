@@ -6,7 +6,10 @@ import { connectDatabase } from '@/lib/mongodb'
 import { isPublishRequestAuthorized } from '@/lib/publish/auth'
 import { isPublishTargetId } from '@/lib/publish/types'
 import { PUBLISH_ACK_MAX_BODY_BYTES, readJsonBody } from '@/lib/read-json-body'
-import { PUBLISH_STATE_DOCUMENT_ID, PublishStateModel } from '@/models/PublishState'
+import {
+  PUBLISH_STATE_DOCUMENT_ID,
+  PublishStateModel,
+} from '@/models/PublishState'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,41 +36,38 @@ const ALLOWED_RESULTS = new Set(['applied', 'unchanged', 'failed'])
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!isPublishRequestAuthorized(request)) {
+    if (!isPublishRequestAuthorized(request))
       return jsonError('Unauthorized', 401)
-    }
 
     const contentType = request.headers.get('content-type') ?? ''
-    if (!contentType.includes('application/json')) {
+    if (!contentType.includes('application/json'))
       return jsonError('Expected Content-Type: application/json', 415)
-    }
 
     const parsed = await readJsonBody<Record<string, unknown>>(request, {
       maxBytes: PUBLISH_ACK_MAX_BODY_BYTES,
     })
-    if (!parsed.ok) {
-      return jsonError(parsed.error, parsed.status)
-    }
+    if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
     const body = parsed.body ?? {}
     const target = body.target
     const version = typeof body.version === 'string' ? body.version : ''
     const result = typeof body.result === 'string' ? body.result : ''
-    const detail = typeof body.detail === 'string' ? body.detail.slice(0, 500) : ''
+    const detail =
+      typeof body.detail === 'string' ? body.detail.slice(0, 500) : ''
 
-    if (!isPublishTargetId(target)) {
+    if (!isPublishTargetId(target))
       return jsonError('Unknown publish target', 400)
-    }
-    if (!HEX_64.test(version)) {
+
+    if (!HEX_64.test(version))
       return jsonError('Version must be a sha256 hex digest', 400)
-    }
-    if (result && !ALLOWED_RESULTS.has(result)) {
+
+    if (result && !ALLOWED_RESULTS.has(result))
       return jsonError('Unknown result', 400)
-    }
 
     const now = new Date()
     // A failed run must not claim the version as published - record the attempt only.
-    const acked = result === 'failed' ? {} : { ackedVersion: version, ackedAt: now }
+    const acked =
+      result === 'failed' ? {} : { ackedVersion: version, ackedAt: now }
     const entry = {
       targetId: target,
       ...acked,

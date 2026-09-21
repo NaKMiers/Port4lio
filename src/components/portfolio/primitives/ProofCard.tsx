@@ -2,7 +2,8 @@ import type { HTMLAttributes, ReactNode } from 'react'
 
 import { EditorialPanel } from './EditorialPanel'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 export type ProofCardProps = {
   children: ReactNode
@@ -30,28 +31,38 @@ export function ProofCard({
   ...rest
 }: ProofCardProps) {
   return (
-    <EditorialPanel className={cx('overflow-hidden p-0', panelClassName)} {...rest}>
-      <div className={cx('flex flex-col gap-4 p-5 sm:p-6 md:flex-row md:items-start md:gap-6', className)}>
+    <EditorialPanel
+      className={cx('overflow-hidden p-0', panelClassName)}
+      {...rest}
+    >
+      <div
+        className={cx(
+          'flex flex-col gap-4 p-5 sm:p-6 md:flex-row md:items-start md:gap-6',
+          className
+        )}
+      >
         {media ? (
-          <div className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-pp-line bg-pp-panel-strong text-lg font-display font-semibold text-pp-text md:h-14 md:w-14'>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-pp-line bg-pp-panel-strong font-display text-lg font-semibold text-pp-text md:h-14 md:w-14">
             {media}
           </div>
         ) : null}
-        <div className='min-w-0 flex-1 space-y-2'>
+        <div className="min-w-0 flex-1 space-y-2">
           {kicker ? (
-            <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
               {kicker}
             </p>
           ) : null}
           {title ? (
-            <div className='font-display text-lg font-semibold leading-snug text-pp-text md:text-xl'>
+            <div className="font-display text-lg font-semibold leading-snug text-pp-text md:text-xl">
               {title}
             </div>
           ) : null}
-          <div className='text-base leading-relaxed text-pp-muted [&_strong]:font-semibold [&_strong]:text-pp-text'>
+          <div className="text-base leading-relaxed text-pp-muted [&_strong]:font-semibold [&_strong]:text-pp-text">
             {children}
           </div>
-          {footer ? <div className='pt-1 text-sm text-pp-muted'>{footer}</div> : null}
+          {footer ? (
+            <div className="pt-1 text-sm text-pp-muted">{footer}</div>
+          ) : null}
         </div>
       </div>
     </EditorialPanel>

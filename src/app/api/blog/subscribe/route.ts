@@ -57,26 +57,33 @@ export async function POST(request: NextRequest) {
     await connectDatabase()
   } catch (error) {
     console.error('[api/blog/subscribe] database unreachable', error)
-    return jsonError('Unable to sign you up right now. Please try again later.', 503)
+    return jsonError(
+      'Unable to sign you up right now. Please try again later.',
+      503
+    )
   }
 
   const limit = await checkRateLimit(clientIpFrom(request), SUBSCRIBE_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
-      { error: 'Too many signups from this connection. Please try again later.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        error: 'Too many signups from this connection. Please try again later.',
+      },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
   const parsed = await readJsonBody<{ email?: unknown }>(request, {
     maxBytes: SUBSCRIBE_MAX_BODY_BYTES,
   })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
-  const raw = typeof parsed.body?.email === 'string' ? parsed.body.email.trim() : ''
-  if (!raw || raw.length > 254 || !EMAIL.test(raw)) {
+  const raw =
+    typeof parsed.body?.email === 'string' ? parsed.body.email.trim() : ''
+  if (!raw || raw.length > 254 || !EMAIL.test(raw))
     return jsonError('That does not look like an email address.', 400)
-  }
 
   // Lowercased so `A@b.com` and `a@b.com` cannot become two rows and two confirmation emails.
   const email = raw.toLowerCase()
@@ -96,9 +103,8 @@ export async function POST(request: NextRequest) {
 
     const token = existing?.token ?? randomBytes(24).toString('base64url')
 
-    if (!existing) {
+    if (!existing)
       await SubscriberModel.create({ email, token, status: 'pending' })
-    }
 
     const origin = resolveSiteOrigin().replace(/\/$/, '')
     const rendered = renderSubscribeConfirmEmail({
@@ -115,7 +121,10 @@ export async function POST(request: NextRequest) {
     // Logged as an error, unlike the contact form's shrug: a failed confirmation email means
     // the signup never completes. The row stays `pending`, which no digest reads, so nothing
     // is on a list it should not be on.
-    console.error(`[api/blog/subscribe] confirmation email failed for a pending signup`, error)
+    console.error(
+      `[api/blog/subscribe] confirmation email failed for a pending signup`,
+      error
+    )
   }
 
   return ACCEPTED

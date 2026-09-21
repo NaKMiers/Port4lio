@@ -11,7 +11,10 @@ import type {
   SkillGroup,
   SkillItem,
 } from '@/types/profile'
-import { DEFAULT_RESUME_SECTION_ORDER, normalizeResumeSectionOrder } from '@/lib/resume-sections'
+import {
+  DEFAULT_RESUME_SECTION_ORDER,
+  normalizeResumeSectionOrder,
+} from '@/lib/resume-sections'
 import { resolveIconCode } from '@/utils/iconResolver'
 
 export function makeEmptyProfile(): Profile {
@@ -59,7 +62,10 @@ function ensureArray(value: unknown): unknown[] {
 
 function normalizeTextBlock(raw: unknown): ResumeTextBlock {
   const source = (raw ?? {}) as Record<string, unknown>
-  return { heading: String(source.heading ?? ''), lines: ensureStringArray(source.lines) }
+  return {
+    heading: String(source.heading ?? ''),
+    lines: ensureStringArray(source.lines),
+  }
 }
 
 export function makeEmptyResume(): Resume {
@@ -89,7 +95,10 @@ export function normalizeResume(raw: unknown): Resume {
 
   const source = raw as Record<string, unknown>
   const contact = (source.contact ?? {}) as Record<string, unknown>
-  const certifications = (source.certifications ?? {}) as Record<string, unknown>
+  const certifications = (source.certifications ?? {}) as Record<
+    string,
+    unknown
+  >
   const pageBreak = (source.pageBreak ?? {}) as Record<string, unknown>
 
   return {
@@ -130,7 +139,10 @@ export function normalizeResume(raw: unknown): Resume {
           issuer: String(group.issuer ?? ''),
           items: ensureArray(group.items).map(cert => {
             const entry = (cert ?? {}) as Record<string, unknown>
-            return { name: String(entry.name ?? ''), link: String(entry.link ?? '') }
+            return {
+              name: String(entry.name ?? ''),
+              link: String(entry.link ?? ''),
+            }
           }),
         }
       }),
@@ -149,7 +161,10 @@ export function normalizeResume(raw: unknown): Resume {
             highlights: ensureStringArray(project.highlights),
             demoLinks: ensureArray(project.demoLinks).map(link => {
               const entryLink = (link ?? {}) as Record<string, unknown>
-              return { label: String(entryLink.label ?? ''), href: String(entryLink.href ?? '') }
+              return {
+                label: String(entryLink.label ?? ''),
+                href: String(entryLink.href ?? ''),
+              }
             }),
           }
         }),
@@ -170,34 +185,46 @@ export function normalizeProfile(raw: unknown): Profile {
   const source = raw as Record<string, unknown>
   const profile: Profile = { ...empty, ...source } as Profile
 
-  profile.socials = Array.isArray(source.socials) ? (source.socials as Profile['socials']) : []
-  profile.stats = Array.isArray(source.stats) ? (source.stats as Profile['stats']) : []
-  profile.skills = Array.isArray(source.skills) ? (source.skills as SkillGroup[]) : []
+  profile.socials = Array.isArray(source.socials)
+    ? (source.socials as Profile['socials'])
+    : []
+  profile.stats = Array.isArray(source.stats)
+    ? (source.stats as Profile['stats'])
+    : []
+  profile.skills = Array.isArray(source.skills)
+    ? (source.skills as SkillGroup[])
+    : []
   profile.experience = Array.isArray(source.experience)
     ? (source.experience as ExperienceItem[])
     : []
-  profile.education = Array.isArray(source.education) ? (source.education as EducationItem[]) : []
+  profile.education = Array.isArray(source.education)
+    ? (source.education as EducationItem[])
+    : []
   profile.certificates = Array.isArray(source.certificates)
     ? (source.certificates as Certificate[])
     : []
   profile.briefServices = ensureStringArray(source.briefServices)
-  profile.services = Array.isArray(source.services) ? (source.services as ServiceItem[]) : []
-  profile.projects = Array.isArray(source.projects) ? (source.projects as ProjectItem[]) : []
+  profile.services = Array.isArray(source.services)
+    ? (source.services as ServiceItem[])
+    : []
+  profile.projects = Array.isArray(source.projects)
+    ? (source.projects as ProjectItem[])
+    : []
 
   profile.fullName = String(profile.fullName ?? '')
   profile.username = String(profile.username ?? '')
 
   const rawJobTitle = source.jobTitle
-  if (Array.isArray(rawJobTitle)) {
-    profile.jobTitle = rawJobTitle.map(item => String(item ?? '').trim()).filter(Boolean)
-  } else if (typeof rawJobTitle === 'string') {
+  if (Array.isArray(rawJobTitle))
+    profile.jobTitle = rawJobTitle
+      .map(item => String(item ?? '').trim())
+      .filter(Boolean)
+  else if (typeof rawJobTitle === 'string')
     profile.jobTitle = rawJobTitle
       .split('\n')
       .map(item => item.trim())
       .filter(Boolean)
-  } else {
-    profile.jobTitle = []
-  }
+  else profile.jobTitle = []
 
   profile.description = String(profile.description ?? '')
   profile.profileHeading = String(profile.profileHeading ?? '')
@@ -208,13 +235,19 @@ export function normalizeProfile(raw: unknown): Profile {
   profile.workHeading = String(profile.workHeading ?? '')
   profile.workSubHeading = String(profile.workSubHeading ?? '')
   profile.avatar = profile.avatar ? String(profile.avatar) : ''
-  profile.backgroundImage = profile.backgroundImage ? String(profile.backgroundImage) : ''
-  profile.publicLocation = profile.publicLocation ? String(profile.publicLocation) : ''
+  profile.backgroundImage = profile.backgroundImage
+    ? String(profile.backgroundImage)
+    : ''
+  profile.publicLocation = profile.publicLocation
+    ? String(profile.publicLocation)
+    : ''
   profile.cv = profile.cv ? String(profile.cv) : ''
 
   // Absence is meaningful - it is what tells `deriveResume` to fall back to the seed.
   profile.resume =
-    source.resume && typeof source.resume === 'object' ? normalizeResume(source.resume) : undefined
+    source.resume && typeof source.resume === 'object'
+      ? normalizeResume(source.resume)
+      : undefined
 
   profile.socials = profile.socials.map(item => {
     const name = String(item?.name ?? '')
@@ -227,7 +260,8 @@ export function normalizeProfile(raw: unknown): Profile {
 
   profile.stats = profile.stats.map(item => ({
     label: String(item.label ?? ''),
-    value: typeof item.value === 'number' ? item.value : Number(item.value ?? 0),
+    value:
+      typeof item.value === 'number' ? item.value : Number(item.value ?? 0),
   }))
 
   profile.skills = profile.skills.map(group => ({
@@ -243,38 +277,47 @@ export function normalizeProfile(raw: unknown): Profile {
   profile.projects = profile.projects.map(project => ({
     title: String(project.title ?? ''),
     overview: String(project.overview ?? ''),
-    techStack: ensureStringArray((project as { techStack?: unknown }).techStack),
+    techStack: ensureStringArray(
+      (project as { techStack?: unknown }).techStack
+    ),
     parts: (() => {
-      if (Array.isArray((project as { parts?: unknown }).parts)) {
+      if (Array.isArray((project as { parts?: unknown }).parts))
         return ((project as { parts: unknown[] }).parts ?? []).map(part => ({
           image: String((part as { image?: unknown })?.image ?? ''),
-          description: String((part as { description?: unknown })?.description ?? ''),
+          description: String(
+            (part as { description?: unknown })?.description ?? ''
+          ),
           link: String((part as { link?: unknown })?.link ?? ''),
         })) satisfies ProjectPart[]
-      }
 
       const legacy = project as {
         images?: unknown[]
         links?: unknown[]
         description?: unknown
       }
-      const legacyImages = Array.isArray(legacy.images) ? legacy.images.map(String) : []
-      const legacyLinks = Array.isArray(legacy.links) ? legacy.links.map(String) : []
+      const legacyImages = Array.isArray(legacy.images)
+        ? legacy.images.map(String)
+        : []
+      const legacyLinks = Array.isArray(legacy.links)
+        ? legacy.links.map(String)
+        : []
       const legacyDescription = String(legacy.description ?? '')
 
-      if (legacyImages.length > 0) {
+      if (legacyImages.length > 0)
         return legacyImages.map((image, index) => ({
           image,
           description: legacyDescription,
           link: legacyLinks[index] ?? legacyLinks[0] ?? '',
         }))
-      }
 
-      if (legacyLinks.length > 0 || legacyDescription) {
+      if (legacyLinks.length > 0 || legacyDescription)
         return legacyLinks.length > 0
-          ? legacyLinks.map(link => ({ image: '', description: legacyDescription, link }))
+          ? legacyLinks.map(link => ({
+              image: '',
+              description: legacyDescription,
+              link,
+            }))
           : [{ image: '', description: legacyDescription, link: '' }]
-      }
 
       return []
     })(),

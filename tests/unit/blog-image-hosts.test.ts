@@ -37,7 +37,9 @@ describe('isAllowedImageUrl - what it must accept', () => {
     // Transformations are how every real cover image is served, so a predicate that only
     // accepted bare paths would be rejected by the first post that used one.
     expect(
-      isAllowedImageUrl(`https://res.cloudinary.com/${CLOUD}/image/upload/w_800,q_auto/v1/a.png`)
+      isAllowedImageUrl(
+        `https://res.cloudinary.com/${CLOUD}/image/upload/w_800,q_auto/v1/a.png`
+      )
     ).toBe(true)
     expect(isAllowedImageUrl(`${OK}?v=2`)).toBe(true)
   })
@@ -53,33 +55,53 @@ describe('isAllowedImageUrl - the bypasses', () => {
 
   it('DROPS userinfo that makes the trusted host look like the authority', () => {
     // hostname here is evil.com; 'res.cloudinary.com' is the username.
-    expect(isAllowedImageUrl('https://res.cloudinary.com@evil.com/x.png')).toBe(false)
-    expect(isAllowedImageUrl(`https://res.cloudinary.com:pw@evil.com/${CLOUD}/x.png`)).toBe(false)
+    expect(isAllowedImageUrl('https://res.cloudinary.com@evil.com/x.png')).toBe(
+      false
+    )
+    expect(
+      isAllowedImageUrl(`https://res.cloudinary.com:pw@evil.com/${CLOUD}/x.png`)
+    ).toBe(false)
   })
 
   it('DROPS a host that merely starts with the trusted one', () => {
     // Why the check is `hostname ===` and never `startsWith`/`includes`.
-    expect(isAllowedImageUrl(`https://res.cloudinary.com.evil.com/${CLOUD}/x.png`)).toBe(false)
-    expect(isAllowedImageUrl(`https://notres.cloudinary.com/${CLOUD}/x.png`)).toBe(false)
+    expect(
+      isAllowedImageUrl(`https://res.cloudinary.com.evil.com/${CLOUD}/x.png`)
+    ).toBe(false)
+    expect(
+      isAllowedImageUrl(`https://notres.cloudinary.com/${CLOUD}/x.png`)
+    ).toBe(false)
   })
 
   it('DROPS plain http, even on the right host', () => {
-    expect(isAllowedImageUrl(`http://res.cloudinary.com/${CLOUD}/image/upload/x.png`)).toBe(false)
+    expect(
+      isAllowedImageUrl(`http://res.cloudinary.com/${CLOUD}/image/upload/x.png`)
+    ).toBe(false)
   })
 
   it("DROPS someone else's cloud name on the right host", () => {
     // THE clause people leave out. res.cloudinary.com is multi-tenant - anyone can open a
     // free account and serve from this exact hostname. Without the path check, "must be
     // Cloudinary" means "must be somebody's Cloudinary".
-    expect(isAllowedImageUrl('https://res.cloudinary.com/attacker/image/upload/x.png')).toBe(false)
+    expect(
+      isAllowedImageUrl(
+        'https://res.cloudinary.com/attacker/image/upload/x.png'
+      )
+    ).toBe(false)
     // And a path that merely CONTAINS our cloud name further down.
-    expect(isAllowedImageUrl(`https://res.cloudinary.com/attacker/${CLOUD}/x.png`)).toBe(false)
+    expect(
+      isAllowedImageUrl(`https://res.cloudinary.com/attacker/${CLOUD}/x.png`)
+    ).toBe(false)
     // And a prefix match on the cloud segment itself, which is why the check ends in '/'.
-    expect(isAllowedImageUrl(`https://res.cloudinary.com/${CLOUD}-evil/x.png`)).toBe(false)
+    expect(
+      isAllowedImageUrl(`https://res.cloudinary.com/${CLOUD}-evil/x.png`)
+    ).toBe(false)
   })
 
   it('DROPS data: and javascript: URLs outright', () => {
-    expect(isAllowedImageUrl('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=')).toBe(false)
+    expect(
+      isAllowedImageUrl('data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=')
+    ).toBe(false)
     expect(isAllowedImageUrl('javascript:alert(1)')).toBe(false)
   })
 
@@ -97,7 +119,11 @@ describe('isAllowedImageUrl - which normalisations URL does and does not do', ()
     // Asserted rather than assumed. If this stopped being true the `hostname ===` check
     // would start rejecting valid images, and the obvious "fix" is a case-insensitive
     // `includes` - which is precisely the bypass asserted two describes up.
-    expect(isAllowedImageUrl(`https://RES.CLOUDINARY.COM/${CLOUD}/image/upload/x.png`)).toBe(true)
+    expect(
+      isAllowedImageUrl(
+        `https://RES.CLOUDINARY.COM/${CLOUD}/image/upload/x.png`
+      )
+    ).toBe(true)
   })
 
   it('DROPS a trailing dot, because URL does NOT strip it', () => {
@@ -110,7 +136,11 @@ describe('isAllowedImageUrl - which normalisations URL does and does not do', ()
     // Left failing closed on purpose: the alternative is normalising the host ourselves,
     // and hand-rolled host normalisation next to a multi-tenant allowlist is how the
     // `startsWith` bypass gets reintroduced by someone being helpful.
-    expect(isAllowedImageUrl(`https://res.cloudinary.com./${CLOUD}/image/upload/x.png`)).toBe(false)
+    expect(
+      isAllowedImageUrl(
+        `https://res.cloudinary.com./${CLOUD}/image/upload/x.png`
+      )
+    ).toBe(false)
   })
 })
 
@@ -123,7 +153,9 @@ describe('filterSrcset', () => {
   it('returns null when nothing survives, so the caller removes the attribute', () => {
     // An empty srcset="" is not the same as an absent one - some browsers read it as a
     // candidate list containing one empty URL.
-    expect(filterSrcset('https://evil.com/a.png 1x, //evil.com/b.png 2x')).toBeNull()
+    expect(
+      filterSrcset('https://evil.com/a.png 1x, //evil.com/b.png 2x')
+    ).toBeNull()
   })
 
   it('handles bare URLs with no descriptor', () => {

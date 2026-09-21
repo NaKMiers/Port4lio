@@ -124,9 +124,11 @@ attemptSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
  * is worth a loud log.
  */
 attemptSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[Attempt] TTL index build FAILED - retention is not being enforced', error)
-  }
+  if (error)
+    console.error(
+      '[Attempt] TTL index build FAILED - retention is not being enforced',
+      error
+    )
 })
 
 export const AttemptModel: mongoose.Model<AttemptDocument> =

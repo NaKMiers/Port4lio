@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { ITEM_COUNT } from '@/lib/iq/items/config'
-import { answerIndexFor, generateItem, generateTest, optionsFor } from '@/lib/iq/items/v1/generate'
+import {
+  answerIndexFor,
+  generateItem,
+  generateTest,
+  optionsFor,
+} from '@/lib/iq/items/v1/generate'
 import { renderMatrix, renderOption } from '@/lib/iq/items/v1/render'
 import { CELL } from '@/lib/iq/items/primitives'
 import { MAX_BARS } from '@/lib/iq/items/v1/rules'
@@ -31,12 +36,14 @@ describe('generateTest', () => {
   })
 
   it('every item passes verification', () => {
-    for (const seed of SEEDS) {
+    for (const seed of SEEDS)
       for (const item of generateTest(seed)) {
         const result = verifyItem(item)
-        expect(result.ok, `seed ${seed} rung ${item.rung} (${item.rule}): ${!result.ok && result.reason}`).toBe(true)
+        expect(
+          result.ok,
+          `seed ${seed} rung ${item.rung} (${item.rule}): ${!result.ok && result.reason}`
+        ).toBe(true)
       }
-    }
   })
 
   it('never offers two options that render identically', () => {
@@ -48,7 +55,10 @@ describe('generateTest', () => {
       test.forEach((item, index) => {
         const options = optionsFor(item, seed, index)
         const keys = new Set(options.map(cellKey))
-        expect(keys.size, `seed ${seed} item ${index} has duplicate options`).toBe(6)
+        expect(
+          keys.size,
+          `seed ${seed} item ${index} has duplicate options`
+        ).toBe(6)
       })
     }
   })
@@ -74,9 +84,8 @@ describe('generateTest', () => {
    */
   it('generates every rule family across the seed sweep', () => {
     const families = new Set<string>()
-    for (const seed of SEEDS) {
+    for (const seed of SEEDS)
       for (const item of generateTest(seed)) families.add(item.rule)
-    }
 
     expect(Array.from(families).sort()).toEqual([
       'count-series',
@@ -89,35 +98,45 @@ describe('generateTest', () => {
   })
 
   it('never asks anyone to count more than MAX_BARS bars', () => {
-    for (const seed of SEEDS) {
-      for (const item of generateTest(seed)) {
+    for (const seed of SEEDS)
+      for (const item of generateTest(seed))
         for (const cell of [...item.cells, item.answer, ...item.distractors]) {
           if (cell.type !== 'bars') continue
-          expect(cell.count, `seed ${seed} rung ${item.rung}`).toBeGreaterThanOrEqual(1)
-          expect(cell.count, `seed ${seed} rung ${item.rung}`).toBeLessThanOrEqual(MAX_BARS + 2)
+          expect(
+            cell.count,
+            `seed ${seed} rung ${item.rung}`
+          ).toBeGreaterThanOrEqual(1)
+          expect(
+            cell.count,
+            `seed ${seed} rung ${item.rung}`
+          ).toBeLessThanOrEqual(MAX_BARS + 2)
         }
-      }
-    }
   })
 
   it('keeps every rendered bar inside its own cell', () => {
     // Read back out of the SVG rather than recomputing the geometry: the assertion has to
     // fail if the renderer's arithmetic is wrong, which a duplicate of that arithmetic
     // cannot do.
-    for (const seed of SEEDS.slice(0, 40)) {
-      for (const item of generateTest(seed)) {
+    for (const seed of SEEDS.slice(0, 40))
+      for (const item of generateTest(seed))
         for (const cell of [...item.cells, item.answer, ...item.distractors]) {
           if (cell.type !== 'bars') continue
           const svg = renderOption(cell, 'bars-test')
-          const rects = Array.from(svg.matchAll(/<rect x="([-\d.]+)"[^>]*width="([\d.]+)"/g))
+          const rects = Array.from(
+            svg.matchAll(/<rect x="([-\d.]+)"[^>]*width="([\d.]+)"/g)
+          )
           expect(rects.length).toBe(cell.count)
           for (const [, x, width] of rects) {
-            expect(Number(x), `${cell.count} bars start off-cell`).toBeGreaterThanOrEqual(0)
-            expect(Number(x) + Number(width), `${cell.count} bars run off-cell`).toBeLessThanOrEqual(CELL)
+            expect(
+              Number(x),
+              `${cell.count} bars start off-cell`
+            ).toBeGreaterThanOrEqual(0)
+            expect(
+              Number(x) + Number(width),
+              `${cell.count} bars run off-cell`
+            ).toBeLessThanOrEqual(CELL)
           }
         }
-      }
-    }
   })
 
   it('is deterministic - the same seed reproduces the same test exactly', () => {
@@ -126,9 +145,9 @@ describe('generateTest', () => {
     for (const seed of SEEDS.slice(0, 20)) {
       const a = generateTest(seed)
       const b = generateTest(seed)
-      expect(a.map(i => [i.rule, cellKey(i.answer), i.cells.map(cellKey)])).toEqual(
-        b.map(i => [i.rule, cellKey(i.answer), i.cells.map(cellKey)])
-      )
+      expect(
+        a.map(i => [i.rule, cellKey(i.answer), i.cells.map(cellKey)])
+      ).toEqual(b.map(i => [i.rule, cellKey(i.answer), i.cells.map(cellKey)]))
     }
   })
 
@@ -184,10 +203,15 @@ describe('set-logic is unambiguous', () => {
       ]
       const consistent = (Object.keys(ops) as (keyof typeof ops)[]).filter(op =>
         rows.every(([a, b, c]) =>
-          Array.from({ length: 9 }, (_, i) => i).every(i => ops[op](a, b, i) === c.has(i))
+          Array.from({ length: 9 }, (_, i) => i).every(
+            i => ops[op](a, b, i) === c.has(i)
+          )
         )
       )
-      expect(consistent, `seed ${seed}: operator is not uniquely inferable`).toHaveLength(1)
+      expect(
+        consistent,
+        `seed ${seed}: operator is not uniquely inferable`
+      ).toHaveLength(1)
 
       const op = consistent[0]!
       const answer = asSet(item.answer as never)!
@@ -221,14 +245,13 @@ describe('render', () => {
   })
 
   it('renders every option shape without throwing', () => {
-    for (const seed of SEEDS.slice(0, 20)) {
+    for (const seed of SEEDS.slice(0, 20))
       generateTest(seed).forEach((item, index) => {
         optionsFor(item, seed, index).forEach((option, optionIndex) => {
           const svg = renderOption(option, `o${index}-${optionIndex}`)
           expect(svg.startsWith('<svg')).toBe(true)
         })
       })
-    }
   })
 
   it('namespaces clip paths so half-shaded cells cannot cross-clip', () => {
@@ -237,11 +260,15 @@ describe('render', () => {
     // actually a wrong answer on screen.
     const test = generateTest(7)
     const withHalf = test.find(item =>
-      item.cells.some(cell => cell.type === 'shape' && cell.spec.shading === 'half')
+      item.cells.some(
+        cell => cell.type === 'shape' && cell.spec.shading === 'half'
+      )
     )
     if (!withHalf) return
     const svg = renderMatrix(withHalf, 'x')
-    const ids = Array.from(svg.matchAll(/id="(h-[^"]+)"/g)).map(match => match[1])
+    const ids = Array.from(svg.matchAll(/id="(h-[^"]+)"/g)).map(
+      match => match[1]
+    )
     expect(new Set(ids).size).toBe(ids.length)
   })
 })

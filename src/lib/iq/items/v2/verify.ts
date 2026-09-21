@@ -1,4 +1,9 @@
-import { cellKey, noHiddenLayers, perceptuallyDistinct, type Cell } from '@/lib/iq/items/v2/cell'
+import {
+  cellKey,
+  noHiddenLayers,
+  perceptuallyDistinct,
+  type Cell,
+} from '@/lib/iq/items/v2/cell'
 import type { RungProfile } from '@/lib/iq/items/v2/ladder'
 import { coordsOf, positionCount } from '@/lib/iq/items/v2/layout'
 import { ORDINAL, trackIsWitnessed } from '@/lib/iq/items/v2/tracks'
@@ -55,7 +60,13 @@ function operatorIsUnique(built: Built): boolean {
     const trio = [0, 1, 2].map(col => built.cells[row * cols + col]?.field)
     // The last row is the incomplete one; only complete rows are evidence.
     if (trio.some(field => !field)) continue
-    rows.push(trio.map(field => new Set(field?.filled ?? [])) as [Set<number>, Set<number>, Set<number>])
+    rows.push(
+      trio.map(field => new Set(field?.filled ?? [])) as [
+        Set<number>,
+        Set<number>,
+        Set<number>,
+      ]
+    )
   }
 
   if (rows.length < 2) return false
@@ -63,9 +74,9 @@ function operatorIsUnique(built: Built): boolean {
   const total = 9
   const consistent = (Object.keys(OPS) as (keyof typeof OPS)[]).filter(op =>
     rows.every(([a, b, c]) => {
-      for (let i = 0; i < total; i += 1) {
+      for (let i = 0; i < total; i += 1)
         if (OPS[op](a.has(i), b.has(i)) !== c.has(i)) return false
-      }
+
       return true
     })
   )
@@ -81,34 +92,37 @@ export function verifyItem(built: Built, profile: RungProfile): VerifyResult {
   const { layout } = profile
   const positions = positionCount(layout)
 
-  if (built.cells.length !== positions) {
-    return fail(`${layout.id} has ${positions} positions, got ${built.cells.length}`)
-  }
+  if (built.cells.length !== positions)
+    return fail(
+      `${layout.id} has ${positions} positions, got ${built.cells.length}`
+    )
 
   for (let index = 0; index < positions; index += 1) {
     const filled = built.cells[index] != null
-    if (filled === (index === layout.holeIndex)) {
-      return fail(`position ${index} should be ${index === layout.holeIndex ? 'the hole' : 'a cell'}`)
-    }
+    if (filled === (index === layout.holeIndex))
+      return fail(
+        `position ${index} should be ${index === layout.holeIndex ? 'the hole' : 'a cell'}`
+      )
   }
 
-  if (built.distractors.length !== 5) {
+  if (built.distractors.length !== 5)
     return fail(`expected 5 distractors, got ${built.distractors.length}`)
-  }
 
   const options: Cell[] = [built.answer, ...built.distractors.map(d => d.cell)]
 
   // Sorting the key throws away paint order, which is only sound while no element can hide
   // another - so this check is what licenses the key, not an extra nicety.
-  for (const [index, cell] of Array.from(built.cells.entries())) {
-    if (cell && !noHiddenLayers(cell)) return fail(`cell ${index} hides one of its own elements`)
-  }
-  for (const cell of options) {
-    if (!noHiddenLayers(cell)) return fail('an option hides one of its own elements')
-  }
+  for (const [index, cell] of Array.from(built.cells.entries()))
+    if (cell && !noHiddenLayers(cell))
+      return fail(`cell ${index} hides one of its own elements`)
+
+  for (const cell of options)
+    if (!noHiddenLayers(cell))
+      return fail('an option hides one of its own elements')
 
   const keys = new Set(options.map(cellKey))
-  if (keys.size !== 6) return fail(`expected 6 distinct options, got ${keys.size}`)
+  if (keys.size !== 6)
+    return fail(`expected 6 distinct options, got ${keys.size}`)
 
   /**
    * Structural distinctness is necessary but NOT sufficient.
@@ -117,18 +131,18 @@ export function verifyItem(built: Built, profile: RungProfile): VerifyResult {
    * identical at render size. A panel built on `cellKey` alone can be perfectly valid and
    * still ask the taker to see a difference that is not there.
    */
-  for (let i = 0; i < options.length; i += 1) {
-    for (let j = i + 1; j < options.length; j += 1) {
-      if (!perceptuallyDistinct(options[i] as Cell, options[j] as Cell)) {
-        return fail(`options ${i} and ${j} are structurally different but look the same`)
-      }
-    }
-  }
+  for (let i = 0; i < options.length; i += 1)
+    for (let j = i + 1; j < options.length; j += 1)
+      if (!perceptuallyDistinct(options[i] as Cell, options[j] as Cell))
+        return fail(
+          `options ${i} and ${j} are structurally different but look the same`
+        )
 
   // The rung's demand, met rather than ignored. v1's whole vocabulary failed this.
-  if (built.dimensions !== profile.dimensions) {
-    return fail(`rung ${profile.rung} wants ${profile.dimensions} dimensions, got ${built.dimensions}`)
-  }
+  if (built.dimensions !== profile.dimensions)
+    return fail(
+      `rung ${profile.rung} wants ${profile.dimensions} dimensions, got ${built.dimensions}`
+    )
 
   /**
    * For set logic, the operator has to be inferable from the two COMPLETE rows.
@@ -141,15 +155,14 @@ export function verifyItem(built: Built, profile: RungProfile): VerifyResult {
    * v1 found this empirically: sweeping 400 seeds, 1 in 89 set-logic items was ambiguous this
    * way - roughly one unfair question per three takers over a 26-item test.
    */
-  if (built.requiresUniqueOperator && !operatorIsUnique(built)) {
+  if (built.requiresUniqueOperator && !operatorIsUnique(built))
     return fail('the given rows are consistent with more than one operator')
-  }
 
-  for (const track of built.tracks) {
-    if (!trackIsWitnessed(track, layout, built.cells)) {
-      return fail(`the ${track.dim} track does not visibly vary across the given cells`)
-    }
-  }
+  for (const track of built.tracks)
+    if (!trackIsWitnessed(track, layout, built.cells))
+      return fail(
+        `the ${track.dim} track does not visibly vary across the given cells`
+      )
 
   /**
    * A layout that confirms the rule fewer than twice needs a directional dimension.
@@ -163,13 +176,18 @@ export function verifyItem(built: Built, profile: RungProfile): VerifyResult {
    * a 2x2 is weaker still - it gives a row step and a column step and confirms NEITHER - so
    * exempting it because it is spelled differently would leave the harder layout unguarded.
    */
-  if (layout.confirmations < 2 && !built.tracks.some(track => ORDINAL.has(track.dim))) {
-    return fail(`${layout.id} confirms the rule ${layout.confirmations} times, so it needs an ordinal track to pin the reading direction`)
-  }
+  if (
+    layout.confirmations < 2 &&
+    !built.tracks.some(track => ORDINAL.has(track.dim))
+  )
+    return fail(
+      `${layout.id} confirms the rule ${layout.confirmations} times, so it needs an ordinal track to pin the reading direction`
+    )
 
-  if (built.decoySlots.length < profile.decoys) {
-    return fail(`rung ${profile.rung} wants ${profile.decoys} decoys, got ${built.decoySlots.length}`)
-  }
+  if (built.decoySlots.length < profile.decoys)
+    return fail(
+      `rung ${profile.rung} wants ${profile.decoys} decoys, got ${built.decoySlots.length}`
+    )
 
   /**
    * A decoy that varies is an undeclared dimension.
@@ -180,9 +198,9 @@ export function verifyItem(built: Built, profile: RungProfile): VerifyResult {
    */
   for (const slot of built.decoySlots) {
     const values = new Set<string>()
-    for (const cell of built.cells) {
+    for (const cell of built.cells)
       if (cell) values.add(JSON.stringify(cell[slot] ?? null))
-    }
+
     values.add(JSON.stringify(built.answer[slot] ?? null))
     if (values.size > 1) return fail(`the ${slot} decoy is not constant`)
   }
@@ -200,7 +218,8 @@ export function verifyItem(built: Built, profile: RungProfile): VerifyResult {
   const tally = new Map<string, number>()
   for (const { error } of built.distractors) {
     tally.set(error, (tally.get(error) ?? 0) + 1)
-    if ((tally.get(error) ?? 0) > 2) return fail(`the ${error} error model appears more than twice`)
+    if ((tally.get(error) ?? 0) > 2)
+      return fail(`the ${error} error model appears more than twice`)
   }
 
   /**
@@ -211,9 +230,9 @@ export function verifyItem(built: Built, profile: RungProfile): VerifyResult {
    * correct while the panel is one option short of the six it claims.
    */
   const answerKey = cellKey(built.answer)
-  for (const { cell, error } of built.distractors) {
-    if (cellKey(cell) === answerKey) return fail(`the ${error} distractor equals the answer`)
-  }
+  for (const { cell, error } of built.distractors)
+    if (cellKey(cell) === answerKey)
+      return fail(`the ${error} distractor equals the answer`)
 
   void coordsOf
   return { ok: true }

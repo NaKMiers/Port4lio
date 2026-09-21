@@ -108,7 +108,5 @@ contactMessageSchema.index({ createdAt: -1 })
 // `compileModel`, not `mongoose.models.X ?? ...`: this schema will gain fields (the owner
 // board, a `readAt`, a reply marker) and the plain cached lookup drops them silently under
 // dev HMR - a write returns 200 with the new field simply absent. See `mongoose-model.ts`.
-export const ContactMessageModel: mongoose.Model<ContactMessageDocument> = compileModel(
-  'ContactMessage',
-  contactMessageSchema
-)
+export const ContactMessageModel: mongoose.Model<ContactMessageDocument> =
+  compileModel('ContactMessage', contactMessageSchema)

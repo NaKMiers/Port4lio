@@ -24,7 +24,6 @@ export type UploadingState = {
   projects: Record<number, boolean>
 }
 
-
 /**
  * What every reorderable CV section card takes. They are rendered from a lookup keyed by
  * `ResumeSectionKey`, so they have to agree on one prop shape.

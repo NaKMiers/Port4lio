@@ -4,7 +4,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import CvSheets from '@/components/cv/CvSheets'
-import { CV_PREVIEW_PRINT_CSS, SHEET_WIDTH_PX } from '@/components/cv/cv-sheet-css'
+import {
+  CV_PREVIEW_PRINT_CSS,
+  SHEET_WIDTH_PX,
+} from '@/components/cv/cv-sheet-css'
 import { arimo } from '@/lib/cv-font'
 import { deriveResume } from '@/lib/resume-view-model'
 import type { Profile, Resume } from '@/types/profile'
@@ -53,10 +56,15 @@ export default function CvTabPreview({
   )
 
   return (
-    <div className='space-y-3'>
+    <div className="space-y-3">
       <ScaledSheets resume={resume} />
 
-      <CvExpandOverlay resume={resume} open={expanded} onClose={onCloseExpand} onDownload={startPrint} />
+      <CvExpandOverlay
+        resume={resume}
+        open={expanded}
+        onClose={onCloseExpand}
+        onDownload={startPrint}
+      />
 
       {/* Mounted only while printing, parked offscreen, and portaled to `document.body`.
           The sheets have to exist at true A4 with no zoom for the print stylesheet to hand
@@ -70,7 +78,12 @@ export default function CvTabPreview({
             <div
               className={`cv-print-root cv ${arimo.variable}`}
               aria-hidden
-              style={{ position: 'fixed', left: -99999, top: 0, width: SHEET_WIDTH_PX }}
+              style={{
+                position: 'fixed',
+                left: -99999,
+                top: 0,
+                width: SHEET_WIDTH_PX,
+              }}
             >
               <CvSheets resume={resume} />
             </div>,
@@ -153,9 +166,10 @@ function ScaledSheets({ resume }: { resume: Resume }) {
     // `/settings` opened in a background tab, say - produces no frames, which would leave
     // the sheets hidden until something happened to resize them.
     const applyWidth = (width: number) => {
-      if (width > 0) {
-        setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, width / SHEET_WIDTH_PX)))
-      }
+      if (width > 0)
+        setScale(
+          Math.min(MAX_SCALE, Math.max(MIN_SCALE, width / SHEET_WIDTH_PX))
+        )
     }
     applyWidth(container.getBoundingClientRect().width)
 
@@ -172,7 +186,11 @@ function ScaledSheets({ resume }: { resume: Resume }) {
     const sheets = Array.from(container.querySelectorAll<HTMLElement>('.sheet'))
     // scrollHeight/clientHeight are layout values, so the comparison is zoom-invariant.
     // One pixel of tolerance keeps sub-pixel rounding from crying wolf.
-    setOverflow(sheets.map(sheet => Math.max(0, sheet.scrollHeight - sheet.clientHeight - 1)))
+    setOverflow(
+      sheets.map(sheet =>
+        Math.max(0, sheet.scrollHeight - sheet.clientHeight - 1)
+      )
+    )
   }, [])
 
   useEffect(() => {
@@ -187,19 +205,25 @@ function ScaledSheets({ resume }: { resume: Resume }) {
     .filter(entry => entry.amount > 0)
 
   return (
-    <div className='space-y-2.5'>
+    <div className="space-y-2.5">
       {overflowing.length > 0 ? (
-        <div className='rounded-[1rem] border border-[rgba(163,49,47,0.2)] bg-[rgba(211,108,105,0.1)] px-3 py-2 text-[11px] leading-relaxed text-[#7f2f2f]'>
-          <span className='font-semibold'>Content is being clipped.</span>{' '}
+        <div className="rounded-[1rem] border border-[rgba(163,49,47,0.2)] bg-[rgba(211,108,105,0.1)] px-3 py-2 text-[11px] leading-relaxed text-[#7f2f2f]">
+          <span className="font-semibold">Content is being clipped.</span>{' '}
           {overflowing
-            .map(entry => `Sheet ${entry.sheet} overflows by about ${Math.round(entry.amount)}px`)
+            .map(
+              entry =>
+                `Sheet ${entry.sheet} overflows by about ${Math.round(entry.amount)}px`
+            )
             .join('; ')}
-          . The page is a fixed 297mm, so the excess is cut off rather than moved to a third
-          sheet.
+          . The page is a fixed 297mm, so the excess is cut off rather than
+          moved to a third sheet.
         </div>
       ) : null}
 
-      <div ref={containerRef} className='overflow-hidden rounded-[0.6rem]'>
+      <div
+        ref={containerRef}
+        className="overflow-hidden rounded-[0.6rem]"
+      >
         {/* Explicit A4 width plus `zoom` gives a deterministic visual width of
             SHEET_WIDTH_PX * scale - a percentage width under zoom would resolve against the
             unscaled parent and shrink twice. Hidden until measured, so the unscaled sheets
@@ -216,7 +240,7 @@ function ScaledSheets({ resume }: { resume: Resume }) {
         </div>
       </div>
 
-      <p className='text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-muted'>
+      <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-muted">
         2 sheets · A4 · {Math.round((scale || 0) * 100)}%
       </p>
     </div>
@@ -250,24 +274,27 @@ function CvExpandOverlay({
   // than that needs to pan sideways rather than clip the right margin.
   return (
     <div
-      className='fixed inset-0 z-[300] overflow-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8'
-      role='dialog'
-      aria-modal='true'
-      aria-label='Curriculum vitae preview'
+      className="fixed inset-0 z-[300] overflow-auto bg-black/70 p-4 backdrop-blur-sm sm:p-8"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Curriculum vitae preview"
       onClick={onClose}
     >
-      <div className='mx-auto flex w-full max-w-[calc(210mm+2rem)] flex-col items-center gap-4'>
-        <div className='flex w-full justify-end gap-2' onClick={event => event.stopPropagation()}>
+      <div className="mx-auto flex w-full max-w-[calc(210mm+2rem)] flex-col items-center gap-4">
+        <div
+          className="flex w-full justify-end gap-2"
+          onClick={event => event.stopPropagation()}
+        >
           <button
-            type='button'
-            className='rounded-full bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_12px_28px_rgba(0,0,0,0.24)]'
+            type="button"
+            className="rounded-full bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_12px_28px_rgba(0,0,0,0.24)]"
             onClick={onDownload}
           >
             Download PDF
           </button>
           <button
-            type='button'
-            className='rounded-full bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_12px_28px_rgba(0,0,0,0.24)]'
+            type="button"
+            className="rounded-full bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_12px_28px_rgba(0,0,0,0.24)]"
             onClick={onClose}
           >
             Close (Esc)

@@ -60,7 +60,8 @@ export type ManualArtifact = {
   fields: ManualField[]
 }
 
-export type PublishArtifact = GithubReadmeArtifact | GithubBioArtifact | ManualArtifact
+export type PublishArtifact =
+  GithubReadmeArtifact | GithubBioArtifact | ManualArtifact
 
 export type PublishTarget = {
   id: PublishTargetId
@@ -100,5 +101,8 @@ export type PublishManifestWithDrift = Omit<PublishManifest, 'targets'> & {
 }
 
 export function isPublishTargetId(value: unknown): value is PublishTargetId {
-  return typeof value === 'string' && (PUBLISH_TARGET_IDS as readonly string[]).includes(value)
+  return (
+    typeof value === 'string' &&
+    (PUBLISH_TARGET_IDS as readonly string[]).includes(value)
+  )
 }

@@ -65,19 +65,19 @@ export function renderRichText(source: string): ReactNode[] {
         <a
           key={key++}
           href={href}
-          target='_blank'
-          rel='noopener noreferrer'
+          target="_blank"
+          rel="noopener noreferrer"
           className={LINK_CLASS}
         >
           {decode(linkLabel)}
-          <span className='sr-only'> (mở tab mới)</span>
+          <span className="sr-only"> (mở tab mới)</span>
         </a>
       )
       continue
     }
 
     const text = decode(inner ?? '')
-    if (tag === 'code') {
+    if (tag === 'code')
       nodes.push(
         <code
           key={key++}
@@ -86,18 +86,16 @@ export function renderRichText(source: string): ReactNode[] {
           {text}
         </code>
       )
-    } else if (tag === 'em') {
-      nodes.push(<em key={key++}>{text}</em>)
-    } else {
+    else if (tag === 'em') nodes.push(<em key={key++}>{text}</em>)
+    else
       nodes.push(
         <strong
           key={key++}
-          className='font-semibold text-pp-text'
+          className="font-semibold text-pp-text"
         >
           {text}
         </strong>
       )
-    }
   }
 
   if (cursor < source.length) nodes.push(decode(source.slice(cursor)))

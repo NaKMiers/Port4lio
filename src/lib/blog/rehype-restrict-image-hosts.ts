@@ -149,17 +149,13 @@ export default function rehypeRestrictImageHosts() {
 
         if (name === 'srcset') {
           const filtered = filterSrcset(value)
-          if (filtered === null) {
-            delete node.properties[name]
-          } else {
-            node.properties[name] = filtered
-          }
+          if (filtered === null) delete node.properties[name]
+          else node.properties[name] = filtered
+
           continue
         }
 
-        if (!isAllowedImageUrl(value)) {
-          delete node.properties[name]
-        }
+        if (!isAllowedImageUrl(value)) delete node.properties[name]
       }
     })
   }

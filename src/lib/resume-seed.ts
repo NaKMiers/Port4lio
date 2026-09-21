@@ -34,8 +34,16 @@ export const RESUME_SEED: Resume = {
     phone: '0899 320 427',
     location: 'Tan Binh, Ho Chi Minh City',
     links: [
-      { label: 'Portfolio', text: 'anhkhoa.info', href: 'https://anhkhoa.info/' },
-      { label: 'Github', text: 'Nguyen Anh Khoa', href: 'https://github.com/NaKMiers' },
+      {
+        label: 'Portfolio',
+        text: 'anhkhoa.info',
+        href: 'https://anhkhoa.info/',
+      },
+      {
+        label: 'Github',
+        text: 'Nguyen Anh Khoa',
+        href: 'https://github.com/NaKMiers',
+      },
       {
         label: 'LinkedIn',
         text: 'Anh Khoa Nguyen',
@@ -142,12 +150,18 @@ export const RESUME_SEED: Resume = {
       {
         issuer: 'Anthropic, 2026',
         items: [
-          { name: 'Claude 101', link: 'https://verify.skilljar.com/c/8o6g5ysos5w7' },
+          {
+            name: 'Claude 101',
+            link: 'https://verify.skilljar.com/c/8o6g5ysos5w7',
+          },
           {
             name: 'Building with the Claude API',
             link: 'https://verify.skilljar.com/c/omvytt6pbs7z',
           },
-          { name: 'Claude Code in Action', link: 'https://verify.skilljar.com/c/v47sjumd9nas' },
+          {
+            name: 'Claude Code in Action',
+            link: 'https://verify.skilljar.com/c/v47sjumd9nas',
+          },
           {
             name: 'Introduction to Agent Skills',
             link: 'https://verify.skilljar.com/c/dayt6wxu4wpb',
@@ -198,7 +212,8 @@ export const RESUME_SEED: Resume = {
         },
         {
           employer: '',
-          title: '**Anpha Shop: E-commerce Website for Account Rental Services**',
+          title:
+            '**Anpha Shop: E-commerce Website for Account Rental Services**',
           period: '08/2023 - current',
           details: [
             '**Position: Full Stack Developer (Owner)**',

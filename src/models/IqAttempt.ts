@@ -154,15 +154,20 @@ const iqAttemptSchema = new Schema(
  */
 iqAttemptSchema.index(
   { certificateId: 1 },
-  { unique: true, partialFilterExpression: { certificateId: { $type: 'string' } } }
+  {
+    unique: true,
+    partialFilterExpression: { certificateId: { $type: 'string' } },
+  }
 )
 
 iqAttemptSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
 
 iqAttemptSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[IqAttempt] index build FAILED - retention or certificate uniqueness is not enforced', error)
-  }
+  if (error)
+    console.error(
+      '[IqAttempt] index build FAILED - retention or certificate uniqueness is not enforced',
+      error
+    )
 })
 
 export const IqAttemptModel: mongoose.Model<IqAttemptDocument> =

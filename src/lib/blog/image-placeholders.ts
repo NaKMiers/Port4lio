@@ -85,7 +85,9 @@ export function findImagePlaceholders(markdown: string): ImagePlaceholder[] {
   //
   // `Array.from` around it because tsconfig targets ES5 without `downlevelIteration`, so a
   // bare `for...of` over the iterator does not compile.
-  for (const match of Array.from(markdown.matchAll(IMAGE_PLACEHOLDER_PATTERN))) {
+  for (const match of Array.from(
+    markdown.matchAll(IMAGE_PLACEHOLDER_PATTERN)
+  )) {
     const [, alt, key] = match
     if (seen.has(key)) continue
     seen.add(key)
@@ -108,7 +110,11 @@ export function findImagePlaceholders(markdown: string): ImagePlaceholder[] {
  * `rehypeRestrictImageHosts`, and a "cleverly" escaped URL would break the Cloudinary paths
  * that are the entire point.
  */
-export function replacePlaceholder(markdown: string, key: string, url: string): string {
+export function replacePlaceholder(
+  markdown: string,
+  key: string,
+  url: string
+): string {
   // Built per call rather than reusing the module constant, for the `lastIndex` reason above,
   // and anchored on the exact key so `image1` cannot match inside `image12`.
   const pattern = new RegExp(`!\\[([^\\]]*)\\]\\(${key}\\)`, 'g')
@@ -146,7 +152,10 @@ export function countBodyImages(markdown: string): number {
 
 /** `image1`, `image2`, ... for a count. The keys the generator is asked to use. */
 export function placeholderKeys(count: number): string[] {
-  return Array.from({ length: Math.max(0, count) }, (_, index) => `image${index + 1}`)
+  return Array.from(
+    { length: Math.max(0, count) },
+    (_, index) => `image${index + 1}`
+  )
 }
 
 /**
@@ -159,7 +168,9 @@ export function placeholderKeys(count: number): string[] {
  */
 export function resolvedImageUrls(markdown: string): string[] {
   const urls: string[] = []
-  for (const match of Array.from(markdown.matchAll(/!\[[^\]]*\]\(([^)\s]+)[^)]*\)/g))) {
+  for (const match of Array.from(
+    markdown.matchAll(/!\[[^\]]*\]\(([^)\s]+)[^)]*\)/g)
+  )) {
     const url = match[1]
     if (!/^image\d+$/.test(url)) urls.push(url)
   }
@@ -196,7 +207,8 @@ export function carryForwardImages(
   oldMarkdown: string
 ): { markdown: string; carried: number; dropped: string[] } {
   const urls = resolvedImageUrls(oldMarkdown)
-  if (urls.length === 0) return { markdown: newMarkdown, carried: 0, dropped: [] }
+  if (urls.length === 0)
+    return { markdown: newMarkdown, carried: 0, dropped: [] }
 
   const placeholders = findImagePlaceholders(newMarkdown)
   let markdown = newMarkdown

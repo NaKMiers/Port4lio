@@ -48,12 +48,22 @@ export default async function SubscribedPage({
   const copy = COPY[state ?? ''] ?? COPY.invalid
 
   return (
-    <div className='mx-auto w-full max-w-editorial px-gutter py-20'>
-      <h1 className='font-display text-3xl font-semibold text-pp-text'>{copy.heading}</h1>
-      <p className='mt-4 max-w-[58ch] text-lg leading-relaxed text-pp-muted'>{copy.body}</p>
-      <p className='mt-8 text-sm'>
-        <Link href='/blog' className='inline-flex items-center gap-1.5 text-pp-blue no-underline'>
-          <ArrowLeft aria-hidden size={14} />
+    <div className="mx-auto w-full max-w-editorial px-gutter py-20">
+      <h1 className="font-display text-3xl font-semibold text-pp-text">
+        {copy.heading}
+      </h1>
+      <p className="mt-4 max-w-[58ch] text-lg leading-relaxed text-pp-muted">
+        {copy.body}
+      </p>
+      <p className="mt-8 text-sm">
+        <Link
+          href="/blog"
+          className="inline-flex items-center gap-1.5 text-pp-blue no-underline"
+        >
+          <ArrowLeft
+            aria-hidden
+            size={14}
+          />
           Back to the writing
         </Link>
       </p>

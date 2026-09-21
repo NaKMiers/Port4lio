@@ -18,18 +18,17 @@ type AnimatedCounterProps = {
 function parseCountValue(rawValue: string): ParsedValue {
   const raw = rawValue.trim()
   const match = raw.match(/^([^0-9-]*)(-?\d[\d,]*(?:\.\d+)?)(.*)$/)
-  if (!match) {
-    return { prefix: '', suffix: '', value: null, decimals: 0 }
-  }
+  if (!match) return { prefix: '', suffix: '', value: null, decimals: 0 }
 
   const [, prefix, numericPart, suffix] = match
   const normalized = numericPart.replace(/,/g, '')
   const value = Number(normalized)
-  if (!Number.isFinite(value)) {
+  if (!Number.isFinite(value))
     return { prefix: '', suffix: '', value: null, decimals: 0 }
-  }
 
-  const decimals = normalized.includes('.') ? normalized.split('.')[1]?.length ?? 0 : 0
+  const decimals = normalized.includes('.')
+    ? (normalized.split('.')[1]?.length ?? 0)
+    : 0
 
   return {
     prefix,
@@ -46,13 +45,11 @@ export default function AnimatedCounter({ value }: AnimatedCounterProps) {
   const hasMounted = useSyncExternalStore(
     () => () => {},
     () => true,
-    () => false,
+    () => false
   )
   const parsed = useMemo(() => parseCountValue(value), [value])
 
-  if (parsed.value === null) {
-    return <span>{value}</span>
-  }
+  if (parsed.value === null) return <span>{value}</span>
 
   const { prefix, suffix, value: endValue, decimals } = parsed
   const shouldAnimate = hasMounted && !prefersReducedMotion && isInView
@@ -66,9 +63,9 @@ export default function AnimatedCounter({ value }: AnimatedCounterProps) {
           start={0}
           end={endValue}
           duration={2.3}
-          separator=','
+          separator=","
           decimals={decimals}
-          decimal='.'
+          decimal="."
           prefix={prefix}
           suffix={suffix}
         />

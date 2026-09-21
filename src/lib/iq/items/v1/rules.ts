@@ -1,5 +1,16 @@
-import { SHAPE_KINDS, type Shading, type ShapeKind } from '@/lib/iq/items/primitives'
-import { cellKey, pick, rng, shuffle, type Cell, type RuleSpec } from '@/lib/iq/items/v1/types'
+import {
+  SHAPE_KINDS,
+  type Shading,
+  type ShapeKind,
+} from '@/lib/iq/items/primitives'
+import {
+  cellKey,
+  pick,
+  rng,
+  shuffle,
+  type Cell,
+  type RuleSpec,
+} from '@/lib/iq/items/v1/types'
 
 /**
  * The rule vocabulary.
@@ -32,7 +43,12 @@ import { cellKey, pick, rng, shuffle, type Cell, type RuleSpec } from '@/lib/iq/
 
 const SHADINGS: readonly Shading[] = ['outline', 'half', 'filled']
 
-function shapeCell(kind: ShapeKind, shading: Shading, rotation = 0, scale = 0.78): Cell {
+function shapeCell(
+  kind: ShapeKind,
+  shading: Shading,
+  rotation = 0,
+  scale = 0.78
+): Cell {
   return { type: 'shape', spec: { kind, shading, rotation, scale } }
 }
 
@@ -67,12 +83,17 @@ const shadingCycle: RuleSpec = {
     const kinds = shuffle(random, SHAPE_KINDS).slice(0, 3)
     const offset = Math.floor(random() * 3)
     const cells: Cell[] = []
-    for (let row = 0; row < 3; row += 1) {
+    for (let row = 0; row < 3; row += 1)
       for (let col = 0; col < 3; col += 1) {
         if (row === 2 && col === 2) continue
-        cells.push(shapeCell(kinds[row] as ShapeKind, SHADINGS[(col + offset) % 3] as Shading))
+        cells.push(
+          shapeCell(
+            kinds[row] as ShapeKind,
+            SHADINGS[(col + offset) % 3] as Shading
+          )
+        )
       }
-    }
+
     const answerKind = kinds[2] as ShapeKind
     const answerShading = SHADINGS[(2 + offset) % 3] as Shading
     const answer = shapeCell(answerKind, answerShading)
@@ -102,16 +123,22 @@ const rotation: RuleSpec = {
   name: 'rotation',
   minRung: 3,
   build: random => {
-    const kind = pick(random, ['square', 'triangle', 'diamond', 'star4', 'star5'] as const)
+    const kind = pick(random, [
+      'square',
+      'triangle',
+      'diamond',
+      'star4',
+      'star5',
+    ] as const)
     const step = pick(random, [30, 45, 60, 90])
     const shading = pick(random, SHADINGS)
     const cells: Cell[] = []
-    for (let row = 0; row < 3; row += 1) {
+    for (let row = 0; row < 3; row += 1)
       for (let col = 0; col < 3; col += 1) {
         if (row === 2 && col === 2) continue
         cells.push(shapeCell(kind, shading, (row * 3 + col) * step))
       }
-    }
+
     const answerAngle = 8 * step
     const answer = shapeCell(kind, shading, answerAngle)
 
@@ -123,9 +150,17 @@ const rotation: RuleSpec = {
         shapeCell(kind, shading, answerAngle + step),
         shapeCell(kind, shading, answerAngle - 2 * step),
         // Correct angle, wrong shading - tests that they tracked the right dimension.
-        shapeCell(kind, shading === 'filled' ? 'outline' : 'filled', answerAngle),
+        shapeCell(
+          kind,
+          shading === 'filled' ? 'outline' : 'filled',
+          answerAngle
+        ),
         // Rotation applied to the wrong shape.
-        shapeCell(kind === 'square' ? 'diamond' : 'square', shading, answerAngle),
+        shapeCell(
+          kind === 'square' ? 'diamond' : 'square',
+          shading,
+          answerAngle
+        ),
         shapeCell(kind, shading, answerAngle + 2 * step),
       ],
       5
@@ -156,7 +191,11 @@ export const MAX_BARS = 7
  * is a fair alternative reading and lands on exactly the same missing cell - so it is a
  * genuinely easier item, not an ambiguous one.
  */
-const COUNT_PARAMS: readonly { start: number; step: number; rowStep: number }[] = [
+const COUNT_PARAMS: readonly {
+  start: number
+  step: number
+  rowStep: number
+}[] = [
   { start: 1, step: 1, rowStep: 1 },
   { start: 1, step: 1, rowStep: 2 },
   { start: 1, step: 2, rowStep: 1 },
@@ -179,12 +218,12 @@ const countSeries: RuleSpec = {
   minRung: 2,
   build: random => {
     const { start, step, rowStep } = pick(random, COUNT_PARAMS)
-    const countAt = (row: number, col: number) => start + col * step + row * rowStep
+    const countAt = (row: number, col: number) =>
+      start + col * step + row * rowStep
 
     const cells: Cell[] = []
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 8; i += 1)
       cells.push({ type: 'bars', count: countAt(Math.floor(i / 3), i % 3) })
-    }
 
     const answerCount = countAt(2, 2)
     const answer: Cell = { type: 'bars', count: answerCount }
@@ -227,8 +266,10 @@ const sizeScale: RuleSpec = {
     const shading = pick(random, SHADINGS)
     const growing = random() > 0.5
     const cells: Cell[] = []
-    const sizeAt = (i: number) => Number((growing ? 0.34 + i * 0.06 : 0.9 - i * 0.06).toFixed(2))
-    for (let i = 0; i < 8; i += 1) cells.push(shapeCell(kind, shading, 0, sizeAt(i)))
+    const sizeAt = (i: number) =>
+      Number((growing ? 0.34 + i * 0.06 : 0.9 - i * 0.06).toFixed(2))
+    for (let i = 0; i < 8; i += 1)
+      cells.push(shapeCell(kind, shading, 0, sizeAt(i)))
     const answerScale = sizeAt(8)
     const answer = shapeCell(kind, shading, 0, answerScale)
 
@@ -239,7 +280,12 @@ const sizeScale: RuleSpec = {
         shapeCell(kind, shading, 0, Number((answerScale + 0.06).toFixed(2))),
         shapeCell(kind, shading, 0, Number((answerScale - 0.12).toFixed(2))),
         // Right size, wrong shading: did they track size or shading?
-        shapeCell(kind, shading === 'filled' ? 'outline' : 'filled', 0, answerScale),
+        shapeCell(
+          kind,
+          shading === 'filled' ? 'outline' : 'filled',
+          0,
+          answerScale
+        ),
         shapeCell(kind, shading, 0, sizeAt(6)),
         shapeCell(kind, shading, 0, Number((answerScale + 0.12).toFixed(2))),
       ],
@@ -257,9 +303,9 @@ const shapeProgression: RuleSpec = {
     const series: ShapeKind[] = ['triangle', 'square', 'hexagon', 'circle']
     const shading = pick(random, SHADINGS)
     const cells: Cell[] = []
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < 8; i += 1)
       cells.push(shapeCell(series[i % series.length] as ShapeKind, shading))
-    }
+
     const answerKind = series[8 % series.length] as ShapeKind
     const answer = shapeCell(answerKind, shading)
 
@@ -305,7 +351,8 @@ const setLogic: RuleSpec = {
       for (let i = 0; i < total; i += 1) {
         const inA = setA.has(i)
         const inB = setB.has(i)
-        const on = op === 'and' ? inA && inB : op === 'or' ? inA || inB : inA !== inB
+        const on =
+          op === 'and' ? inA && inB : op === 'or' ? inA || inB : inA !== inB
         if (on) out.push(i)
       }
       return out
@@ -318,18 +365,24 @@ const setLogic: RuleSpec = {
     })
 
     const cells: Cell[] = []
-    for (let row = 0; row < 3; row += 1) {
+    for (let row = 0; row < 3; row += 1)
       for (let col = 0; col < 3; col += 1) {
         if (row === 2 && col === 2) continue
-        cells.push({ type: 'dotgrid', size, filled: rows[row]?.[col] as number[] })
+        cells.push({
+          type: 'dotgrid',
+          size,
+          filled: rows[row]?.[col] as number[],
+        })
       }
-    }
+
     const answerFilled = rows[2]?.[2] as number[]
     const answer: Cell = { type: 'dotgrid', size, filled: answerFilled }
 
     const a = rows[2]?.[0] as number[]
     const b = rows[2]?.[1] as number[]
-    const otherOps = (['and', 'or', 'xor'] as const).filter(candidate => candidate !== op)
+    const otherOps = (['and', 'or', 'xor'] as const).filter(
+      candidate => candidate !== op
+    )
     const withOp = (which: 'and' | 'or' | 'xor'): number[] => {
       const setA = new Set(a)
       const setB = new Set(b)
@@ -337,7 +390,12 @@ const setLogic: RuleSpec = {
       for (let i = 0; i < total; i += 1) {
         const inA = setA.has(i)
         const inB = setB.has(i)
-        const on = which === 'and' ? inA && inB : which === 'or' ? inA || inB : inA !== inB
+        const on =
+          which === 'and'
+            ? inA && inB
+            : which === 'or'
+              ? inA || inB
+              : inA !== inB
         if (on) out.push(i)
       }
       return out
@@ -355,8 +413,16 @@ const setLogic: RuleSpec = {
       answer,
       [
         // The other two operators: wrong for a statable reason.
-        { type: 'dotgrid', size, filled: withOp(otherOps[0] as 'and' | 'or' | 'xor') },
-        { type: 'dotgrid', size, filled: withOp(otherOps[1] as 'and' | 'or' | 'xor') },
+        {
+          type: 'dotgrid',
+          size,
+          filled: withOp(otherOps[0] as 'and' | 'or' | 'xor'),
+        },
+        {
+          type: 'dotgrid',
+          size,
+          filled: withOp(otherOps[1] as 'and' | 'or' | 'xor'),
+        },
         // Right operator, one cell off.
         { type: 'dotgrid', size, filled: flipOne(answerFilled, 1) },
         { type: 'dotgrid', size, filled: flipOne(answerFilled, 2) },

@@ -47,13 +47,21 @@ describe('resume.hidePhoto', () => {
     const now = new Date()
     await ProfileModel.findOneAndUpdate(
       { _id: PROFILE_DOCUMENT_ID },
-      { $set: { ...sent, updatedAt: now }, $setOnInsert: { _id: PROFILE_DOCUMENT_ID, createdAt: now } },
+      {
+        $set: { ...sent, updatedAt: now },
+        $setOnInsert: { _id: PROFILE_DOCUMENT_ID, createdAt: now },
+      },
       { upsert: true, new: true, lean: true, runValidators: true }
     )
 
     // What loadPublicResume reads for /cv.
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).select('resume avatar').lean()
-    const raw = (doc as Record<string, unknown> | null)?.resume as Record<string, unknown>
+    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
+      .select('resume avatar')
+      .lean()
+    const raw = (doc as Record<string, unknown> | null)?.resume as Record<
+      string,
+      unknown
+    >
 
     expect(raw.hidePhoto).toBe(true)
     expect(deriveResume({ resume: raw as never }).hidePhoto).toBe(true)
@@ -79,8 +87,13 @@ describe('resume.hidePhoto', () => {
       { upsert: true, new: true, lean: true, runValidators: true }
     )
 
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).select('resume').lean()
-    const raw = (doc as Record<string, unknown> | null)?.resume as Record<string, unknown>
+    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
+      .select('resume')
+      .lean()
+    const raw = (doc as Record<string, unknown> | null)?.resume as Record<
+      string,
+      unknown
+    >
     expect(raw.hidePhoto).toBe(false)
   })
 })
@@ -95,13 +108,22 @@ describe('resume.hidePhoto', () => {
  */
 describe('compileModel', () => {
   it('picks up a field added to a schema after the first compile', async () => {
-    const before = new Schema({ _id: String, box: { type: new Schema({ a: String }, { _id: false }), default: undefined } })
+    const before = new Schema({
+      _id: String,
+      box: {
+        type: new Schema({ a: String }, { _id: false }),
+        default: undefined,
+      },
+    })
     compileModel('RecompileProbe', before)
 
     // Same model name, schema now one field wider - what editing a schema file does.
     const after = new Schema({
       _id: String,
-      box: { type: new Schema({ a: String, b: Boolean }, { _id: false }), default: undefined },
+      box: {
+        type: new Schema({ a: String, b: Boolean }, { _id: false }),
+        default: undefined,
+      },
     })
     const Model = compileModel('RecompileProbe', after)
 
@@ -111,7 +133,11 @@ describe('compileModel', () => {
       { upsert: true, new: true, lean: true, runValidators: true }
     )
 
-    const raw = await mongoose.connection.db!.collection('recompileprobes').findOne({ _id: 'p' as never })
-    expect((raw as unknown as { box: Record<string, unknown> }).box.b).toBe(true)
+    const raw = await mongoose.connection
+      .db!.collection('recompileprobes')
+      .findOne({ _id: 'p' as never })
+    expect((raw as unknown as { box: Record<string, unknown> }).box.b).toBe(
+      true
+    )
   })
 })

@@ -46,12 +46,14 @@ export async function POST(request: NextRequest) {
   await connectDatabase()
 
   const limit = await checkRateLimit(clientIpFrom(request), IQ_START_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
   let body: unknown = {}
   try {

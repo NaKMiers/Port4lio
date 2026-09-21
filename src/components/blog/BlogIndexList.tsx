@@ -97,46 +97,56 @@ export default function BlogIndexList({
 
   for (const post of posts) {
     if (post.isPillar) continue
-    if (post.series && bySeries.has(post.series)) bySeries.get(post.series)?.push(post)
+    if (post.series && bySeries.has(post.series))
+      bySeries.get(post.series)?.push(post)
     else unclustered.push(post)
   }
 
   return (
     <>
-      <div className='mt-8'>
-        <label className='sr-only' htmlFor='blog-search'>
+      <div className="mt-8">
+        <label
+          className="sr-only"
+          htmlFor="blog-search"
+        >
           {copy.searchLabel}
         </label>
-        <div className='relative'>
+        <div className="relative">
           <Search
             aria-hidden
             size={15}
-            className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-pp-muted'
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-pp-muted"
           />
           <input
-            id='blog-search'
-            type='search'
+            id="blog-search"
+            type="search"
             value={query}
             onChange={event => setQuery(event.target.value)}
             placeholder={copy.searchPlaceholder}
-            className='w-full rounded-full border border-pp-line bg-pp-panel py-3 pl-11 pr-11 text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none backdrop-blur-md transition placeholder:text-pp-muted/75 focus:border-pp-blue/55 focus:bg-white focus:ring-4 focus:ring-pp-blue/10'
+            className="w-full rounded-full border border-pp-line bg-pp-panel py-3 pl-11 pr-11 text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none backdrop-blur-md transition placeholder:text-pp-muted/75 focus:border-pp-blue/55 focus:bg-white focus:ring-4 focus:ring-pp-blue/10"
           />
           {query ? (
             <button
-              type='button'
+              type="button"
               onClick={() => setQuery('')}
               aria-label={copy.searchClear}
-              className='absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-pp-muted transition hover:bg-white hover:text-pp-text'
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-pp-muted transition hover:bg-white hover:text-pp-text"
             >
-              <X aria-hidden size={14} />
+              <X
+                aria-hidden
+                size={14}
+              />
             </button>
           ) : null}
         </div>
       </div>
 
       {trimmed ? (
-        <section className='mt-10' aria-live='polite'>
-          <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-ink-violet'>
+        <section
+          className="mt-10"
+          aria-live="polite"
+        >
+          <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-ink-violet">
             {matches.length === 0
               ? copy.resultsNone
               : matches.length === 1
@@ -145,11 +155,17 @@ export default function BlogIndexList({
           </h2>
 
           {matches.length === 0 ? (
-            <p className='mt-4 max-w-[60ch] text-pp-muted'>{copy.noMatchBody(query.trim())}</p>
+            <p className="mt-4 max-w-[60ch] text-pp-muted">
+              {copy.noMatchBody(query.trim())}
+            </p>
           ) : (
-            <div className='mt-5 grid gap-5 sm:grid-cols-2'>
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
               {matches.map(post => (
-                <PostCard key={post.slug} post={post} kind={kindMap.get(post.kind)} />
+                <PostCard
+                  key={post.slug}
+                  post={post}
+                  kind={kindMap.get(post.kind)}
+                />
               ))}
             </div>
           )}
@@ -157,13 +173,18 @@ export default function BlogIndexList({
       ) : (
         <>
           {pillars.length > 0 ? (
-            <section className='mt-14'>
-              <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-ink-violet'>
+            <section className="mt-14">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-ink-violet">
                 {copy.startHere}
               </h2>
-              <div className='mt-5 grid gap-5 sm:grid-cols-2'>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 {pillars.map(post => (
-                  <PostCard key={post.slug} post={post} kind={kindMap.get(post.kind)} featured />
+                  <PostCard
+                    key={post.slug}
+                    post={post}
+                    kind={kindMap.get(post.kind)}
+                    featured
+                  />
                 ))}
               </div>
             </section>
@@ -184,7 +205,11 @@ export default function BlogIndexList({
                 `scroll-mt-6` so the heading is not flush against the viewport edge after the
                 jump, which reads as having overshot by a section.
               */
-              <section key={item.slug} id={item.slug} className='mt-14 scroll-mt-6'>
+              <section
+                key={item.slug}
+                id={item.slug}
+                className="mt-14 scroll-mt-6"
+              >
                 {/*
                   Violet, the same ink a post's series eyebrow and the prose h2s use. A series
                   is the one concept that appears on three surfaces - the cluster heading here,
@@ -194,13 +219,21 @@ export default function BlogIndexList({
                   `More posts` below deliberately stays `--pp-text`. It is the bucket for posts
                   that belong to NO series, and the absence of the colour is what says so.
                 */}
-                <h2 className='font-display text-xl font-semibold text-pp-ink-violet'>{item.title}</h2>
+                <h2 className="font-display text-xl font-semibold text-pp-ink-violet">
+                  {item.title}
+                </h2>
                 {item.blurb ? (
-                  <p className='mt-1 max-w-[60ch] text-sm text-pp-muted'>{item.blurb}</p>
+                  <p className="mt-1 max-w-[60ch] text-sm text-pp-muted">
+                    {item.blurb}
+                  </p>
                 ) : null}
-                <div className='mt-5 grid gap-5 sm:grid-cols-2'>
+                <div className="mt-5 grid gap-5 sm:grid-cols-2">
                   {items.map(post => (
-                    <PostCard key={post.slug} post={post} kind={kindMap.get(post.kind)} />
+                    <PostCard
+                      key={post.slug}
+                      post={post}
+                      kind={kindMap.get(post.kind)}
+                    />
                   ))}
                 </div>
               </section>
@@ -208,11 +241,17 @@ export default function BlogIndexList({
           })}
 
           {unclustered.length > 0 ? (
-            <section className='mt-14'>
-              <h2 className='font-display text-xl font-semibold text-pp-text'>{copy.morePosts}</h2>
-              <div className='mt-5 grid gap-5 sm:grid-cols-2'>
+            <section className="mt-14">
+              <h2 className="font-display text-xl font-semibold text-pp-text">
+                {copy.morePosts}
+              </h2>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
                 {unclustered.map(post => (
-                  <PostCard key={post.slug} post={post} kind={kindMap.get(post.kind)} />
+                  <PostCard
+                    key={post.slug}
+                    post={post}
+                    kind={kindMap.get(post.kind)}
+                  />
                 ))}
               </div>
             </section>

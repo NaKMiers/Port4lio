@@ -33,7 +33,7 @@ export const metadata: Metadata = {
 export default function VocabPage() {
   return (
     <CcafGate>
-      <main className='w-full p-4 lg:h-[100dvh]'>
+      <main className="w-full p-4 lg:h-[100dvh]">
         <VocabTracker />
       </main>
     </CcafGate>

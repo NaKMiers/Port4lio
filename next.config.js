@@ -6,10 +6,18 @@ const nextConfig = {
   async redirects() {
     return [
       { source: '/about', destination: '/?section=about', permanent: true },
-      { source: '/services', destination: '/?section=services', permanent: true },
+      {
+        source: '/services',
+        destination: '/?section=services',
+        permanent: true,
+      },
       { source: '/work', destination: '/?section=work', permanent: true },
       { source: '/contact', destination: '/?section=contact', permanent: true },
-      { source: '/testimonials', destination: '/?section=testimonials', permanent: true },
+      {
+        source: '/testimonials',
+        destination: '/?section=testimonials',
+        permanent: true,
+      },
     ]
   },
 

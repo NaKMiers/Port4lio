@@ -75,22 +75,24 @@ export default async function IqResultPage({
   const copy = iqUi(lang)
 
   // Started but never finished: send them back rather than showing an empty result.
-  if (attempt.submittedAt === null || attempt.score === null) {
+  if (attempt.submittedAt === null || attempt.score === null)
     return (
       <main>
-        <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
-          <p className='text-pp-muted'>{copy.timeUp}</p>
+        <SectionFrame
+          className="py-section-sm"
+          innerClassName="max-w-2xl"
+        >
+          <p className="text-pp-muted">{copy.timeUp}</p>
           <Link
             href={`/${lang}/iq/test`}
-            className='mt-6 inline-flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text'
+            className="mt-6 inline-flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text"
           >
             {copy.retake}
-            <Chevron direction='right' />
+            <Chevron direction="right" />
           </Link>
         </SectionFrame>
       </main>
     )
-  }
 
   /**
    * `paid` is what gates the score, not the presence of an email.
@@ -130,11 +132,14 @@ export default async function IqResultPage({
 
     return (
       <main>
-        <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
+        <SectionFrame
+          className="py-section-sm"
+          innerClassName="max-w-2xl"
+        >
           <TestPaywall
             token={id}
             locale={lang}
-            endpoint='/api/iq/checkout'
+            endpoint="/api/iq/checkout"
             withName
             // Formatted here rather than in the client so đồng formatting lives in one
             // place and the client never has to know the raw amount.
@@ -164,14 +169,14 @@ export default async function IqResultPage({
             lands on a paywall for a stranger's result with no way into the product - the
             loop stops on the exact page it is supposed to continue from.
           */}
-          <div className='mt-8 border-t border-pp-line pt-6'>
-            <p className='text-sm text-pp-muted'>{copy.lockedRecruitLead}</p>
+          <div className="mt-8 border-t border-pp-line pt-6">
+            <p className="text-sm text-pp-muted">{copy.lockedRecruitLead}</p>
             <Link
               href={`/${lang}/iq/test`}
-              className='mt-3 inline-flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text'
+              className="mt-3 inline-flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text"
             >
               {copy.lockedRecruitCta}
-              <Chevron direction='right' />
+              <Chevron direction="right" />
             </Link>
           </div>
         </SectionFrame>
@@ -189,30 +194,38 @@ export default async function IqResultPage({
   return (
     <main>
       <SectionFrame
-        aria-labelledby='iq-result-heading'
+        aria-labelledby="iq-result-heading"
         disableReveal
-        className='border-b border-pp-line pb-section-sm pt-10 md:pt-14'
-        innerClassName='max-w-3xl'
+        className="border-b border-pp-line pb-section-sm pt-10 md:pt-14"
+        innerClassName="max-w-3xl"
       >
-        <p className='font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted">
           {copy.yourScore}
         </p>
         <h1
-          id='iq-result-heading'
-          className='mt-3 font-display text-[clamp(3.5rem,12vw,7rem)] font-semibold leading-[0.95] tracking-tight text-pp-text tabular-nums'
+          id="iq-result-heading"
+          className="mt-3 font-display text-[clamp(3.5rem,12vw,7rem)] font-semibold tabular-nums leading-[0.95] tracking-tight text-pp-text"
         >
           {attempt.score}
         </h1>
-        <p className='mt-3 font-display text-xl font-semibold text-pp-text'>{bandLabel}</p>
-        <p className='mt-4 text-base text-pp-muted md:text-lg'>
+        <p className="mt-3 font-display text-xl font-semibold text-pp-text">
+          {bandLabel}
+        </p>
+        <p className="mt-4 text-base text-pp-muted md:text-lg">
           {fill(copy.percentileLabel, { percentile: attempt.percentile ?? 0 })}
         </p>
-        <p className='mt-1 text-sm text-pp-muted'>
-          {fill(copy.rawLabel, { raw: attempt.raw ?? 0, total: attempt.answers?.length ?? 26 })}
+        <p className="mt-1 text-sm text-pp-muted">
+          {fill(copy.rawLabel, {
+            raw: attempt.raw ?? 0,
+            total: attempt.answers?.length ?? 26,
+          })}
         </p>
       </SectionFrame>
 
-      <SectionFrame className='py-section-sm' innerClassName='max-w-3xl'>
+      <SectionFrame
+        className="py-section-sm"
+        innerClassName="max-w-3xl"
+      >
         {/*
           The waiver, said out loud, above everything else on the page.
           ```
@@ -231,18 +244,23 @@ export default async function IqResultPage({
           shows them.
         */}
         {explainWaiver ? (
-          <EditorialPanel variant='strong' className='mb-8 p-6 md:p-7'>
-            <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+          <EditorialPanel
+            variant="strong"
+            className="mb-8 p-6 md:p-7"
+          >
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
               {copy.waivedTitle}
             </h2>
-            <p className='mt-3 text-pp-muted'>{copy.waivedBody}</p>
-            <p className='mt-3 text-sm text-pp-muted'>{copy.waivedNoCertificate}</p>
+            <p className="mt-3 text-pp-muted">{copy.waivedBody}</p>
+            <p className="mt-3 text-sm text-pp-muted">
+              {copy.waivedNoCertificate}
+            </p>
             <Link
               href={`/${lang}/iq/test`}
-              className='mt-5 inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline'
+              className="mt-5 inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline"
             >
               {copy.retake}
-              <Chevron direction='right' />
+              <Chevron direction="right" />
             </Link>
           </EditorialPanel>
         ) : null}
@@ -253,17 +271,20 @@ export default async function IqResultPage({
           was bought and there is no name to put on it.
         */}
         {attempt.certificateId ? (
-          <EditorialPanel variant='strong' className='p-6 md:p-7'>
-            <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+          <EditorialPanel
+            variant="strong"
+            className="p-6 md:p-7"
+          >
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
               {copy.certificateTitle}
             </h2>
-            <p className='mt-3 text-pp-muted'>{copy.certificateLead}</p>
+            <p className="mt-3 text-pp-muted">{copy.certificateLead}</p>
             <Link
               href={`/${lang}/iq/certificate/${attempt.certificateId}`}
-              className='mt-5 inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline'
+              className="mt-5 inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline"
             >
               {copy.certificateView}
-              <Chevron direction='right' />
+              <Chevron direction="right" />
             </Link>
           </EditorialPanel>
         ) : null}
@@ -274,21 +295,23 @@ export default async function IqResultPage({
           it. Answering that honestly here is worth more than another share button.
         */}
         <MethodTease
-          className='mt-8'
+          className="mt-8"
           href={`/${lang}/iq/method`}
           title={copy.methodTeaseTitle}
           body={copy.methodTeaseBody}
           cta={copy.methodTeaseCta}
         />
 
-        <div className='mt-9 flex flex-wrap items-center gap-4'>
+        <div className="mt-9 flex flex-wrap items-center gap-4">
           <ShareControl
-            product='iq'
+            product="iq"
             shareToken={shareToken}
             type={attempt.band ?? 'iq'}
             url={shareUrl}
             title={`${copy.scoreLabel} ${attempt.score}`}
-            text={fill(copy.percentileLabel, { percentile: attempt.percentile ?? 0 })}
+            text={fill(copy.percentileLabel, {
+              percentile: attempt.percentile ?? 0,
+            })}
             copy={{
               share: copy.certificateShare,
               copied: copy.shareCopied,
@@ -297,13 +320,15 @@ export default async function IqResultPage({
           />
           <Link
             href={`/${lang}/iq/test`}
-            className='text-sm text-pp-muted underline underline-offset-[0.2em]'
+            className="text-sm text-pp-muted underline underline-offset-[0.2em]"
           >
             {copy.retake}
           </Link>
         </div>
 
-        <p className='mt-8 text-sm text-pp-muted'>{fill(copy.keepLink, { days: ATTEMPT_TTL_DAYS })}</p>
+        <p className="mt-8 text-sm text-pp-muted">
+          {fill(copy.keepLink, { days: ATTEMPT_TTL_DAYS })}
+        </p>
       </SectionFrame>
     </main>
   )

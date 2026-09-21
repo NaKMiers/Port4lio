@@ -42,7 +42,9 @@ export function renderStem(item: Item, label: string): string {
       parts.push(holeAt(x, y))
       continue
     }
-    parts.push(boxOf(cellSvg(item.cells[index] as Cell, `c${index}`), x, y, true))
+    parts.push(
+      boxOf(cellSvg(item.cells[index] as Cell, `c${index}`), x, y, true)
+    )
   }
 
   return svgDocument(width, height, parts.join(''), label)

@@ -44,12 +44,17 @@ function matrixWithDecoys(): { item: Item; profile: RungProfile } {
       candidate.decoySlots.length >= 1 &&
       candidate.answer.inner != null
   )
-  if (!item) throw new Error('no matrix item with decoys in the sample - adjust the seed')
+  if (!item)
+    throw new Error(
+      'no matrix item with decoys in the sample - adjust the seed'
+    )
   return { item, profile: item.profile }
 }
 
 function sequenceItem(): { item: Item; profile: RungProfile } {
-  const item = SAMPLE.find(candidate => candidate.profile.layout.id === '1x3-sequence')
+  const item = SAMPLE.find(
+    candidate => candidate.profile.layout.id === '1x3-sequence'
+  )
   if (!item) throw new Error('no sequence item in the sample - adjust the seed')
   return { item, profile: item.profile }
 }
@@ -57,7 +62,10 @@ function sequenceItem(): { item: Item; profile: RungProfile } {
 /** Assert a mutation is rejected, and rejected for the reason intended. */
 function expectRejected(built: Built, profile: RungProfile, because: RegExp) {
   const verdict = verifyItem(built, profile)
-  expect(verdict.ok, 'expected this item to be rejected, but verification passed').toBe(false)
+  expect(
+    verdict.ok,
+    'expected this item to be rejected, but verification passed'
+  ).toBe(false)
   if (!verdict.ok) expect(verdict.reason).toMatch(because)
 }
 
@@ -66,7 +74,10 @@ describe('the baseline is genuinely valid', () => {
     // Without this, a mutation test could pass because the BASELINE was already broken.
     for (const item of SAMPLE) {
       const verdict = verifyItem(item, item.profile)
-      expect(verdict.ok, `rung ${item.rung} (${item.rule}): ${!verdict.ok && verdict.reason}`).toBe(true)
+      expect(
+        verdict.ok,
+        `rung ${item.rung} (${item.rule}): ${!verdict.ok && verdict.reason}`
+      ).toBe(true)
     }
   })
 })
@@ -74,7 +85,11 @@ describe('the baseline is genuinely valid', () => {
 describe('structural rejections', () => {
   it('rejects a grid with the wrong number of positions', () => {
     const { item, profile } = matrixWithDecoys()
-    expectRejected({ ...item, cells: [...item.cells, null] }, profile, /positions/)
+    expectRejected(
+      { ...item, cells: [...item.cells, null] },
+      profile,
+      /positions/
+    )
   })
 
   it('rejects a cell sitting where the hole should be', () => {
@@ -93,7 +108,11 @@ describe('structural rejections', () => {
 
   it('rejects a panel that is not six options', () => {
     const { item, profile } = matrixWithDecoys()
-    expectRejected({ ...item, distractors: item.distractors.slice(0, 4) }, profile, /5 distractors/)
+    expectRejected(
+      { ...item, distractors: item.distractors.slice(0, 4) },
+      profile,
+      /5 distractors/
+    )
   })
 })
 
@@ -107,13 +126,21 @@ describe('option-distinctness rejections', () => {
       { cell: item.answer, error: 'off-by-one-step' },
       ...item.distractors.slice(1),
     ]
-    expectRejected({ ...item, distractors }, profile, /distinct options|equals the answer/)
+    expectRejected(
+      { ...item, distractors },
+      profile,
+      /distinct options|equals the answer/
+    )
   })
 
   it('rejects two distractors identical to each other', () => {
     const { item, profile } = matrixWithDecoys()
     const first = item.distractors[0] as Distractor
-    const distractors = [first, { ...first, error: 'not-advanced' as ErrorModel }, ...item.distractors.slice(2)]
+    const distractors = [
+      first,
+      { ...first, error: 'not-advanced' as ErrorModel },
+      ...item.distractors.slice(2),
+    ]
     expectRejected({ ...item, distractors }, profile, /distinct options/)
   })
 
@@ -146,8 +173,21 @@ describe('option-distinctness rejections', () => {
      */
     const { item, profile } = matrixWithDecoys()
     const hidden: Cell = {
-      frame: { class: 'frame', kind: 'square', shading: 'filled', rotationDeg: 0, sizeStep: 13 },
-      inner: { class: 'inner', anchor: 'center', kind: 'circle', shading: 'outline', rotationDeg: 0, sizeStep: 1 },
+      frame: {
+        class: 'frame',
+        kind: 'square',
+        shading: 'filled',
+        rotationDeg: 0,
+        sizeStep: 13,
+      },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        kind: 'circle',
+        shading: 'outline',
+        rotationDeg: 0,
+        sizeStep: 1,
+      },
     }
     const cells = [...item.cells]
     cells[0] = hidden
@@ -164,7 +204,11 @@ describe('rung-demand rejections', () => {
      * what the rule delivered.
      */
     const { item, profile } = matrixWithDecoys()
-    expectRejected({ ...item, dimensions: profile.dimensions + 1 }, profile, /wants .* dimensions/)
+    expectRejected(
+      { ...item, dimensions: profile.dimensions + 1 },
+      profile,
+      /wants .* dimensions/
+    )
   })
 
   it('rejects a track that does not visibly vary across the given cells', () => {
@@ -177,9 +221,19 @@ describe('rung-demand rejections', () => {
      * everywhere - which is exactly what an invisible dimension looks like.
      */
     const { item, profile } = matrixWithDecoys()
-    const dead: Track = { dim: 'count', target: 'tally', axis: 'col', step: 1, phase: 0 }
+    const dead: Track = {
+      dim: 'count',
+      target: 'tally',
+      axis: 'col',
+      step: 1,
+      phase: 0,
+    }
     expectRejected(
-      { ...item, tracks: [...item.tracks, dead], dimensions: item.dimensions + 1 },
+      {
+        ...item,
+        tracks: [...item.tracks, dead],
+        dimensions: item.dimensions + 1,
+      },
       { ...profile, dimensions: (profile.dimensions + 1) as 1 | 2 | 3 },
       /does not visibly vary/
     )
@@ -199,16 +253,17 @@ describe('rung-demand rejections', () => {
      * reason rather than just on failure.
      */
     const found = (() => {
-      for (let seed = 1; seed <= 60; seed += 1) {
+      for (let seed = 1; seed <= 60; seed += 1)
         for (const candidate of generateTest(seed)) {
           if (candidate.profile.layout.id !== '1x3-sequence') continue
           const cyclic = candidate.tracks.filter(track => CYCLIC.has(track.dim))
           if (cyclic.length) return { item: candidate, cyclic }
         }
-      }
+
       return null
     })()
-    if (!found) throw new Error('no sequence item with a cyclic track in 60 seeds')
+    if (!found)
+      throw new Error('no sequence item with a cyclic track in 60 seeds')
 
     expectRejected(
       { ...found.item, tracks: found.cyclic, dimensions: found.cyclic.length },
@@ -226,7 +281,10 @@ describe('rung-demand rejections', () => {
       layout: LAYOUTS['2x2-matrix'],
       dimensions: item.dimensions as 1 | 2 | 3,
     }
-    const cyclicOnly: Track[] = item.tracks.map(track => ({ ...track, dim: 'shading' }))
+    const cyclicOnly: Track[] = item.tracks.map(track => ({
+      ...track,
+      dim: 'shading',
+    }))
     // The grid shape is wrong for a 2x2 too, so this asserts only that it does not PASS.
     expect(verifyItem({ ...item, tracks: cyclicOnly }, profile).ok).toBe(false)
   })
@@ -251,9 +309,9 @@ describe('decoy rejections', () => {
     const cells = [...item.cells]
     const first = cells.find(cell => cell != null) as Cell
     const element = first[slot]
-    if (!element || element.class === 'tally') {
+    if (!element || element.class === 'tally')
       throw new Error('decoy slot is not a shape - adjust the seed')
-    }
+
     /**
      * Rotation, not shading. Flipping a frame to `filled` makes it paint over its own
      * contents, so `noHiddenLayers` rejects the cell before the decoy check ever runs -
@@ -277,7 +335,11 @@ describe('distractor-quality rejections', () => {
       ...distractor,
       error: 'off-by-one-step' as ErrorModel,
     }))
-    expectRejected({ ...item, distractors }, profile, /same error model|more than twice/)
+    expectRejected(
+      { ...item, distractors },
+      profile,
+      /same error model|more than twice/
+    )
   })
 
   it('rejects one error model appearing more than twice', () => {
@@ -302,10 +364,18 @@ describe('set-logic rejections', () => {
      * apart. Every row here is disjoint.
      */
     const profile = profileFor(1)
-    const field = (filled: number[]): Cell => ({ class: undefined, field: { class: 'field', size: 3, filled } } as unknown as Cell)
+    const field = (filled: number[]): Cell =>
+      ({
+        class: undefined,
+        field: { class: 'field', size: 3, filled },
+      }) as unknown as Cell
 
     const rows = [
-      [[0, 1], [4, 5], [0, 1, 4, 5]],
+      [
+        [0, 1],
+        [4, 5],
+        [0, 1, 4, 5],
+      ],
       [[2], [6, 7], [2, 6, 7]],
       [[3, 8], [1], [3, 8, 1]],
     ]
@@ -332,6 +402,10 @@ describe('set-logic rejections', () => {
       requiresUniqueOperator: true,
     }
 
-    expectRejected(built, { ...profile, dimensions: 2 }, /more than one operator/)
+    expectRejected(
+      built,
+      { ...profile, dimensions: 2 },
+      /more than one operator/
+    )
   })
 })

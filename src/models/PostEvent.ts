@@ -85,7 +85,11 @@ export type PostEventDocument = {
 const postEventSchema = new Schema<PostEventDocument>(
   {
     _id: { type: String, required: true },
-    kind: { type: String, enum: ['view', 'share', 'attribute'], required: true },
+    kind: {
+      type: String,
+      enum: ['view', 'share', 'attribute'],
+      required: true,
+    },
     slug: { type: String, required: true },
     count: { type: Number, required: true, default: 1 },
     clientReported: { type: Boolean, required: true, default: true },
@@ -113,9 +117,11 @@ postEventSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
  * rather than trusting this alone.
  */
 postEventSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[PostEvent] TTL index build FAILED - retention is not being enforced', error)
-  }
+  if (error)
+    console.error(
+      '[PostEvent] TTL index build FAILED - retention is not being enforced',
+      error
+    )
 })
 
 export const PostEventModel: mongoose.Model<PostEventDocument> = compileModel(

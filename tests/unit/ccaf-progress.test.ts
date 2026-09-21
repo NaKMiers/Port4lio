@@ -260,12 +260,11 @@ describe('roadmap invariants', () => {
   it('gives every task a completion criterion and at least one step', () => {
     for (const { task } of tasks) {
       expect(task.steps.length, `${task.id} has no steps`).toBeGreaterThan(0)
-      for (const locale of LOCALES) {
+      for (const locale of LOCALES)
         expect(
           task.doneWhen[locale],
           `${task.id} has no "done when" in ${locale}`
         ).not.toBe('')
-      }
     }
   })
 
@@ -440,50 +439,43 @@ describe('bilingual content', () => {
   })
 
   it('has a non-empty string in every language', () => {
-    for (const { where, value } of everyLocalized) {
-      for (const locale of LOCALES) {
+    for (const { where, value } of everyLocalized)
+      for (const locale of LOCALES)
         expect(
           value[locale]?.trim(),
           `${where} is empty in ${locale}`
         ).toBeTruthy()
-      }
-    }
   })
 
   it('keeps code spans identical across languages', () => {
     // `stop_reason` is `stop_reason` in every language. A translated identifier is a bug
     // somebody pastes into a terminal.
-    for (const { where, value } of everyLocalized) {
+    for (const { where, value } of everyLocalized)
       expect(codeSpans(value.en), `${where} altered a code span`).toEqual(
         codeSpans(value.vi)
       )
-    }
   })
 
   it('keeps link placeholders pointing at the same targets', () => {
-    for (const { where, value } of everyLocalized) {
+    for (const { where, value } of everyLocalized)
       expect(linkKeys(value.en), `${where} changed a link key`).toEqual(
         linkKeys(value.vi)
       )
-    }
   })
 
   it('only references link keys that exist', () => {
-    for (const { where, value } of everyLocalized) {
-      for (const locale of LOCALES) {
-        for (const key of linkKeys(value[locale])) {
+    for (const { where, value } of everyLocalized)
+      for (const locale of LOCALES)
+        for (const key of linkKeys(value[locale]))
           expect(
             LINKS[key],
             `${where} points at unknown link "${key}"`
           ).toBeTruthy()
-        }
-      }
-    }
   })
 
   it('balances every inline tag it opens', () => {
-    for (const { where, value } of everyLocalized) {
-      for (const locale of LOCALES) {
+    for (const { where, value } of everyLocalized)
+      for (const locale of LOCALES)
         for (const tag of ['strong', 'em', 'code']) {
           const open = (value[locale].match(new RegExp(`<${tag}>`, 'g')) ?? [])
             .length
@@ -494,13 +486,9 @@ describe('bilingual content', () => {
             open
           )
         }
-      }
-    }
   })
 
   it('names seven weekdays in each language', () => {
-    for (const locale of LOCALES) {
-      expect(WEEKDAYS[locale]).toHaveLength(7)
-    }
+    for (const locale of LOCALES) expect(WEEKDAYS[locale]).toHaveLength(7)
   })
 })

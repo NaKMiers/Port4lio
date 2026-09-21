@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { formatPrice, getResultPrice, isPaidMode, PAYOS_MIN_AMOUNT } from '@/lib/mbti/pricing'
+import {
+  formatPrice,
+  getResultPrice,
+  isPaidMode,
+  PAYOS_MIN_AMOUNT,
+} from '@/lib/mbti/pricing'
 
 /**
  * Whether the site is charging, and how much.
@@ -14,7 +19,11 @@ import { formatPrice, getResultPrice, isPaidMode, PAYOS_MIN_AMOUNT } from '@/lib
 // NODE_ENV readonly, so a direct assignment fails typecheck even though it works at
 // runtime. `unstubAllEnvs` also restores the real values, including the ones this repo's
 // .env sets, so the suite cannot leak config into other test files.
-const PAYOS_KEYS = ['PAYOS_CLIENT_ID', 'PAYOS_API_KEY', 'PAYOS_CHECKSUM_KEY'] as const
+const PAYOS_KEYS = [
+  'PAYOS_CLIENT_ID',
+  'PAYOS_API_KEY',
+  'PAYOS_CHECKSUM_KEY',
+] as const
 
 function configurePayos() {
   for (const key of PAYOS_KEYS) vi.stubEnv(key, 'configured')
@@ -68,7 +77,9 @@ describe('getResultPrice', () => {
     // deployment that also hosts the portfolio is not.
     vi.stubEnv('MBTI_RESULT_PRICE', '500')
     expect(getResultPrice()).toBe(0)
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('below the PayOS minimum'))
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('below the PayOS minimum')
+    )
   })
 
   it('throws in development when the price is below the PayOS floor', () => {
@@ -91,7 +102,9 @@ describe('isPaidMode', () => {
     // away, because the visitor cannot pay AND cannot read what they answered 60 questions for.
     vi.stubEnv('MBTI_RESULT_PRICE', '2000')
     expect(isPaidMode()).toBe(false)
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('PayOS is not configured'))
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('PayOS is not configured')
+    )
   })
 
   it('is false when PayOS is only partly configured', () => {

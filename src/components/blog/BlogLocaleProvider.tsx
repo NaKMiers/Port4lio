@@ -1,6 +1,12 @@
 'use client'
 
-import { createContext, useContext, useEffect, useEffectEvent, useState } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useState,
+} from 'react'
 
 import { BLOG_COPY, type BlogCopy } from '@/lib/blog/ui-copy'
 import { isLocale, type Locale } from '@/lib/i18n'
@@ -49,7 +55,11 @@ type BlogLocaleValue = {
 
 const BlogLocaleContext = createContext<BlogLocaleValue | null>(null)
 
-export default function BlogLocaleProvider({ children }: { children: React.ReactNode }) {
+export default function BlogLocaleProvider({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   // NOT `DEFAULT_LOCALE`, which is `vi` for the test products. The blog's posts are English
   // (D7), so English furniture around them is the honest default for a reader with no
   // preference stored - and it is what the server rendered.
@@ -84,7 +94,9 @@ export default function BlogLocaleProvider({ children }: { children: React.React
   }
 
   return (
-    <BlogLocaleContext.Provider value={{ locale, setLocale, copy: BLOG_COPY[locale], ready }}>
+    <BlogLocaleContext.Provider
+      value={{ locale, setLocale, copy: BLOG_COPY[locale], ready }}
+    >
       {children}
     </BlogLocaleContext.Provider>
   )

@@ -60,7 +60,10 @@ const ENTITIES: Record<string, string> = {
 function headingLabel(inner: string): string {
   return inner
     .replace(TAG, '')
-    .replace(/&(?:amp|lt|gt|quot|nbsp|#x27|#39);/gi, match => ENTITIES[match.toLowerCase()] ?? match)
+    .replace(
+      /&(?:amp|lt|gt|quot|nbsp|#x27|#39);/gi,
+      match => ENTITIES[match.toLowerCase()] ?? match
+    )
     .replace(/\s+/g, ' ')
     .trim()
 }

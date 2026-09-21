@@ -116,7 +116,11 @@ export default function rehypeHeadingIds() {
 
       // An author-written `{#custom-id}` is not a thing this pipeline supports, but a future
       // plugin could set one - so an existing id is left alone rather than overwritten.
-      if (typeof node.properties?.id === 'string' && node.properties.id.length > 0) return
+      if (
+        typeof node.properties?.id === 'string' &&
+        node.properties.id.length > 0
+      )
+        return
 
       const base = slugifyHeading(headingText(node.children))
       if (!base) return

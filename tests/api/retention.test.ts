@@ -38,7 +38,10 @@ describe('TTL retention indexes', () => {
   it('Attempt expires documents on expireAt', async () => {
     const ttl = ttlIndexOf(await builtIndexes(AttemptModel as never))
 
-    expect(ttl, 'Attempt has no TTL index - the privacy notice is not being kept').toBeDefined()
+    expect(
+      ttl,
+      'Attempt has no TTL index - the privacy notice is not being kept'
+    ).toBeDefined()
     // 0 means "delete once expireAt is in the past", not "delete 0 seconds after". A
     // missing or non-zero value here silently changes retention rather than breaking.
     expect(ttl?.expireAfterSeconds).toBe(0)
@@ -47,13 +50,17 @@ describe('TTL retention indexes', () => {
   it('TestEvent expires documents on expireAt', async () => {
     const ttl = ttlIndexOf(await builtIndexes(TestEventModel as never))
 
-    expect(ttl, 'TestEvent has no TTL index - behavioural traces would be kept forever').toBeDefined()
+    expect(
+      ttl,
+      'TestEvent has no TTL index - behavioural traces would be kept forever'
+    ).toBeDefined()
     expect(ttl?.expireAfterSeconds).toBe(0)
   })
 
   it('TestEvent retention matches Attempt, so one sentence covers both', () => {
     const now = new Date('2026-09-02T00:00:00.000Z')
-    const elapsedDays = (testEventExpiryFrom(now).getTime() - now.getTime()) / 86_400_000
+    const elapsedDays =
+      (testEventExpiryFrom(now).getTime() - now.getTime()) / 86_400_000
 
     // Two different retention windows would mean the privacy notice needs two sentences,
     // and the second one is the one that goes stale.
@@ -63,7 +70,10 @@ describe('TTL retention indexes', () => {
   it('IqAttempt expires documents on expireAt', async () => {
     const ttl = ttlIndexOf(await builtIndexes(IqAttemptModel as never))
 
-    expect(ttl, 'IqAttempt has no TTL index - the IQ privacy notice is not being kept').toBeDefined()
+    expect(
+      ttl,
+      'IqAttempt has no TTL index - the IQ privacy notice is not being kept'
+    ).toBeDefined()
     expect(ttl?.expireAfterSeconds).toBe(0)
   })
 
@@ -73,7 +83,10 @@ describe('TTL retention indexes', () => {
     // Same tiered trick as `Payment`: the index exists, and a paid row survives it by
     // carrying `expireAt: null`. An abandoned checkout holds an email and a name for a
     // purchase that never happened, so it has to go.
-    expect(ttl, 'IqPayment has no TTL index - abandoned checkouts would be kept forever').toBeDefined()
+    expect(
+      ttl,
+      'IqPayment has no TTL index - abandoned checkouts would be kept forever'
+    ).toBeDefined()
     expect(ttl?.expireAfterSeconds).toBe(0)
   })
 
@@ -84,7 +97,10 @@ describe('TTL retention indexes', () => {
       return key?.certificateId !== undefined
     })
 
-    expect(certificate, 'IqAttempt is missing the certificateId unique index').toBeDefined()
+    expect(
+      certificate,
+      'IqAttempt is missing the certificateId unique index'
+    ).toBeDefined()
     expect(certificate?.unique).toBe(true)
 
     /**
@@ -96,19 +112,28 @@ describe('TTL retention indexes', () => {
      * second attempt ever created. The happy path passed; the second visitor did not.
      */
     expect(certificate?.sparse).toBeUndefined()
-    expect(certificate?.partialFilterExpression).toEqual({ certificateId: { $type: 'string' } })
+    expect(certificate?.partialFilterExpression).toEqual({
+      certificateId: { $type: 'string' },
+    })
   })
 
   it('TestEvent indexes the admin aggregation, not just uniqueness', async () => {
     const indexes = await builtIndexes(TestEventModel as never)
     const compound = indexes.find(index => {
       const key = index.key as Record<string, number> | undefined
-      return key?.product !== undefined && key?.kind !== undefined && key?.createdAt !== undefined
+      return (
+        key?.product !== undefined &&
+        key?.kind !== undefined &&
+        key?.createdAt !== undefined
+      )
     })
 
     // The composite `_id` makes writes idempotent but supports no grouping. Without this
     // the metrics page is a collection scan the first time there is real data.
-    expect(compound, 'TestEvent is missing the {product,kind,createdAt} read index').toBeDefined()
+    expect(
+      compound,
+      'TestEvent is missing the {product,kind,createdAt} read index'
+    ).toBeDefined()
   })
 })
 
@@ -119,7 +144,7 @@ describe('TestEvent idempotency', () => {
 
     // Three writes: StrictMode double-invoke plus a refresh. This is the exact sequence
     // that would otherwise triple the share rate - the failure that looks like success.
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 3; i += 1)
       await TestEventModel.findByIdAndUpdate(
         id,
         {
@@ -134,7 +159,6 @@ describe('TestEvent idempotency', () => {
         },
         { upsert: true, lean: true }
       )
-    }
 
     const docs = await TestEventModel.find({ kind: 'attribute' }).lean()
     expect(docs).toHaveLength(1)

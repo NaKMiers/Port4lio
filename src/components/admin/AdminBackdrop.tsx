@@ -24,12 +24,15 @@ import PortfolioBackdropOrnaments from '@/components/portfolio/PortfolioBackdrop
 export default function AdminBackdrop() {
   return (
     <>
-      <div className='pointer-events-none absolute inset-0 -z-10' aria-hidden>
-        <div className='absolute -left-16 top-32 h-48 w-48 rounded-full bg-pp-orange/15 blur-3xl' />
-        <div className='absolute right-0 top-20 h-64 w-64 rounded-full bg-pp-blue/10 blur-3xl' />
-        <div className='absolute left-1/3 top-[55%] h-52 w-52 rounded-full bg-pp-pink/10 blur-3xl' />
-        <div className='absolute -right-10 bottom-24 h-56 w-56 rounded-full bg-pp-violet/10 blur-3xl' />
-        <div className='absolute bottom-10 left-[8%] h-44 w-44 rounded-full bg-pp-green/10 blur-3xl' />
+      <div
+        className="pointer-events-none absolute inset-0 -z-10"
+        aria-hidden
+      >
+        <div className="absolute -left-16 top-32 h-48 w-48 rounded-full bg-pp-orange/15 blur-3xl" />
+        <div className="absolute right-0 top-20 h-64 w-64 rounded-full bg-pp-blue/10 blur-3xl" />
+        <div className="absolute left-1/3 top-[55%] h-52 w-52 rounded-full bg-pp-pink/10 blur-3xl" />
+        <div className="absolute -right-10 bottom-24 h-56 w-56 rounded-full bg-pp-violet/10 blur-3xl" />
+        <div className="absolute bottom-10 left-[8%] h-44 w-44 rounded-full bg-pp-green/10 blur-3xl" />
       </div>
       <PortfolioBackdropOrnaments />
     </>

@@ -27,7 +27,11 @@ import TabNav from '@/components/settings/TabNav'
 import { useRailWidth } from '@/components/settings/useRailWidth'
 import type { TabItem } from '@/components/settings/TabNav'
 import { cleanProfileForSave } from '@/components/settings/cleanProfileForSave'
-import type { IconPickerTarget, SettingTabId, UploadingState } from '@/components/settings/types'
+import type {
+  IconPickerTarget,
+  SettingTabId,
+  UploadingState,
+} from '@/components/settings/types'
 import { useApp } from '@/context/AppContext'
 import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
 import { deriveResume } from '@/lib/resume-view-model'
@@ -56,7 +60,9 @@ const SETTING_TABS: TabItem[] = [
   { id: 'cv', label: 'CV', count: 6 },
 ]
 
-const SETTING_TAB_IDS: readonly SettingTabId[] = SETTING_TABS.map(t => t.id as SettingTabId)
+const SETTING_TAB_IDS: readonly SettingTabId[] = SETTING_TABS.map(
+  t => t.id as SettingTabId
+)
 
 /** Falls back to `profile` for anything that is not a tab id this build knows about -
  * a stale value from a removed tab, or storage tampered with by hand. */
@@ -64,7 +70,9 @@ function readStoredTab(): SettingTabId {
   if (typeof window === 'undefined') return 'profile'
   try {
     const stored = window.localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)
-    return (SETTING_TAB_IDS as string[]).includes(stored ?? '') ? (stored as SettingTabId) : 'profile'
+    return (SETTING_TAB_IDS as string[]).includes(stored ?? '')
+      ? (stored as SettingTabId)
+      : 'profile'
   } catch {
     return 'profile'
   }
@@ -88,16 +96,23 @@ function SettingEditorGate() {
   const { profile, setProfile, loading, error, refetchProfile } = useApp()
 
   if (loading) return <SettingLoading />
-  if (error) {
+  if (error)
     return (
-      <SettingLoadError message={error} onRetry={() => void refetchProfile({ blocking: true })} />
+      <SettingLoadError
+        message={error}
+        onRetry={() => void refetchProfile({ blocking: true })}
+      />
     )
-  }
 
   // A 200 carrying `profile: null` means the document does not exist yet. Open an empty
   // editor so the first save can create it, rather than blocking on data that will never
   // arrive.
-  return <SettingEditor appProfile={profile ?? makeEmptyProfile()} setAppProfile={setProfile} />
+  return (
+    <SettingEditor
+      appProfile={profile ?? makeEmptyProfile()}
+      setAppProfile={setProfile}
+    />
+  )
 }
 
 interface SettingEditorProps {
@@ -116,9 +131,14 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   })
   const [tab, setTab] = useState<SettingTabId>(readStoredTab)
   const [fullWidth, setFullWidth] = useState(readStoredFullWidth)
-  const [iconPickerTarget, setIconPickerTarget] = useState<IconPickerTarget>(null)
+  const [iconPickerTarget, setIconPickerTarget] =
+    useState<IconPickerTarget>(null)
   const [iconQuery, setIconQuery] = useState('')
-  const { width: railWidth, setWidth: setRailWidth, resetWidth: resetRailWidth } = useRailWidth(tab)
+  const {
+    width: railWidth,
+    setWidth: setRailWidth,
+    resetWidth: resetRailWidth,
+  } = useRailWidth(tab)
   const layoutRef = useRef<HTMLDivElement | null>(null)
   const saveButtonRef = useRef<HTMLButtonElement | null>(null)
   const [uploading, setUploading] = useState<UploadingState>({
@@ -131,7 +151,10 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(FULL_WIDTH_STORAGE_KEY, JSON.stringify(fullWidth))
+      window.localStorage.setItem(
+        FULL_WIDTH_STORAGE_KEY,
+        JSON.stringify(fullWidth)
+      )
     } catch {
       // A blocked or full storage quota costs the preference, nothing more.
     }
@@ -156,7 +179,9 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
     const q = iconQuery.trim().toLowerCase()
     if (!q) return iconCatalog
     return iconCatalog.filter(
-      item => item.code.toLowerCase().includes(q) || item.name.toLowerCase().includes(q)
+      item =>
+        item.code.toLowerCase().includes(q) ||
+        item.name.toLowerCase().includes(q)
     )
   }, [iconCatalog, iconQuery])
 
@@ -167,9 +192,10 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
       const body = cleanProfileForSave(profile)
       const json = JSON.stringify(body)
 
-      if (new TextEncoder().encode(json).length > MAX_PROFILE_JSON_BYTES) {
-        throw new Error(`Profile data exceeds ${MAX_PROFILE_JSON_BYTES / (1024 * 1024)} MB`)
-      }
+      if (new TextEncoder().encode(json).length > MAX_PROFILE_JSON_BYTES)
+        throw new Error(
+          `Profile data exceeds ${MAX_PROFILE_JSON_BYTES / (1024 * 1024)} MB`
+        )
 
       const res = await fetch('/api/profile', {
         method: 'POST',
@@ -202,7 +228,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   const applyIconCode = (iconCode: string) => {
     if (!iconPickerTarget) return
 
-    if (iconPickerTarget.kind === 'skill') {
+    if (iconPickerTarget.kind === 'skill')
       setProfile(prev => {
         const nextSkills = [...prev.skills]
         const group = nextSkills[iconPickerTarget.groupIndex]
@@ -210,13 +236,16 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         const nextItems = [...group.items]
         const currentItem = nextItems[iconPickerTarget.itemIndex]
         if (!currentItem) return prev
-        nextItems[iconPickerTarget.itemIndex] = { ...currentItem, icon: iconCode }
+        nextItems[iconPickerTarget.itemIndex] = {
+          ...currentItem,
+          icon: iconCode,
+        }
         nextSkills[iconPickerTarget.groupIndex] = { ...group, items: nextItems }
         return { ...prev, skills: nextSkills }
       })
-    } else if (iconPickerTarget.kind === 'service') {
+    else if (iconPickerTarget.kind === 'service')
       updateService(iconPickerTarget.serviceIndex, { icon: iconCode })
-    } else if (iconPickerTarget.kind === 'social') {
+    else if (iconPickerTarget.kind === 'social')
       setProfile(prev => {
         const next = [...prev.socials]
         const cur = next[iconPickerTarget.socialIndex]
@@ -224,7 +253,6 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         next[iconPickerTarget.socialIndex] = { ...cur, icon: iconCode }
         return { ...prev, socials: next }
       })
-    }
 
     setIconPickerTarget(null)
     setIconQuery('')
@@ -257,7 +285,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         tabs={SETTING_TABS}
         activeId={tab}
         onChange={id => setTab(id as SettingTabId)}
-        ariaLabel='Profile editor sections'
+        ariaLabel="Profile editor sections"
       />
 
       <SectionOpenProvider>
@@ -266,12 +294,12 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
             below `xl` stays a plain Tailwind class rather than an inline override. */}
         <div
           ref={layoutRef}
-          className='grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_var(--rail-width)] xl:gap-8'
+          className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_var(--rail-width)] xl:gap-8"
           style={{ '--rail-width': `${railWidth}px` } as React.CSSProperties}
         >
           {/* Every tab writes into the same `profile` state, so switching tabs never
             discards an unsaved edit - only the section cards unmount. */}
-          <div className='space-y-5'>
+          <div className="space-y-5">
             {tab === 'profile' ? (
               <>
                 <BasicsSection
@@ -282,15 +310,21 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
                   setUploading={setUploading}
                   setError={setError}
                 />
-                <div className='grid grid-cols-1 items-start gap-5 lg:grid-cols-2'>
+                <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
                   <SocialsSection
                     profile={profile}
                     setProfile={setProfile}
                     setIconPickerTarget={setIconPickerTarget}
                   />
-                  <StatsSection profile={profile} setProfile={setProfile} />
+                  <StatsSection
+                    profile={profile}
+                    setProfile={setProfile}
+                  />
                 </div>
-                <AboutSection profile={profile} setProfile={setProfile} />
+                <AboutSection
+                  profile={profile}
+                  setProfile={setProfile}
+                />
               </>
             ) : null}
 
@@ -301,9 +335,18 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
                   setProfile={setProfile}
                   setIconPickerTarget={setIconPickerTarget}
                 />
-                <ExperienceSection profile={profile} setProfile={setProfile} />
-                <EducationSection profile={profile} setProfile={setProfile} />
-                <CertificatesSection profile={profile} setProfile={setProfile} />
+                <ExperienceSection
+                  profile={profile}
+                  setProfile={setProfile}
+                />
+                <EducationSection
+                  profile={profile}
+                  setProfile={setProfile}
+                />
+                <CertificatesSection
+                  profile={profile}
+                  setProfile={setProfile}
+                />
               </>
             ) : null}
 
@@ -335,14 +378,17 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
             ) : null}
           </div>
 
-          <div className='relative xl:pl-2'>
+          <div className="relative xl:pl-2">
             <RailResizeHandle
               width={railWidth}
               onResize={setRailWidth}
               onReset={resetRailWidth}
               containerRef={layoutRef}
             />
-            <PreviewRail tab={tab} profile={profile} />
+            <PreviewRail
+              tab={tab}
+              profile={profile}
+            />
           </div>
         </div>
       </SectionOpenProvider>

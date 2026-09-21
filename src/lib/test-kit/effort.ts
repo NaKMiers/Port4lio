@@ -85,7 +85,9 @@ export function isEffortWaiverEnabled(): boolean {
   // Neither spelling. Falling back to ON keeps a typo from quietly starting to charge for
   // noise scores, which is the exact failure this whole rule exists to prevent - and it is
   // the same direction every threshold below errs in.
-  console.error(`[effort] EFFORT_WAIVER is not a boolean ("${raw}") - leaving the waiver on`)
+  console.error(
+    `[effort] EFFORT_WAIVER is not a boolean ("${raw}") - leaving the waiver on`
+  )
   return true
 }
 
@@ -124,13 +126,21 @@ export type IqEffortInput = {
  * browser), so the speed half cannot be faked. The accuracy half cannot be faked in any
  * useful direction: answering well enough to pay is the same thing as earning a real score.
  */
-export function iqEffortWaived({ raw, answers, startedAt, submittedAt }: IqEffortInput): boolean {
+export function iqEffortWaived({
+  raw,
+  answers,
+  startedAt,
+  submittedAt,
+}: IqEffortInput): boolean {
   if (raw > IQ_CHANCE_CEILING) return false
 
   const elapsedSeconds = (submittedAt.getTime() - startedAt.getTime()) / 1000
   const skipped = answers.filter(answer => answer < 0).length
 
-  return elapsedSeconds < IQ_RUSH_SECONDS || skipped >= answers.length * IQ_SKIP_FRACTION
+  return (
+    elapsedSeconds < IQ_RUSH_SECONDS ||
+    skipped >= answers.length * IQ_SKIP_FRACTION
+  )
 }
 
 /**
@@ -191,7 +201,8 @@ export function mbtiEffortWaived({ answers }: MbtiEffortInput): boolean {
   if (answers.length === 0) return false
 
   const totals = new Map<string, number>()
-  for (const answer of answers) totals.set(answer, (totals.get(answer) ?? 0) + 1)
+  for (const answer of answers)
+    totals.set(answer, (totals.get(answer) ?? 0) + 1)
 
   const largest = Math.max(...Array.from(totals.values()))
   if (largest >= answers.length * MBTI_STRAIGHT_LINE_SHARE) return true
@@ -200,12 +211,12 @@ export function mbtiEffortWaived({ answers }: MbtiEffortInput): boolean {
 
   for (let period = 1; period <= MBTI_MAX_MECHANICAL_PERIOD; period += 1) {
     let repeats = true
-    for (let index = period; index < answers.length; index += 1) {
+    for (let index = period; index < answers.length; index += 1)
       if (answers[index] !== answers[index - period]) {
         repeats = false
         break
       }
-    }
+
     if (repeats) return true
   }
 

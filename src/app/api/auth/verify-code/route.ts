@@ -42,41 +42,38 @@ export const dynamic = 'force-dynamic'
  * the cap is not a login attempt.
  */
 export async function POST(request: NextRequest) {
-  const parsed = await readJsonBody<{ code?: unknown; days?: unknown }>(request, {
-    maxBytes: VERIFY_CODE_MAX_BODY_BYTES,
-  })
-  if (!parsed.ok) {
-    return jsonError(parsed.error, parsed.status)
-  }
+  const parsed = await readJsonBody<{ code?: unknown; days?: unknown }>(
+    request,
+    {
+      maxBytes: VERIFY_CODE_MAX_BODY_BYTES,
+    }
+  )
+  if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
   const body = parsed.body
   const code = String(body?.code ?? '').trim()
-  if (!/^\d{6}$/.test(code)) {
-    return jsonError('Invalid code', 400)
-  }
+  if (!/^\d{6}$/.test(code)) return jsonError('Invalid code', 400)
 
   // Before the code is checked, so a bad length costs a round trip rather than the code -
   // the OTP is single-use, and burning one on a malformed request means a second email.
   const days = parseAuthDays(body?.days)
-  if (days === null) {
+  if (days === null)
     return jsonError(
       `Session length must be a whole number of days between ${AUTH_MIN_DAYS} and ${AUTH_MAX_DAYS}.`,
       400
     )
-  }
 
   const otp = parseOtpState(request.cookies.get(getOtpCookieName())?.value)
-  if (!otp) {
-    return jsonError('No code requested (or it expired). Request a new code.', 400)
-  }
+  if (!otp)
+    return jsonError(
+      'No code requested (or it expired). Request a new code.',
+      400
+    )
 
-  if (Date.now() > otp.exp) {
+  if (Date.now() > otp.exp)
     return jsonError('Code expired. Request a new code.', 400)
-  }
 
-  if (!verifyOtpCode(code, otp)) {
-    return jsonError('Incorrect code', 401)
-  }
+  if (!verifyOtpCode(code, otp)) return jsonError('Incorrect code', 401)
 
   const ttlSeconds = authTtlSecondsForDays(days)
   const authExpMs = Date.now() + ttlSeconds * 1000

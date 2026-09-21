@@ -38,7 +38,8 @@
  * fails the schema, and one with no tags is a post nobody finds.
  */
 
-export type FieldControl = 'text' | 'textarea' | 'select' | 'multiselect' | 'boolean'
+export type FieldControl =
+  'text' | 'textarea' | 'select' | 'multiselect' | 'boolean'
 
 /**
  * Where a select's choices come from when they are not known at build time.
@@ -78,20 +79,32 @@ export const GROUP_LABELS: Record<FieldGroup, string> = {
 }
 
 export const GROUP_INTROS: Record<FieldGroup, string> = {
-  identity: 'What the post is called and how it is summarised. These are post columns, so a manual value is written verbatim.',
-  taxonomy: 'Where the post sits on /blog. Validated against the collections, so a deleted kind or series is refused rather than dangling.',
-  craft: 'How it should be written. None of these are stored - they only shape the prompt.',
+  identity:
+    'What the post is called and how it is summarised. These are post columns, so a manual value is written verbatim.',
+  taxonomy:
+    'Where the post sits on /blog. Validated against the collections, so a deleted kind or series is refused rather than dangling.',
+  craft:
+    'How it should be written. None of these are stored - they only shape the prompt.',
   engine: 'Which model writes it, and how far it may wander from the brief.',
 }
 
 export const STYLE_OPTIONS = [
-  { value: 'measured-teardown', label: 'Measured teardown - a number that contradicted the docs' },
-  { value: 'postmortem', label: 'Postmortem - what broke, why, and what was rejected' },
+  {
+    value: 'measured-teardown',
+    label: 'Measured teardown - a number that contradicted the docs',
+  },
+  {
+    value: 'postmortem',
+    label: 'Postmortem - what broke, why, and what was rejected',
+  },
   { value: 'tutorial', label: 'Tutorial - do this, then this' },
   { value: 'listicle', label: 'Numbered list - N things, each with evidence' },
   { value: 'opinion', label: 'Opinion - a claim, defended' },
   { value: 'narrative', label: 'Narrative - the story in order' },
-  { value: 'reference', label: 'Reference - the thing you look up twice a year' },
+  {
+    value: 'reference',
+    label: 'Reference - the thing you look up twice a year',
+  },
 ] as const
 
 export const TONE_OPTIONS = [
@@ -127,7 +140,10 @@ export const AUDIENCE_OPTIONS = [
 export const POV_OPTIONS = [
   { value: 'first-person', label: 'First person - I built, I measured' },
   { value: 'second-person', label: 'Second person - you will hit this' },
-  { value: 'impersonal', label: 'Impersonal - the build does, the route returns' },
+  {
+    value: 'impersonal',
+    label: 'Impersonal - the build does, the route returns',
+  },
 ] as const
 
 export const STRUCTURE_OPTIONS = [
@@ -137,7 +153,10 @@ export const STRUCTURE_OPTIONS = [
     seniority signal, and it is exactly the step a model drops unless it is asked for by name.
     `buildGenerationPrompt` spells all seven out when this is selected.
   */
-  { value: 'seven-step', label: 'The seven-step template (docs/blog/authoring.md)' },
+  {
+    value: 'seven-step',
+    label: 'The seven-step template (docs/blog/authoring.md)',
+  },
   { value: 'problem-solution', label: 'Problem, then solution' },
   { value: 'chronological', label: 'Chronological' },
   { value: 'numbered-list', label: 'Numbered list' },
@@ -246,7 +265,9 @@ const CREATIVITY_TEMPERATURE: Record<string, number> = {
 }
 
 export function resolveTemperature(creativity: string | undefined): number {
-  return CREATIVITY_TEMPERATURE[creativity ?? ''] ?? CREATIVITY_TEMPERATURE.balanced
+  return (
+    CREATIVITY_TEMPERATURE[creativity ?? ''] ?? CREATIVITY_TEMPERATURE.balanced
+  )
 }
 
 /**
@@ -258,7 +279,10 @@ export function resolveTemperature(creativity: string | undefined): number {
  */
 export const MODEL_OPTIONS = [
   { value: 'ag/claude-sonnet-4-6', label: 'Claude Sonnet 4.6 - the default' },
-  { value: 'ag/claude-opus-4-6-thinking', label: 'Claude Opus 4.6 (thinking) - slower, stronger' },
+  {
+    value: 'ag/claude-opus-4-6-thinking',
+    label: 'Claude Opus 4.6 (thinking) - slower, stronger',
+  },
   { value: 'cx/gpt-6-astra', label: 'GPT-6 Astra' },
   { value: 'ag/gemini-3.8-flash', label: 'Gemini 3.8 Flash - fastest' },
 ] as const
@@ -319,7 +343,8 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'identity',
     control: 'text',
     placeholder: 'five-things-next-16-did',
-    autoNote: 'Derived from the title. A collision gets a numeric suffix rather than a failure.',
+    autoNote:
+      'Derived from the title. A collision gets a numeric suffix rather than a failure.',
     maxLength: 80,
   },
   {
@@ -328,7 +353,8 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'identity',
     control: 'textarea',
     placeholder: 'The one sentence that decides whether the post gets opened.',
-    autoNote: 'Written from the finished body, so it describes what was actually written.',
+    autoNote:
+      'Written from the finished body, so it describes what was actually written.',
     maxLength: 300,
   },
   {
@@ -354,14 +380,16 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'taxonomy',
     control: 'select',
     optionsFrom: 'series',
-    autoNote: 'The cluster the topic belongs to, or none if it belongs to none of them.',
+    autoNote:
+      'The cluster the topic belongs to, or none if it belongs to none of them.',
   },
   {
     key: 'isPillar',
     label: 'Pillar post',
     group: 'taxonomy',
     control: 'boolean',
-    autoNote: 'Off. A series may have one hub and the database enforces it, so this is a deliberate choice rather than a guess.',
+    autoNote:
+      'Off. A series may have one hub and the database enforces it, so this is a deliberate choice rather than a guess.',
   },
   {
     key: 'language',
@@ -377,7 +405,8 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'taxonomy',
     control: 'multiselect',
     optionsFrom: 'slugs',
-    autoNote: 'Up to five published posts the model judges relevant. Unknown slugs are dropped.',
+    autoNote:
+      'Up to five published posts the model judges relevant. Unknown slugs are dropped.',
     maxItems: 5,
   },
   {
@@ -386,7 +415,8 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'craft',
     control: 'textarea',
     placeholder: 'What the post is about, and the thing you actually measured.',
-    autoNote: 'The model picks a subject from the series and genres. This is the field worth filling in.',
+    autoNote:
+      'The model picks a subject from the series and genres. This is the field worth filling in.',
     maxLength: 2000,
   },
   {
@@ -468,14 +498,16 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'craft',
     control: 'select',
     options: IMAGE_COUNT_OPTIONS,
-    autoNote: 'One or two where a picture actually helps, none if the post does not need any.',
+    autoNote:
+      'One or two where a picture actually helps, none if the post does not need any.',
   },
   {
     key: 'titleRule',
     label: 'Title must carry a number or a named failure',
     group: 'craft',
     control: 'boolean',
-    autoNote: 'On for an article, off for a note - the rule in docs/blog/authoring.md.',
+    autoNote:
+      'On for an article, off for a note - the rule in docs/blog/authoring.md.',
   },
   {
     key: 'callToAction',
@@ -491,7 +523,8 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'craft',
     control: 'text',
     placeholder: 'next.js 16 revalidatePath, ISR',
-    autoNote: 'The words the topic already implies, used once each rather than sprinkled.',
+    autoNote:
+      'The words the topic already implies, used once each rather than sprinkled.',
     maxLength: 200,
   },
   {
@@ -499,7 +532,8 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     label: 'Extra instruction',
     group: 'craft',
     control: 'textarea',
-    placeholder: 'Anything the fields above cannot say. Open the post on the measurement, not the setup.',
+    placeholder:
+      'Anything the fields above cannot say. Open the post on the measurement, not the setup.',
     autoNote: 'Nothing extra.',
     maxLength: 4000,
   },
@@ -553,7 +587,8 @@ export function emptyValueFor(field: GenerationField): FieldValue {
   // A select opens on its first choice rather than on an empty option. Switching a field to
   // manual and leaving it blank is not a state worth modelling - it means the same thing as
   // auto and reads as a bug.
-  if (field.control === 'select' && field.options?.length) return field.options[0].value
+  if (field.control === 'select' && field.options?.length)
+    return field.options[0].value
   return ''
 }
 
@@ -648,9 +683,8 @@ export function presetSpecFromPost(
     "decide again" rather than picking a number nobody chose. Picking "None - text only" by
     hand still works and still means none.
   */
-  if (post.imageCount > 0 && post.imageCount <= MAX_PRESETTABLE_IMAGE_COUNT) {
+  if (post.imageCount > 0 && post.imageCount <= MAX_PRESETTABLE_IMAGE_COUNT)
     set('imageCount', String(post.imageCount))
-  }
 
   return spec
 }
@@ -698,18 +732,26 @@ export function normaliseSpec(raw: unknown): {
 }
 
 /** `null` means "not usable as a manual value" - the field stays on auto. */
-function coerceValue(field: GenerationField, value: unknown, dropped: string[]): FieldValue | null {
-  if (field.control === 'boolean') {
+function coerceValue(
+  field: GenerationField,
+  value: unknown,
+  dropped: string[]
+): FieldValue | null {
+  if (field.control === 'boolean')
     return typeof value === 'boolean' ? value : null
-  }
 
   if (field.control === 'multiselect') {
     if (!Array.isArray(value)) return null
-    const strings = value.filter((item): item is string => typeof item === 'string')
+    const strings = value.filter(
+      (item): item is string => typeof item === 'string'
+    )
     const allowed = field.options
       ? strings.filter(item => {
           const ok = field.options!.some(option => option.value === item)
-          if (!ok) dropped.push(`"${item}" is not a ${field.label.toLowerCase()} option.`)
+          if (!ok)
+            dropped.push(
+              `"${item}" is not a ${field.label.toLowerCase()} option.`
+            )
           return ok
         })
       : strings
@@ -743,7 +785,10 @@ export function manualString(
   return typeof entry.value === 'string' ? entry.value : undefined
 }
 
-export function manualList(spec: GenerationSpec, key: GenerationFieldKey): string[] | undefined {
+export function manualList(
+  spec: GenerationSpec,
+  key: GenerationFieldKey
+): string[] | undefined {
   const entry = spec[key]
   if (!entry || entry.mode !== 'manual') return undefined
   return Array.isArray(entry.value) ? entry.value : undefined

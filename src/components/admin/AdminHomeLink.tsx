@@ -32,17 +32,30 @@ export default function AdminHomeLink() {
   const pathname = usePathname()
   if (pathname === '/admin' || pathname === '/admin/ccaf/vocab') return null
 
-  const isCcafRoadmap = pathname === '/admin/ccaf' || pathname === '/admin/ccaf/en'
+  const isCcafRoadmap =
+    pathname === '/admin/ccaf' || pathname === '/admin/ccaf/en'
 
   return (
-    <div className='relative mx-auto flex w-full max-w-editorial items-center justify-between gap-3 px-gutter pt-8'>
-      <Link href='/admin' className={pillCls}>
-        <LayoutGrid aria-hidden size={13} />
+    <div className="relative mx-auto flex w-full max-w-editorial items-center justify-between gap-3 px-gutter pt-8">
+      <Link
+        href="/admin"
+        className={pillCls}
+      >
+        <LayoutGrid
+          aria-hidden
+          size={13}
+        />
         All boards
       </Link>
       {isCcafRoadmap ? (
-        <Link href='/admin/ccaf/vocab' className={pillCls}>
-          <BookOpen aria-hidden size={13} />
+        <Link
+          href="/admin/ccaf/vocab"
+          className={pillCls}
+        >
+          <BookOpen
+            aria-hidden
+            size={13}
+          />
           Vocab
         </Link>
       ) : null}

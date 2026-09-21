@@ -1,7 +1,15 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
 import { NextRequest } from 'next/server'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { ContactMessageModel } from '@/models/ContactMessage'
 import { PostEventModel } from '@/models/PostEvent'
@@ -88,9 +96,12 @@ async function makePost(overrides: Record<string, unknown> = {}) {
  * looks like an auth bug rather than a test-harness one.
  */
 function call(id: string, query = '') {
-  const request = new NextRequest(`http://localhost/api/admin/blog/${id}${query}`, {
-    method: 'DELETE',
-  })
+  const request = new NextRequest(
+    `http://localhost/api/admin/blog/${id}${query}`,
+    {
+      method: 'DELETE',
+    }
+  )
   return DELETE(request, { params: Promise.resolve({ id }) })
 }
 
@@ -104,7 +115,10 @@ describe('the precondition: already soft-deleted', () => {
         by a mistyped query string, not by a script, not by a stale tab holding a published
         post's id. Two separate deletions are always required.
       */
-      const post = await makePost({ status, publishedAt: status === 'draft' ? null : new Date() })
+      const post = await makePost({
+        status,
+        publishedAt: status === 'draft' ? null : new Date(),
+      })
 
       const response = await call(String(post._id), '?permanent=true')
 
@@ -116,7 +130,10 @@ describe('the precondition: already soft-deleted', () => {
   it('soft-deletes without the flag, leaving the document in place', async () => {
     // The default path is unchanged. `permanent` is opt-in, so an existing caller - or the
     // board's own row action - cannot become destructive by accident.
-    const post = await makePost({ status: 'published', publishedAt: new Date() })
+    const post = await makePost({
+      status: 'published',
+      publishedAt: new Date(),
+    })
 
     const response = await call(String(post._id))
 
@@ -132,12 +149,29 @@ describe('the warning: a slug that is on real contact messages', () => {
     // not blocked, they are shown the number before being asked again.
     const post = await makePost()
     await ContactMessageModel.create([
-      { email: 'a@b.c', firstname: 'A', lastname: 'B', subject: 's', message: 'm', sourceSlug: 'a-post' },
-      { email: 'd@e.f', firstname: 'D', lastname: 'E', subject: 's', message: 'm', sourceSlug: 'a-post' },
+      {
+        email: 'a@b.c',
+        firstname: 'A',
+        lastname: 'B',
+        subject: 's',
+        message: 'm',
+        sourceSlug: 'a-post',
+      },
+      {
+        email: 'd@e.f',
+        firstname: 'D',
+        lastname: 'E',
+        subject: 's',
+        message: 'm',
+        sourceSlug: 'a-post',
+      },
     ])
 
     const response = await call(String(post._id), '?permanent=true')
-    const body = (await response.json()) as { contactMessages?: number; error?: string }
+    const body = (await response.json()) as {
+      contactMessages?: number
+      error?: string
+    }
 
     expect(response.status).toBe(409)
     expect(body.contactMessages).toBe(2)
@@ -147,10 +181,18 @@ describe('the warning: a slug that is on real contact messages', () => {
   it('goes through once acknowledged', async () => {
     const post = await makePost()
     await ContactMessageModel.create({
-      email: 'a@b.c', firstname: 'A', lastname: 'B', subject: 's', message: 'm', sourceSlug: 'a-post',
+      email: 'a@b.c',
+      firstname: 'A',
+      lastname: 'B',
+      subject: 's',
+      message: 'm',
+      sourceSlug: 'a-post',
     })
 
-    const response = await call(String(post._id), '?permanent=true&acknowledge=true')
+    const response = await call(
+      String(post._id),
+      '?permanent=true&acknowledge=true'
+    )
 
     expect(response.status).toBe(200)
     expect(await PostModel.countDocuments({})).toBe(0)
@@ -165,7 +207,12 @@ describe('the warning: a slug that is on real contact messages', () => {
     */
     const post = await makePost()
     await ContactMessageModel.create({
-      email: 'a@b.c', firstname: 'A', lastname: 'B', subject: 's', message: 'm', sourceSlug: 'a-post',
+      email: 'a@b.c',
+      firstname: 'A',
+      lastname: 'B',
+      subject: 's',
+      message: 'm',
+      sourceSlug: 'a-post',
     })
 
     await call(String(post._id), '?permanent=true&acknowledge=true')
@@ -175,12 +222,17 @@ describe('the warning: a slug that is on real contact messages', () => {
     expect(messages[0].sourceSlug).toBe('a-post')
   })
 
-  it('does not count another post\'s messages', async () => {
+  it("does not count another post's messages", async () => {
     // `sourceSlug` is a plain string with no reference to a document, so the count has to be
     // filtered on the exact slug. A bug here would refuse every permanent delete forever.
     const post = await makePost()
     await ContactMessageModel.create({
-      email: 'a@b.c', firstname: 'A', lastname: 'B', subject: 's', message: 'm', sourceSlug: 'other-post',
+      email: 'a@b.c',
+      firstname: 'A',
+      lastname: 'B',
+      subject: 's',
+      message: 'm',
+      sourceSlug: 'other-post',
     })
 
     const response = await call(String(post._id), '?permanent=true')
@@ -191,7 +243,7 @@ describe('the warning: a slug that is on real contact messages', () => {
 })
 
 describe('what goes with the post', () => {
-  it('removes the slug\'s PostEvent rows, and only that slug\'s', async () => {
+  it("removes the slug's PostEvent rows, and only that slug's", async () => {
     /*
       `PostEvent` is keyed by slug with no reference to the document, so leaving these behind
       means a future post taking the slug inherits its predecessor's read and share counts -
@@ -200,9 +252,27 @@ describe('what goes with the post', () => {
     const post = await makePost()
     const expireAt = new Date(Date.now() + 86_400_000)
     await PostEventModel.create([
-      { _id: 'blog:view:a-post:s1', kind: 'view', slug: 'a-post', createdAt: new Date(), expireAt },
-      { _id: 'blog:share:a-post:s2', kind: 'share', slug: 'a-post', createdAt: new Date(), expireAt },
-      { _id: 'blog:view:other:s3', kind: 'view', slug: 'other', createdAt: new Date(), expireAt },
+      {
+        _id: 'blog:view:a-post:s1',
+        kind: 'view',
+        slug: 'a-post',
+        createdAt: new Date(),
+        expireAt,
+      },
+      {
+        _id: 'blog:share:a-post:s2',
+        kind: 'share',
+        slug: 'a-post',
+        createdAt: new Date(),
+        expireAt,
+      },
+      {
+        _id: 'blog:view:other:s3',
+        kind: 'view',
+        slug: 'other',
+        createdAt: new Date(),
+        expireAt,
+      },
     ])
 
     const response = await call(String(post._id), '?permanent=true')
@@ -229,7 +299,11 @@ describe('what goes with the post', () => {
     const post = await makePost()
     await call(String(post._id), '?permanent=true')
 
-    const replacement = await PostModel.create({ slug: 'a-post', title: 'New', kind: 'article' })
+    const replacement = await PostModel.create({
+      slug: 'a-post',
+      title: 'New',
+      kind: 'article',
+    })
 
     expect(replacement.slug).toBe('a-post')
   })
@@ -258,13 +332,17 @@ describe('the last reference to the slug', () => {
 
     expect(body.unlinkedFrom).toBe(1)
     // The OTHER slug on that post is untouched - this is a `$pull` of one value, not a reset.
-    expect((await PostModel.findById(neighbour._id))?.relatedSlugs).toEqual(['another-one'])
+    expect((await PostModel.findById(neighbour._id))?.relatedSlugs).toEqual([
+      'another-one',
+    ])
   })
 
   it('reports zero when nothing pointed at it', async () => {
     const post = await makePost()
 
-    const body = (await (await call(String(post._id), '?permanent=true')).json()) as {
+    const body = (await (
+      await call(String(post._id), '?permanent=true')
+    ).json()) as {
       unlinkedFrom?: number
     }
 
@@ -308,7 +386,10 @@ describe('the last reference to the slug', () => {
     const post = await makePost()
 
     const response = await call(String(post._id), '?permanent=true')
-    const body = (await response.json()) as { ok?: boolean; revalidated?: boolean }
+    const body = (await response.json()) as {
+      ok?: boolean
+      revalidated?: boolean
+    }
 
     expect(response.status).toBe(200)
     expect(body.ok).toBe(true)

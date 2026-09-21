@@ -1,7 +1,15 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
 import { NextRequest } from 'next/server'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { MAX_IMAGE_PROMPTS } from '@/lib/blog/constants'
 import { PostModel } from '@/models/Post'
@@ -21,12 +29,20 @@ import { PostModel } from '@/models/Post'
 vi.mock('@/lib/blog/revalidate', () => ({ revalidatePublishedPost: vi.fn() }))
 
 vi.mock('@/lib/blog/markdown', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/blog/markdown')>('@/lib/blog/markdown')
-  return { ...actual, renderMarkdown: vi.fn(async (markdown: string) => `<p>${markdown}</p>`) }
+  const actual = await vi.importActual<typeof import('@/lib/blog/markdown')>(
+    '@/lib/blog/markdown'
+  )
+  return {
+    ...actual,
+    renderMarkdown: vi.fn(async (markdown: string) => `<p>${markdown}</p>`),
+  }
 })
 
 let memory: MongoMemoryServer
-let PATCH: (request: NextRequest, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
+let PATCH: (
+  request: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) => Promise<Response>
 
 /** Matches the allowlist: https, res.cloudinary.com, and a path under this cloud name. */
 const CLOUD_URL = 'https://res.cloudinary.com/test-cloud/image/upload/v1/a.png'
@@ -96,7 +112,9 @@ describe('status, which the editor could not actually change', () => {
 
     await call(String(post._id), { status: 'published' })
 
-    expect((await PostModel.findById(post._id))?.publishedAt?.toISOString()).toBe(when.toISOString())
+    expect(
+      (await PostModel.findById(post._id))?.publishedAt?.toISOString()
+    ).toBe(when.toISOString())
   })
 
   it('lets a NEVER-published archived post go back to draft', async () => {
@@ -128,7 +146,9 @@ describe('status, which the editor could not actually change', () => {
   it('refuses to reach the deleted state through PATCH', async () => {
     const post = await makePost()
 
-    expect((await call(String(post._id), { status: 'deleted' })).status).toBe(400)
+    expect((await call(String(post._id), { status: 'deleted' })).status).toBe(
+      400
+    )
   })
 })
 
@@ -136,14 +156,22 @@ describe('the cover image, the one image URL a reader gets unfiltered', () => {
   it('accepts a URL from our own Cloudinary account', async () => {
     const post = await makePost()
 
-    expect((await call(String(post._id), { coverImage: CLOUD_URL })).status).toBe(200)
+    expect(
+      (await call(String(post._id), { coverImage: CLOUD_URL })).status
+    ).toBe(200)
     expect((await PostModel.findById(post._id))?.coverImage).toBe(CLOUD_URL)
   })
 
   it.each([
     ['another host', 'https://cdn.some-tool.ai/out/abc.png'],
-    ['another cloud account', 'https://res.cloudinary.com/someone-else/image/upload/v1/a.png'],
-    ['plain http', 'http://res.cloudinary.com/test-cloud/image/upload/v1/a.png'],
+    [
+      'another cloud account',
+      'https://res.cloudinary.com/someone-else/image/upload/v1/a.png',
+    ],
+    [
+      'plain http',
+      'http://res.cloudinary.com/test-cloud/image/upload/v1/a.png',
+    ],
     ['a protocol-relative URL', '//evil.example/x.png'],
     ['a data URI', 'data:image/png;base64,iVBORw0KGgo='],
   ])('refuses %s', async (_label, url) => {
@@ -164,7 +192,9 @@ describe('the cover image, the one image URL a reader gets unfiltered', () => {
   it('still allows clearing the cover', async () => {
     const post = await makePost({ coverImage: CLOUD_URL })
 
-    expect((await call(String(post._id), { coverImage: null })).status).toBe(200)
+    expect((await call(String(post._id), { coverImage: null })).status).toBe(
+      200
+    )
     expect((await PostModel.findById(post._id))?.coverImage).toBeNull()
   })
 })
@@ -197,26 +227,35 @@ describe('image prompts', () => {
       prompt: 'A picture.',
     }))
 
-    expect((await call(String(post._id), { imagePrompts: prompts })).status).toBe(200)
-    expect((await PostModel.findById(post._id))?.imagePrompts).toHaveLength(MAX_IMAGE_PROMPTS)
+    expect(
+      (await call(String(post._id), { imagePrompts: prompts })).status
+    ).toBe(200)
+    expect((await PostModel.findById(post._id))?.imagePrompts).toHaveLength(
+      MAX_IMAGE_PROMPTS
+    )
   })
 
   it.each([
     ['an empty key', ''],
     ['a key that is not a placeholder', 'cover'],
     ['a key with the wrong shape', 'image-1'],
-  ])('refuses %s with a written message, not raw mongoose text', async (_label, key) => {
-    // `key` was accepted on `typeof === 'string'` alone, so `''` passed the filter and then
-    // failed `required` at save - surfacing "Path `key` is required" to the client. Nothing
-    // bounded its length either.
-    const post = await makePost()
+  ])(
+    'refuses %s with a written message, not raw mongoose text',
+    async (_label, key) => {
+      // `key` was accepted on `typeof === 'string'` alone, so `''` passed the filter and then
+      // failed `required` at save - surfacing "Path `key` is required" to the client. Nothing
+      // bounded its length either.
+      const post = await makePost()
 
-    const response = await call(String(post._id), { imagePrompts: [{ key, prompt: 'x' }] })
-    const body = (await response.json()) as { error?: string }
+      const response = await call(String(post._id), {
+        imagePrompts: [{ key, prompt: 'x' }],
+      })
+      const body = (await response.json()) as { error?: string }
 
-    expect(response.status).toBe(400)
-    expect(body.error).not.toMatch(/Path `|validation failed/)
-  })
+      expect(response.status).toBe(400)
+      expect(body.error).not.toMatch(/Path `|validation failed/)
+    }
+  )
 
   it('does not move contentUpdatedAt - prompts are not reader-visible content', async () => {
     const post = await makePost()
@@ -227,7 +266,9 @@ describe('image prompts', () => {
       coverImagePrompt: 'A cover.',
     })
 
-    expect((await PostModel.findById(post._id))?.contentUpdatedAt?.toISOString()).toBe(before)
+    expect(
+      (await PostModel.findById(post._id))?.contentUpdatedAt?.toISOString()
+    ).toBe(before)
   })
 
   it('leaves both prompt fields untouched when they are omitted', async () => {

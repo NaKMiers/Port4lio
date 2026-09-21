@@ -29,30 +29,45 @@ export default function Breadcrumbs({ trail }: { trail: Crumb[] }) {
   if (trail.length === 0) return null
 
   return (
-    <nav aria-label='Breadcrumb' className='mb-8 text-sm'>
-      <ol className='flex flex-wrap items-center gap-x-2 gap-y-1 text-pp-muted'>
+    <nav
+      aria-label="Breadcrumb"
+      className="mb-8 text-sm"
+    >
+      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-pp-muted">
         {trail.map((crumb, index) => {
           const isLast = index === trail.length - 1
 
           return (
-            <li key={crumb.href} className='flex items-center gap-2'>
+            <li
+              key={crumb.href}
+              className="flex items-center gap-2"
+            >
               {index > 0 ? (
                 // `pp-line` is the border token and renders as very nearly the page
                 // background, so a separator drawn in it is invisible and the trail reads as
                 // three unrelated words. Muted at 60% is a separator you can see without it
                 // competing with the crumbs it separates.
-                <span aria-hidden className='text-pp-muted/60'>
+                <span
+                  aria-hidden
+                  className="text-pp-muted/60"
+                >
                   /
                 </span>
               ) : null}
               {isLast ? (
                 // Truncated so a long post title does not wrap the trail onto three lines on a
                 // phone. The full title is the `h1` immediately below it, so nothing is lost.
-                <span aria-current='page' className='block max-w-[22ch] truncate sm:max-w-none'>
+                <span
+                  aria-current="page"
+                  className="block max-w-[22ch] truncate sm:max-w-none"
+                >
                   {crumb.name}
                 </span>
               ) : (
-                <Link href={crumb.href} className='no-underline hover:text-pp-text'>
+                <Link
+                  href={crumb.href}
+                  className="no-underline hover:text-pp-text"
+                >
                   {crumb.name}
                 </Link>
               )}

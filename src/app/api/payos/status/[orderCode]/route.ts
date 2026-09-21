@@ -5,10 +5,17 @@ import { deliverIqResultEmail } from '@/lib/iq/result-email'
 import { deliverResultEmail } from '@/lib/mbti/result-email'
 import { connectDatabase } from '@/lib/mongodb'
 import { getPaymentLinkInformation, isPayosConfigured } from '@/lib/payos'
-import { fulfilMbtiPayment, markPayosPaymentCancelled } from '@/lib/payos-fulfil'
+import {
+  fulfilMbtiPayment,
+  markPayosPaymentCancelled,
+} from '@/lib/payos-fulfil'
 import { checkRateLimit, clientIpFrom, STATUS_LIMIT } from '@/lib/rate-limit'
 import { IqPaymentModel, type IqPaymentDocument } from '@/models/IqPayment'
-import { PaymentModel, type PaymentDocument, type PaymentStatus } from '@/models/Payment'
+import {
+  PaymentModel,
+  type PaymentDocument,
+  type PaymentStatus,
+} from '@/models/Payment'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,43 +45,43 @@ export async function GET(
   const { orderCode: rawOrderCode } = await params
   const orderCode = Number(rawOrderCode)
 
-  if (!Number.isFinite(orderCode)) {
+  if (!Number.isFinite(orderCode))
     return NextResponse.json({ message: 'Invalid order code' }, { status: 400 })
-  }
 
   await connectDatabase()
 
   const limit = await checkRateLimit(clientIpFrom(request), STATUS_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { message: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
-  const payment = (await PaymentModel.findOne({ orderCode }).lean()) as PaymentDocument | null
+  const payment = (await PaymentModel.findOne({
+    orderCode,
+  }).lean()) as PaymentDocument | null
 
   if (!payment) {
     const iqPayment = (await IqPaymentModel.findOne({
       orderCode,
     }).lean()) as IqPaymentDocument | null
 
-    if (!iqPayment) {
+    if (!iqPayment)
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
-    }
 
     return iqStatus(orderCode, iqPayment)
   }
 
   // Already settled locally - skip the outbound call entirely. This is the common case
   // once the webhook has landed, and it is what makes polling cheap.
-  if (payment.status === 'paid') {
+  if (payment.status === 'paid')
     return NextResponse.json({ status: 'paid' }, { status: 200 })
-  }
 
-  if (!isPayosConfigured()) {
+  if (!isPayosConfigured())
     return NextResponse.json({ status: payment.status }, { status: 200 })
-  }
 
   // Annotated because the `=== 'paid'` early return above narrows `payment.status` down to
   // the unpaid states, and this variable has to be able to hold 'paid' again.
@@ -112,7 +119,10 @@ export async function GET(
     .select('status')
     .lean()) as Pick<PaymentDocument, 'status'> | null
 
-  return NextResponse.json({ status: refreshed?.status ?? status }, { status: 200 })
+  return NextResponse.json(
+    { status: refreshed?.status ?? status },
+    { status: 200 }
+  )
 }
 
 /**
@@ -121,13 +131,11 @@ export async function GET(
  * fulfilment actually wrote rather than what we hoped it would.
  */
 async function iqStatus(orderCode: number, payment: IqPaymentDocument) {
-  if (payment.status === 'paid') {
+  if (payment.status === 'paid')
     return NextResponse.json({ status: 'paid' }, { status: 200 })
-  }
 
-  if (!isPayosConfigured()) {
+  if (!isPayosConfigured())
     return NextResponse.json({ status: payment.status }, { status: 200 })
-  }
 
   let status: IqPaymentDocument['status'] = payment.status
 
@@ -162,5 +170,8 @@ async function iqStatus(orderCode: number, payment: IqPaymentDocument) {
     .select('status')
     .lean()) as Pick<IqPaymentDocument, 'status'> | null
 
-  return NextResponse.json({ status: refreshed?.status ?? status }, { status: 200 })
+  return NextResponse.json(
+    { status: refreshed?.status ?? status },
+    { status: 200 }
+  )
 }

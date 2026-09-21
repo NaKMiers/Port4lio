@@ -60,7 +60,10 @@ export async function generateMetadata(): Promise<Metadata> {
   try {
     return buildBlogIndexMetadata(origin, await listPublishedPosts())
   } catch (error) {
-    console.error('[blog] index metadata degraded - posts unavailable for keywords', error)
+    console.error(
+      '[blog] index metadata degraded - posts unavailable for keywords',
+      error
+    )
     return buildBlogIndexMetadata(origin)
   }
 }
@@ -105,10 +108,12 @@ export default async function BlogIndexPage() {
    * reason.
    */
   const topics = Object.entries(
-    posts.flatMap(post => post.tags).reduce<Record<string, number>>((counts, tag) => {
-      counts[tag] = (counts[tag] ?? 0) + 1
-      return counts
-    }, {})
+    posts
+      .flatMap(post => post.tags)
+      .reduce<Record<string, number>>((counts, tag) => {
+        counts[tag] = (counts[tag] ?? 0) + 1
+        return counts
+      }, {})
   )
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, 3)
@@ -117,13 +122,15 @@ export default async function BlogIndexPage() {
   return (
     <>
       <script
-        type='application/ld+json'
+        type="application/ld+json"
         // `JSON.stringify` output through `escapeJsonForInlineScript`, over stored fields
         // only - see `serializeGraph` in `lib/blog/seo.ts`.
-        dangerouslySetInnerHTML={{ __html: buildBlogIndexJsonLd(origin, profile, posts) }}
+        dangerouslySetInnerHTML={{
+          __html: buildBlogIndexJsonLd(origin, profile, posts),
+        }}
       />
 
-      <div className='mx-auto w-full max-w-editorial flex-1 px-gutter py-12'>
+      <div className="mx-auto w-full max-w-editorial flex-1 px-gutter py-12">
         {/*
           The trail this page's `BreadcrumbList` describes, rendered rather than only
           declared. Two levels is a short trail, and it is still the one Google prints in
@@ -136,7 +143,10 @@ export default async function BlogIndexPage() {
           ]}
         />
 
-        <BlogIndexHeader postCount={posts.length} topics={topics} />
+        <BlogIndexHeader
+          postCount={posts.length}
+          topics={topics}
+        />
 
         {posts.length === 0 ? (
           /*
@@ -147,7 +157,9 @@ export default async function BlogIndexPage() {
             Rendered here rather than inside `BlogIndexList` so the search box is not offered
             over nothing at all.
           */
-          <p className='mt-16 text-pp-muted'>Nothing published yet. The first posts are in progress.</p>
+          <p className="mt-16 text-pp-muted">
+            Nothing published yet. The first posts are in progress.
+          </p>
         ) : (
           /*
             The grouping and the search both live in a client component, because search needs
@@ -157,7 +169,11 @@ export default async function BlogIndexPage() {
             `kinds` is handed over as entries rather than as the `Map` it is on the server: a
             `Map` does not survive serialisation across the server-to-client boundary.
           */
-          <BlogIndexList posts={posts} series={allSeries} kinds={Array.from(kinds)} />
+          <BlogIndexList
+            posts={posts}
+            series={allSeries}
+            kinds={Array.from(kinds)}
+          />
         )}
 
         {/*
@@ -168,7 +184,7 @@ export default async function BlogIndexPage() {
         <SubscribeForm />
       </div>
 
-      <AvailabilityBlock locale='en' />
+      <AvailabilityBlock locale="en" />
     </>
   )
 }

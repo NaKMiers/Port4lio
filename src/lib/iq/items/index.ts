@@ -4,7 +4,10 @@ import {
   generateTest as generateTestV1,
   optionsFor as optionsForV1,
 } from '@/lib/iq/items/v1/generate'
-import { renderMatrix as renderMatrixV1, renderOption as renderOptionV1 } from '@/lib/iq/items/v1/render'
+import {
+  renderMatrix as renderMatrixV1,
+  renderOption as renderOptionV1,
+} from '@/lib/iq/items/v1/render'
 import {
   answerIndexFor as answerIndexForV2,
   generateTest as generateTestV2,
@@ -110,11 +113,15 @@ export function renderTest(seed: number, version: number): RenderedQuestion[] {
 }
 
 export function answerKeyFor(seed: number, version: number): number[] {
-  if (version === 1) {
-    return generateTestV1(seed).map((item, index) => answerIndexForV1(item, seed, index))
-  }
-  if (version === 2) {
-    return generateTestV2(seed).map((item, index) => answerIndexForV2(item, seed, index))
-  }
+  if (version === 1)
+    return generateTestV1(seed).map((item, index) =>
+      answerIndexForV1(item, seed, index)
+    )
+
+  if (version === 2)
+    return generateTestV2(seed).map((item, index) =>
+      answerIndexForV2(item, seed, index)
+    )
+
   return unknownVersion(version)
 }

@@ -34,108 +34,131 @@ import { resolveSiteOrigin } from '@/lib/seo'
 
 export const metadata: Metadata = {
   title: 'Privacy',
-  description: 'What this site stores, for how long, and why the answers differ by kind.',
-  alternates: { canonical: `${resolveSiteOrigin().replace(/\/$/, '')}/blog/privacy` },
+  description:
+    'What this site stores, for how long, and why the answers differ by kind.',
+  alternates: {
+    canonical: `${resolveSiteOrigin().replace(/\/$/, '')}/blog/privacy`,
+  },
 }
 
 export default function BlogPrivacyPage() {
   return (
-    <div className='mx-auto w-full max-w-editorial px-gutter py-12'>
-      <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>Privacy</p>
-      <h1 className='mt-2 font-display text-3xl font-semibold text-pp-text'>
+    <div className="mx-auto w-full max-w-editorial px-gutter py-12">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
+        Privacy
+      </p>
+      <h1 className="mt-2 font-display text-3xl font-semibold text-pp-text">
         What this site keeps
       </h1>
-      <p className='mt-4 max-w-[62ch] text-lg leading-relaxed text-pp-muted'>
-        Three different kinds of data with three different lifetimes. The difference is not
-        arbitrary - a behavioural trace and a message somebody wrote to me are not the same
-        thing and should not expire on the same schedule.
+      <p className="mt-4 max-w-[62ch] text-lg leading-relaxed text-pp-muted">
+        Three different kinds of data with three different lifetimes. The
+        difference is not arbitrary - a behavioural trace and a message somebody
+        wrote to me are not the same thing and should not expire on the same
+        schedule.
       </p>
 
-      <section className='mt-10'>
-        <h2 className='font-display text-xl font-semibold text-pp-text'>
+      <section className="mt-10">
+        <h2 className="font-display text-xl font-semibold text-pp-text">
           Messages you send me - kept until I delete them
         </h2>
-        <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
-          If you use the contact form, I store your name, email address, subject and message,
-          plus whatever you typed into &ldquo;how did you hear about me&rdquo; if you filled it
-          in. There is deliberately no expiry on this. It is correspondence: you wrote to a
-          person and are waiting for a reply, and a conversation that resumes four months later
-          is normal. Expiring it would delete my own inbox on a timer.
+        <p className="mt-2 max-w-[62ch] leading-relaxed text-pp-muted">
+          If you use the contact form, I store your name, email address, subject
+          and message, plus whatever you typed into &ldquo;how did you hear
+          about me&rdquo; if you filled it in. There is deliberately no expiry
+          on this. It is correspondence: you wrote to a person and are waiting
+          for a reply, and a conversation that resumes four months later is
+          normal. Expiring it would delete my own inbox on a timer.
         </p>
-        <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
-          It is never shared, never used for a mailing list, and never sold. Ask me to delete a
-          message and I will.
+        <p className="mt-2 max-w-[62ch] leading-relaxed text-pp-muted">
+          It is never shared, never used for a mailing list, and never sold. Ask
+          me to delete a message and I will.
         </p>
       </section>
 
-      <section className='mt-8'>
-        <h2 className='font-display text-xl font-semibold text-pp-text'>
+      <section className="mt-8">
+        <h2 className="font-display text-xl font-semibold text-pp-text">
           If you arrived from a post
         </h2>
-        <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
-          The contact form records which post you came from, when you came from one. That is
-          the only reason the blog can tell whether writing anything was worth doing. It is a
-          slug - the last part of a post&rsquo;s URL - attached to a message you chose to send,
-          and it is stored with that message under the same terms above.
+        <p className="mt-2 max-w-[62ch] leading-relaxed text-pp-muted">
+          The contact form records which post you came from, when you came from
+          one. That is the only reason the blog can tell whether writing
+          anything was worth doing. It is a slug - the last part of a
+          post&rsquo;s URL - attached to a message you chose to send, and it is
+          stored with that message under the same terms above.
         </p>
       </section>
 
-      <section className='mt-8'>
-        <h2 className='font-display text-xl font-semibold text-pp-text'>
+      <section className="mt-8">
+        <h2 className="font-display text-xl font-semibold text-pp-text">
           Test results - deleted after {ATTEMPT_TTL_DAYS} days
         </h2>
-        <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
-          The MBTI and IQ tests store your answers and result against a random link, with no
-          name and no email, and delete them after {ATTEMPT_TTL_DAYS} days. The counters that
-          tell me whether a test is being finished or abandoned are on the same{' '}
-          {ATTEMPT_TTL_DAYS}-day clock. The{' '}
-          <Link href='/vi/mbti/privacy' className='text-pp-blue no-underline'>
+        <p className="mt-2 max-w-[62ch] leading-relaxed text-pp-muted">
+          The MBTI and IQ tests store your answers and result against a random
+          link, with no name and no email, and delete them after{' '}
+          {ATTEMPT_TTL_DAYS} days. The counters that tell me whether a test is
+          being finished or abandoned are on the same {ATTEMPT_TTL_DAYS}-day
+          clock. The{' '}
+          <Link
+            href="/vi/mbti/privacy"
+            className="text-pp-blue no-underline"
+          >
             MBTI
           </Link>{' '}
           and{' '}
-          <Link href='/vi/iq/privacy' className='text-pp-blue no-underline'>
+          <Link
+            href="/vi/iq/privacy"
+            className="text-pp-blue no-underline"
+          >
             IQ
           </Link>{' '}
           notices cover those in full.
         </p>
       </section>
 
-      <section className='mt-8'>
-        <h2 className='font-display text-xl font-semibold text-pp-text'>
+      <section className="mt-8">
+        <h2 className="font-display text-xl font-semibold text-pp-text">
           Reading a post - deleted after {BLOG_EVENT_TTL_DAYS} days
         </h2>
-        <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
-          When you open a post I record that a post was read, and if you arrived through
-          somebody&rsquo;s shared link, that the link worked. No name, no email, no account,
-          no third-party analytics. Your browser tab gets a random id stored in
-          sessionStorage - it disappears when you close the tab, and its only job is to stop
-          one person refreshing a page from counting as several. All of it is deleted after{' '}
-          {BLOG_EVENT_TTL_DAYS} days.
+        <p className="mt-2 max-w-[62ch] leading-relaxed text-pp-muted">
+          When you open a post I record that a post was read, and if you arrived
+          through somebody&rsquo;s shared link, that the link worked. No name,
+          no email, no account, no third-party analytics. Your browser tab gets
+          a random id stored in sessionStorage - it disappears when you close
+          the tab, and its only job is to stop one person refreshing a page from
+          counting as several. All of it is deleted after {BLOG_EVENT_TTL_DAYS}{' '}
+          days.
         </p>
-        <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
-          Being honest about the limit of that: the tab id is generated by your browser, so
-          these numbers tell me roughly whether writing is worth doing and nothing more. I do
-          not treat them as identities and they cannot be joined to a message you send me
-          unless you paste a link yourself.
-        </p>
-      </section>
-
-      <section className='mt-8'>
-        <h2 className='font-display text-xl font-semibold text-pp-text'>Not collected</h2>
-        <p className='mt-2 max-w-[62ch] leading-relaxed text-pp-muted'>
-          No tracking cookies, no advertising pixels, no analytics service, no third parties.
-          Blog posts load images from one image host and nothing else - the page&rsquo;s own
-          Content-Security-Policy enforces that, so a post cannot quietly fetch something from
-          anywhere else even if I made a mistake writing it.
+        <p className="mt-2 max-w-[62ch] leading-relaxed text-pp-muted">
+          Being honest about the limit of that: the tab id is generated by your
+          browser, so these numbers tell me roughly whether writing is worth
+          doing and nothing more. I do not treat them as identities and they
+          cannot be joined to a message you send me unless you paste a link
+          yourself.
         </p>
       </section>
 
-      <p className='mt-12 text-sm'>
+      <section className="mt-8">
+        <h2 className="font-display text-xl font-semibold text-pp-text">
+          Not collected
+        </h2>
+        <p className="mt-2 max-w-[62ch] leading-relaxed text-pp-muted">
+          No tracking cookies, no advertising pixels, no analytics service, no
+          third parties. Blog posts load images from one image host and nothing
+          else - the page&rsquo;s own Content-Security-Policy enforces that, so
+          a post cannot quietly fetch something from anywhere else even if I
+          made a mistake writing it.
+        </p>
+      </section>
+
+      <p className="mt-12 text-sm">
         <Link
-          href='/blog'
-          className='inline-flex items-center gap-1.5 text-pp-muted no-underline hover:text-pp-text'
+          href="/blog"
+          className="inline-flex items-center gap-1.5 text-pp-muted no-underline hover:text-pp-text"
         >
-          <ArrowLeft aria-hidden size={14} />
+          <ArrowLeft
+            aria-hidden
+            size={14}
+          />
           Writing
         </Link>
       </p>

@@ -7,6 +7,13 @@
  * lives in `auth.ts`, which owns `AUTH_SECRET`.
  */
 export function base64url(input: Buffer | Uint8Array | string): string {
-  const buf = typeof input === 'string' ? Buffer.from(input) : Buffer.from(input as Uint8Array)
-  return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const buf =
+    typeof input === 'string'
+      ? Buffer.from(input)
+      : Buffer.from(input as Uint8Array)
+  return buf
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
 }

@@ -123,11 +123,14 @@ export default function TestChrome({
   children: React.ReactNode
 }) {
   return (
-    <div lang={locale} className='portfolio-public-root relative flex min-h-screen flex-col'>
+    <div
+      lang={locale}
+      className="portfolio-public-root relative flex min-h-screen flex-col"
+    >
       <PortfolioBackdropOrnaments />
 
-      <header className='sticky top-0 z-30 border-b border-pp-line bg-[var(--pp-bg)]/80 backdrop-blur-md'>
-        <div className='mx-auto flex w-full max-w-editorial items-center justify-between gap-4 px-gutter py-3.5'>
+      <header className="bg-[var(--pp-bg)]/80 sticky top-0 z-30 border-b border-pp-line backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-editorial items-center justify-between gap-4 px-gutter py-3.5">
           {/*
             The nav IS the branding. There is no separate wordmark, because with two
             products a lone brand label plus a nav that repeats it says the same thing
@@ -141,7 +144,7 @@ export default function TestChrome({
             button - something that submits - on a page whose real buttons are answers.
           */}
           <nav aria-label={brand}>
-            <ul className='flex items-center gap-5 sm:gap-7'>
+            <ul className="flex items-center gap-5 sm:gap-7">
               {nav.map(item => {
                 const active = item.key === activeProduct
                 return (
@@ -149,7 +152,7 @@ export default function TestChrome({
                     <Link
                       href={item.href}
                       aria-current={active ? 'page' : undefined}
-                      className='group inline-flex items-center gap-2.5 no-underline'
+                      className="group inline-flex items-center gap-2.5 no-underline"
                     >
                       <span
                         aria-hidden
@@ -161,7 +164,9 @@ export default function TestChrome({
                       />
                       <span
                         className={`font-display text-sm font-semibold uppercase tracking-[0.2em] transition-colors ${
-                          active ? 'text-pp-text' : 'text-pp-muted group-hover:text-pp-text'
+                          active
+                            ? 'text-pp-text'
+                            : 'text-pp-muted group-hover:text-pp-text'
                         }`}
                       >
                         {item.label}
@@ -177,7 +182,7 @@ export default function TestChrome({
         </div>
       </header>
 
-      <div className='grow'>{children}</div>
+      <div className="grow">{children}</div>
 
       {/*
         Outside `.grow`, so it sits at the true bottom of a short page rather than being
@@ -191,11 +196,11 @@ export default function TestChrome({
       */}
       {footerSlot}
 
-      <footer className='border-t border-pp-line'>
-        <div className='mx-auto flex w-full max-w-editorial items-center justify-center px-gutter py-8 text-sm'>
+      <footer className="border-t border-pp-line">
+        <div className="mx-auto flex w-full max-w-editorial items-center justify-center px-gutter py-8 text-sm">
           <Link
             href={privacyHref}
-            className='font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue'
+            className="font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue"
           >
             {privacyLabel}
           </Link>

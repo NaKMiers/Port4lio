@@ -34,12 +34,23 @@ export const IQ_SEO = {
   vi: {
     name: 'Test IQ online',
     description: `Bài trắc nghiệm IQ bằng hình ảnh, ${ITEM_COUNT} câu trong ${MINUTES} phút. {price}. Không cần đăng ký, đề sinh riêng cho từng lượt làm.`,
-    keywords: ['test iq', 'trắc nghiệm iq', 'kiểm tra iq', 'iq test online', 'test iq miễn phí'],
+    keywords: [
+      'test iq',
+      'trắc nghiệm iq',
+      'kiểm tra iq',
+      'iq test online',
+      'test iq miễn phí',
+    ],
   },
   en: {
     name: 'Online IQ test',
     description: `A visual reasoning IQ test, ${ITEM_COUNT} questions in ${MINUTES} minutes. {price}. No signup, and the questions are generated per attempt.`,
-    keywords: ['iq test', 'online iq test', 'free iq test', 'visual reasoning test'],
+    keywords: [
+      'iq test',
+      'online iq test',
+      'free iq test',
+      'visual reasoning test',
+    ],
   },
 } as const
 
@@ -52,7 +63,9 @@ export function iqDescription(locale: Locale, price: number): string {
  * `hreflang` pairs. `x-default` points at Vietnamese because that is the primary audience;
  * a crawler with no language preference should land there rather than on English.
  */
-export function alternateIqLanguages(path: (locale: Locale) => string): Record<string, string> {
+export function alternateIqLanguages(
+  path: (locale: Locale) => string
+): Record<string, string> {
   const languages: Record<string, string> = {}
   for (const locale of LOCALES) languages[locale] = path(locale)
   languages['x-default'] = path('vi')
@@ -128,7 +141,11 @@ export function iqBreadcrumbJsonLd(
  * Quiz reinforce each other instead of competing for the same query, and `isPartOf` folds
  * it into the site graph.
  */
-export function iqMethodJsonLd(locale: Locale, title: string, description: string): JsonLdValue {
+export function iqMethodJsonLd(
+  locale: Locale,
+  title: string,
+  description: string
+): JsonLdValue {
   const origin = siteOrigin()
 
   return {
@@ -138,7 +155,11 @@ export function iqMethodJsonLd(locale: Locale, title: string, description: strin
     description,
     url: `${origin}/${locale}/iq/method`,
     inLanguage: locale,
-    about: { '@type': 'Quiz', name: IQ_SEO[locale].name, url: `${origin}/${locale}/iq` },
+    about: {
+      '@type': 'Quiz',
+      name: IQ_SEO[locale].name,
+      url: `${origin}/${locale}/iq`,
+    },
     publisher: { '@id': personEntityId(origin) },
     isPartOf: { '@id': websiteEntityId(origin) },
   }
@@ -149,7 +170,10 @@ export function iqMethodJsonLd(locale: Locale, title: string, description: strin
  * "is this accurate" gets the real answer, not a reassuring one, because the same claim is
  * on `/iq/method` and the two must not disagree.
  */
-export function iqFaqEntries(locale: Locale, price: number): { q: string; a: string }[] {
+export function iqFaqEntries(
+  locale: Locale,
+  price: number
+): { q: string; a: string }[] {
   // The cost question, answered from config rather than from written-in copy. Whoever reads
   // this is deciding whether to spend 24 minutes, so it has to be true - which means saying
   // a paid unlock exists even though the figure itself is held back until they finish.
@@ -162,7 +186,7 @@ export function iqFaqEntries(locale: Locale, price: number): { q: string; a: str
         ? 'Làm bài thì miễn phí, không cần đăng ký. Mở kết quả đầy đủ là tùy chọn có trả phí - đã bao gồm chứng nhận công khai mang tên bạn - và mức giá hiện ngay trên trang kết quả sau khi bạn làm xong.'
         : 'Taking the test is free, with no signup. Opening the full result is an optional paid unlock - it includes the public certificate in your name - and the price is shown on your result page once you finish.'
 
-  if (locale === 'vi') {
+  if (locale === 'vi')
     return [
       {
         q: 'Bài test IQ này có mất phí không?',
@@ -181,7 +205,7 @@ export function iqFaqEntries(locale: Locale, price: number): { q: string; a: str
         a: 'Không. Đề được sinh riêng cho từng lượt làm, nên không có bộ đáp án chung để tra.',
       },
     ]
-  }
+
   return [
     {
       q: 'Is this IQ test free?',

@@ -91,15 +91,15 @@ export default function PostCard({
     >
       {post.coverImage ? (
         post.coverCaption ? (
-          <figure className='mb-4'>
+          <figure className="mb-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.coverImage}
-              alt=''
-              loading='lazy'
-              className='aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover'
+              alt=""
+              loading="lazy"
+              className="aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
             />
-            <figcaption className='mt-2 text-[11px] leading-relaxed text-pp-muted'>
+            <figcaption className="mt-2 text-[11px] leading-relaxed text-pp-muted">
               {post.coverCaption}
             </figcaption>
           </figure>
@@ -107,10 +107,10 @@ export default function PostCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={post.coverImage}
-            alt=''
+            alt=""
             aria-hidden
-            loading='lazy'
-            className='mb-4 aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover'
+            loading="lazy"
+            className="mb-4 aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
           />
         )
       ) : null}
@@ -129,7 +129,7 @@ export default function PostCard({
         post bodies by source order; there is no third copy of this problem.
       */}
       {showEyebrow ? (
-        <span className='block text-[10px] font-semibold uppercase tracking-[0.16em] text-pp-ink-rose'>
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-pp-ink-rose">
           {kind?.label}
         </span>
       ) : null}
@@ -173,7 +173,7 @@ export default function PostCard({
         </Link>
       </h3>
 
-      <p className='mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pp-muted'>
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-pp-muted">
         {post.publishedAt ? (
           <time dateTime={new Date(post.publishedAt).toISOString()}>
             {DATE_FORMAT.format(new Date(post.publishedAt))}
@@ -182,7 +182,7 @@ export default function PostCard({
         {post.language !== locale ? (
           <>
             <span aria-hidden>&middot;</span>
-            <span className='rounded-full border border-pp-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]'>
+            <span className="rounded-full border border-pp-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]">
               {POST_LANGUAGE_LABEL[post.language] ?? post.language}
             </span>
           </>
@@ -190,15 +190,17 @@ export default function PostCard({
       </p>
 
       {post.excerpt ? (
-        <p className='mt-2 text-sm leading-relaxed text-pp-muted'>{post.excerpt}</p>
+        <p className="mt-2 text-sm leading-relaxed text-pp-muted">
+          {post.excerpt}
+        </p>
       ) : null}
 
       {post.tags.length > 0 ? (
-        <ul className='mt-3 flex flex-wrap gap-2'>
+        <ul className="mt-3 flex flex-wrap gap-2">
           {post.tags.slice(0, 4).map(tag => (
             <li
               key={tag}
-              className='blog-tag'
+              className="blog-tag"
             >
               {tag}
             </li>

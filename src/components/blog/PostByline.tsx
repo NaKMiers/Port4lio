@@ -71,10 +71,13 @@ export default function PostByline({
   const updated = showUpdated ? formatDate(contentUpdatedAt) : null
 
   return (
-    <div className='mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-pp-muted'>
+    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-pp-muted">
       <span>
         By{' '}
-        <Link href='/cv' className='font-semibold text-pp-text no-underline hover:text-pp-blue'>
+        <Link
+          href="/cv"
+          className="font-semibold text-pp-text no-underline hover:text-pp-blue"
+        >
           {authorName}
         </Link>
       </span>
@@ -92,7 +95,9 @@ export default function PostByline({
       {updated ? (
         <>
           <span aria-hidden>·</span>
-          <time dateTime={contentUpdatedAt?.toISOString()}>Updated {updated}</time>
+          <time dateTime={contentUpdatedAt?.toISOString()}>
+            Updated {updated}
+          </time>
         </>
       ) : null}
       {readingMinutes ? (
@@ -102,7 +107,9 @@ export default function PostByline({
             `<time>` with an ISO 8601 duration, the same string the JSON-LD carries as
             `timeRequired`. One value, two encodings of it, and no way for them to disagree.
           */}
-          <time dateTime={`PT${readingMinutes}M`}>{readingMinutes} min read</time>
+          <time dateTime={`PT${readingMinutes}M`}>
+            {readingMinutes} min read
+          </time>
         </>
       ) : null}
     </div>

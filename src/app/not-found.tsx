@@ -26,18 +26,20 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <div className='portfolio-public-root flex min-h-screen items-center justify-center px-gutter py-24'>
-      <div className='w-full max-w-xl text-center'>
-        <p className='font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-pp-muted'>
+    <div className="portfolio-public-root flex min-h-screen items-center justify-center px-gutter py-24">
+      <div className="w-full max-w-xl text-center">
+        <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-pp-muted">
           404
         </p>
 
-        <h1 className='mt-4 font-display text-[clamp(1.875rem,5vw,2.75rem)] font-semibold leading-tight tracking-tight text-pp-text'>
+        <h1 className="mt-4 font-display text-[clamp(1.875rem,5vw,2.75rem)] font-semibold leading-tight tracking-tight text-pp-text">
           Không tìm thấy trang này
         </h1>
-        <p className='mt-2 font-display text-lg font-medium text-pp-muted'>Page not found</p>
+        <p className="mt-2 font-display text-lg font-medium text-pp-muted">
+          Page not found
+        </p>
 
-        <p className='mt-6 text-sm leading-relaxed text-pp-muted'>
+        <p className="mt-6 text-sm leading-relaxed text-pp-muted">
           Đường dẫn có thể đã sai, hoặc kết quả bạn tìm đã hết hạn.
           <br />
           The link may be wrong, or a result you are looking for has expired.

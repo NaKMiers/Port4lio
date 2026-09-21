@@ -27,7 +27,8 @@ function timingSafeEqualString(a: string, b: string): boolean {
  * any deploy missing the variable. Throwing surfaces as a 500 - fail closed, not open.
  */
 export function isPublishRequestAuthorized(request: NextRequest): boolean {
-  if (hasOwnerAccess(request.cookies.get(getAuthCookieName())?.value)) return true
+  if (hasOwnerAccess(request.cookies.get(getAuthCookieName())?.value))
+    return true
 
   const header = request.headers.get('authorization') ?? ''
   const presented = header.startsWith('Bearer ') ? header.slice(7).trim() : ''

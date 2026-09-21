@@ -45,7 +45,9 @@ export type FulfilInput = {
   transactionDateTime?: string
 }
 
-export async function payosOrderCodeIsTaken(orderCode: number): Promise<boolean> {
+export async function payosOrderCodeIsTaken(
+  orderCode: number
+): Promise<boolean> {
   return !!(await PaymentModel.findOne({ orderCode }).select('_id').lean())
 }
 
@@ -61,24 +63,24 @@ export async function fulfilMbtiPayment(
 ): Promise<FulfilResult> {
   const { orderCode, amount, reference, transactionDateTime } = input
 
-  const existing = (await PaymentModel.findOne({ orderCode }).lean()) as PaymentDocument | null
+  const existing = (await PaymentModel.findOne({
+    orderCode,
+  }).lean()) as PaymentDocument | null
 
   // PayOS posts an arbitrary payload when the webhook URL is registered, and links can
   // outlive cleanup. Neither is an error, and both must still get a 2XX.
   if (!existing) return { outcome: 'unknown-order-code' }
 
   // Never trust the reported amount: it has to match the figure we signed.
-  if (Math.round(amount) !== Math.round(existing.amount)) {
+  if (Math.round(amount) !== Math.round(existing.amount))
     return {
       outcome: 'amount-mismatch',
       payment: existing,
       message: `Amount mismatch (received ${amount}, expected ${existing.amount})`,
     }
-  }
 
-  if (existing.status === 'paid') {
+  if (existing.status === 'paid')
     return { outcome: 'already-processed', payment: existing }
-  }
 
   // `$ne: 'paid'` rather than `status: 'pending'`: a row we optimistically marked
   // cancelled or expired must still be claimable. Money confirmed by the bank outranks our
@@ -124,16 +126,17 @@ export async function fulfilMbtiPayment(
       { new: true, lean: true }
     )
 
-    if (!unlocked) {
+    if (!unlocked)
       // The attempt expired or was deleted between checkout and payment. The money is
       // real, so this is a refund conversation, not something to swallow.
       failure = `Attempt ${claimed.attemptToken} no longer exists - paid result cannot be unlocked`
-    } else {
-      unlockedNow = true
-    }
+    else unlockedNow = true
   } catch (error) {
     console.error(`[PayOS Fulfil] Unlock threw for ${orderCode}:`, error)
-    failure = error instanceof Error ? error.message : 'Unknown error unlocking the attempt'
+    failure =
+      error instanceof Error
+        ? error.message
+        : 'Unknown error unlocking the attempt'
   }
 
   /**
@@ -152,18 +155,21 @@ export async function fulfilMbtiPayment(
    * indistinguishable from a real one afterward, making the funnel quietly worthless
    * rather than obviously broken.
    */
-  if (unlockedNow) {
-    recordFunnelDetached('mbti', FUNNEL_EVENTS.paid)
-  }
+  if (unlockedNow) recordFunnelDetached('mbti', FUNNEL_EVENTS.paid)
 
-  if (!failure) {
+  if (!failure)
     try {
       await deliver(claimed)
     } catch (error) {
-      console.error(`[PayOS Fulfil] Result email failed for ${orderCode}:`, error)
-      failure = error instanceof Error ? error.message : 'Unknown error sending the result email'
+      console.error(
+        `[PayOS Fulfil] Result email failed for ${orderCode}:`,
+        error
+      )
+      failure =
+        error instanceof Error
+          ? error.message
+          : 'Unknown error sending the result email'
     }
-  }
 
   if (failure) {
     // The result page still unlocks on the next visit if the attempt survived - the link
@@ -179,7 +185,9 @@ export async function fulfilMbtiPayment(
 }
 
 /** Only a still-pending payment can be cancelled; never downgrade a paid one. */
-export async function markPayosPaymentCancelled(orderCode: number): Promise<void> {
+export async function markPayosPaymentCancelled(
+  orderCode: number
+): Promise<void> {
   await PaymentModel.findOneAndUpdate(
     { orderCode, status: 'pending' },
     { $set: { status: 'cancelled' } }

@@ -2,7 +2,11 @@ import type { Element, Root } from 'hast'
 import { describe, expect, it } from 'vitest'
 
 import type { PostListItem } from '@/lib/blog/post-data'
-import { countProseWords, readingDuration, readingMinutes } from '@/lib/blog/reading'
+import {
+  countProseWords,
+  readingDuration,
+  readingMinutes,
+} from '@/lib/blog/reading'
 import rehypeHeadingIds, { slugifyHeading } from '@/lib/blog/rehype-heading-ids'
 import {
   blogEntityId,
@@ -44,7 +48,8 @@ function makePost(overrides: Partial<PostListItem> = {}): PostListItem {
   return {
     slug: 'measuring-revalidatepath',
     title: 'Measuring revalidatePath',
-    excerpt: 'What the pattern form actually does, measured against a real build.',
+    excerpt:
+      'What the pattern form actually does, measured against a real build.',
     kind: 'article',
     series: 'measured-in-production',
     isPillar: false,
@@ -64,7 +69,10 @@ function parseGraph(json: string): Record<string, unknown>[] {
   return parsed['@graph']
 }
 
-function nodeOfType(graph: Record<string, unknown>[], type: string): Record<string, unknown> {
+function nodeOfType(
+  graph: Record<string, unknown>[],
+  type: string
+): Record<string, unknown> {
   const found = graph.find(node => node['@type'] === type)
   expect(found, `no ${type} node in the graph`).toBeDefined()
   return found as Record<string, unknown>
@@ -106,7 +114,10 @@ describe('post JSON-LD', () => {
     // not reach across URLs to pull one in - see the comment on `personNode`.
     expect(person.name).toBe('Anh Khoa Nguyen')
     // Only `https://` socials, and the unparseable entry is dropped rather than emitted.
-    expect(person.sameAs).toEqual(['https://github.com/NaKMiers', 'https://x.com/somehandle'])
+    expect(person.sameAs).toEqual([
+      'https://github.com/NaKMiers',
+      'https://x.com/somehandle',
+    ])
   })
 
   it('carries the breadcrumb trail the page renders, in order', () => {
@@ -138,7 +149,9 @@ describe('post JSON-LD', () => {
       })
     )
 
-    expect(nodeOfType(graph, 'BlogPosting').articleSection).toBe('Measured in production')
+    expect(nodeOfType(graph, 'BlogPosting').articleSection).toBe(
+      'Measured in production'
+    )
   })
 
   it('derives about and keywords from the same tags, and omits both when there are none', () => {
@@ -154,7 +167,11 @@ describe('post JSON-LD', () => {
     ])
 
     const without = parseGraph(
-      buildPostJsonLd({ post: makePost({ tags: [] }), origin: ORIGIN, profile: PROFILE })
+      buildPostJsonLd({
+        post: makePost({ tags: [] }),
+        origin: ORIGIN,
+        profile: PROFILE,
+      })
     )
     const bare = nodeOfType(without, 'BlogPosting')
 
@@ -164,7 +181,12 @@ describe('post JSON-LD', () => {
 
   it('omits wordCount and timeRequired rather than claiming zero', () => {
     const graph = parseGraph(
-      buildPostJsonLd({ post: makePost(), origin: ORIGIN, profile: PROFILE, wordCount: 0 })
+      buildPostJsonLd({
+        post: makePost(),
+        origin: ORIGIN,
+        profile: PROFILE,
+        wordCount: 0,
+      })
     )
     const posting = nodeOfType(graph, 'BlogPosting')
 
@@ -189,7 +211,9 @@ describe('post JSON-LD', () => {
 
   it('cannot be broken out of by a title containing a closing script tag', () => {
     const json = buildPostJsonLd({
-      post: makePost({ title: 'Breaking out </script><script>alert(1)</script>' }),
+      post: makePost({
+        title: 'Breaking out </script><script>alert(1)</script>',
+      }),
       origin: ORIGIN,
       profile: PROFILE,
     })
@@ -198,13 +222,18 @@ describe('post JSON-LD', () => {
     // does survive still parses back to the original title.
     expect(json).not.toContain('</script')
     expect(json).not.toContain('<')
-    expect(nodeOfType(parseGraph(json), 'BlogPosting').headline).toContain('</script>')
+    expect(nodeOfType(parseGraph(json), 'BlogPosting').headline).toContain(
+      '</script>'
+    )
   })
 })
 
 describe('blog index JSON-LD', () => {
   it('declares the Blog node the posts point at, with its posts listed', () => {
-    const posts = [makePost(), makePost({ slug: 'second', title: 'Second post' })]
+    const posts = [
+      makePost(),
+      makePost({ slug: 'second', title: 'Second post' }),
+    ]
     const graph = parseGraph(buildBlogIndexJsonLd(ORIGIN, PROFILE, posts))
     const blog = nodeOfType(graph, 'Blog')
 
@@ -220,13 +249,18 @@ describe('blog index JSON-LD', () => {
   })
 
   it('omits blogPost entirely on an empty blog rather than emitting an empty list', () => {
-    const blog = nodeOfType(parseGraph(buildBlogIndexJsonLd(ORIGIN, PROFILE, [])), 'Blog')
+    const blog = nodeOfType(
+      parseGraph(buildBlogIndexJsonLd(ORIGIN, PROFILE, [])),
+      'Blog'
+    )
     expect(blog).not.toHaveProperty('blogPost')
   })
 
   it('stops the breadcrumb at Writing, matching the two crumbs the page renders', () => {
     const graph = parseGraph(buildBlogIndexJsonLd(ORIGIN, PROFILE, []))
-    const crumbs = nodeOfType(graph, 'BreadcrumbList').itemListElement as { name: string }[]
+    const crumbs = nodeOfType(graph, 'BreadcrumbList').itemListElement as {
+      name: string
+    }[]
 
     expect(crumbs.map(c => c.name)).toEqual(['Home', 'Writing'])
   })
@@ -234,11 +268,18 @@ describe('blog index JSON-LD', () => {
 
 describe('post metadata', () => {
   it('appends the brand only when the whole title still fits the budget', () => {
-    const short = buildPostMetadata(makePost({ title: 'Short title' }), ORIGIN, PROFILE)
+    const short = buildPostMetadata(
+      makePost({ title: 'Short title' }),
+      ORIGIN,
+      PROFILE
+    )
     expect(short.title).toBe('Short title | Anh Khoa Nguyen')
 
     const long = buildPostMetadata(
-      makePost({ title: 'A title long enough that the brand suffix would push it past sixty' }),
+      makePost({
+        title:
+          'A title long enough that the brand suffix would push it past sixty',
+      }),
       ORIGIN,
       PROFILE
     )
@@ -247,7 +288,11 @@ describe('post metadata', () => {
 
   it('falls back to the site share card when a post has no cover of its own', () => {
     const withCover = buildPostMetadata(makePost(), ORIGIN, PROFILE)
-    const withoutCover = buildPostMetadata(makePost({ coverImage: null }), ORIGIN, PROFILE)
+    const withoutCover = buildPostMetadata(
+      makePost({ coverImage: null }),
+      ORIGIN,
+      PROFILE
+    )
 
     expect(withCover.openGraph?.images).toEqual([
       {
@@ -266,15 +311,17 @@ describe('post metadata', () => {
     expect(withHandle.twitter).toMatchObject({ creator: '@somehandle' })
 
     const noSocials = { ...PROFILE, socials: [] } as unknown as PublicProfile
-    expect(buildPostMetadata(makePost(), ORIGIN, noSocials).twitter).not.toHaveProperty(
-      'creator'
-    )
+    expect(
+      buildPostMetadata(makePost(), ORIGIN, noSocials).twitter
+    ).not.toHaveProperty('creator')
   })
 
   it('canonicalises to the post URL and declares no hreflang (D7)', () => {
     const meta = buildPostMetadata(makePost(), ORIGIN, PROFILE)
 
-    expect(meta.alternates?.canonical).toBe(`${ORIGIN}/blog/measuring-revalidatepath`)
+    expect(meta.alternates?.canonical).toBe(
+      `${ORIGIN}/blog/measuring-revalidatepath`
+    )
     expect(meta.alternates).not.toHaveProperty('languages')
   })
 })
@@ -317,11 +364,13 @@ describe('reading time', () => {
 
 describe('heading anchors and the table of contents', () => {
   it('slugifies to a charset that cannot escape an attribute', () => {
-    expect(slugifyHeading('Why the order is this, and not the obvious one')).toBe(
-      'why-the-order-is-this-and-not-the-obvious-one'
-    )
+    expect(
+      slugifyHeading('Why the order is this, and not the obvious one')
+    ).toBe('why-the-order-is-this-and-not-the-obvious-one')
     expect(slugifyHeading('Đo lường ISR')).toBe('do-luong-isr')
-    expect(slugifyHeading('" onmouseover="alert(1)')).toBe('onmouseover-alert-1')
+    expect(slugifyHeading('" onmouseover="alert(1)')).toBe(
+      'onmouseover-alert-1'
+    )
     // Nothing alphanumeric at all: no id, rather than the id `-`.
     expect(slugifyHeading('!!!')).toBe('')
   })
@@ -360,7 +409,11 @@ describe('heading anchors and the table of contents', () => {
 
     const tree: Root = {
       type: 'root',
-      children: [heading('h2', 'Why'), heading('h2', 'Why'), heading('h1', 'Title')],
+      children: [
+        heading('h2', 'Why'),
+        heading('h2', 'Why'),
+        heading('h1', 'Title'),
+      ],
     }
 
     rehypeHeadingIds()(tree)

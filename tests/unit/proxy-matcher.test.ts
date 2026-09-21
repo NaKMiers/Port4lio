@@ -19,7 +19,9 @@ describe('proxy matcher', () => {
   it('covers the bare and nested path of every test product', () => {
     for (const product of TEST_PRODUCTS) {
       expect(config.matcher, `bare /${product}`).toContain(`/${product}`)
-      expect(config.matcher, `nested /${product}/*`).toContain(`/${product}/:path*`)
+      expect(config.matcher, `nested /${product}/*`).toContain(
+        `/${product}/:path*`
+      )
     }
   })
 
@@ -30,9 +32,15 @@ describe('proxy matcher', () => {
   })
 
   it('never matches the portfolio, its assets, or already-localised paths', () => {
-    const forbidden = ['/', '/cv', '/api/:path*', '/_next/:path*', '/vi/:path*', '/en/:path*']
-    for (const path of forbidden) {
+    const forbidden = [
+      '/',
+      '/cv',
+      '/api/:path*',
+      '/_next/:path*',
+      '/vi/:path*',
+      '/en/:path*',
+    ]
+    for (const path of forbidden)
       expect(config.matcher, path).not.toContain(path)
-    }
   })
 })

@@ -60,5 +60,8 @@ export type RuleSpec = {
   name: string
   /** Lowest rung this rule may appear at. Keeps easy rungs to one varying dimension. */
   minRung: number
-  build: (random: () => number, rung: number) => { cells: Cell[]; answer: Cell; distractors: Cell[] }
+  build: (
+    random: () => number,
+    rung: number
+  ) => { cells: Cell[]; answer: Cell; distractors: Cell[] }
 }

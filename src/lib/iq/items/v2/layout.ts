@@ -63,9 +63,27 @@ export type LayoutSpec = {
 
 export const LAYOUTS: Record<LayoutId, LayoutSpec> = {
   // Four boxes, three given. Named for the three the taker reads, sized for what renders.
-  '1x3-sequence': { id: '1x3-sequence', cols: 4, rows: 1, holeIndex: 3, confirmations: 1 },
-  '2x2-matrix': { id: '2x2-matrix', cols: 2, rows: 2, holeIndex: 3, confirmations: 0 },
-  '3x3-matrix': { id: '3x3-matrix', cols: 3, rows: 3, holeIndex: 8, confirmations: 2 },
+  '1x3-sequence': {
+    id: '1x3-sequence',
+    cols: 4,
+    rows: 1,
+    holeIndex: 3,
+    confirmations: 1,
+  },
+  '2x2-matrix': {
+    id: '2x2-matrix',
+    cols: 2,
+    rows: 2,
+    holeIndex: 3,
+    confirmations: 0,
+  },
+  '3x3-matrix': {
+    id: '3x3-matrix',
+    cols: 3,
+    rows: 3,
+    holeIndex: 8,
+    confirmations: 2,
+  },
 }
 
 export const LAYOUT_IDS = Object.keys(LAYOUTS) as LayoutId[]
@@ -81,7 +99,10 @@ export function givenCellCount(layout: LayoutSpec): number {
 }
 
 /** Row and column of a grid position. */
-export function coordsOf(layout: LayoutSpec, index: number): { row: number; col: number } {
+export function coordsOf(
+  layout: LayoutSpec,
+  index: number
+): { row: number; col: number } {
   return { row: Math.floor(index / layout.cols), col: index % layout.cols }
 }
 

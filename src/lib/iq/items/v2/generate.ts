@@ -1,7 +1,13 @@
 import { ITEM_COUNT } from '@/lib/iq/items/config'
 import { rng, shuffle } from '@/lib/iq/items/random'
 import { cellKey, type Cell } from '@/lib/iq/items/v2/cell'
-import { LADDER, MAX_PER_FAMILY, planFamilies, profileFor, type RungProfile } from '@/lib/iq/items/v2/ladder'
+import {
+  LADDER,
+  MAX_PER_FAMILY,
+  planFamilies,
+  profileFor,
+  type RungProfile,
+} from '@/lib/iq/items/v2/ladder'
 import type { CellGrid } from '@/lib/iq/items/v2/layout'
 import {
   familyCanFill,
@@ -54,7 +60,6 @@ export type Item = Built & {
   attempts: number
 }
 
-
 /**
  * Parameter re-rolls before giving up on the planned family.
  *
@@ -78,7 +83,8 @@ function tryFamily(
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     const random = rng(seed * 7919 + rung * 104729 + (attempt + offset) * 31337)
     const built = rule.build(random, profile)
-    if (built && verifyItem(built, profile).ok) return { built, attempts: attempt + 1 }
+    if (built && verifyItem(built, profile).ok)
+      return { built, attempts: attempt + 1 }
   }
   return null
 }
@@ -101,7 +107,7 @@ export function generateItem(
   const profile = profileFor(rung)
 
   const planned = tryFamily(family, seed, rung, profile, 0)
-  if (planned) {
+  if (planned)
     return {
       ...planned.built,
       rule: family,
@@ -110,7 +116,6 @@ export function generateItem(
       substituted: false,
       attempts: planned.attempts,
     }
-  }
 
   /**
    * Substitution, and only among families that satisfy the SAME rung profile.
@@ -153,15 +158,21 @@ export function generateItem(
    */
   const countOf = (name: string) => uses.get(name) ?? 0
   const tiers = [
-    shuffle(random, capable.filter(name => countOf(name) < MAX_PER_FAMILY)),
-    shuffle(random, capable.filter(name => countOf(name) === MAX_PER_FAMILY)),
+    shuffle(
+      random,
+      capable.filter(name => countOf(name) < MAX_PER_FAMILY)
+    ),
+    shuffle(
+      random,
+      capable.filter(name => countOf(name) === MAX_PER_FAMILY)
+    ),
     shuffle(random, capable),
   ]
 
-  for (const tier of tiers) {
+  for (const tier of tiers)
     for (const alternative of tier) {
       const built = tryFamily(alternative, seed, rung, profile, 977)
-      if (built) {
+      if (built)
         return {
           ...built.built,
           rule: alternative,
@@ -170,9 +181,7 @@ export function generateItem(
           substituted: true,
           attempts: built.attempts,
         }
-      }
     }
-  }
 
   // Every family capable of this rung failed. That is a bug in a rule or in the ladder, not
   // bad luck, and shipping an unverified item to a taker is worse than a loud failure.
@@ -181,14 +190,22 @@ export function generateItem(
 
 /** A whole test: 26 items on the ladder in `v2/ladder.ts`. */
 export function generateTest(seed: number): Item[] {
-  const plan = planFamilies(seed, { weights: FAMILY_WEIGHTS, eligible: familyCanFill })
+  const plan = planFamilies(seed, {
+    weights: FAMILY_WEIGHTS,
+    eligible: familyCanFill,
+  })
 
   // Tallied as we go, so a substitution cannot take a family far past the cap the plan
   // respected. The plan never exceeds it; only the last-resort tier can, and by one.
   const uses = new Map<string, number>()
 
   return LADDER.map((profile, index) => {
-    const item = generateItem(seed + index, profile.rung, plan[index] as string, uses)
+    const item = generateItem(
+      seed + index,
+      profile.rung,
+      plan[index] as string,
+      uses
+    )
     uses.set(item.rule, (uses.get(item.rule) ?? 0) + 1)
     return item
   })
@@ -201,7 +218,10 @@ export function generateTest(seed: number): Item[] {
  * unchanged: the shuffle has to be a pure function of the seed and the item index.
  */
 export function optionsFor(item: Item, seed: number, index: number): Cell[] {
-  return shuffle(rng(seed + index * 977), [item.answer, ...item.distractors.map(d => d.cell)])
+  return shuffle(rng(seed + index * 977), [
+    item.answer,
+    ...item.distractors.map(d => d.cell),
+  ])
 }
 
 /**
@@ -212,9 +232,15 @@ export function optionsFor(item: Item, seed: number, index: number): Cell[] {
  * key marks every answer in the test wrong. Safe because verification has already proven the
  * six keys are distinct.
  */
-export function answerIndexFor(item: Item, seed: number, index: number): number {
+export function answerIndexFor(
+  item: Item,
+  seed: number,
+  index: number
+): number {
   const target = cellKey(item.answer)
-  return optionsFor(item, seed, index).findIndex(cell => cellKey(cell) === target)
+  return optionsFor(item, seed, index).findIndex(
+    cell => cellKey(cell) === target
+  )
 }
 
 void ITEM_COUNT

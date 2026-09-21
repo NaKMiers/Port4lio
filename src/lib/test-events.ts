@@ -71,11 +71,17 @@ export const FUNNEL_EVENTS = {
  */
 const CLIENT_POSTABLE_FUNNEL_EVENTS: readonly string[] = []
 
-const CLIENT_POSTABLE_KINDS: readonly TestEventKind[] = ['share', 'attribute', 'progress']
+const CLIENT_POSTABLE_KINDS: readonly TestEventKind[] = [
+  'share',
+  'attribute',
+  'progress',
+]
 
 export class ServerOnlyEventError extends Error {
   constructor(kind: string, event: string | null) {
-    super(`"${kind}${event ? `:${event}` : ''}" is server-authoritative and cannot be posted`)
+    super(
+      `"${kind}${event ? `:${event}` : ''}" is server-authoritative and cannot be posted`
+    )
     this.name = 'ServerOnlyEventError'
   }
 }
@@ -85,16 +91,18 @@ export class ServerOnlyEventError extends Error {
  * else - server callers are trusted by construction because they are already inside the
  * server.
  */
-export function assertClientPostable(kind: string, event: string | null): asserts kind is TestEventKind {
+export function assertClientPostable(
+  kind: string,
+  event: string | null
+): asserts kind is TestEventKind {
   if (kind === 'funnel') {
-    if (!event || !CLIENT_POSTABLE_FUNNEL_EVENTS.includes(event)) {
+    if (!event || !CLIENT_POSTABLE_FUNNEL_EVENTS.includes(event))
       throw new ServerOnlyEventError(kind, event)
-    }
+
     return
   }
-  if (!CLIENT_POSTABLE_KINDS.includes(kind as TestEventKind)) {
+  if (!CLIENT_POSTABLE_KINDS.includes(kind as TestEventKind))
     throw new ServerOnlyEventError(kind, event)
-  }
 }
 
 type RecordInput = {
@@ -116,7 +124,15 @@ type RecordInput = {
  * by counting documents.
  */
 export async function recordEvent(input: RecordInput): Promise<void> {
-  const { id, product, kind, event = null, clientReported = false, data, max } = input
+  const {
+    id,
+    product,
+    kind,
+    event = null,
+    clientReported = false,
+    data,
+    max,
+  } = input
   try {
     await connectDatabase()
     const now = new Date()
@@ -132,8 +148,20 @@ export async function recordEvent(input: RecordInput): Promise<void> {
           createdAt: now,
           expireAt: testEventExpiryFrom(now),
         },
-        ...(data ? { $set: Object.fromEntries(Object.entries(data).map(([k, v]) => [`data.${k}`, v])) } : {}),
-        ...(max ? { $max: Object.fromEntries(Object.entries(max).map(([k, v]) => [`data.${k}`, v])) } : {}),
+        ...(data
+          ? {
+              $set: Object.fromEntries(
+                Object.entries(data).map(([k, v]) => [`data.${k}`, v])
+              ),
+            }
+          : {}),
+        ...(max
+          ? {
+              $max: Object.fromEntries(
+                Object.entries(max).map(([k, v]) => [`data.${k}`, v])
+              ),
+            }
+          : {}),
       },
       { upsert: true, lean: true }
     )
@@ -145,7 +173,10 @@ export async function recordEvent(input: RecordInput): Promise<void> {
 }
 
 /** Server-side funnel counter, bucketed by day so a time series falls out of the key. */
-export async function recordFunnel(product: string, event: string): Promise<void> {
+export async function recordFunnel(
+  product: string,
+  event: string
+): Promise<void> {
   const now = new Date()
   await recordEvent({
     id: testEventId.funnel(product, event, dayBucket(now)),

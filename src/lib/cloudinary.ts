@@ -7,13 +7,12 @@ const cloudName = process.env.CLOUDINARY_CLOUD_NAME
 const apiKey = process.env.CLOUDINARY_API_KEY
 const apiSecret = process.env.CLOUDINARY_API_SECRET
 
-if (cloudName && apiKey && apiSecret) {
+if (cloudName && apiKey && apiSecret)
   cloudinary.config({
     cloud_name: cloudName,
     api_key: apiKey,
     api_secret: apiSecret,
   })
-}
 
 export type UploadedAsset = {
   url: string
@@ -40,13 +39,13 @@ export async function uploadToCloudinary(
   folder: string,
   resourceType: 'image' | 'auto' = 'image'
 ): Promise<UploadedAsset> {
-  if (!cloudName || !apiKey || !apiSecret) {
+  if (!cloudName || !apiKey || !apiSecret)
     throw new Error('Missing Cloudinary env vars')
-  }
 
-  if (typeof file.size === 'number' && file.size > MAX_UPLOAD_BYTES) {
-    throw new Error(`File exceeds ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB upload limit`)
-  }
+  if (typeof file.size === 'number' && file.size > MAX_UPLOAD_BYTES)
+    throw new Error(
+      `File exceeds ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB upload limit`
+    )
 
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
@@ -61,9 +60,9 @@ export async function uploadToCloudinary(
       },
       (error, result) => {
         if (error) return reject(error)
-        if (!result || !('secure_url' in result)) {
+        if (!result || !('secure_url' in result))
           return reject(new Error('Cloudinary upload failed'))
-        }
+
         resolve({ url: result.secure_url, publicId: result.public_id })
       }
     )

@@ -40,33 +40,39 @@ export default async function WritingTeaser({ limit = 3 }: { limit?: number }) {
   try {
     posts = (await listPublishedPosts()).slice(0, limit)
   } catch (error) {
-    console.error('[blog] WritingTeaser could not load posts - rendering nothing', error)
+    console.error(
+      '[blog] WritingTeaser could not load posts - rendering nothing',
+      error
+    )
     return null
   }
 
   if (posts.length === 0) return null
 
   return (
-    <div className='rounded-panel border border-pp-line bg-[var(--pp-panel)] p-5'>
-      <div className='flex items-baseline justify-between gap-4'>
-        <h2 className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+    <div className="rounded-panel border border-pp-line bg-[var(--pp-panel)] p-5">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
           Writing
         </h2>
         <Link
-          href='/blog'
-          className='inline-flex items-center gap-1 text-xs font-semibold text-pp-blue no-underline hover:underline'
+          href="/blog"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-pp-blue no-underline hover:underline"
         >
           All posts
-          <ArrowRight aria-hidden size={13} />
+          <ArrowRight
+            aria-hidden
+            size={13}
+          />
         </Link>
       </div>
 
-      <ul className='mt-3 space-y-2'>
+      <ul className="mt-3 space-y-2">
         {posts.map(post => (
           <li key={post.slug}>
             <Link
               href={`/blog/${post.slug}`}
-              className='font-display text-sm font-semibold leading-snug text-pp-text no-underline hover:text-pp-blue'
+              className="font-display text-sm font-semibold leading-snug text-pp-text no-underline hover:text-pp-blue"
             >
               {post.title}
             </Link>

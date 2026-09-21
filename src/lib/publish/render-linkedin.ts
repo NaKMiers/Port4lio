@@ -19,7 +19,8 @@ const PROJECT_LIMIT = 3
 function headline(profile: PublicProfile): string {
   const titles = dedupeJobTitles(profile.jobTitle)
   const description = collapseWhitespace(profile.description)
-  if (titles.length > 0 && description) return `${titles.join(' · ')} | ${description}`
+  if (titles.length > 0 && description)
+    return `${titles.join(' · ')} | ${description}`
   return titles.join(' · ') || description
 }
 
@@ -32,29 +33,36 @@ function about(profile: PublicProfile, ctx: RenderContext): string {
 
   const blocks: string[] = [...paragraphs]
 
-  if (stats.length > 0) {
+  if (stats.length > 0)
     blocks.push(
       stats
-        .map(stat => `${stat.value.toLocaleString('en-US')} ${collapseWhitespace(stat.label)}`)
+        .map(
+          stat =>
+            `${stat.value.toLocaleString('en-US')} ${collapseWhitespace(stat.label)}`
+        )
         .join(' · ')
     )
-  }
 
-  if (projects.length > 0) {
+  if (projects.length > 0)
     blocks.push(
-      ['What I have shipped:', ...projects.map(project => {
-        const overview = collapseWhitespace(project.overview ?? '')
-        return `• ${collapseWhitespace(project.title)}${overview ? ` - ${overview}` : ''}`
-      })].join('\n')
+      [
+        'What I have shipped:',
+        ...projects.map(project => {
+          const overview = collapseWhitespace(project.overview ?? '')
+          return `• ${collapseWhitespace(project.title)}${overview ? ` - ${overview}` : ''}`
+        }),
+      ].join('\n')
     )
-  }
 
   const stores = extractStoreLinksFromProjects(profile.projects).filter(link =>
     /^https:\/\//i.test(link.url)
   )
-  if (stores.length > 0) {
-    blocks.push(stores.map(link => `${collapseWhitespace(link.name)}: ${link.url}`).join('\n'))
-  }
+  if (stores.length > 0)
+    blocks.push(
+      stores
+        .map(link => `${collapseWhitespace(link.name)}: ${link.url}`)
+        .join('\n')
+    )
 
   blocks.push(`Portfolio: ${siteUrl(ctx)}`)
 
@@ -65,7 +73,7 @@ function skills(profile: PublicProfile): string {
   const seen = new Set<string>()
   const names: string[] = []
 
-  for (const group of sanitizeSkillGroups(profile.skills)) {
+  for (const group of sanitizeSkillGroups(profile.skills))
     for (const item of group.items) {
       const name = collapseWhitespace(item.name)
       const key = name.toLowerCase()
@@ -73,13 +81,15 @@ function skills(profile: PublicProfile): string {
       seen.add(key)
       names.push(name)
     }
-  }
 
   return names.slice(0, PLATFORM_LIMITS.linkedinSkills).join('\n')
 }
 
 /** LinkedIn has no profile-write API - these are paste targets, not API payloads. */
-export function renderLinkedIn(profile: PublicProfile, ctx: RenderContext): ManualArtifact {
+export function renderLinkedIn(
+  profile: PublicProfile,
+  ctx: RenderContext
+): ManualArtifact {
   const skillList = skills(profile)
   const skillCount = skillList ? skillList.split('\n').length : 0
 

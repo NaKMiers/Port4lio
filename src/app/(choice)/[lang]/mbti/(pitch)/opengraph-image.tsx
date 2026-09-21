@@ -64,96 +64,98 @@ export default async function MbtiLandingOpenGraphImage({
 
   // Satori cannot render a useful error, so an unexpected param produces a blank card
   // rather than failing the build.
-  if (!isLocale(lang)) {
-    return new ImageResponse(<div style={{ width: '100%', height: '100%' }} />, size)
-  }
+  if (!isLocale(lang))
+    return new ImageResponse(
+      <div style={{ width: '100%', height: '100%' }} />,
+      size
+    )
 
   // Title from the same builder the `<title>` uses, so the card and the tab never disagree
   // about the question count.
   const title = landingTitle(lang, priceForSeo())
 
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '80px',
-          background: EMAIL_COLOR.page,
-          color: EMAIL_COLOR.text,
-          fontFamily: 'sans-serif',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div
-            style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '999px',
-              background: EMAIL_COLOR.violet,
-              display: 'flex',
-            }}
-          />
-          <div
-            style={{
-              fontSize: '26px',
-              fontWeight: 600,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: EMAIL_COLOR.muted,
-              display: 'flex',
-            }}
-          >
-            {SEO[lang].siteName}
-          </div>
-        </div>
-
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '80px',
+        background: EMAIL_COLOR.page,
+        color: EMAIL_COLOR.text,
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div
           style={{
-            fontSize: '76px',
-            fontWeight: 700,
-            lineHeight: 1.1,
-            letterSpacing: '-0.02em',
-            marginTop: '40px',
-            maxWidth: '1000px',
+            width: '20px',
+            height: '20px',
+            borderRadius: '999px',
+            background: EMAIL_COLOR.violet,
+            display: 'flex',
+          }}
+        />
+        <div
+          style={{
+            fontSize: '26px',
+            fontWeight: 600,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            color: EMAIL_COLOR.muted,
             display: 'flex',
           }}
         >
-          {title}
-        </div>
-
-        <div style={{ display: 'flex', gap: '20px', marginTop: '52px' }}>
-          {AXES.map(axis => (
-            <div
-              key={axis.pair}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                padding: '14px 26px',
-                borderRadius: '999px',
-                background: '#ffffff',
-                border: `1px solid ${EMAIL_COLOR.line}`,
-              }}
-            >
-              <div
-                style={{
-                  width: '14px',
-                  height: '14px',
-                  borderRadius: '999px',
-                  background: axis.color,
-                  display: 'flex',
-                }}
-              />
-              <div style={{ fontSize: '30px', fontWeight: 600, display: 'flex' }}>{axis.pair}</div>
-            </div>
-          ))}
+          {SEO[lang].siteName}
         </div>
       </div>
-    ),
+
+      <div
+        style={{
+          fontSize: '76px',
+          fontWeight: 700,
+          lineHeight: 1.1,
+          letterSpacing: '-0.02em',
+          marginTop: '40px',
+          maxWidth: '1000px',
+          display: 'flex',
+        }}
+      >
+        {title}
+      </div>
+
+      <div style={{ display: 'flex', gap: '20px', marginTop: '52px' }}>
+        {AXES.map(axis => (
+          <div
+            key={axis.pair}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '14px 26px',
+              borderRadius: '999px',
+              background: '#ffffff',
+              border: `1px solid ${EMAIL_COLOR.line}`,
+            }}
+          >
+            <div
+              style={{
+                width: '14px',
+                height: '14px',
+                borderRadius: '999px',
+                background: axis.color,
+                display: 'flex',
+              }}
+            />
+            <div style={{ fontSize: '30px', fontWeight: 600, display: 'flex' }}>
+              {axis.pair}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>,
     size
   )
 }

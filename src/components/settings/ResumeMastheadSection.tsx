@@ -18,7 +18,11 @@ import {
   uploadAssetToCloudinary,
   uploadInputCls,
 } from '@/components/settings/settings-utils'
-import { replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
+import {
+  replaceAt,
+  resumeOf,
+  updateResume,
+} from '@/components/settings/resume-utils'
 import { moveItem } from '@/lib/resume-sections'
 import type { UploadingState } from '@/components/settings/types'
 import type { Profile, ResumeContactLink } from '@/types/profile'
@@ -47,7 +51,10 @@ export default function ResumeMastheadSection({
   const addLink = () =>
     updateResume(setProfile, r => ({
       ...r,
-      contact: { ...r.contact, links: [...r.contact.links, { label: '', text: '', href: '' }] },
+      contact: {
+        ...r.contact,
+        links: [...r.contact.links, { label: '', text: '', href: '' }],
+      },
     }))
 
   const updateLink = (idx: number, patch: Partial<ResumeContactLink>) => {
@@ -64,44 +71,57 @@ export default function ResumeMastheadSection({
     }))
 
   return (
-    <Section id='cv-masthead' title='CV Masthead' badge='name, role, contact' defaultOpen>
-      <div className='space-y-4'>
+    <Section
+      id="cv-masthead"
+      title="CV Masthead"
+      badge="name, role, contact"
+      defaultOpen
+    >
+      <div className="space-y-4">
         <p className={helpTextCls}>
-          Printed at the top of <strong>/cv</strong>. The vertical pipes between contact items use
-          gaps measured against these exact strings - after changing the email, phone or location,
-          open /cv and check the spacing by eye. The overflow test only measures height, so it
-          cannot catch a pipe that sits wrong.
+          Printed at the top of <strong>/cv</strong>. The vertical pipes between
+          contact items use gaps measured against these exact strings - after
+          changing the email, phone or location, open /cv and check the spacing
+          by eye. The overflow test only measures height, so it cannot catch a
+          pipe that sits wrong.
         </p>
 
-        <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-          <div className='space-y-2'>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="space-y-2">
             <label className={labelCls}>Name</label>
             <input
               className={inputCls}
               value={resume.name}
-              onChange={e => updateResume(setProfile, r => ({ ...r, name: e.target.value }))}
+              onChange={e =>
+                updateResume(setProfile, r => ({ ...r, name: e.target.value }))
+              }
             />
           </div>
-          <div className='space-y-2'>
+          <div className="space-y-2">
             <label className={labelCls}>Role</label>
             <input
               className={inputCls}
               value={resume.role}
-              onChange={e => updateResume(setProfile, r => ({ ...r, role: e.target.value }))}
+              onChange={e =>
+                updateResume(setProfile, r => ({ ...r, role: e.target.value }))
+              }
             />
           </div>
         </div>
 
         <div className={itemCardCls}>
-          <div className='flex items-center justify-between gap-3'>
+          <div className="flex items-center justify-between gap-3">
             <label className={labelCls}>CV photo</label>
-            <div className='flex items-center gap-2'>
-              {uploading.cvPhoto ? <Spinner className='text-pp-muted' /> : null}
+            <div className="flex items-center gap-2">
+              {uploading.cvPhoto ? <Spinner className="text-pp-muted" /> : null}
               <button
-                type='button'
+                type="button"
                 className={ghostBtnCls}
                 onClick={() =>
-                  updateResume(setProfile, r => ({ ...r, hidePhoto: !r.hidePhoto }))
+                  updateResume(setProfile, r => ({
+                    ...r,
+                    hidePhoto: !r.hidePhoto,
+                  }))
                 }
               >
                 {resume.hidePhoto ? 'Show avatar on CV' : 'Hide avatar on CV'}
@@ -109,15 +129,16 @@ export default function ResumeMastheadSection({
             </div>
           </div>
           <p className={helpTextCls}>
-            Defaults to your profile avatar. Upload one here only when the printed CV should use a
-            different picture - it is cropped to a circle, so a head-and-shoulders shot works best.
-            Max {MAX_UPLOAD_MB_LABEL} MB, uploads immediately.
+            Defaults to your profile avatar. Upload one here only when the
+            printed CV should use a different picture - it is cropped to a
+            circle, so a head-and-shoulders shot works best. Max{' '}
+            {MAX_UPLOAD_MB_LABEL} MB, uploads immediately.
           </p>
           {resume.hidePhoto ? (
             <p className={`${helpTextCls} mt-1 font-semibold text-pp-text`}>
-              Hidden on the printed CV - name, role and contact reclaim the width it used, all the
-              way to the right margin. The photo below is kept, so switching this back on restores
-              it without a re-upload.
+              Hidden on the printed CV - name, role and contact reclaim the
+              width it used, all the way to the right margin. The photo below is
+              kept, so switching this back on restores it without a re-upload.
             </p>
           ) : null}
 
@@ -129,15 +150,15 @@ export default function ResumeMastheadSection({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={effectivePhoto}
-              alt='CV photo preview'
-              className='h-24 w-24 rounded-full border-2 border-pp-text object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]'
+              alt="CV photo preview"
+              className="h-24 w-24 rounded-full border-2 border-pp-text object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]"
             />
 
-            <div className='space-y-3'>
+            <div className="space-y-3">
               <input
-                type='file'
-                aria-label='Upload CV photo'
-                accept='image/*'
+                type="file"
+                aria-label="Upload CV photo"
+                accept="image/*"
                 disabled={uploading.cvPhoto}
                 className={uploadInputCls}
                 onChange={async e => {
@@ -145,7 +166,9 @@ export default function ResumeMastheadSection({
                   e.target.value = ''
                   if (!file) return
                   if (file.size > MAX_UPLOAD_BYTES) {
-                    setError(`Image must be ${MAX_UPLOAD_MB_LABEL} MB or smaller`)
+                    setError(
+                      `Image must be ${MAX_UPLOAD_MB_LABEL} MB or smaller`
+                    )
                     return
                   }
                   setError(null)
@@ -154,29 +177,40 @@ export default function ResumeMastheadSection({
                     const url = await uploadAssetToCloudinary(file, 'cv-photo')
                     updateResume(setProfile, r => ({ ...r, photo: url }))
                   } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Upload failed')
+                    setError(
+                      err instanceof Error ? err.message : 'Upload failed'
+                    )
                   } finally {
                     setUploading(u => ({ ...u, cvPhoto: false }))
                   }
                 }}
               />
 
-              <div className='space-y-2'>
+              <div className="space-y-2">
                 <label className={labelCls}>Photo URL</label>
                 <input
                   className={inputCls}
                   value={resume.photo}
-                  placeholder={profile.avatar || 'Leave empty to use your profile avatar'}
-                  onChange={e => updateResume(setProfile, r => ({ ...r, photo: e.target.value }))}
+                  placeholder={
+                    profile.avatar || 'Leave empty to use your profile avatar'
+                  }
+                  onChange={e =>
+                    updateResume(setProfile, r => ({
+                      ...r,
+                      photo: e.target.value,
+                    }))
+                  }
                 />
               </div>
 
-              <div className='flex flex-wrap items-center gap-2'>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  type='button'
+                  type="button"
                   className={ghostBtnCls}
                   disabled={inheritsAvatar}
-                  onClick={() => updateResume(setProfile, r => ({ ...r, photo: '' }))}
+                  onClick={() =>
+                    updateResume(setProfile, r => ({ ...r, photo: '' }))
+                  }
                 >
                   Use profile avatar
                 </button>
@@ -193,8 +227,8 @@ export default function ResumeMastheadSection({
         </div>
 
         <div className={itemCardCls}>
-          <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
-            <div className='space-y-2'>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="space-y-2">
               <label className={labelCls}>Email</label>
               <input
                 className={inputCls}
@@ -207,7 +241,7 @@ export default function ResumeMastheadSection({
                 }
               />
             </div>
-            <div className='space-y-2'>
+            <div className="space-y-2">
               <label className={labelCls}>Phone</label>
               <input
                 className={inputCls}
@@ -220,7 +254,7 @@ export default function ResumeMastheadSection({
                 }
               />
             </div>
-            <div className='space-y-2'>
+            <div className="space-y-2">
               <label className={labelCls}>Location</label>
               <input
                 className={inputCls}
@@ -235,15 +269,16 @@ export default function ResumeMastheadSection({
             </div>
           </div>
           <p className={`${helpTextCls} mt-3`}>
-            These three are printed on the public CV page but are kept out of the public profile
-            API, so they are not served as machine-readable JSON.
+            These three are printed on the public CV page but are kept out of
+            the public profile API, so they are not served as machine-readable
+            JSON.
           </p>
         </div>
 
-        <div className='flex items-center justify-between'>
-          <h2 className='text-sm font-semibold'>Contact links</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Contact links</h2>
           <button
-            type='button'
+            type="button"
             className={secondaryBtnCls}
             onClick={addLink}
           >
@@ -258,46 +293,52 @@ export default function ResumeMastheadSection({
         <DragList
           ids={contact.links.map((_, idx) => `link-${idx}`)}
           onReorder={moveLink}
-          itemLabel='contact link'
+          itemLabel="contact link"
         >
           {(idx, linkHandle) => {
             const link = contact.links[idx]
             return (
               <div className={itemCardCls}>
-                <div className='flex items-start gap-2'>
-                  <div className='grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-3'>
-                    <div className='space-y-2'>
+                <div className="flex items-start gap-2">
+                  <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="space-y-2">
                       <label className={labelCls}>Label</label>
                       <input
                         className={inputCls}
-                        placeholder='Portfolio'
+                        placeholder="Portfolio"
                         value={link.label}
-                        onChange={e => updateLink(idx, { label: e.target.value })}
+                        onChange={e =>
+                          updateLink(idx, { label: e.target.value })
+                        }
                       />
                     </div>
-                    <div className='space-y-2'>
+                    <div className="space-y-2">
                       <label className={labelCls}>Anchor text</label>
                       <input
                         className={inputCls}
-                        placeholder='anhkhoa.info'
+                        placeholder="anhkhoa.info"
                         value={link.text}
-                        onChange={e => updateLink(idx, { text: e.target.value })}
+                        onChange={e =>
+                          updateLink(idx, { text: e.target.value })
+                        }
                       />
                     </div>
-                    <div className='space-y-2'>
+                    <div className="space-y-2">
                       <label className={labelCls}>Href</label>
                       <input
                         className={inputCls}
                         value={link.href}
-                        onChange={e => updateLink(idx, { href: e.target.value })}
+                        onChange={e =>
+                          updateLink(idx, { href: e.target.value })
+                        }
                       />
                     </div>
                   </div>
-                  <div className='pt-6'>{linkHandle}</div>
+                  <div className="pt-6">{linkHandle}</div>
                 </div>
-                <div className='mt-3 flex justify-end'>
+                <div className="mt-3 flex justify-end">
                   <button
-                    type='button'
+                    type="button"
                     className={ghostBtnCls}
                     onClick={() =>
                       updateResume(setProfile, r => ({
@@ -318,7 +359,10 @@ export default function ResumeMastheadSection({
         </DragList>
 
         {contact.links.length > 0 ? (
-          <AddMoreButton label='+ Add contact link' onClick={addLink} />
+          <AddMoreButton
+            label="+ Add contact link"
+            onClick={addLink}
+          />
         ) : null}
       </div>
     </Section>

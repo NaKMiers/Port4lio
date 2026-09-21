@@ -13,7 +13,8 @@ import { BANDS } from '@/lib/iq/scoring'
 export const IQ_UI = {
   vi: {
     brand: 'IQ',
-    landingTitle: 'Test IQ online: bài trắc nghiệm IQ bằng hình ảnh chuẩn quốc tế',
+    landingTitle:
+      'Test IQ online: bài trắc nghiệm IQ bằng hình ảnh chuẩn quốc tế',
     landingLead:
       '26 câu hỏi hình ảnh, 24 phút. Không cần đăng ký, không cần tài khoản. Đề được sinh riêng cho từng lượt làm.',
     startTest: 'Bắt đầu kiểm tra',
@@ -50,7 +51,8 @@ export const IQ_UI = {
     percentileLabel: 'Cao hơn {percentile}% dân số',
     rawLabel: 'Trả lời đúng {raw} / {total} câu',
     bandLabel: 'Xếp loại',
-    keepLink: 'Lưu lại đường dẫn này. Đây là cách duy nhất để quay lại kết quả, và nó hết hạn sau {days} ngày.',
+    keepLink:
+      'Lưu lại đường dẫn này. Đây là cách duy nhất để quay lại kết quả, và nó hết hạn sau {days} ngày.',
     retake: 'Làm lại bài test',
     reviewAnswers: 'Xem lại từng câu',
     correct: 'Đúng',
@@ -65,7 +67,8 @@ export const IQ_UI = {
       'Chứng nhận công khai có tên bạn, điểm và phân vị - dùng để chia sẻ và để người khác kiểm chứng.',
     certificateNameLabel: 'Tên trên chứng nhận',
     certificateNamePlaceholder: 'Nguyễn Văn A',
-    certificateNameHint: 'Tên này sẽ hiển thị công khai trên chứng nhận, và không thể sửa sau khi cấp.',
+    certificateNameHint:
+      'Tên này sẽ hiển thị công khai trên chứng nhận, và không thể sửa sau khi cấp.',
     certificateView: 'Xem chứng nhận',
     /**
      * Sharing. The link points at the public IQ landing page, never at a result URL - a
@@ -123,7 +126,8 @@ export const IQ_UI = {
   },
   en: {
     brand: 'IQ',
-    landingTitle: 'Online IQ test: a visual reasoning test scored the moment you finish',
+    landingTitle:
+      'Online IQ test: a visual reasoning test scored the moment you finish',
     landingLead:
       '26 visual questions, 24 minutes. No signup and no account. The questions are generated fresh for every attempt.',
     startTest: 'Start the test',
@@ -144,13 +148,15 @@ export const IQ_UI = {
     back: 'Previous',
     submitting: 'Scoring...',
     timeUp: 'Time is up. Your answers are being scored.',
-    confirmLeave: 'You are in the middle of the test. Leaving will lose your result.',
+    confirmLeave:
+      'You are in the middle of the test. Leaving will lose your result.',
 
     yourScore: 'Your IQ score',
     percentileLabel: 'Higher than {percentile}% of the population',
     rawLabel: '{raw} of {total} correct',
     bandLabel: 'Band',
-    keepLink: 'Keep this link. It is the only way back to your result, and it expires after {days} days.',
+    keepLink:
+      'Keep this link. It is the only way back to your result, and it expires after {days} days.',
     retake: 'Take the test again',
     reviewAnswers: 'Review each question',
     correct: 'Correct',
@@ -164,7 +170,8 @@ export const IQ_UI = {
       'A public certificate with your name, score and percentile - shareable, and verifiable by anyone.',
     certificateNameLabel: 'Name on the certificate',
     certificateNamePlaceholder: 'Alex Nguyen',
-    certificateNameHint: 'Shown publicly on the certificate, and cannot be changed once issued.',
+    certificateNameHint:
+      'Shown publicly on the certificate, and cannot be changed once issued.',
     certificateView: 'View certificate',
     /** See the Vietnamese entry for why the shared link is never a result URL. */
     certificateShare: 'Share your result',
@@ -343,7 +350,10 @@ export function iqUi(locale: Locale) {
 }
 
 /** `fill('Câu {current} / {total}', {current: 3, total: 26})`. */
-export function fill(template: string, values: Record<string, string | number>): string {
+export function fill(
+  template: string,
+  values: Record<string, string | number>
+): string {
   return Object.entries(values).reduce(
     (out, [key, value]) => out.replaceAll(`{${key}}`, String(value)),
     template

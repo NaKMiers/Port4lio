@@ -31,7 +31,9 @@ describe('CODE_LANGUAGE_OPTIONS vs SHIKI_LANGUAGES', () => {
    */
   it('offers only languages Shiki has a grammar for', () => {
     const grammars = new Set<string>(SHIKI_LANGUAGES)
-    const orphans = CODE_LANGUAGE_OPTIONS.filter(option => !grammars.has(option.value))
+    const orphans = CODE_LANGUAGE_OPTIONS.filter(
+      option => !grammars.has(option.value)
+    )
 
     expect(orphans.map(option => option.value)).toEqual([])
   })
@@ -57,7 +59,9 @@ describe('defaultSpec', () => {
 
 describe('normaliseSpec', () => {
   it('ignores a field left on auto, whatever value rides along with it', () => {
-    const { spec } = normaliseSpec({ title: { mode: 'auto', value: 'ignored' } })
+    const { spec } = normaliseSpec({
+      title: { mode: 'auto', value: 'ignored' },
+    })
 
     expect(spec.title).toEqual({ mode: 'auto', value: '' })
   })
@@ -67,7 +71,10 @@ describe('normaliseSpec', () => {
       title: { mode: 'manual', value: '  Five things Next.js 16 did  ' },
     })
 
-    expect(spec.title).toEqual({ mode: 'manual', value: 'Five things Next.js 16 did' })
+    expect(spec.title).toEqual({
+      mode: 'manual',
+      value: 'Five things Next.js 16 did',
+    })
     expect(dropped).toEqual([])
   })
 
@@ -78,7 +85,9 @@ describe('normaliseSpec', () => {
   })
 
   it('refuses a select value that is not one of its options, and says so', () => {
-    const { spec, dropped } = normaliseSpec({ tone: { mode: 'manual', value: 'shouty' } })
+    const { spec, dropped } = normaliseSpec({
+      tone: { mode: 'manual', value: 'shouty' },
+    })
 
     expect(spec.tone.mode).toBe('auto')
     expect(dropped).toHaveLength(1)
@@ -89,7 +98,9 @@ describe('normaliseSpec', () => {
     // The stale-tab case. A dialog from a deploy that had a field this one does not would
     // otherwise have its value swallowed, and the author would read the result as the model
     // ignoring them.
-    const { dropped } = normaliseSpec({ vibe: { mode: 'manual', value: 'cosy' } })
+    const { dropped } = normaliseSpec({
+      vibe: { mode: 'manual', value: 'cosy' },
+    })
 
     expect(dropped).toEqual(['"vibe" is not a property of a generated post.'])
   })
@@ -98,17 +109,33 @@ describe('normaliseSpec', () => {
     const { spec, dropped } = normaliseSpec({
       genres: {
         mode: 'manual',
-        value: ['engineering', 'measurement', 'astrology', 'testing', 'security', 'career'],
+        value: [
+          'engineering',
+          'measurement',
+          'astrology',
+          'testing',
+          'security',
+          'career',
+        ],
       },
     })
 
-    expect(spec.genres.value).toEqual(['engineering', 'measurement', 'testing', 'security'])
+    expect(spec.genres.value).toEqual([
+      'engineering',
+      'measurement',
+      'testing',
+      'security',
+    ])
     expect(dropped[0]).toContain('astrology')
   })
 
   it('takes a boolean only as a boolean', () => {
-    const asString = normaliseSpec({ isPillar: { mode: 'manual', value: 'true' } })
-    const asBoolean = normaliseSpec({ isPillar: { mode: 'manual', value: true } })
+    const asString = normaliseSpec({
+      isPillar: { mode: 'manual', value: 'true' },
+    })
+    const asBoolean = normaliseSpec({
+      isPillar: { mode: 'manual', value: true },
+    })
 
     expect(asString.spec.isPillar.mode).toBe('auto')
     expect(asBoolean.spec.isPillar).toEqual({ mode: 'manual', value: true })
@@ -118,13 +145,17 @@ describe('normaliseSpec', () => {
     // `readJsonBody` guarantees valid JSON and nothing more - `null`, `[]` and `7` all parse.
     for (const body of [null, undefined, [], 7, 'spec']) {
       const { spec, dropped } = normaliseSpec(body)
-      expect(Object.values(spec).every(entry => entry.mode === 'auto')).toBe(true)
+      expect(Object.values(spec).every(entry => entry.mode === 'auto')).toBe(
+        true
+      )
       expect(dropped).toEqual([])
     }
   })
 
-  it('truncates a manual string to the field\'s own bound', () => {
-    const { spec } = normaliseSpec({ title: { mode: 'manual', value: 'x'.repeat(400) } })
+  it("truncates a manual string to the field's own bound", () => {
+    const { spec } = normaliseSpec({
+      title: { mode: 'manual', value: 'x'.repeat(400) },
+    })
 
     // 140 is `Post.title`'s `maxlength`. Clamping here means a long title is a shorter title
     // rather than a mongoose ValidationError after a minute of generation.
@@ -157,10 +188,19 @@ describe('presetSpecFromPost', () => {
   it('holds every field the post actually has', () => {
     const spec = presetSpecFromPost(POST)
 
-    expect(spec.title).toEqual({ mode: 'manual', value: 'Five things Next.js 16 did' })
-    expect(spec.slug).toEqual({ mode: 'manual', value: 'five-things-next-16-did' })
+    expect(spec.title).toEqual({
+      mode: 'manual',
+      value: 'Five things Next.js 16 did',
+    })
+    expect(spec.slug).toEqual({
+      mode: 'manual',
+      value: 'five-things-next-16-did',
+    })
     expect(spec.kind).toEqual({ mode: 'manual', value: 'article' })
-    expect(spec.series).toEqual({ mode: 'manual', value: 'measured-in-production' })
+    expect(spec.series).toEqual({
+      mode: 'manual',
+      value: 'measured-in-production',
+    })
     expect(spec.language).toEqual({ mode: 'manual', value: 'en' })
     expect(spec.tags).toEqual({ mode: 'manual', value: 'nextjs, caching' })
     expect(spec.relatedSlugs).toEqual({ mode: 'manual', value: ['first-post'] })
@@ -182,9 +222,8 @@ describe('presetSpecFromPost', () => {
     const { spec: round, dropped } = normaliseSpec(manual)
 
     expect(dropped).toEqual([])
-    for (const key of Object.keys(manual) as (keyof typeof spec)[]) {
+    for (const key of Object.keys(manual) as (keyof typeof spec)[])
       expect(round[key]).toEqual(spec[key])
-    }
   })
 
   it('holds the slug, which is the field that must not drift', () => {
@@ -200,7 +239,12 @@ describe('presetSpecFromPost', () => {
       excerpt - it is a post that never got one. Pinning it to manual-empty would mean the field
       the author most wants filled comes back empty every single time.
     */
-    const spec = presetSpecFromPost({ ...POST, excerpt: '   ', tags: [], relatedSlugs: [] })
+    const spec = presetSpecFromPost({
+      ...POST,
+      excerpt: '   ',
+      tags: [],
+      relatedSlugs: [],
+    })
 
     expect(spec.excerpt.mode).toBe('auto')
     expect(spec.tags.mode).toBe('auto')
@@ -219,7 +263,10 @@ describe('presetSpecFromPost', () => {
   it('holds isPillar in both states', () => {
     // A post that IS its series' hub must not lose that by being rewritten, and one that is not
     // must not gain it - `false` is as real a choice as `true`.
-    expect(presetSpecFromPost(POST).isPillar).toEqual({ mode: 'manual', value: true })
+    expect(presetSpecFromPost(POST).isPillar).toEqual({
+      mode: 'manual',
+      value: true,
+    })
     expect(presetSpecFromPost({ ...POST, isPillar: false }).isPillar).toEqual({
       mode: 'manual',
       value: false,
@@ -238,13 +285,17 @@ describe('presetSpecFromPost', () => {
       This is not inconsistent with `resolveImageCount`, which must keep reading a manual `'0'`
       as zero: there the author picked it off a dropdown. The difference is who said it.
     */
-    expect(presetSpecFromPost({ ...POST, imageCount: 0 }).imageCount.mode).toBe('auto')
+    expect(presetSpecFromPost({ ...POST, imageCount: 0 }).imageCount.mode).toBe(
+      'auto'
+    )
   })
 
   it('falls back to auto for a count the dropdown cannot represent', () => {
     // Seven images has no option to preset to, and picking four would silently discard three.
     // Auto says "decide again" instead.
-    expect(presetSpecFromPost({ ...POST, imageCount: 7 }).imageCount.mode).toBe('auto')
+    expect(presetSpecFromPost({ ...POST, imageCount: 7 }).imageCount.mode).toBe(
+      'auto'
+    )
   })
 
   it('leaves the whole craft group on auto - there is nothing stored to read back', () => {
@@ -252,8 +303,14 @@ describe('presetSpecFromPost', () => {
     // the author reaches for when the first attempt came out wrong.
     const spec = presetSpecFromPost(POST)
 
-    for (const key of ['style', 'tone', 'genres', 'structure', 'length', 'topic'] as const) {
+    for (const key of [
+      'style',
+      'tone',
+      'genres',
+      'structure',
+      'length',
+      'topic',
+    ] as const)
       expect(spec[key].mode).toBe('auto')
-    }
   })
 })

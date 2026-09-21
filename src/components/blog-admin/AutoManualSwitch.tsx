@@ -40,17 +40,17 @@ export default function AutoManualSwitch({
 }) {
   return (
     <span
-      role='radiogroup'
+      role="radiogroup"
       aria-labelledby={`${id}-label`}
-      className='inline-flex shrink-0 items-center rounded-full border border-pp-line bg-white/70 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]'
+      className="inline-flex shrink-0 items-center rounded-full border border-pp-line bg-white/70 p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]"
     >
       {(['auto', 'manual'] as const).map(value => {
         const active = mode === value
         return (
           <button
             key={value}
-            type='button'
-            role='radio'
+            type="button"
+            role="radio"
             aria-checked={active}
             disabled={disabled}
             onClick={() => onChange(value)}

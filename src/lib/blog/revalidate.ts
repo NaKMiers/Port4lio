@@ -55,7 +55,9 @@ export function revalidatePublishedPost(slug: string) {
   // Logged before the calls, because if one of them throws this line is the only record of
   // which slug was mid-flight. The board's Force revalidate button exists so the owner can
   // re-run this by hand, and these logs are how they tell an ISR window from a failure.
-  console.info(`[blog] revalidating /blog, /blog/${slug}, /sitemap.xml, /blog/rss.xml`)
+  console.info(
+    `[blog] revalidating /blog, /blog/${slug}, /sitemap.xml, /blog/rss.xml`
+  )
 
   revalidatePath('/blog')
   revalidatePath(`/blog/${slug}`)

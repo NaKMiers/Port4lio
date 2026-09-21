@@ -2,7 +2,8 @@ import type { HTMLAttributes, ReactNode } from 'react'
 
 import RevealOnScroll from '@/components/portfolio/client/RevealOnScroll'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 export type SectionFrameProps = {
   children: ReactNode
@@ -39,13 +40,16 @@ export function SectionFrame({
       <div
         className={cx(
           'mx-auto w-full max-w-editorial px-gutter',
-          innerClassName,
+          innerClassName
         )}
       >
         {disableReveal ? (
           children
         ) : (
-          <RevealOnScroll variant={revealVariant} delay={revealDelay}>
+          <RevealOnScroll
+            variant={revealVariant}
+            delay={revealDelay}
+          >
             {children}
           </RevealOnScroll>
         )}

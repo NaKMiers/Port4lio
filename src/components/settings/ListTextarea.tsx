@@ -65,9 +65,7 @@ export default function ListTextarea({
     // Only accept a genuine external replacement, such as a Save round-trip.
     // When the incoming list is just our own parse coming back, the draft is the more
     // faithful copy and must win, otherwise it gets clobbered mid-keystroke.
-    if (!sameList(parse(draft), value)) {
-      setDraft(joined)
-    }
+    if (!sameList(parse(draft), value)) setDraft(joined)
   }
 
   return (

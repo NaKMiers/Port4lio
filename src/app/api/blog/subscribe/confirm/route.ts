@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token') ?? ''
 
   const back = (state: string) =>
-    NextResponse.redirect(`${origin}/blog/subscribed?state=${state}`, { status: 303 })
+    NextResponse.redirect(`${origin}/blog/subscribed?state=${state}`, {
+      status: 303,
+    })
 
   if (!token) return back('invalid')
 

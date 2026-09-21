@@ -46,17 +46,20 @@ export const SEED_SERIES = [
   {
     slug: 'measured-in-production',
     title: 'Measured in production',
-    blurb: 'Things I tested against a real build, where the result contradicted the docs.',
+    blurb:
+      'Things I tested against a real build, where the result contradicted the docs.',
   },
   {
     slug: 'shipping-side-products',
     title: 'Shipping side products',
-    blurb: 'Two personality tests with real traffic, and what that traffic did and did not do.',
+    blurb:
+      'Two personality tests with real traffic, and what that traffic did and did not do.',
   },
   {
     slug: 'dev-career-vn',
     title: 'A developer career, from Vietnam',
-    blurb: 'How the work actually gets found, through one lens rather than general advice.',
+    blurb:
+      'How the work actually gets found, through one lens rather than general advice.',
   },
 ] as const
 
@@ -65,7 +68,12 @@ export const SERIES_SLUG_PATTERN = /^[a-z0-9-]{1,48}$/
 
 export type PostSeries = string
 
-export const POST_STATUSES = ['draft', 'published', 'archived', 'deleted'] as const
+export const POST_STATUSES = [
+  'draft',
+  'published',
+  'archived',
+  'deleted',
+] as const
 export type PostStatus = (typeof POST_STATUSES)[number]
 
 /**

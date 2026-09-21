@@ -34,10 +34,17 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { lang } = await params
   if (!isLocale(lang)) return {}
-  return { title: iqUi(lang).startTest, robots: { index: false, follow: false } }
+  return {
+    title: iqUi(lang).startTest,
+    robots: { index: false, follow: false },
+  }
 }
 
-export default async function IqTestPage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function IqTestPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
   const { lang } = await params
   if (!isLocale(lang)) notFound()
 

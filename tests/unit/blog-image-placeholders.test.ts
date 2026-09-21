@@ -80,7 +80,9 @@ describe('replacePlaceholder', () => {
     // screen reader reads - so arriving at the picture must not reset it to "image".
     const body = '![the two revalidate calls](image1)'
 
-    expect(replacePlaceholder(body, 'image1', url)).toBe(`![the two revalidate calls](${url})`)
+    expect(replacePlaceholder(body, 'image1', url)).toBe(
+      `![the two revalidate calls](${url})`
+    )
   })
 
   it('replaces every occurrence of the key', () => {
@@ -101,7 +103,9 @@ describe('replacePlaceholder', () => {
     const body = '![image](image1)\n![image](image2)'
     const after = replacePlaceholder(body, 'image1', url)
 
-    expect(findImagePlaceholders(after)).toEqual([{ key: 'image2', alt: 'image' }])
+    expect(findImagePlaceholders(after)).toEqual([
+      { key: 'image2', alt: 'image' },
+    ])
   })
 })
 
@@ -142,7 +146,9 @@ describe('contextAround', () => {
   it('falls back to the head of the post when the key has been deleted', () => {
     // Reachable from a card that has not re-rendered yet. A prompt from the wrong context
     // beats an error for something this recoverable.
-    expect(contextAround('## A post about caching', 'image9')).toContain('caching')
+    expect(contextAround('## A post about caching', 'image9')).toContain(
+      'caching'
+    )
   })
 })
 
@@ -150,9 +156,9 @@ describe('normaliseImagePrompt', () => {
   it('collapses newlines, because the field exists to be pasted elsewhere', () => {
     // A prompt with a hard line break pasted into an image tool's single-line input is a
     // prompt that submits halfway through.
-    expect(normaliseImagePrompt('Isometric render\nof a cable\n\nsplit in two')).toBe(
-      'Isometric render of a cable split in two'
-    )
+    expect(
+      normaliseImagePrompt('Isometric render\nof a cable\n\nsplit in two')
+    ).toBe('Isometric render of a cable split in two')
   })
 
   it('caps at the length the schema stores', () => {
@@ -160,9 +166,8 @@ describe('normaliseImagePrompt', () => {
   })
 
   it('returns empty for anything that is not a string', () => {
-    for (const value of [null, undefined, 42, {}, ['a']]) {
+    for (const value of [null, undefined, 42, {}, ['a']])
       expect(normaliseImagePrompt(value)).toBe('')
-    }
   })
 })
 
@@ -239,7 +244,9 @@ describe('resolvedImageUrls - the third question this file answers', () => {
     // Not `findImagePlaceholders` (what is outstanding) and not `countBodyImages` (how many
     // pictures). This one is "which pictures does this post already have", which is what a
     // rewrite needs in order not to throw them away.
-    expect(resolvedImageUrls(`![a](${A})\n\n![image](image1)\n\n![b](${B})`)).toEqual([A, B])
+    expect(
+      resolvedImageUrls(`![a](${A})\n\n![image](image1)\n\n![b](${B})`)
+    ).toEqual([A, B])
   })
 
   it('returns them in document order, because position is the only thing a rewrite can match on', () => {
@@ -247,7 +254,9 @@ describe('resolvedImageUrls - the third question this file answers', () => {
   })
 
   it('is empty for a body of nothing but placeholders', () => {
-    expect(resolvedImageUrls('![image](image1)\n\n![image](image2)')).toEqual([])
+    expect(resolvedImageUrls('![image](image1)\n\n![image](image2)')).toEqual(
+      []
+    )
   })
 
   it('ignores a markdown title on the image', () => {
@@ -281,13 +290,19 @@ describe('carryForwardImages - what stops a rewrite publishing broken images', (
     // `replacePlaceholder` preserves the alt on the placeholder it replaces. The new body is
     // new prose, so its alt describes the new context - carrying the old alt forward would
     // caption a picture against text that no longer exists.
-    const result = carryForwardImages('![a fresh caption](image1)', `![the old caption](${A})`)
+    const result = carryForwardImages(
+      '![a fresh caption](image1)',
+      `![the old caption](${A})`
+    )
 
     expect(result.markdown).toBe(`![a fresh caption](${A})`)
   })
 
   it('leaves surplus placeholders alone - they are genuinely new slots', () => {
-    const result = carryForwardImages('![image](image1)\n\n![image](image2)', `![one](${A})`)
+    const result = carryForwardImages(
+      '![image](image1)\n\n![image](image2)',
+      `![one](${A})`
+    )
 
     expect(result.carried).toBe(1)
     expect(result.markdown).toContain(A)
@@ -298,7 +313,10 @@ describe('carryForwardImages - what stops a rewrite publishing broken images', (
     // The caller quotes these back in full. A picture that no longer fits is a URL the author
     // may want to re-place by hand, and losing it without a word is the same failure class as
     // blanking it.
-    const result = carryForwardImages('![image](image1)', `![one](${A})\n\n![two](${B})`)
+    const result = carryForwardImages(
+      '![image](image1)',
+      `![one](${A})\n\n![two](${B})`
+    )
 
     expect(result.carried).toBe(1)
     expect(result.dropped).toEqual([B])
@@ -326,8 +344,11 @@ describe('carryForwardImages - what stops a rewrite publishing broken images', (
   it('does not reuse one picture for two placeholders', () => {
     // Position matching means one URL per slot. Filling both from the single old image would
     // duplicate a picture the author never chose to repeat.
-    const result = carryForwardImages('![image](image1)\n\n![image](image2)', `![one](${A})`)
+    const result = carryForwardImages(
+      '![image](image1)\n\n![image](image2)',
+      `![one](${A})`
+    )
 
-    expect((result.markdown.match(/res\.cloudinary\.com/g) ?? [])).toHaveLength(1)
+    expect(result.markdown.match(/res\.cloudinary\.com/g) ?? []).toHaveLength(1)
   })
 })

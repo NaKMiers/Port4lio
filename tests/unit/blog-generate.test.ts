@@ -32,8 +32,16 @@ const CONTEXT: GenerationContext = {
     { slug: 'note', label: 'Note' },
   ],
   series: [
-    { slug: 'measured-in-production', title: 'Measured in production', blurb: 'Things I tested.' },
-    { slug: 'dev-career-vn', title: 'A developer career', blurb: 'From Vietnam.' },
+    {
+      slug: 'measured-in-production',
+      title: 'Measured in production',
+      blurb: 'Things I tested.',
+    },
+    {
+      slug: 'dev-career-vn',
+      title: 'A developer career',
+      blurb: 'From Vietnam.',
+    },
   ],
   relatedCandidates: [
     { slug: 'first-post', title: 'The first post' },
@@ -41,7 +49,8 @@ const CONTEXT: GenerationContext = {
   ],
 }
 
-const BODY = '## What I measured\n\nThe literal path worked and the pattern form did not.'
+const BODY =
+  '## What I measured\n\nThe literal path worked and the pattern form did not.'
 
 function reply(overrides: Record<string, unknown> = {}) {
   return {
@@ -64,32 +73,44 @@ describe('parseGeneratedDraft - what is fatal', () => {
   it('refuses a reply with no body', () => {
     // The only content failure with no honest fallback. A title can come from the author and
     // a slug from the title; a post with no body is not a post.
-    expect(() => parseGeneratedDraft(reply({ bodyMarkdown: '' }), AUTO, CONTEXT)).toThrow(
-      GenerationError
-    )
+    expect(() =>
+      parseGeneratedDraft(reply({ bodyMarkdown: '' }), AUTO, CONTEXT)
+    ).toThrow(GenerationError)
   })
 
   it('refuses a body past what the schema will store', () => {
     // `bodyMarkdown` is `maxlength: 200_000`. Caught here so the message names the size
     // rather than arriving as a mongoose ValidationError after the model has been paid for.
     expect(() =>
-      parseGeneratedDraft(reply({ bodyMarkdown: 'x'.repeat(200_001) }), AUTO, CONTEXT)
+      parseGeneratedDraft(
+        reply({ bodyMarkdown: 'x'.repeat(200_001) }),
+        AUTO,
+        CONTEXT
+      )
     ).toThrow(/200000/)
   })
 
   it('refuses an author-chosen slug that is reserved by a route', () => {
-    const { spec } = normaliseSpec({ slug: { mode: 'manual', value: 'privacy' } })
+    const { spec } = normaliseSpec({
+      slug: { mode: 'manual', value: 'privacy' },
+    })
 
-    expect(() => parseGeneratedDraft(reply(), spec, CONTEXT)).toThrow(/reserved/)
+    expect(() => parseGeneratedDraft(reply(), spec, CONTEXT)).toThrow(
+      /reserved/
+    )
   })
 
   it('refuses an author-chosen kind that no longer exists', () => {
     // The stale-tab case, and it is fatal rather than a warning because the author named it.
     // Quietly substituting a different kind would report success for a post filed somewhere
     // they did not choose.
-    const { spec } = normaliseSpec({ kind: { mode: 'manual', value: 'link-roundup' } })
+    const { spec } = normaliseSpec({
+      kind: { mode: 'manual', value: 'link-roundup' },
+    })
     // `link-roundup` is a legal slug, so it survives normalisation and dies here instead.
-    expect(() => parseGeneratedDraft(reply(), spec, CONTEXT)).toThrow(/is not a kind/)
+    expect(() => parseGeneratedDraft(reply(), spec, CONTEXT)).toThrow(
+      /is not a kind/
+    )
   })
 })
 
@@ -168,7 +189,7 @@ describe('parseGeneratedDraft - what is recoverable', () => {
 })
 
 describe('parseGeneratedDraft - manual values win', () => {
-  it('writes the author\'s title and excerpt over the model\'s', () => {
+  it("writes the author's title and excerpt over the model's", () => {
     const { spec } = normaliseSpec({
       title: { mode: 'manual', value: 'The title I chose' },
       excerpt: { mode: 'manual', value: 'The excerpt I chose.' },
@@ -181,7 +202,9 @@ describe('parseGeneratedDraft - manual values win', () => {
   })
 
   it('reads the no-series sentinel as null', () => {
-    const { spec } = normaliseSpec({ series: { mode: 'manual', value: NO_SERIES } })
+    const { spec } = normaliseSpec({
+      series: { mode: 'manual', value: NO_SERIES },
+    })
 
     expect(parseGeneratedDraft(reply(), spec, CONTEXT).draft.series).toBeNull()
   })
@@ -193,11 +216,19 @@ describe('parseGeneratedDraft - manual values win', () => {
       has been paid for. The flag is manual-only for that reason; the route additionally
       drops it if the series already has a hub.
     */
-    const { draft } = parseGeneratedDraft(reply({ isPillar: true }), AUTO, CONTEXT)
+    const { draft } = parseGeneratedDraft(
+      reply({ isPillar: true }),
+      AUTO,
+      CONTEXT
+    )
     expect(draft.isPillar).toBe(false)
 
-    const { spec } = normaliseSpec({ isPillar: { mode: 'manual', value: true } })
-    expect(parseGeneratedDraft(reply(), spec, CONTEXT).draft.isPillar).toBe(true)
+    const { spec } = normaliseSpec({
+      isPillar: { mode: 'manual', value: true },
+    })
+    expect(parseGeneratedDraft(reply(), spec, CONTEXT).draft.isPillar).toBe(
+      true
+    )
   })
 })
 
@@ -209,9 +240,8 @@ describe('slugify', () => {
   })
 
   it('never returns something that fails SLUG_PATTERN', () => {
-    for (const input of ['!!!', '   ', '...', '???-']) {
+    for (const input of ['!!!', '   ', '...', '???-'])
       expect(slugify(input)).toMatch(/^[a-z0-9-]{1,80}$/)
-    }
   })
 
   it('does not leave a trailing hyphen after truncating at 80', () => {
@@ -234,7 +264,10 @@ describe('buildGenerationPrompt', () => {
 
   it('carries a manual value through as a constraint', () => {
     const { spec } = normaliseSpec({
-      topic: { mode: 'manual', value: 'revalidatePath pattern form is a no-op' },
+      topic: {
+        mode: 'manual',
+        value: 'revalidatePath pattern form is a no-op',
+      },
       instruction: { mode: 'manual', value: 'Open on the measurement.' },
     })
 
@@ -247,7 +280,9 @@ describe('buildGenerationPrompt', () => {
   it('spells out all seven steps when the repo template is picked', () => {
     // Step 6, "what I rejected", is the one `docs/blog/authoring.md` calls the seniority
     // signal and the one a model drops unless it is asked for by name.
-    const { spec } = normaliseSpec({ structure: { mode: 'manual', value: 'seven-step' } })
+    const { spec } = normaliseSpec({
+      structure: { mode: 'manual', value: 'seven-step' },
+    })
 
     const { user } = buildGenerationPrompt(spec, CONTEXT)
 
@@ -268,13 +303,20 @@ describe('buildGenerationPrompt', () => {
   })
 
   it('pins the fence language when one was chosen', () => {
-    const { spec } = normaliseSpec({ codeLanguage: { mode: 'manual', value: 'sql' } })
+    const { spec } = normaliseSpec({
+      codeLanguage: { mode: 'manual', value: 'sql' },
+    })
 
-    expect(buildGenerationPrompt(spec, CONTEXT).system).toContain('tagged `sql`')
+    expect(buildGenerationPrompt(spec, CONTEXT).system).toContain(
+      'tagged `sql`'
+    )
   })
 
   it('says so when there is nothing to reference yet', () => {
-    const { user } = buildGenerationPrompt(AUTO, { ...CONTEXT, relatedCandidates: [] })
+    const { user } = buildGenerationPrompt(AUTO, {
+      ...CONTEXT,
+      relatedCandidates: [],
+    })
 
     expect(user).toContain('`relatedSlugs` must be [].')
   })
@@ -282,8 +324,12 @@ describe('buildGenerationPrompt', () => {
 
 describe('generationTemperature', () => {
   it('maps the three words, and defaults to balanced', () => {
-    const grounded = normaliseSpec({ creativity: { mode: 'manual', value: 'grounded' } }).spec
-    const inventive = normaliseSpec({ creativity: { mode: 'manual', value: 'inventive' } }).spec
+    const grounded = normaliseSpec({
+      creativity: { mode: 'manual', value: 'grounded' },
+    }).spec
+    const inventive = normaliseSpec({
+      creativity: { mode: 'manual', value: 'inventive' },
+    }).spec
 
     expect(generationTemperature(grounded)).toBe(0.2)
     expect(generationTemperature(inventive)).toBe(0.9)
@@ -315,8 +361,13 @@ describe('parseGeneratedDraft - image prompts', () => {
   it('keeps one prompt per placeholder, in body order', () => {
     const { draft, warnings } = parseGeneratedDraft(withImages(), AUTO, CONTEXT)
 
-    expect(draft.imagePrompts.map(entry => entry.key)).toEqual(['image1', 'image2'])
-    expect(draft.coverImagePrompt).toBe('Matte painting of a server rack at dusk')
+    expect(draft.imagePrompts.map(entry => entry.key)).toEqual([
+      'image1',
+      'image2',
+    ])
+    expect(draft.coverImagePrompt).toBe(
+      'Matte painting of a server rack at dusk'
+    )
     expect(warnings).toEqual([])
   })
 
@@ -366,9 +417,23 @@ describe('parseGeneratedDraft - image prompts', () => {
   })
 
   it('survives imagePrompts being any shape at all', () => {
-    for (const value of [null, 'image1', 42, [null], [{ prompt: 'no key' }], [{ key: 7 }]]) {
-      const { draft } = parseGeneratedDraft(withImages({ imagePrompts: value }), AUTO, CONTEXT)
-      expect(draft.imagePrompts.map(entry => entry.key)).toEqual(['image1', 'image2'])
+    for (const value of [
+      null,
+      'image1',
+      42,
+      [null],
+      [{ prompt: 'no key' }],
+      [{ key: 7 }],
+    ]) {
+      const { draft } = parseGeneratedDraft(
+        withImages({ imagePrompts: value }),
+        AUTO,
+        CONTEXT
+      )
+      expect(draft.imagePrompts.map(entry => entry.key)).toEqual([
+        'image1',
+        'image2',
+      ])
     }
   })
 })
@@ -380,7 +445,9 @@ describe('resolveImageCount', () => {
       turns the one deliberate "no pictures" choice into auto - putting placeholders on a post
       that explicitly asked for none, and then blocking its publish on a missing-image warning.
     */
-    const { spec } = normaliseSpec({ imageCount: { mode: 'manual', value: '0' } })
+    const { spec } = normaliseSpec({
+      imageCount: { mode: 'manual', value: '0' },
+    })
 
     expect(resolveImageCount(spec)).toBe(0)
   })
@@ -390,7 +457,9 @@ describe('resolveImageCount', () => {
   })
 
   it('reads a chosen count', () => {
-    const { spec } = normaliseSpec({ imageCount: { mode: 'manual', value: '3' } })
+    const { spec } = normaliseSpec({
+      imageCount: { mode: 'manual', value: '3' },
+    })
 
     expect(resolveImageCount(spec)).toBe(3)
   })
@@ -398,7 +467,9 @@ describe('resolveImageCount', () => {
 
 describe('buildGenerationPrompt - images', () => {
   it('asks for exact keys when a count was chosen', () => {
-    const { spec } = normaliseSpec({ imageCount: { mode: 'manual', value: '2' } })
+    const { spec } = normaliseSpec({
+      imageCount: { mode: 'manual', value: '2' },
+    })
 
     const { user } = buildGenerationPrompt(spec, CONTEXT)
 
@@ -408,7 +479,9 @@ describe('buildGenerationPrompt - images', () => {
   })
 
   it('forbids placeholders outright at zero', () => {
-    const { spec } = normaliseSpec({ imageCount: { mode: 'manual', value: '0' } })
+    const { spec } = normaliseSpec({
+      imageCount: { mode: 'manual', value: '0' },
+    })
 
     expect(buildGenerationPrompt(spec, CONTEXT).user).toContain('Images: none')
   })
@@ -416,12 +489,16 @@ describe('buildGenerationPrompt - images', () => {
   it('permits zero on auto rather than demanding one', () => {
     // A note is 150 words. Always asking for an image would put a picture larger than the post
     // on it, and block shipping until somebody made that picture.
-    expect(buildGenerationPrompt(AUTO, CONTEXT).user).toContain('None at all is a fine answer')
+    expect(buildGenerationPrompt(AUTO, CONTEXT).user).toContain(
+      'None at all is a fine answer'
+    )
   })
 
   it('forbids inventing an image URL', () => {
     // Any URL the model writes is dropped by `rehypeRestrictImageHosts`, silently.
-    expect(buildGenerationPrompt(AUTO, CONTEXT).system).toContain('Never write a real image URL')
+    expect(buildGenerationPrompt(AUTO, CONTEXT).system).toContain(
+      'Never write a real image URL'
+    )
   })
 
   it('carries the no-lettering rule, which is the one that is not taste', () => {

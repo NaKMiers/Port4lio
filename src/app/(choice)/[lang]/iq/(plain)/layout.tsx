@@ -27,7 +27,10 @@ export default async function IqPlainLayout({
   if (!isLocale(lang)) notFound()
 
   return (
-    <TestProductShell locale={lang} product='iq'>
+    <TestProductShell
+      locale={lang}
+      product="iq"
+    >
       {children}
     </TestProductShell>
   )

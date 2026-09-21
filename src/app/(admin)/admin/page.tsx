@@ -1,4 +1,10 @@
-import { BarChart3, FileText, GraduationCap, Send, SlidersHorizontal } from 'lucide-react'
+import {
+  BarChart3,
+  FileText,
+  GraduationCap,
+  Send,
+  SlidersHorizontal,
+} from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
@@ -61,35 +67,40 @@ const BOARDS: readonly Board[] = [
   {
     href: '/admin/settings',
     title: 'Portfolio',
-    blurb: 'The one-page editor. Basics, about, services, projects, skills and the CV sheet, with the live preview rail.',
+    blurb:
+      'The one-page editor. Basics, about, services, projects, skills and the CV sheet, with the live preview rail.',
     Icon: SlidersHorizontal,
     tint: 'border-pp-orange/30 bg-pp-orange/10 text-pp-orange',
   },
   {
     href: '/admin/blog',
     title: 'Blog',
-    blurb: 'Drafts, publishing and the days-since-last-post signal. Start a draft from a source comment you already wrote.',
+    blurb:
+      'Drafts, publishing and the days-since-last-post signal. Start a draft from a source comment you already wrote.',
     Icon: FileText,
     tint: 'border-pp-blue/30 bg-pp-blue/10 text-pp-blue',
   },
   {
     href: '/admin/publish',
     title: 'Publish',
-    blurb: 'The syndication artifacts: the GitHub README, the LinkedIn about, the Upwork profile, and what is paste-only.',
+    blurb:
+      'The syndication artifacts: the GitHub README, the LinkedIn about, the Upwork profile, and what is paste-only.',
     Icon: Send,
     tint: 'border-pp-green/30 bg-pp-green/10 text-pp-green',
   },
   {
     href: '/admin/metrics',
     title: 'Metrics',
-    blurb: 'MBTI and IQ attempts, completion, and where people stop. The traffic the availability block is aimed at.',
+    blurb:
+      'MBTI and IQ attempts, completion, and where people stop. The traffic the availability block is aimed at.',
     Icon: BarChart3,
     tint: 'border-pp-violet/30 bg-pp-violet/10 text-pp-violet',
   },
   {
     href: '/admin/ccaf',
     title: 'CCA-F',
-    blurb: 'The certification tracker: roadmap, readiness and the reference deck.',
+    blurb:
+      'The certification tracker: roadmap, readiness and the reference deck.',
     Icon: GraduationCap,
     tint: 'border-pp-pink/30 bg-pp-pink/10 text-pp-pink',
     secondary: [
@@ -102,23 +113,26 @@ const BOARDS: readonly Board[] = [
 export default function AdminHubPage() {
   return (
     <OwnerAuthGate>
-      <div className='mx-auto w-full max-w-editorial px-gutter py-10'>
+      <div className="mx-auto w-full max-w-editorial px-gutter py-10">
         <header>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
             Owner
           </p>
-          <h1 className='mt-2 font-display text-3xl font-semibold tracking-tight text-pp-text sm:text-4xl'>
+          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-pp-text sm:text-4xl">
             Control room
           </h1>
-          <p className='mt-3 max-w-[60ch] text-lg leading-relaxed text-pp-muted'>
-            Everything on this site that only you can change. Nothing here is indexed, and
-            every board re-checks the cookie on its own.
+          <p className="mt-3 max-w-[60ch] text-lg leading-relaxed text-pp-muted">
+            Everything on this site that only you can change. Nothing here is
+            indexed, and every board re-checks the cookie on its own.
           </p>
         </header>
 
-        <div className='mt-10 grid gap-5 sm:grid-cols-2'>
+        <div className="mt-10 grid gap-5 sm:grid-cols-2">
           {BOARDS.map(({ href, title, blurb, Icon, tint, secondary }) => (
-            <div key={href} className='relative'>
+            <div
+              key={href}
+              className="relative"
+            >
               {/*
                 The whole card is the link, so the target is the card and not the six
                 characters of its title. `secondary` sits outside it and above it - a link
@@ -126,7 +140,7 @@ export default function AdminHubPage() {
               */}
               <Link
                 href={href}
-                className='group flex h-full flex-col rounded-panel border border-pp-line bg-pp-panel p-6 no-underline shadow-panel backdrop-blur-md transition-transform motion-safe:hover:-translate-y-1'
+                className="group flex h-full flex-col rounded-panel border border-pp-line bg-pp-panel p-6 no-underline shadow-panel backdrop-blur-md transition-transform motion-safe:hover:-translate-y-1"
               >
                 <span
                   className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border ${tint}`}
@@ -134,19 +148,21 @@ export default function AdminHubPage() {
                 >
                   <Icon size={19} />
                 </span>
-                <h2 className='mt-4 font-display text-xl font-semibold text-pp-text'>
+                <h2 className="mt-4 font-display text-xl font-semibold text-pp-text">
                   {title}
                 </h2>
-                <p className='mt-2 text-sm leading-relaxed text-pp-muted'>{blurb}</p>
+                <p className="mt-2 text-sm leading-relaxed text-pp-muted">
+                  {blurb}
+                </p>
               </Link>
 
               {secondary ? (
-                <div className='absolute right-6 top-6 flex flex-col items-end gap-1.5'>
+                <div className="absolute right-6 top-6 flex flex-col items-end gap-1.5">
                   {secondary.map(({ href, label }) => (
                     <Link
                       key={href}
                       href={href}
-                      className='rounded-full border border-pp-line bg-white/82 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-muted no-underline backdrop-blur-md transition-colors hover:text-pp-text'
+                      className="bg-white/82 rounded-full border border-pp-line px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-muted no-underline backdrop-blur-md transition-colors hover:text-pp-text"
                     >
                       {label}
                     </Link>
@@ -157,9 +173,12 @@ export default function AdminHubPage() {
           ))}
         </div>
 
-        <p className='mt-10 text-sm text-pp-muted'>
+        <p className="mt-10 text-sm text-pp-muted">
           Back to the{' '}
-          <Link href='/' className='text-pp-text'>
+          <Link
+            href="/"
+            className="text-pp-text"
+          >
             public site
           </Link>
           .

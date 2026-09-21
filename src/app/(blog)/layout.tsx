@@ -75,7 +75,11 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default function BlogLayout({ children }: { children: React.ReactNode }) {
+export default function BlogLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   /*
     `BlogLocaleProvider` is a provider, and the header above spends four paragraphs on why
     this layout must not have one - so the distinction matters. What it refuses is
@@ -90,7 +94,9 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
   */
   return (
     <BlogLocaleProvider>
-      <div className='portfolio-public-root flex min-h-screen flex-col'>{children}</div>
+      <div className="portfolio-public-root flex min-h-screen flex-col">
+        {children}
+      </div>
     </BlogLocaleProvider>
   )
 }

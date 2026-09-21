@@ -55,9 +55,13 @@ export async function listKinds(): Promise<Omit<KindRecord, 'postCount'>[]> {
 }
 
 /** The lookup `/blog` hands to each card, so a card never queries for itself. */
-export async function kindPresentationMap(): Promise<Map<string, KindPresentation>> {
+export async function kindPresentationMap(): Promise<
+  Map<string, KindPresentation>
+> {
   const kinds = await listKinds()
-  return new Map(kinds.map(kind => [kind.slug, { label: kind.label, eyebrow: kind.eyebrow }]))
+  return new Map(
+    kinds.map(kind => [kind.slug, { label: kind.label, eyebrow: kind.eyebrow }])
+  )
 }
 
 export async function listKindsWithCounts(): Promise<KindRecord[]> {
@@ -66,7 +70,9 @@ export async function listKindsWithCounts(): Promise<KindRecord[]> {
 
   const [rows, counts] = await Promise.all([
     KindModel.find({}).sort({ order: 1, slug: 1 }).lean(),
-    PostModel.aggregate<{ _id: string; n: number }>([{ $group: { _id: '$kind', n: { $sum: 1 } } }]),
+    PostModel.aggregate<{ _id: string; n: number }>([
+      { $group: { _id: '$kind', n: { $sum: 1 } } },
+    ]),
   ])
 
   const bySlug = new Map(counts.map(row => [row._id, row.n]))
@@ -81,8 +87,13 @@ export async function listKindsWithCounts(): Promise<KindRecord[]> {
   }))
 }
 
-export async function postsUsingKind(slug: string): Promise<{ id: string; title: string }[]> {
-  const rows = await PostModel.find({ kind: slug }).select('title').limit(20).lean()
+export async function postsUsingKind(
+  slug: string
+): Promise<{ id: string; title: string }[]> {
+  const rows = await PostModel.find({ kind: slug })
+    .select('title')
+    .limit(20)
+    .lean()
   return rows.map(row => ({ id: String(row._id), title: row.title }))
 }
 
@@ -102,6 +113,9 @@ export async function kindExists(slug: string): Promise<boolean> {
  */
 export async function defaultKindSlug(): Promise<string | null> {
   await ensureKindsSeeded()
-  const first = await KindModel.findOne({}).sort({ order: 1, slug: 1 }).select('slug').lean()
+  const first = await KindModel.findOne({})
+    .sort({ order: 1, slug: 1 })
+    .select('slug')
+    .lean()
   return first?.slug ?? null
 }

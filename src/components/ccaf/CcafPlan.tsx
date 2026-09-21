@@ -90,25 +90,25 @@ function TaskRow({
   const plainTitle = t(task.title, locale).replace(/<[^>]+>/g, '')
 
   return (
-    <li className='min-w-0'>
-      <div className='grid grid-cols-[1.125rem_minmax(0,1fr)] items-start gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-pp-bg/50'>
+    <li className="min-w-0">
+      <div className="grid grid-cols-[1.125rem_minmax(0,1fr)] items-start gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-pp-bg/50">
         <input
-          type='checkbox'
+          type="checkbox"
           id={`ccaf-task-${task.id}`}
           checked={checked}
           disabled={!editable}
           onChange={onToggleDone}
-          className='mt-1 h-[18px] w-[18px] shrink-0 accent-pp-blue disabled:cursor-not-allowed disabled:opacity-50'
+          className="mt-1 h-[18px] w-[18px] shrink-0 accent-pp-blue disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`${t(UI.markComplete, locale)}: ${plainTitle}`}
         />
         <button
-          type='button'
+          type="button"
           onClick={onToggleOpen}
           aria-expanded={open}
           aria-controls={detailsId}
-          className='grid min-w-0 grid-cols-[minmax(0,1fr)_1rem] items-start gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue'
+          className="grid min-w-0 grid-cols-[minmax(0,1fr)_1rem] items-start gap-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue"
         >
-          <span className='min-w-0'>
+          <span className="min-w-0">
             <span
               className={cx(
                 'text-sm leading-relaxed',
@@ -119,7 +119,7 @@ function TaskRow({
             >
               <RichText>{t(task.title, locale)}</RichText>
             </span>
-            <span className='ml-1.5 inline-flex flex-wrap gap-1 align-middle'>
+            <span className="ml-1.5 inline-flex flex-wrap gap-1 align-middle">
               {task.tags.map(tag => (
                 <span
                   key={tag}
@@ -130,7 +130,7 @@ function TaskRow({
                       'h-1.5 w-1.5 rounded-full',
                       tagAccentClass(tag)
                     )}
-                    aria-hidden='true'
+                    aria-hidden="true"
                   />
                   {t(TAG_LABEL[tag], locale)}
                 </span>
@@ -142,7 +142,7 @@ function TaskRow({
               'mt-1 h-4 w-4 shrink-0 text-pp-muted transition-transform duration-200',
               open && 'rotate-90 text-pp-blue'
             )}
-            aria-hidden='true'
+            aria-hidden="true"
           />
         </button>
       </div>
@@ -150,9 +150,9 @@ function TaskRow({
       <div
         id={detailsId}
         hidden={!open}
-        className='ml-[1.9rem] mt-1 rounded-xl border border-pp-line border-l-2 border-l-pp-blue bg-pp-bg/60 px-4 py-3.5'
+        className="ml-[1.9rem] mt-1 rounded-xl border border-l-2 border-pp-line border-l-pp-blue bg-pp-bg/60 px-4 py-3.5"
       >
-        <ol className='ml-4 list-decimal space-y-1.5 text-sm leading-relaxed text-pp-muted marker:font-semibold marker:text-pp-blue'>
+        <ol className="ml-4 list-decimal space-y-1.5 text-sm leading-relaxed text-pp-muted marker:font-semibold marker:text-pp-blue">
           {task.steps.map((step, i) => (
             <li key={i}>
               <RichText>{t(step, locale)}</RichText>
@@ -160,12 +160,12 @@ function TaskRow({
           ))}
         </ol>
         {task.code ? (
-          <pre className='mt-3 overflow-x-auto rounded-lg border border-pp-line bg-pp-panel-strong px-3 py-2.5 font-mono text-xs leading-relaxed text-pp-text'>
+          <pre className="mt-3 overflow-x-auto rounded-lg border border-pp-line bg-pp-panel-strong px-3 py-2.5 font-mono text-xs leading-relaxed text-pp-text">
             {task.code}
           </pre>
         ) : null}
-        <p className='mt-3 border-t border-dashed border-pp-line pt-2.5 text-[13px] leading-relaxed text-pp-muted'>
-          <strong className='font-semibold text-pp-green'>
+        <p className="mt-3 border-t border-dashed border-pp-line pt-2.5 text-[13px] leading-relaxed text-pp-muted">
+          <strong className="font-semibold text-pp-green">
             {t(UI.doneWhenLabel, locale)}
           </strong>{' '}
           <RichText>{t(task.doneWhen, locale)}</RichText>
@@ -213,7 +213,7 @@ function DayCard({
         status === 'done' && 'opacity-90'
       )}
     >
-      <div className='grid grid-cols-[3.75rem_minmax(0,1fr)] sm:grid-cols-[4.75rem_minmax(0,1fr)]'>
+      <div className="grid grid-cols-[3.75rem_minmax(0,1fr)] sm:grid-cols-[4.75rem_minmax(0,1fr)]">
         <div
           className={cx(
             'flex flex-col items-center justify-start gap-0.5 border-r border-pp-line px-2 py-4 text-center',
@@ -223,19 +223,19 @@ function DayCard({
           <span className={cx(mutedMonoCls, 'uppercase tracking-[0.12em]')}>
             {day.floating ? t(UI.examDayLabel, locale) : t(UI.dayLabel, locale)}
           </span>
-          <span className='font-display text-2xl font-semibold leading-none tracking-tight text-pp-text'>
+          <span className="font-display text-2xl font-semibold leading-none tracking-tight text-pp-text">
             {day.floating ? '★' : String(index).padStart(2, '0')}
           </span>
-          <span className='text-[11px] leading-tight text-pp-muted'>
+          <span className="text-[11px] leading-tight text-pp-muted">
             {parsed ? WEEKDAYS[locale][parsed.getDay()] : ''}
             <br />
             {formatDayMonth(date)}
           </span>
         </div>
 
-        <div className='min-w-0 px-3 py-3.5 sm:px-4'>
-          <div className='mb-2 flex flex-wrap items-center gap-2'>
-            <h4 className='mr-auto font-display text-base font-semibold leading-snug text-pp-text'>
+        <div className="min-w-0 px-3 py-3.5 sm:px-4">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h4 className="mr-auto font-display text-base font-semibold leading-snug text-pp-text">
               {t(day.title, locale)}
             </h4>
             <span className={cx(chipCls, 'px-2 py-0.5 text-[10px]')}>
@@ -274,7 +274,7 @@ function DayCard({
             <span className={cx(mutedMonoCls, 'tabular-nums')}>
               {done}/{day.tasks.length}
             </span>
-            <span className='h-1 w-14 overflow-hidden rounded-full bg-pp-line'>
+            <span className="h-1 w-14 overflow-hidden rounded-full bg-pp-line">
               <span
                 className={cx(
                   'block h-full rounded-full transition-[width] duration-300',
@@ -285,7 +285,7 @@ function DayCard({
             </span>
           </div>
 
-          <ul className='space-y-0.5'>
+          <ul className="space-y-0.5">
             {day.tasks.map(task => (
               <TaskRow
                 key={task.id}
@@ -378,16 +378,16 @@ export default function CcafPlan({
 
   return (
     <SectionFrame
-      id='ccaf-plan'
-      aria-labelledby='ccaf-plan-heading'
-      className='scroll-mt-24 border-b border-pp-line pt-8 md:scroll-mt-28 md:pt-12'
+      id="ccaf-plan"
+      aria-labelledby="ccaf-plan-heading"
+      className="scroll-mt-24 border-b border-pp-line pt-8 md:scroll-mt-28 md:pt-12"
     >
-      <div className='space-y-6'>
-        <header className='max-w-3xl space-y-2'>
+      <div className="space-y-6">
+        <header className="max-w-3xl space-y-2">
           <p className={eyebrowCls}>{t(UI.planEyebrow, locale)}</p>
           <h2
-            id='ccaf-plan-heading'
-            className='text-pretty font-display text-[clamp(1.65rem,3.6vw,2.35rem)] font-semibold leading-tight tracking-tight text-pp-text'
+            id="ccaf-plan-heading"
+            className="text-pretty font-display text-[clamp(1.65rem,3.6vw,2.35rem)] font-semibold leading-tight tracking-tight text-pp-text"
           >
             {t(UI.planHeading, locale)}
           </h2>
@@ -395,7 +395,7 @@ export default function CcafPlan({
 
         <nav
           aria-label={t(UI.weeksNavLabel, locale)}
-          className='grid gap-2 sm:grid-cols-2 lg:grid-cols-4'
+          className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
         >
           {WEEKS.map(candidate => {
             const stats = weekProgress(candidate.id, state.doneTaskIds)
@@ -403,7 +403,7 @@ export default function CcafPlan({
             return (
               <button
                 key={candidate.id}
-                type='button'
+                type="button"
                 onClick={() => setActiveWeekId(candidate.id)}
                 aria-current={active ? 'true' : undefined}
                 className={cx(
@@ -414,7 +414,7 @@ export default function CcafPlan({
                     : 'border-pp-line bg-pp-panel hover:border-pp-muted/40'
                 )}
               >
-                <span className='flex items-baseline justify-between gap-2'>
+                <span className="flex items-baseline justify-between gap-2">
                   <span
                     className={cx(
                       'font-display text-sm font-semibold',
@@ -425,10 +425,10 @@ export default function CcafPlan({
                   </span>
                   <span className={mutedMonoCls}>{candidate.range}</span>
                 </span>
-                <span className='mt-0.5 block truncate text-xs text-pp-muted'>
+                <span className="mt-0.5 block truncate text-xs text-pp-muted">
                   {t(candidate.phase, locale)} · {stats.done}/{stats.total}
                 </span>
-                <span className='mt-2 block h-1 overflow-hidden rounded-full bg-pp-line'>
+                <span className="mt-2 block h-1 overflow-hidden rounded-full bg-pp-line">
                   <span
                     className={cx(
                       'block h-full rounded-full transition-[width] duration-300',
@@ -446,23 +446,23 @@ export default function CcafPlan({
           })}
         </nav>
 
-        <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8'>
-          <div className='min-w-0 space-y-4'>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
+          <div className="min-w-0 space-y-4">
             <EditorialPanel
-              variant='strong'
-              className='border-l-4 border-l-pp-blue p-5'
+              variant="strong"
+              className="border-l-4 border-l-pp-blue p-5"
             >
-              <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
-                <div className='min-w-0 flex-1 space-y-1.5'>
-                  <h3 className='font-display text-xl font-semibold tracking-tight text-pp-text'>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <h3 className="font-display text-xl font-semibold tracking-tight text-pp-text">
                     {t(week.label, locale)} · {t(week.phase, locale)}
                   </h3>
-                  <p className='text-sm leading-relaxed text-pp-muted'>
+                  <p className="text-sm leading-relaxed text-pp-muted">
                     {t(week.desc, locale)}
                   </p>
                 </div>
-                <div className='flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-[11.5rem] sm:flex-col sm:items-end'>
-                  <span className='font-display text-2xl font-semibold tabular-nums text-pp-text'>
+                <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-[11.5rem] sm:flex-col sm:items-end">
+                  <span className="font-display text-2xl font-semibold tabular-nums text-pp-text">
                     {weekStats.percent}%
                   </span>
                   <span className={cx(mutedMonoCls, 'whitespace-nowrap')}>
@@ -471,7 +471,7 @@ export default function CcafPlan({
                     {formatHours(weekHours, locale)} {t(UI.hoursSuffix, locale)}
                   </span>
                   <button
-                    type='button'
+                    type="button"
                     onClick={() =>
                       setOpenIds(current => {
                         const next = new Set(current)
@@ -520,7 +520,7 @@ export default function CcafPlan({
             })}
           </div>
 
-          <div className='space-y-4 lg:sticky lg:top-6'>{rail}</div>
+          <div className="space-y-4 lg:sticky lg:top-6">{rail}</div>
         </div>
       </div>
     </SectionFrame>

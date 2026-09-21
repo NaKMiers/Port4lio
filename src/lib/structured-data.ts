@@ -54,12 +54,16 @@ function stripTrailingSlashOrigin(siteOrigin: string): string {
 }
 
 /** Turn stored avatar/path into absolute https URL where possible. */
-function absolutePublicAssetUrl(siteOrigin: string, value: unknown): string | undefined {
+function absolutePublicAssetUrl(
+  siteOrigin: string,
+  value: unknown
+): string | undefined {
   const raw = trimText(value)
   if (!raw || raw === '/' || /\s/.test(raw)) return undefined
   if (/^https:\/\//i.test(raw)) return raw
   if (/^\/\//.test(raw)) return `https:${raw}`
-  if (raw.startsWith('/')) return `${stripTrailingSlashOrigin(siteOrigin)}${raw}`
+  if (raw.startsWith('/'))
+    return `${stripTrailingSlashOrigin(siteOrigin)}${raw}`
   return undefined
 }
 
@@ -97,31 +101,43 @@ function featuredListItems(vm: PublicPortfolioViewModel): JsonLdThing[] {
 /** Grounded in services fields surfaced on the homepage. */
 function professionalServiceCopy(
   profile: PublicProfile,
-  vm: PublicPortfolioViewModel,
+  vm: PublicPortfolioViewModel
 ): { name: string; description?: string } {
   const person = collapseWhitespace(profile.fullName) || vm.meta.displayName
-  let svcTitles = vm.services.items.map(s => collapseWhitespace(s.title)).filter(Boolean)
-  if (!svcTitles.length) {
-    svcTitles = [...vm.services.briefBullets]
-  }
+  let svcTitles = vm.services.items
+    .map(s => collapseWhitespace(s.title))
+    .filter(Boolean)
+  if (!svcTitles.length) svcTitles = [...vm.services.briefBullets]
+
   const svcHeading =
     collapseWhitespace(profile.serviceHeading) ||
     collapseWhitespace(vm.services.heading) ||
     (svcTitles.slice(0, 3).length ? svcTitles.slice(0, 3).join(', ') : '')
 
   const nameParts = [person, svcHeading].filter(Boolean)
-  const name = nameParts.length ? nameParts.join(' - ') : person || svcHeading || 'Portfolio'
+  const name = nameParts.length
+    ? nameParts.join(' - ')
+    : person || svcHeading || 'Portfolio'
 
-  const sub = collapseWhitespace(profile.serviceSubHeading) || collapseWhitespace(vm.services.subheading)
+  const sub =
+    collapseWhitespace(profile.serviceSubHeading) ||
+    collapseWhitespace(vm.services.subheading)
   const titleLine = svcTitles.slice(0, 8).join(' · ')
 
   const rawDesc =
     excerptText([sub, titleLine].filter(Boolean).join(' - '), 380) ||
-    excerptText(profile.description || vm.hero.description || (vm.about.paragraphs[0] ?? ''), 260)
+    excerptText(
+      profile.description ||
+        vm.hero.description ||
+        (vm.about.paragraphs[0] ?? ''),
+      260
+    )
 
   return {
     name: collapseWhitespace(name) || 'Portfolio',
-    ...(collapseWhitespace(rawDesc).length >= 48 ? { description: collapseWhitespace(rawDesc) } : {}),
+    ...(collapseWhitespace(rawDesc).length >= 48
+      ? { description: collapseWhitespace(rawDesc) }
+      : {}),
   }
 }
 
@@ -138,13 +154,14 @@ function hasServiceSignals(vm: PublicPortfolioViewModel): boolean {
 function buildPortfolioJsonLdGraph(
   siteOrigin: string,
   profile: PublicProfile,
-  vm: PublicPortfolioViewModel,
+  vm: PublicPortfolioViewModel
 ): { '@context': string; '@graph': JsonLdThing[] } {
   const homeUrl = canonicalPageUrl(siteOrigin)
   const personUri = fragmentId(siteOrigin, PERSON_FRAGMENT)
   const webUri = fragmentId(siteOrigin, WEBSITE_FRAGMENT)
 
-  const displayName = collapseWhitespace(profile.fullName) || vm.meta.displayName || 'Portfolio'
+  const displayName =
+    collapseWhitespace(profile.fullName) || vm.meta.displayName || 'Portfolio'
   const avatar = absolutePublicAssetUrl(siteOrigin, profile.avatar)
   const sameAs = sameAsHttps(vm)
   const jobTitles = vm.hero.jobTitles
@@ -160,8 +177,10 @@ function buildPortfolioJsonLdGraph(
   }
 
   const websiteDescRaw = excerptText(
-    profile.description || vm.hero.description || (vm.about.paragraphs[0] ?? vm.hero.headline),
-    240,
+    profile.description ||
+      vm.hero.description ||
+      (vm.about.paragraphs[0] ?? vm.hero.headline),
+    240
   )
 
   const website: JsonLdThing = {
@@ -169,7 +188,9 @@ function buildPortfolioJsonLdGraph(
     '@id': webUri,
     url: homeUrl,
     name: displayName,
-    ...(collapseWhitespace(websiteDescRaw).length >= 48 ? { description: collapseWhitespace(websiteDescRaw) } : {}),
+    ...(collapseWhitespace(websiteDescRaw).length >= 48
+      ? { description: collapseWhitespace(websiteDescRaw) }
+      : {}),
     publisher: { '@id': personUri },
   }
 
@@ -234,6 +255,12 @@ export function escapeJsonForInlineScript(json: string): string {
     .replace(/\u2029/g, '\\u2029')
 }
 
-export function serializePortfolioJsonLd(siteOrigin: string, profile: PublicProfile, vm: PublicPortfolioViewModel): string {
-  return escapeJsonForInlineScript(JSON.stringify(buildPortfolioJsonLdGraph(siteOrigin, profile, vm)))
+export function serializePortfolioJsonLd(
+  siteOrigin: string,
+  profile: PublicProfile,
+  vm: PublicPortfolioViewModel
+): string {
+  return escapeJsonForInlineScript(
+    JSON.stringify(buildPortfolioJsonLdGraph(siteOrigin, profile, vm))
+  )
 }

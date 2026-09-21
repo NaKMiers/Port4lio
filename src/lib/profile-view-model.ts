@@ -127,7 +127,7 @@ export type PublicPortfolioViewModel = {
 }
 
 function toSocialProofLinks(
-  socials: Array<{ name: string; link: string; icon: string }>,
+  socials: Array<{ name: string; link: string; icon: string }>
 ): SocialProofLink[] {
   return socials.map(s => ({
     name: collapseWhitespace(s.name) || 'Link',
@@ -140,12 +140,17 @@ function buildTrustCards(
   profile: PublicProfile,
   paragraphs: string[],
   stats: Stat[],
-  projects: ProjectItem[],
+  projects: ProjectItem[]
 ): TrustCardViewModel[] {
   const cards: TrustCardViewModel[] = []
   let idx = 0
 
-  const push = (kicker: string, title: string, body: string, prefix: string) => {
+  const push = (
+    kicker: string,
+    title: string,
+    body: string,
+    prefix: string
+  ) => {
     if (cards.length >= TRUST_CARD_LIMIT) return
     const t = collapseWhitespace(title)
     const k = collapseWhitespace(kicker)
@@ -163,9 +168,8 @@ function buildTrustCards(
     })
   }
 
-  for (const s of stats.slice(0, 3)) {
+  for (const s of stats.slice(0, 3))
     push('Impact', s.label, String(s.value), 'stat')
-  }
 
   if (cards.length < TRUST_CARD_LIMIT) {
     const storePairs = extractStoreLinksFromProjects(projects)
@@ -189,14 +193,14 @@ function buildTrustCards(
         .filter(Boolean)
       if (names.length) capLines.push(`${g.groupName}: ${names.join(', ')}`)
     }
-    if (!capLines.length && briefLines.length) {
-      for (const line of briefLines.slice(0, 6)) {
-        capLines.push(line)
-      }
-    }
+    if (!capLines.length && briefLines.length)
+      for (const line of briefLines.slice(0, 6)) capLines.push(line)
+
     if (capLines.length) {
       const capTitle =
-        groups[0] && collapseWhitespace(groups[0].groupName) ? groups[0].groupName : 'What I ship'
+        groups[0] && collapseWhitespace(groups[0].groupName)
+          ? groups[0].groupName
+          : 'What I ship'
       push('Capabilities', capTitle, capLines.join('\n'), 'cap')
     }
   }
@@ -223,8 +227,13 @@ function buildTrustCards(
   return cards.slice(0, TRUST_CARD_LIMIT)
 }
 
-function computeMeta(profile: PublicProfile, hero: HeroViewModel, paragraphs: string[]): PublicPortfolioMeta {
-  const displayName = collapseWhitespace(profile.fullName) || hero.headline || 'Portfolio'
+function computeMeta(
+  profile: PublicProfile,
+  hero: HeroViewModel,
+  paragraphs: string[]
+): PublicPortfolioMeta {
+  const displayName =
+    collapseWhitespace(profile.fullName) || hero.headline || 'Portfolio'
   const hasStory = paragraphs.some(p => collapseWhitespace(p).length > 0)
   const hasWork =
     sanitizeProjects(profile.projects ?? []).length > 0 ||
@@ -237,7 +246,8 @@ function computeMeta(profile: PublicProfile, hero: HeroViewModel, paragraphs: st
     hero.jobTitles.length > 0 ||
     collapseWhitespace(profile.description).length > 0
 
-  const isEffectivelyEmpty = !hasIdentity && !hasStory && !hasWork && hero.stats.length === 0
+  const isEffectivelyEmpty =
+    !hasIdentity && !hasStory && !hasWork && hero.stats.length === 0
 
   return { displayName, isEffectivelyEmpty }
 }
@@ -246,7 +256,9 @@ function computeMeta(profile: PublicProfile, hero: HeroViewModel, paragraphs: st
  * Derived, defensive view model for the public portfolio page (server-first rendering).
  * Starts from {@link normalizeProfile} output - keep API/admin payloads unchanged.
  */
-export function derivePublicPortfolioViewModel(profile: PublicProfile): PublicPortfolioViewModel {
+export function derivePublicPortfolioViewModel(
+  profile: PublicProfile
+): PublicPortfolioViewModel {
   const jobTitles = dedupeJobTitles(profile.jobTitle ?? [])
   const paragraphs = splitAboutParagraphs(profile.aboutMe ?? '')
   const stats = sanitizeStats(profile.stats ?? [])
@@ -287,19 +299,22 @@ export function derivePublicPortfolioViewModel(profile: PublicProfile): PublicPo
     founderQuote &&
     paragraphs.length === 1 &&
     collapseWhitespace(paragraphs[0]) === collapseWhitespace(founderQuote)
-  ) {
+  )
     founderQuote = null
-  }
 
   const founderProof: FounderProofViewModel = {
     quote: founderQuote,
-    attributionName: collapseWhitespace(profile.fullName) || collapseWhitespace(profile.username) || hero.headline,
+    attributionName:
+      collapseWhitespace(profile.fullName) ||
+      collapseWhitespace(profile.username) ||
+      hero.headline,
     highlightStats: stats.slice(0, 3),
   }
 
   const about: AboutViewModel = {
     heading: collapseWhitespace(profile.profileHeading) || hero.headline,
-    subheading: collapseWhitespace(profile.profileSubHeading) || hero.subheadline,
+    subheading:
+      collapseWhitespace(profile.profileSubHeading) || hero.subheadline,
     paragraphs,
     skills: sanitizeSkillGroups(profile.skills ?? []),
     experience: sanitizeExperience(profile.experience ?? []),
@@ -314,7 +329,10 @@ export function derivePublicPortfolioViewModel(profile: PublicProfile): PublicPo
     items: services,
   }
 
-  const featuredProjects: ProjectItem[] = projects.slice(0, FEATURED_PROJECT_LIMIT)
+  const featuredProjects: ProjectItem[] = projects.slice(
+    0,
+    FEATURED_PROJECT_LIMIT
+  )
   const catalogProjects: ProjectItem[] = projects.slice(FEATURED_PROJECT_LIMIT)
 
   const featuredBand: ProjectsBandViewModel = {

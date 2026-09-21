@@ -2,9 +2,17 @@ import { createHash } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { answerKeyFor, CURRENT_GENERATOR_VERSION, renderTest } from '@/lib/iq/items'
+import {
+  answerKeyFor,
+  CURRENT_GENERATOR_VERSION,
+  renderTest,
+} from '@/lib/iq/items'
 import { ITEM_COUNT } from '@/lib/iq/items/config'
-import { answerIndexFor, generateTest, optionsFor } from '@/lib/iq/items/v1/generate'
+import {
+  answerIndexFor,
+  generateTest,
+  optionsFor,
+} from '@/lib/iq/items/v1/generate'
 import { renderMatrix, renderOption } from '@/lib/iq/items/v1/render'
 
 /**
@@ -90,7 +98,10 @@ function fingerprint(seed: number): string {
     rule: item.rule,
   }))
 
-  return createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 16)
+  return createHash('sha256')
+    .update(JSON.stringify(payload))
+    .digest('hex')
+    .slice(0, 16)
 }
 
 describe('generator v1', () => {
@@ -102,9 +113,8 @@ describe('generator v1', () => {
     // Cheap, and it catches the one failure the golden table cannot: state leaking between
     // calls. A module-level accumulator in a rule would still hash correctly on the first
     // call of a fresh process and drift on the second.
-    for (const [seed] of GOLDEN.slice(0, 5)) {
+    for (const [seed] of GOLDEN.slice(0, 5))
       expect(fingerprint(seed)).toBe(fingerprint(seed))
-    }
   })
 })
 
@@ -117,23 +127,26 @@ describe('generator v1', () => {
  * both ends: the markup a taker receives, and the key they are scored against.
  */
 describe('the version facade', () => {
-  it.each(GOLDEN.map(([seed]) => seed))('routes seed %i to the v1 engine', seed => {
-    const items = generateTest(seed)
+  it.each(GOLDEN.map(([seed]) => seed))(
+    'routes seed %i to the v1 engine',
+    seed => {
+      const items = generateTest(seed)
 
-    expect(renderTest(seed, 1)).toEqual(
-      items.map((item, index) => ({
-        matrix: renderMatrix(item, `${index + 1} / ${items.length}`),
-        options: optionsFor(item, seed, index).map((option, optionIndex) =>
-          renderOption(option, `q${index}o${optionIndex}`)
-        ),
-        aspect: 1,
-      }))
-    )
+      expect(renderTest(seed, 1)).toEqual(
+        items.map((item, index) => ({
+          matrix: renderMatrix(item, `${index + 1} / ${items.length}`),
+          options: optionsFor(item, seed, index).map((option, optionIndex) =>
+            renderOption(option, `q${index}o${optionIndex}`)
+          ),
+          aspect: 1,
+        }))
+      )
 
-    expect(answerKeyFor(seed, 1)).toEqual(
-      items.map((item, index) => answerIndexFor(item, seed, index))
-    )
-  })
+      expect(answerKeyFor(seed, 1)).toEqual(
+        items.map((item, index) => answerIndexFor(item, seed, index))
+      )
+    }
+  )
 
   it('throws on a version it has no generator for', () => {
     // Loud beats plausible. Falling back to the newest generator would score the attempt

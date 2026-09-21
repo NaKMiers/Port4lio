@@ -2,12 +2,18 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 import { connectDatabase } from '@/lib/mongodb'
-import { getPublicProfileUpdatedAt, loadPublicProfile } from '@/lib/profile-data'
+import {
+  getPublicProfileUpdatedAt,
+  loadPublicProfile,
+} from '@/lib/profile-data'
 import { isPublishRequestAuthorized } from '@/lib/publish/auth'
 import { attachDrift, buildPublishManifest } from '@/lib/publish/manifest'
 import type { StoredTargetState } from '@/lib/publish/manifest'
 import { resolveSiteOrigin } from '@/lib/seo'
-import { PUBLISH_STATE_DOCUMENT_ID, PublishStateModel } from '@/models/PublishState'
+import {
+  PUBLISH_STATE_DOCUMENT_ID,
+  PublishStateModel,
+} from '@/models/PublishState'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,9 +37,8 @@ async function readTargetStates(): Promise<StoredTargetState[]> {
  */
 export async function GET(request: NextRequest) {
   try {
-    if (!isPublishRequestAuthorized(request)) {
+    if (!isPublishRequestAuthorized(request))
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     const [profile, profileUpdatedAt, states] = await Promise.all([
       loadPublicProfile(),
@@ -55,7 +60,8 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown server error'
+    const message =
+      error instanceof Error ? error.message : 'Unknown server error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

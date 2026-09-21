@@ -53,12 +53,16 @@ import { useEffect, useEffectEvent, useState } from 'react'
 
 const SESSION_KEY = 'blog-session'
 /** Matches the server's `^[A-Za-z0-9_-]{1,64}$`, which excludes the `_id` separator. */
-const TOKEN_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+const TOKEN_ALPHABET =
+  'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 function mintToken(length = 16): string {
   const bytes = new Uint8Array(length)
   crypto.getRandomValues(bytes)
-  return Array.from(bytes, byte => TOKEN_ALPHABET[byte % TOKEN_ALPHABET.length]).join('')
+  return Array.from(
+    bytes,
+    byte => TOKEN_ALPHABET[byte % TOKEN_ALPHABET.length]
+  ).join('')
 }
 
 function sessionId(): string {
@@ -99,9 +103,7 @@ export default function PostTracker({ slug }: { slug: string }) {
     // `?from=<token>` means this reader arrived through somebody's shared link. Recorded
     // against the token, so the board can say which post produced onward reach.
     const token = new URLSearchParams(window.location.search).get('from')
-    if (token) {
-      void send({ kind: 'attribute', slug, token, sessionId: session })
-    }
+    if (token) void send({ kind: 'attribute', slug, token, sessionId: session })
   })
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export default function PostTracker({ slug }: { slug: string }) {
   return (
     <button
       onClick={() => void share()}
-      className='inline-flex min-h-[44px] items-center gap-2 rounded-full border border-pp-line px-5 py-2 text-sm font-semibold text-pp-text transition-colors hover:border-pp-blue/40'
+      className="inline-flex min-h-[44px] items-center gap-2 rounded-full border border-pp-line px-5 py-2 text-sm font-semibold text-pp-text transition-colors hover:border-pp-blue/40"
     >
       {copied ? 'Link copied' : 'Copy link'}
     </button>

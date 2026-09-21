@@ -49,7 +49,12 @@ export type KindDocument = {
 
 const kindSchema = new Schema<KindDocument>(
   {
-    slug: { type: String, required: true, match: KIND_SLUG_PATTERN, unique: true },
+    slug: {
+      type: String,
+      required: true,
+      match: KIND_SLUG_PATTERN,
+      unique: true,
+    },
     label: { type: String, required: true, maxlength: 40 },
     eyebrow: { type: Boolean, default: false },
     order: { type: Number, default: 0 },

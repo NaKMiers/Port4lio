@@ -18,9 +18,8 @@ import {
  */
 describe('parseAuthDays', () => {
   it('accepts every whole day in the range', () => {
-    for (let days = AUTH_MIN_DAYS; days <= AUTH_MAX_DAYS; days += 1) {
+    for (let days = AUTH_MIN_DAYS; days <= AUTH_MAX_DAYS; days += 1)
       expect(parseAuthDays(days), `${days} days`).toBe(days)
-    }
   })
 
   it('reads the number a JSON body might send as a string', () => {

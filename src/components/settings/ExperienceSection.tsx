@@ -28,15 +28,25 @@ export default function ExperienceSection({
   }
 
   const addExperience = () =>
-    setProfile(p => ({ ...p, experience: [...p.experience, { companyName: '', position: '', start: '', end: '' }] }))
+    setProfile(p => ({
+      ...p,
+      experience: [
+        ...p.experience,
+        { companyName: '', position: '', start: '', end: '' },
+      ],
+    }))
 
   return (
-    <Section id='experience' title='Experience' badge='work history'>
-      <div className='space-y-4'>
-        <div className='flex items-center justify-between'>
-          <h2 className='text-sm font-semibold'>Experience</h2>
+    <Section
+      id="experience"
+      title="Experience"
+      badge="work history"
+    >
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Experience</h2>
           <button
-            type='button'
+            type="button"
             className={secondaryBtnCls}
             onClick={addExperience}
           >
@@ -49,49 +59,61 @@ export default function ExperienceSection({
         ) : null}
 
         {profile.experience.map((exp, idx) => (
-          <div key={idx} className={itemCardCls}>
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-              <div className='space-y-2'>
+          <div
+            key={idx}
+            className={itemCardCls}
+          >
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-2">
                 <label className={labelCls}>Company name</label>
                 <input
                   className={inputCls}
                   value={exp.companyName}
-                  onChange={e => updateExperience(idx, { companyName: e.target.value })}
+                  onChange={e =>
+                    updateExperience(idx, { companyName: e.target.value })
+                  }
                 />
               </div>
-              <div className='space-y-2'>
+              <div className="space-y-2">
                 <label className={labelCls}>Position</label>
                 <input
                   className={inputCls}
                   value={exp.position}
-                  onChange={e => updateExperience(idx, { position: e.target.value })}
+                  onChange={e =>
+                    updateExperience(idx, { position: e.target.value })
+                  }
                 />
               </div>
-              <div className='space-y-2'>
+              <div className="space-y-2">
                 <label className={labelCls}>Start</label>
                 <input
                   className={inputCls}
-                  type='date'
+                  type="date"
                   value={exp.start}
-                  onChange={e => updateExperience(idx, { start: e.target.value })}
+                  onChange={e =>
+                    updateExperience(idx, { start: e.target.value })
+                  }
                 />
               </div>
-              <div className='space-y-2'>
+              <div className="space-y-2">
                 <label className={labelCls}>End</label>
                 <input
                   className={inputCls}
-                  type='date'
+                  type="date"
                   value={exp.end}
                   onChange={e => updateExperience(idx, { end: e.target.value })}
                 />
               </div>
             </div>
-            <div className='mt-3 flex justify-end'>
+            <div className="mt-3 flex justify-end">
               <button
-                type='button'
+                type="button"
                 className={ghostBtnCls}
                 onClick={() =>
-                  setProfile(p => ({ ...p, experience: p.experience.filter((_, i) => i !== idx) }))
+                  setProfile(p => ({
+                    ...p,
+                    experience: p.experience.filter((_, i) => i !== idx),
+                  }))
                 }
               >
                 Remove
@@ -101,7 +123,10 @@ export default function ExperienceSection({
         ))}
 
         {profile.experience.length > 0 ? (
-          <AddMoreButton label='+ Add experience item' onClick={addExperience} />
+          <AddMoreButton
+            label="+ Add experience item"
+            onClick={addExperience}
+          />
         ) : null}
       </div>
     </Section>

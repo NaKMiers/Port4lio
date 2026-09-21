@@ -37,7 +37,9 @@ export function generateItem(seed: number, rung: number): Item {
   // rule, not bad luck. Throwing is right: shipping an unverified item to a taker is worse
   // than a loud failure, and `tests/unit/iq-items.test.ts` walks every rung to make sure
   // this never fires in practice.
-  throw new Error(`[iq] could not generate a verified item for rung ${rung} after ${MAX_ATTEMPTS} attempts`)
+  throw new Error(
+    `[iq] could not generate a verified item for rung ${rung} after ${MAX_ATTEMPTS} attempts`
+  )
 }
 
 /**
@@ -56,12 +58,20 @@ export function generateTest(seed: number): Item[] {
 }
 
 /** Options in display order, deterministic per seed so a re-render matches what was sat. */
-export function optionsFor(item: Item, seed: number, index: number): Item['answer'][] {
+export function optionsFor(
+  item: Item,
+  seed: number,
+  index: number
+): Item['answer'][] {
   return shuffle(rng(seed + index * 977), [item.answer, ...item.distractors])
 }
 
 /** Where the answer sits after shuffling. The scorer compares against this, never a label. */
-export function answerIndexFor(item: Item, seed: number, index: number): number {
+export function answerIndexFor(
+  item: Item,
+  seed: number,
+  index: number
+): number {
   const options = optionsFor(item, seed, index)
   return options.indexOf(item.answer)
 }

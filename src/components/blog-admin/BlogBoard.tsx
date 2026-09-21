@@ -10,7 +10,11 @@ import PostRowActions from '@/components/blog-admin/PostRowActions'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoading from '@/components/settings/SettingLoading'
-import { inputCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
+import {
+  inputCls,
+  primaryBtnCls,
+  secondaryBtnCls,
+} from '@/components/settings/settings-utils'
 
 /**
  * `/admin/blog` - every post, and the two numbers that decide whether this is working.
@@ -97,7 +101,10 @@ export default function BlogBoard() {
   const [error, setError] = useState<string | null>(null)
   const [newSlug, setNewSlug] = useState('')
   const [busy, setBusy] = useState(false)
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; title: string } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{
+    id: string
+    title: string
+  } | null>(null)
   /**
    * The permanent-delete confirm, and `contactMessages` is the two-stage part.
    *
@@ -180,13 +187,19 @@ export default function BlogBoard() {
       setNewSlug('')
       await load()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create the draft')
+      setError(
+        cause instanceof Error ? cause.message : 'Could not create the draft'
+      )
     } finally {
       setBusy(false)
     }
   }
 
-  async function mutate(id: string, body: Record<string, unknown>, method: 'PATCH' | 'DELETE') {
+  async function mutate(
+    id: string,
+    body: Record<string, unknown>,
+    method: 'PATCH' | 'DELETE'
+  ) {
     setBusy(true)
     setError(null)
     try {
@@ -213,18 +226,33 @@ export default function BlogBoard() {
    * the second carries `acknowledge=true` to say the owner has seen it. A slug with nothing
    * against it goes on the first press and never shows the second dialog at all.
    */
-  async function purge(id: string, slug: string, title: string, acknowledge: boolean) {
+  async function purge(
+    id: string,
+    slug: string,
+    title: string,
+    acknowledge: boolean
+  ) {
     setBusy(true)
     setError(null)
     try {
       const query = `permanent=true${acknowledge ? '&acknowledge=true' : ''}`
-      const res = await fetch(`/api/admin/blog/${id}?${query}`, { method: 'DELETE' })
-      const data = (await res.json()) as { error?: string; contactMessages?: number }
+      const res = await fetch(`/api/admin/blog/${id}?${query}`, {
+        method: 'DELETE',
+      })
+      const data = (await res.json()) as {
+        error?: string
+        contactMessages?: number
+      }
 
       if (res.status === 409 && typeof data.contactMessages === 'number') {
         // Re-open the same dialog in its second stage rather than surfacing a banner: the
         // decision is still in front of the owner, so the number belongs where the button is.
-        setPendingPurge({ id, slug, title, contactMessages: data.contactMessages })
+        setPendingPurge({
+          id,
+          slug,
+          title,
+          contactMessages: data.contactMessages,
+        })
         return
       }
       if (!res.ok) throw new Error(data.error ?? 'Could not delete the post')
@@ -233,73 +261,94 @@ export default function BlogBoard() {
       await load()
     } catch (cause) {
       setPendingPurge(null)
-      setError(cause instanceof Error ? cause.message : 'Could not delete the post')
+      setError(
+        cause instanceof Error ? cause.message : 'Could not delete the post'
+      )
     } finally {
       setBusy(false)
     }
   }
 
-  if (posts === null && !error) {
+  if (posts === null && !error)
     return (
       <OwnerAuthGate onAuthed={() => void load()}>
         <SettingLoading
-          title='Loading posts...'
-          subtitle='Reading the blog board.'
+          title="Loading posts..."
+          subtitle="Reading the blog board."
         />
       </OwnerAuthGate>
     )
-  }
 
-  const lastPublished = (posts ?? [])
-    .filter(post => post.status === 'published' && post.publishedAt)
-    .map(post => post.publishedAt as string)
-    .sort()
-    .at(-1) ?? null
+  const lastPublished =
+    (posts ?? [])
+      .filter(post => post.status === 'published' && post.publishedAt)
+      .map(post => post.publishedAt as string)
+      .sort()
+      .at(-1) ?? null
   const quietDays = daysSince(lastPublished)
 
   return (
     <OwnerAuthGate onAuthed={() => void load()}>
-      <div className='mx-auto w-full max-w-editorial px-gutter py-10'>
-        <header className='flex flex-wrap items-baseline justify-between gap-4'>
+      <div className="mx-auto w-full max-w-editorial px-gutter py-10">
+        <header className="flex flex-wrap items-baseline justify-between gap-4">
           <div>
-            <h1 className='font-display text-2xl font-semibold tracking-tight'>Blog</h1>
-            <p className='mt-1 text-sm text-pp-muted'>
+            <h1 className="font-display text-2xl font-semibold tracking-tight">
+              Blog
+            </h1>
+            <p className="mt-1 text-sm text-pp-muted">
               {quietDays === null
                 ? 'Nothing published yet.'
                 : `${quietDays} day${quietDays === 1 ? '' : 's'} since the last publish.`}
               {quietDays !== null && quietDays > 14 ? (
-                <span className='ml-2 font-semibold text-pp-text'>
+                <span className="ml-2 font-semibold text-pp-text">
                   Cadence is 2 articles + 8 notes in 6 weeks.
                 </span>
               ) : null}
             </p>
           </div>
-          <div className='flex gap-2'>
-            <Link className={secondaryBtnCls} href='/admin/settings'>
+          <div className="flex gap-2">
+            <Link
+              className={secondaryBtnCls}
+              href="/admin/settings"
+            >
               Settings
             </Link>
-            <Link className={secondaryBtnCls} href='/blog'>
+            <Link
+              className={secondaryBtnCls}
+              href="/blog"
+            >
               View blog
             </Link>
           </div>
         </header>
 
-        {error ? <div className='mt-6'><SettingErrorBanner message={error} /></div> : null}
+        {error ? (
+          <div className="mt-6">
+            <SettingErrorBanner message={error} />
+          </div>
+        ) : null}
 
-        <div className='mt-8 flex flex-wrap items-end gap-3'>
-          <div className='min-w-[16rem] flex-1'>
-            <label className='mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted' htmlFor='new-slug'>
+        <div className="mt-8 flex flex-wrap items-end gap-3">
+          <div className="min-w-[16rem] flex-1">
+            <label
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
+              htmlFor="new-slug"
+            >
               New draft slug
             </label>
             <input
-              id='new-slug'
+              id="new-slug"
               className={inputCls}
               value={newSlug}
               onChange={event => setNewSlug(event.target.value)}
-              placeholder='five-things-next-16-did'
+              placeholder="five-things-next-16-did"
             />
           </div>
-          <button className={primaryBtnCls} onClick={() => void create()} disabled={busy}>
+          <button
+            className={primaryBtnCls}
+            onClick={() => void create()}
+            disabled={busy}
+          >
             Create draft
           </button>
           {/*
@@ -307,10 +356,13 @@ export default function BlogBoard() {
             the left one makes an empty page to write on, the right one writes it. Putting the
             expensive, animated control first would make it the default press.
           */}
-          <GenerateBlogButton onClick={() => setGenerating(true)} disabled={busy} />
+          <GenerateBlogButton
+            onClick={() => setGenerating(true)}
+            disabled={busy}
+          />
         </div>
 
-        <ul className='mt-8 space-y-2'>
+        <ul className="mt-8 space-y-2">
           {(posts ?? []).map(post => (
             <li
               key={post._id}
@@ -338,10 +390,13 @@ export default function BlogBoard() {
                 .filter(Boolean)
                 .join(' ')}
             >
-              <span aria-hidden className='w-4 text-pp-muted'>
+              <span
+                aria-hidden
+                className="w-4 text-pp-muted"
+              >
                 {STATUS_MARK[post.status]}
               </span>
-              <span className='sr-only'>{post.status}</span>
+              <span className="sr-only">{post.status}</span>
 
               {/*
                 `alt=''`: the title is the next element and says the same thing. No box at all
@@ -349,23 +404,23 @@ export default function BlogBoard() {
                 rather than as "no image".
               */}
               {post.coverImage ? (
-                <span className='hidden h-10 w-16 shrink-0 overflow-hidden rounded-[0.6rem] border border-pp-line bg-white/60 sm:block'>
+                <span className="hidden h-10 w-16 shrink-0 overflow-hidden rounded-[0.6rem] border border-pp-line bg-white/60 sm:block">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={post.coverImage}
-                    alt=''
+                    alt=""
                     aria-hidden
-                    loading='lazy'
-                    className='h-full w-full object-cover'
+                    loading="lazy"
+                    className="h-full w-full object-cover"
                   />
                 </span>
               ) : null}
 
-              <span className='min-w-0 flex-1'>
-                <span className='block truncate font-display text-sm font-semibold'>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-sm font-semibold">
                   {post.title}
                 </span>
-                <span className='block truncate text-xs text-pp-muted'>
+                <span className="block truncate text-xs text-pp-muted">
                   /blog/{post.slug}
                   {post.isPillar ? ' · pillar' : ''}
                   {post.series ? ` · ${post.series}` : ''}
@@ -408,17 +463,30 @@ export default function BlogBoard() {
                             can mint a fresh one each time and add a unique read to the very
                             `metrics.views` number printed on this row.
                           */
-                          { key: 'view', label: 'View', href: `/blog/${post.slug}` },
+                          {
+                            key: 'view',
+                            label: 'View',
+                            href: `/blog/${post.slug}`,
+                          },
                         ]
                       : []),
-                    { key: 'edit', label: 'Edit', href: `/admin/blog/${post._id}` },
+                    {
+                      key: 'edit',
+                      label: 'Edit',
+                      href: `/admin/blog/${post._id}`,
+                    },
                     ...(post.status === 'published'
                       ? [
                           {
                             key: 'archive',
                             label: 'Archive',
                             disabled: busy,
-                            onSelect: () => void mutate(post._id, { status: 'archived' }, 'PATCH'),
+                            onSelect: () =>
+                              void mutate(
+                                post._id,
+                                { status: 'archived' },
+                                'PATCH'
+                              ),
                           },
                         ]
                       : [
@@ -433,7 +501,11 @@ export default function BlogBoard() {
                                     title: post.title || post.slug,
                                     unresolvedImages: post.unresolvedImages,
                                   })
-                                : void mutate(post._id, { status: 'published' }, 'PATCH'),
+                                : void mutate(
+                                    post._id,
+                                    { status: 'published' },
+                                    'PATCH'
+                                  ),
                           },
                         ]),
                     {
@@ -441,13 +513,17 @@ export default function BlogBoard() {
                       label: 'Delete',
                       disabled: busy,
                       separated: true,
-                      onSelect: () => setPendingDelete({ id: post._id, title: post.title || post.slug }),
+                      onSelect: () =>
+                        setPendingDelete({
+                          id: post._id,
+                          title: post.title || post.slug,
+                        }),
                     },
                   ]}
                 />
               ) : (
-                <span className='flex items-center gap-3'>
-                  <span className='text-xs text-pp-muted'>holds its slug</span>
+                <span className="flex items-center gap-3">
+                  <span className="text-xs text-pp-muted">holds its slug</span>
                   <PostRowActions
                     label={`Restore ${post.title || post.slug}`}
                     actions={[
@@ -508,9 +584,9 @@ export default function BlogBoard() {
         </ul>
 
         {posts !== null && posts.length === 0 && !error ? (
-          <p className='mt-8 text-sm text-pp-muted'>
-            No posts yet. The first three should be mined from source comments you have
-            already written - see <code>docs/blog/authoring.md</code>.
+          <p className="mt-8 text-sm text-pp-muted">
+            No posts yet. The first three should be mined from source comments
+            you have already written - see <code>docs/blog/authoring.md</code>.
           </p>
         ) : null}
       </div>
@@ -546,29 +622,34 @@ export default function BlogBoard() {
           pendingPurge?.contactMessages ? (
             <>
               <p>
-                <strong className='font-semibold text-pp-text'>
+                <strong className="font-semibold text-pp-text">
                   {pendingPurge.contactMessages} contact message
                   {pendingPurge.contactMessages === 1 ? '' : 's'}
                 </strong>{' '}
-                came from <code>/blog/{pendingPurge.slug}</code>. The messages are kept either
-                way - they are not deleted with the post.
+                came from <code>/blog/{pendingPurge.slug}</code>. The messages
+                are kept either way - they are not deleted with the post.
               </p>
-              <p className='mt-2'>
+              <p className="mt-2">
                 What is released is the slug. A future post taking{' '}
                 <code>{pendingPurge.slug}</code> would inherit{' '}
-                {pendingPurge.contactMessages === 1 ? 'that attribution' : 'those attributions'},
-                which is the one number the blog is measured by.
+                {pendingPurge.contactMessages === 1
+                  ? 'that attribution'
+                  : 'those attributions'}
+                , which is the one number the blog is measured by.
               </p>
             </>
           ) : (
             <>
-              &quot;{pendingPurge?.title ?? ''}&quot; and its read counts will be removed from the
-              database. This cannot be undone, and <code>{pendingPurge?.slug}</code> becomes
-              available for a new post to take.
+              &quot;{pendingPurge?.title ?? ''}&quot; and its read counts will
+              be removed from the database. This cannot be undone, and{' '}
+              <code>{pendingPurge?.slug}</code> becomes available for a new post
+              to take.
             </>
           )
         }
-        confirmLabel={pendingPurge?.contactMessages ? 'Delete anyway' : 'Delete forever'}
+        confirmLabel={
+          pendingPurge?.contactMessages ? 'Delete anyway' : 'Delete forever'
+        }
         busy={busy}
         onCancel={() => setPendingPurge(null)}
         onConfirm={() => {
@@ -582,25 +663,28 @@ export default function BlogBoard() {
 
       <ConfirmDialog
         open={pendingPublish !== null}
-        title='This post has images that were never made'
+        title="This post has images that were never made"
         message={
           <>
             <p>
               &quot;{pendingPublish?.title ?? ''}&quot; still has{' '}
-              <strong className='font-semibold text-pp-text'>
+              <strong className="font-semibold text-pp-text">
                 {pendingPublish?.unresolvedImages}{' '}
-                {pendingPublish?.unresolvedImages === 1 ? 'placeholder' : 'placeholders'}
+                {pendingPublish?.unresolvedImages === 1
+                  ? 'placeholder'
+                  : 'placeholders'}
               </strong>{' '}
               in the body.
             </p>
-            <p className='mt-2'>
-              A placeholder is refused by the renderer and published as an image with no source,
-              which every browser paints as a broken-image icon. Open the post and upload them,
-              or publish now and fix it after - the choice is yours, but it will be visible.
+            <p className="mt-2">
+              A placeholder is refused by the renderer and published as an image
+              with no source, which every browser paints as a broken-image icon.
+              Open the post and upload them, or publish now and fix it after -
+              the choice is yours, but it will be visible.
             </p>
           </>
         }
-        confirmLabel='Publish anyway'
+        confirmLabel="Publish anyway"
         busy={busy}
         onCancel={() => setPendingPublish(null)}
         onConfirm={() => {
@@ -613,9 +697,9 @@ export default function BlogBoard() {
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title='Delete this post?'
+        title="Delete this post?"
         message={`"${pendingDelete?.title ?? ''}" will be soft-deleted. Its slug stays reserved and the row stays on this board, greyed out.`}
-        confirmLabel='Delete'
+        confirmLabel="Delete"
         busy={busy}
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => {

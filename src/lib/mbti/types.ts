@@ -73,7 +73,10 @@ export function typesInGroup(group: TypeGroup): MbtiType[] {
 }
 
 export function isMbtiType(value: string | undefined): value is MbtiType {
-  return typeof value === 'string' && (MBTI_TYPES as readonly string[]).includes(value.toUpperCase())
+  return (
+    typeof value === 'string' &&
+    (MBTI_TYPES as readonly string[]).includes(value.toUpperCase())
+  )
 }
 
 /** Route segments are lowercase (`/vi/mbti/enfj`); type codes are uppercase everywhere else. */

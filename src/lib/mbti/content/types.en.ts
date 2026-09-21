@@ -15,10 +15,11 @@ import type { MbtiType } from '@/lib/mbti/types'
 export const TYPES_EN: Record<MbtiType, TypeContent> = {
   ENFJ: {
     nickname: 'The Teacher',
-    tagline: 'You read the room before you read the agenda, and you have usually already decided who needs help.',
+    tagline:
+      'You read the room before you read the agenda, and you have usually already decided who needs help.',
     overview: [
       'You notice what people need before they say it, and you find it hard not to act on that. In groups you end up holding things together almost by reflex, and often nobody names it because you make it look easy.',
-      'The cost is that your attention runs outward by default. You will spend a week solving someone else\'s problem and only notice on Sunday that you have not thought about your own.',
+      "The cost is that your attention runs outward by default. You will spend a week solving someone else's problem and only notice on Sunday that you have not thought about your own.",
     ],
     strengths: [
       'You can tell what a group is actually feeling, not what it is saying',
@@ -36,7 +37,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ENFP: {
     nickname: 'The Champion',
-    tagline: 'You can find the interesting thread in almost anything, which is why you have started so many projects.',
+    tagline:
+      'You can find the interesting thread in almost anything, which is why you have started so many projects.',
     overview: [
       'Possibility is the thing that moves you. A conversation about what something could become will hold you far longer than a conversation about what it currently is, and you are genuinely good at making other people see it too.',
       'The same wiring makes finishing hard. The idea is most alive at the beginning, and by the middle it has become logistics, which is the part your attention slides off.',
@@ -57,7 +59,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ENTJ: {
     nickname: 'The Executive',
-    tagline: 'You see where this is going and you have already worked out who needs to do what.',
+    tagline:
+      'You see where this is going and you have already worked out who needs to do what.',
     overview: [
       'You organise instinctively. Given a vague situation you will produce a direction, a sequence, and an owner for each part, usually faster than anyone asked you to.',
       'That decisiveness is your value and your blind spot. You move before consensus arrives, and sometimes the thing you steamrolled was a legitimate objection you did not slow down enough to hear.',
@@ -78,7 +81,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ENTP: {
     nickname: 'The Inventor',
-    tagline: 'You argue the other side because you want to see if the idea survives it.',
+    tagline:
+      'You argue the other side because you want to see if the idea survives it.',
     overview: [
       'You think by testing. Given a claim, your instinct is to push on it and find where it breaks, and you enjoy this more than most people expect you to.',
       'This makes you very good at finding the flaw and less reliably good at building the replacement. The interesting part of a problem, for you, is the part before it becomes work.',
@@ -99,7 +103,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ESFJ: {
     nickname: 'The Provider',
-    tagline: 'You remember who does not eat dairy, and you noticed they went quiet twenty minutes ago.',
+    tagline:
+      'You remember who does not eat dairy, and you noticed they went quiet twenty minutes ago.',
     overview: [
       'You keep the practical fabric of a group intact. You remember the details about people that make them feel known, and you act on them without making a production of it.',
       'Because harmony matters to you, conflict registers as something to fix rather than something to sit inside. That instinct resolves a lot of small friction and occasionally buries a real disagreement.',
@@ -120,7 +125,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ESFP: {
     nickname: 'The Performer',
-    tagline: 'You are fully in the room, which is why the room is better when you are in it.',
+    tagline:
+      'You are fully in the room, which is why the room is better when you are in it.',
     overview: [
       'You live in the present more completely than most people manage. You notice texture, mood, and the actual moment, and you pull other people into it with you.',
       'The flip side is that things which pay off slowly and invisibly get neglected. Long-term plans compete with a vivid present, and the present usually wins.',
@@ -162,7 +168,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ESTP: {
     nickname: 'The Promoter',
-    tagline: 'You would rather try it and find out than sit in another meeting about it.',
+    tagline:
+      'You would rather try it and find out than sit in another meeting about it.',
     overview: [
       'You are calibrated for real time. You read situations fast, act on incomplete information, and are usually correct enough, which is a rarer skill than it sounds.',
       'That bias toward action makes slow deliberate work feel like friction. You are excellent when something is happening and restless when nothing is.',
@@ -183,7 +190,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   INFJ: {
     nickname: 'The Counselor',
-    tagline: 'You understood what was going on with them before they had words for it, and you said nothing.',
+    tagline:
+      'You understood what was going on with them before they had words for it, and you said nothing.',
     overview: [
       'You perceive patterns in people that you cannot always explain. You often know where something is heading well before there is evidence, and you are usually right often enough that it unsettles people.',
       'You are also more private than you appear. You draw others out easily and give back a curated version of yourself, which can leave you known by many and understood by very few.',
@@ -204,7 +212,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   INFP: {
     nickname: 'The Mediator',
-    tagline: 'There is a way things should be, and you can feel exactly how far the current version is from it.',
+    tagline:
+      'There is a way things should be, and you can feel exactly how far the current version is from it.',
     overview: [
       'You run everything against an internal sense of what is right. This makes you hard to move on things that matter and surprisingly flexible on things that do not.',
       'That same standard turns inward. You hold yourself to a version of you that does not exist yet, and you are considerably harder on yourself than on anyone else.',
@@ -228,7 +237,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
     // landing page rendered a section headed ANALYSTS with a card inside it reading "The
     // Analyst". Architect is the more widely recognised name for INTJ anyway.
     nickname: 'The Architect',
-    tagline: 'You already thought this through, and you are waiting for everyone else to catch up.',
+    tagline:
+      'You already thought this through, and you are waiting for everyone else to catch up.',
     overview: [
       'You build models. You want to understand how a system actually works, and once you do, its flaws are obvious to you and hard to unsee.',
       'Your confidence in your own reasoning is mostly earned, which is what makes it dangerous. You will discount an objection because the person could not argue it well, when the objection itself was sound.',
@@ -249,7 +259,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   INTP: {
     nickname: 'The Logician',
-    tagline: 'You will happily spend three hours on a problem nobody asked you to solve.',
+    tagline:
+      'You will happily spend three hours on a problem nobody asked you to solve.',
     overview: [
       'You want things to be internally consistent. An idea that almost works bothers you more than one that clearly does not, and you will keep turning it over long after the conversation moved on.',
       'The gap is between understanding and doing. You can hold a complete solution in your head and feel no particular urgency to build it, because the understanding was the part you wanted.',
@@ -263,7 +274,7 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
     growth: [
       'Shipping something imperfect instead of refining it privately',
       'Saying the thought instead of assuming it was obvious',
-      'Treating other people\'s feelings as real constraints, not noise',
+      "Treating other people's feelings as real constraints, not noise",
     ],
     inRelationships:
       'You are genuinely interested in how someone thinks, which is its own form of attention. The difficulty is emotional bandwidth: you may go quiet exactly when someone needs you present, not because you do not care but because you are processing.',
@@ -291,7 +302,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ISFP: {
     nickname: 'The Composer',
-    tagline: 'You do not explain it much, but you know exactly how you want it to feel.',
+    tagline:
+      'You do not explain it much, but you know exactly how you want it to feel.',
     overview: [
       'You have strong aesthetic and moral instincts that you rarely argue for. You simply know what feels right, and you arrange your life around that rather than around a stated position.',
       'You are more private than people assume from your warmth. Conflict feels genuinely bad to you, so you tend to withdraw rather than press, and things go unsaid for a long time.',
@@ -312,7 +324,8 @@ export const TYPES_EN: Record<MbtiType, TypeContent> = {
   },
   ISTJ: {
     nickname: 'The Inspector',
-    tagline: 'If you said it would be done, it is done, and it is done properly.',
+    tagline:
+      'If you said it would be done, it is done, and it is done properly.',
     overview: [
       'You are the person things can be relied on. You do what you said, to the standard you said, on the date you said, and you find it strange that this is considered remarkable.',
       'You trust what has been demonstrated. Untested enthusiasm does not move you, which protects you from most bad ideas and occasionally from a good one.',

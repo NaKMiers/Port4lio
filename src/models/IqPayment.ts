@@ -132,9 +132,11 @@ const iqPaymentSchema = new Schema(
 iqPaymentSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
 
 iqPaymentSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[IqPayment] index build FAILED - orderCode uniqueness may not be enforced', error)
-  }
+  if (error)
+    console.error(
+      '[IqPayment] index build FAILED - orderCode uniqueness may not be enforced',
+      error
+    )
 })
 
 export const IqPaymentModel: mongoose.Model<IqPaymentDocument> =

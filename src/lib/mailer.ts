@@ -2,12 +2,11 @@ import nodeMailer from 'nodemailer'
 
 import { getRequiredEnv } from '@/lib/required-env'
 
-let cachedTransporter: ReturnType<typeof nodeMailer.createTransport> | null = null
+let cachedTransporter: ReturnType<typeof nodeMailer.createTransport> | null =
+  null
 
 function getTransporter() {
-  if (cachedTransporter) {
-    return cachedTransporter
-  }
+  if (cachedTransporter) return cachedTransporter
 
   cachedTransporter = nodeMailer.createTransport({
     service: 'gmail',
@@ -34,7 +33,13 @@ export type SendMailOptions = {
   replyTo?: string
 }
 
-export async function sendMail({ to, subject, html, text, replyTo }: SendMailOptions) {
+export async function sendMail({
+  to,
+  subject,
+  html,
+  text,
+  replyTo,
+}: SendMailOptions) {
   await getTransporter().sendMail({
     from: 'Portfolio <no-reply@anhkhoa.info>',
     to,

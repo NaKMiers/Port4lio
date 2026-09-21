@@ -92,7 +92,9 @@ export async function generateStaticParams() {
   }
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { 'blog-slug': slug } = await params
   const post = await readPublishedPost(slug)
   if (!post) return {}
@@ -130,7 +132,9 @@ export default async function BlogPostPage({ params }: PageProps) {
     listSeries(),
   ])
 
-  const series = post.series ? allSeries.find(entry => entry.slug === post.series) : undefined
+  const series = post.series
+    ? allSeries.find(entry => entry.slug === post.series)
+    : undefined
 
   /*
     A post the author hand-picked as related is very often also in the same series, and
@@ -164,7 +168,7 @@ export default async function BlogPostPage({ params }: PageProps) {
   return (
     <>
       <script
-        type='application/ld+json'
+        type="application/ld+json"
         // The only `dangerouslySetInnerHTML` allowed to take a non-post string, and its
         // input is `JSON.stringify` output run through `escapeJsonForInlineScript` - never
         // author markdown. See `serializeGraph` in `lib/blog/seo.ts`.
@@ -183,7 +187,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         }}
       />
 
-      <div className='mx-auto w-full max-w-editorial flex-1 px-gutter py-10'>
+      <div className="mx-auto w-full max-w-editorial flex-1 px-gutter py-10">
         <Breadcrumbs
           trail={[
             { name: 'Home', href: '/' },
@@ -199,7 +203,7 @@ export default async function BlogPostPage({ params }: PageProps) {
           wrapper further out that also contains English navigation.
         */}
         <article lang={post.language}>
-          <header className='mb-8'>
+          <header className="mb-8">
             {series ? (
               /*
                 The series, above the title, linking to its section on the index. This is the
@@ -207,22 +211,22 @@ export default async function BlogPostPage({ params }: PageProps) {
                 model, which previously existed only as a heading on `/blog` with no way back
                 to it from a post.
               */
-              <p className='text-[11px] font-semibold uppercase tracking-[0.16em]'>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
                 {/* Violet, the same ink the body's h2s use. This line and those headings are
                     the two things on the page that say "where am I", so they match. */}
                 <Link
                   href={`/blog#${series.slug}`}
-                  className='text-pp-ink-violet no-underline hover:underline'
+                  className="text-pp-ink-violet no-underline hover:underline"
                 >
                   {series.title}
                 </Link>
               </p>
             ) : null}
-            <h1 className='mt-2 font-display text-3xl font-semibold leading-tight text-pp-text sm:text-4xl'>
+            <h1 className="mt-2 font-display text-3xl font-semibold leading-tight text-pp-text sm:text-4xl">
               {post.title}
             </h1>
             {post.excerpt ? (
-              <p className='mt-4 max-w-[62ch] text-lg leading-relaxed text-pp-muted'>
+              <p className="mt-4 max-w-[62ch] text-lg leading-relaxed text-pp-muted">
                 {post.excerpt}
               </p>
             ) : null}
@@ -255,17 +259,17 @@ export default async function BlogPostPage({ params }: PageProps) {
           */}
           {post.coverImage ? (
             post.coverCaption ? (
-              <figure className='mb-8'>
+              <figure className="mb-8">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={post.coverImage}
-                  alt=''
+                  alt=""
                   width={1200}
                   height={630}
-                  fetchPriority='high'
-                  className='aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover'
+                  fetchPriority="high"
+                  className="aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
                 />
-                <figcaption className='mt-2 text-xs leading-relaxed text-pp-muted'>
+                <figcaption className="mt-2 text-xs leading-relaxed text-pp-muted">
                   {post.coverCaption}
                 </figcaption>
               </figure>
@@ -273,12 +277,12 @@ export default async function BlogPostPage({ params }: PageProps) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={post.coverImage}
-                alt=''
+                alt=""
                 aria-hidden
                 width={1200}
                 height={630}
-                fetchPriority='high'
-                className='mb-8 aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover'
+                fetchPriority="high"
+                className="mb-8 aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
               />
             )
           ) : null}
@@ -294,7 +298,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             ~5.5s per-process bootstrap is the reason.
           */}
           <div
-            className='blog-prose'
+            className="blog-prose"
             dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
           />
 
@@ -309,13 +313,16 @@ export default async function BlogPostPage({ params }: PageProps) {
           */}
           {post.tags.length > 0 ? (
             <ul
-              aria-label='Tags'
-              className='mt-10 flex flex-wrap gap-2 border-t border-pp-line pt-6'
+              aria-label="Tags"
+              className="mt-10 flex flex-wrap gap-2 border-t border-pp-line pt-6"
             >
               {post.tags.map(tag => (
                 /* `blog-tag` carries the whole chip, including a colour chosen by its
                    position in the row - see the rule in `styles/globals.css`. */
-                <li key={tag} className='blog-tag'>
+                <li
+                  key={tag}
+                  className="blog-tag"
+                >
                   {tag}
                 </li>
               ))}
@@ -330,29 +337,29 @@ export default async function BlogPostPage({ params }: PageProps) {
           collapsing blog:share:<token> to a single document forever while attributions kept
           growing - a silently, permanently wrong ratio that looks plausible.
         */}
-        <div className='mt-10 flex items-center gap-3 border-t border-pp-line pt-6'>
+        <div className="mt-10 flex items-center gap-3 border-t border-pp-line pt-6">
           <PostTracker slug={post.slug} />
-          <span className='text-xs text-pp-muted'>
+          <span className="text-xs text-pp-muted">
             Sharing this link lets me see the post reached somebody.
           </span>
         </div>
 
         {seriesOnly.length > 0 && series ? (
-          <aside className='mt-14 border-t border-pp-line pt-8'>
-            <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-muted'>
+          <aside className="mt-14 border-t border-pp-line pt-8">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-muted">
               More in {series.title}
             </h2>
-            <ul className='mt-4 space-y-3'>
+            <ul className="mt-4 space-y-3">
               {seriesOnly.map(item => (
                 <li key={item.slug}>
                   <Link
                     href={`/blog/${item.slug}`}
-                    className='font-display text-base font-semibold text-pp-text no-underline hover:text-pp-blue'
+                    className="font-display text-base font-semibold text-pp-text no-underline hover:text-pp-blue"
                   >
                     {item.title}
                   </Link>
                   {item.excerpt ? (
-                    <p className='mt-1 max-w-[62ch] text-sm text-pp-muted'>
+                    <p className="mt-1 max-w-[62ch] text-sm text-pp-muted">
                       {/* One line, because this is a nudge and not a second index. */}
                       {item.excerpt}
                     </p>
@@ -364,16 +371,16 @@ export default async function BlogPostPage({ params }: PageProps) {
         ) : null}
 
         {related.length > 0 ? (
-          <aside className='mt-14 border-t border-pp-line pt-8'>
-            <h2 className='font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-muted'>
+          <aside className="mt-14 border-t border-pp-line pt-8">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.14em] text-pp-muted">
               Related
             </h2>
-            <ul className='mt-4 space-y-3'>
+            <ul className="mt-4 space-y-3">
               {related.map(item => (
                 <li key={item.slug}>
                   <Link
                     href={`/blog/${item.slug}`}
-                    className='font-display text-base font-semibold text-pp-text no-underline hover:text-pp-blue'
+                    className="font-display text-base font-semibold text-pp-text no-underline hover:text-pp-blue"
                   >
                     {item.title}
                   </Link>
@@ -384,7 +391,7 @@ export default async function BlogPostPage({ params }: PageProps) {
         ) : null}
       </div>
 
-      <AvailabilityBlock locale='en' />
+      <AvailabilityBlock locale="en" />
     </>
   )
 }

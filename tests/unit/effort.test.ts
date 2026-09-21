@@ -30,7 +30,12 @@ const MASHED = Array.from({ length: 26 }, () => 0)
 describe('iqEffortWaived', () => {
   it('waives a chance-level score reached in under five minutes', () => {
     expect(
-      iqEffortWaived({ raw: 4, answers: MASHED, startedAt: START, submittedAt: after(90) })
+      iqEffortWaived({
+        raw: 4,
+        answers: MASHED,
+        startedAt: START,
+        submittedAt: after(90),
+      })
     ).toBe(true)
   })
 
@@ -51,7 +56,12 @@ describe('iqEffortWaived', () => {
     // The case a stopwatch-only rule gets wrong, and the expensive one: able takers finish
     // early and are exactly the people who want a certificate.
     expect(
-      iqEffortWaived({ raw: 22, answers: MASHED, startedAt: START, submittedAt: after(120) })
+      iqEffortWaived({
+        raw: 22,
+        answers: MASHED,
+        startedAt: START,
+        submittedAt: after(120),
+      })
     ).toBe(false)
   })
 
@@ -59,7 +69,12 @@ describe('iqEffortWaived', () => {
     // Twenty careful minutes for four correct IS a measurement - a low one, honestly
     // obtained. Waiving it would be charging by outcome, which is a different rule.
     expect(
-      iqEffortWaived({ raw: 4, answers: MASHED, startedAt: START, submittedAt: after(20 * 60) })
+      iqEffortWaived({
+        raw: 4,
+        answers: MASHED,
+        startedAt: START,
+        submittedAt: after(20 * 60),
+      })
     ).toBe(false)
   })
 
@@ -74,7 +89,9 @@ describe('iqEffortWaived', () => {
     expect(
       iqEffortWaived({ ...guessing, submittedAt: after(IQ_RUSH_SECONDS - 1) })
     ).toBe(true)
-    expect(iqEffortWaived({ ...guessing, submittedAt: after(IQ_RUSH_SECONDS) })).toBe(false)
+    expect(
+      iqEffortWaived({ ...guessing, submittedAt: after(IQ_RUSH_SECONDS) })
+    ).toBe(false)
   })
 })
 
@@ -90,7 +107,9 @@ describe('mbtiEffortWaived', () => {
      * is a perfectly innocent 30/30.
      */
     const answers = SLOTS.map(index => (index % 2 === 0 ? 'a' : 'b'))
-    expect(answers.filter(answer => answer === 'a').length).toBe(answers.length / 2)
+    expect(answers.filter(answer => answer === 'a').length).toBe(
+      answers.length / 2
+    )
     expect(mbtiEffortWaived({ answers })).toBe(true)
   })
 
@@ -121,7 +140,9 @@ describe('mbtiEffortWaived', () => {
 
   it('CHARGES an ordinary mixed profile', () => {
     // Deliberately not periodic: a 5-long cycle is longer than any drumming finger.
-    const answers = SLOTS.map(index => (index % 5 === 0 || index % 7 === 3 ? 'b' : 'a'))
+    const answers = SLOTS.map(index =>
+      index % 5 === 0 || index % 7 === 3 ? 'b' : 'a'
+    )
     expect(mbtiEffortWaived({ answers })).toBe(false)
   })
 
@@ -148,12 +169,15 @@ describe('isEffortWaiverEnabled', () => {
     expect(isEffortWaiverEnabled()).toBe(true)
   })
 
-  it.each(['false', '0', 'off', 'no', 'FALSE', ' off '])('reads %o as off', raw => {
-    // Every spelling someone might reach for. A value that LOOKS off but reads as on would
-    // leave the operator believing they had disabled a rule that is still running.
-    vi.stubEnv('EFFORT_WAIVER', raw)
-    expect(isEffortWaiverEnabled()).toBe(false)
-  })
+  it.each(['false', '0', 'off', 'no', 'FALSE', ' off '])(
+    'reads %o as off',
+    raw => {
+      // Every spelling someone might reach for. A value that LOOKS off but reads as on would
+      // leave the operator believing they had disabled a rule that is still running.
+      vi.stubEnv('EFFORT_WAIVER', raw)
+      expect(isEffortWaiverEnabled()).toBe(false)
+    }
+  )
 
   it.each(['true', '1', 'on', 'yes', 'TRUE'])('reads %o as on', raw => {
     vi.stubEnv('EFFORT_WAIVER', raw)
@@ -196,6 +220,8 @@ describe('the /iq/method waiver section', () => {
     expect(marked).toHaveLength(1)
     // Guards against the marker migrating onto an unrelated section: the one it belongs to
     // is the one that says we do not charge.
-    expect(marked[0].heading.toLowerCase()).toMatch(/không thu phí|do not charge/)
+    expect(marked[0].heading.toLowerCase()).toMatch(
+      /không thu phí|do not charge/
+    )
   })
 })

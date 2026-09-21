@@ -122,7 +122,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       },
     ]
   } catch (error) {
-    console.error('[sitemap] blog posts unavailable - serving the rest of the feed', error)
+    console.error(
+      '[sitemap] blog posts unavailable - serving the rest of the feed',
+      error
+    )
   }
 
   /**

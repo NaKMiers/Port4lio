@@ -86,7 +86,8 @@ type Config = {
 const CONFIG: Record<TaxonomyResource, Config> = {
   series: {
     heading: 'Manage series',
-    intro: 'A series is a cluster on /blog. The title and blurb are the heading and the line under it; the order here is the order there.',
+    intro:
+      'A series is a cluster on /blog. The title and blurb are the heading and the line under it; the order here is the order there.',
     listKey: 'series',
     nameField: 'title',
     slugPlaceholder: 'shipping-side-products',
@@ -96,7 +97,8 @@ const CONFIG: Record<TaxonomyResource, Config> = {
   },
   kinds: {
     heading: 'Manage kinds',
-    intro: 'A kind is the tier a post is written at. Turn on the eyebrow to print its label above the title on the card, the way Note always has.',
+    intro:
+      'A kind is the tier a post is written at. Turn on the eyebrow to print its label above the title on the card, the way Note always has.',
     listKey: 'kinds',
     nameField: 'label',
     slugPlaceholder: 'link-roundup',
@@ -122,7 +124,9 @@ export default function TaxonomyDialog({
   const endpoint = `/api/admin/blog/${resource}`
   const [entries, setEntries] = useState<Entry[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [blockedBy, setBlockedBy] = useState<{ id: string; title: string }[] | null>(null)
+  const [blockedBy, setBlockedBy] = useState<
+    { id: string; title: string }[] | null
+  >(null)
   const [busy, setBusy] = useState(false)
   const [newSlug, setNewSlug] = useState('')
   const [newName, setNewName] = useState('')
@@ -136,11 +140,13 @@ export default function TaxonomyDialog({
     try {
       const res = await fetch(endpoint, { cache: 'no-store' })
       const data = (await res.json()) as Record<string, unknown>
-      if (!res.ok) throw new Error((data.error as string) ?? `Could not load ${resource}`)
+      if (!res.ok)
+        throw new Error((data.error as string) ?? `Could not load ${resource}`)
 
       // Normalised here rather than at every use: the two resources name their display field
       // differently (`title` vs `label`) and nothing below this line should have to care.
-      const rows = (data[config.listKey] as Record<string, unknown>[] | undefined) ?? []
+      const rows =
+        (data[config.listKey] as Record<string, unknown>[] | undefined) ?? []
       setEntries(
         rows.map(row => ({
           id: String(row.id),
@@ -153,7 +159,9 @@ export default function TaxonomyDialog({
         }))
       )
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : `Could not load ${resource}`)
+      setError(
+        cause instanceof Error ? cause.message : `Could not load ${resource}`
+      )
     }
   }, [endpoint, resource, config.listKey, config.nameField])
 
@@ -186,7 +194,10 @@ export default function TaxonomyDialog({
     setBlockedBy(null)
     try {
       const res = await fn()
-      const data = (await res.json()) as { error?: string; posts?: { id: string; title: string }[] }
+      const data = (await res.json()) as {
+        error?: string
+        posts?: { id: string; title: string }[]
+      }
       if (!res.ok) {
         // A 409 from DELETE carries the posts that blocked it - the refusal IS the worklist.
         if (data.posts) setBlockedBy(data.posts)
@@ -211,7 +222,9 @@ export default function TaxonomyDialog({
         body: JSON.stringify({
           slug: newSlug.trim(),
           [config.nameField]: newName.trim(),
-          ...(resource === 'series' ? { blurb: newBlurb.trim() } : { eyebrow: newEyebrow }),
+          ...(resource === 'series'
+            ? { blurb: newBlurb.trim() }
+            : { eyebrow: newEyebrow }),
         }),
       })
     )
@@ -251,7 +264,7 @@ export default function TaxonomyDialog({
 
   return (
     <div
-      className='fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[rgba(31,28,26,0.35)] p-4 backdrop-blur-sm sm:p-8'
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[rgba(31,28,26,0.35)] p-4 backdrop-blur-sm sm:p-8"
       // Click the backdrop to dismiss, but only the backdrop - `currentTarget` rather than
       // `target`, so a click that started inside the panel and drifted out does not close it.
       onClick={event => {
@@ -260,44 +273,47 @@ export default function TaxonomyDialog({
     >
       <div
         ref={panelRef}
-        role='dialog'
-        aria-modal='true'
-        aria-labelledby='taxonomy-dialog-title'
-        className='w-full max-w-2xl rounded-[1.75rem] border border-pp-line bg-[rgba(255,253,250,0.99)] p-6 shadow-[0_32px_64px_rgba(46,35,28,0.28)] backdrop-blur-xl sm:p-7'
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="taxonomy-dialog-title"
+        className="w-full max-w-2xl rounded-[1.75rem] border border-pp-line bg-[rgba(255,253,250,0.99)] p-6 shadow-[0_32px_64px_rgba(46,35,28,0.28)] backdrop-blur-xl sm:p-7"
       >
-        <div className='flex items-start justify-between gap-4'>
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted">
               Blog editor
             </p>
             <h2
-              id='taxonomy-dialog-title'
-              className='mt-1 font-display text-2xl font-semibold tracking-tight text-pp-text'
+              id="taxonomy-dialog-title"
+              className="mt-1 font-display text-2xl font-semibold tracking-tight text-pp-text"
             >
               {config.heading}
             </h2>
             <p className={`${helpTextCls} mt-2 max-w-[56ch]`}>{config.intro}</p>
           </div>
           <button
-            type='button'
+            type="button"
             onClick={onClose}
-            aria-label='Close'
-            className='shrink-0 rounded-full border border-pp-line bg-white/82 p-2 text-pp-muted transition hover:bg-white hover:text-pp-text'
+            aria-label="Close"
+            className="bg-white/82 shrink-0 rounded-full border border-pp-line p-2 text-pp-muted transition hover:bg-white hover:text-pp-text"
           >
-            <X aria-hidden size={15} />
+            <X
+              aria-hidden
+              size={15}
+            />
           </button>
         </div>
 
         {error ? (
-          <div className='mt-5 rounded-[1.15rem] border border-[rgba(163,49,47,0.16)] bg-[rgba(211,108,105,0.1)] px-3.5 py-2.5 text-sm text-[#7f2f2f]'>
+          <div className="mt-5 rounded-[1.15rem] border border-[rgba(163,49,47,0.16)] bg-[rgba(211,108,105,0.1)] px-3.5 py-2.5 text-sm text-[#7f2f2f]">
             {error}
             {blockedBy && blockedBy.length > 0 ? (
-              <ul className='mt-2 space-y-1'>
+              <ul className="mt-2 space-y-1">
                 {blockedBy.map(post => (
                   <li key={post.id}>
                     <a
                       href={`/admin/blog/${post.id}`}
-                      className='text-[#7f2f2f] underline underline-offset-2'
+                      className="text-[#7f2f2f] underline underline-offset-2"
                     >
                       {post.title || '(untitled)'}
                     </a>
@@ -308,7 +324,7 @@ export default function TaxonomyDialog({
           </div>
         ) : null}
 
-        <div className='mt-6 space-y-3'>
+        <div className="mt-6 space-y-3">
           {entries === null ? (
             <p className={helpTextCls}>Loading...</p>
           ) : entries.length === 0 ? (
@@ -321,37 +337,43 @@ export default function TaxonomyDialog({
             entries.map((item, index) => (
               <div
                 key={item.id}
-                className='rounded-[1.3rem] border border-pp-line bg-white/85 p-4 shadow-[0_14px_28px_rgba(46,35,28,0.05)] backdrop-blur-md'
+                className="rounded-[1.3rem] border border-pp-line bg-white/85 p-4 shadow-[0_14px_28px_rgba(46,35,28,0.05)] backdrop-blur-md"
               >
-                <div className='flex flex-wrap items-center gap-2'>
-                  <code className='rounded-full border border-pp-line bg-white/82 px-2.5 py-1 text-[11px] text-pp-muted'>
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="bg-white/82 rounded-full border border-pp-line px-2.5 py-1 text-[11px] text-pp-muted">
                     {item.slug}
                   </code>
-                  <span className='text-[11px] text-pp-muted'>
+                  <span className="text-[11px] text-pp-muted">
                     {item.postCount} post{item.postCount === 1 ? '' : 's'}
                   </span>
 
-                  <span className='ml-auto flex items-center gap-1'>
+                  <span className="ml-auto flex items-center gap-1">
                     <button
-                      type='button'
+                      type="button"
                       className={ghostBtnCls}
                       disabled={busy || index === 0}
                       aria-label={`Move ${item.name} up`}
                       onClick={() => void move(index, -1)}
                     >
-                      <ChevronUp aria-hidden size={14} />
+                      <ChevronUp
+                        aria-hidden
+                        size={14}
+                      />
                     </button>
                     <button
-                      type='button'
+                      type="button"
                       className={ghostBtnCls}
                       disabled={busy || index === entries.length - 1}
                       aria-label={`Move ${item.name} down`}
                       onClick={() => void move(index, 1)}
                     >
-                      <ChevronDown aria-hidden size={14} />
+                      <ChevronDown
+                        aria-hidden
+                        size={14}
+                      />
                     </button>
                     <button
-                      type='button'
+                      type="button"
                       className={ghostBtnCls}
                       disabled={busy}
                       aria-label={`Delete ${item.name}`}
@@ -361,15 +383,20 @@ export default function TaxonomyDialog({
                           : 'Delete'
                       }
                       onClick={() =>
-                        void run(() => fetch(`${endpoint}/${item.id}`, { method: 'DELETE' }))
+                        void run(() =>
+                          fetch(`${endpoint}/${item.id}`, { method: 'DELETE' })
+                        )
                       }
                     >
-                      <Trash2 aria-hidden size={14} />
+                      <Trash2
+                        aria-hidden
+                        size={14}
+                      />
                     </button>
                   </span>
                 </div>
 
-                <div className='mt-3 space-y-2'>
+                <div className="mt-3 space-y-2">
                   <input
                     className={inputCls}
                     defaultValue={item.name}
@@ -379,30 +406,33 @@ export default function TaxonomyDialog({
                     // timer as the typing, remounting the field mid-word.
                     onBlur={event => {
                       const next = event.target.value.trim()
-                      if (next && next !== item.name) {
+                      if (next && next !== item.name)
                         void patch(item.id, { [config.nameField]: next })
-                      }
                     }}
                   />
                   {resource === 'series' ? (
                     <input
                       className={inputCls}
                       defaultValue={item.blurb}
-                      placeholder='One line, shown under the heading on /blog'
+                      placeholder="One line, shown under the heading on /blog"
                       aria-label={`Blurb for ${item.slug}`}
                       onBlur={event => {
                         const next = event.target.value.trim()
-                        if (next !== item.blurb) void patch(item.id, { blurb: next })
+                        if (next !== item.blurb)
+                          void patch(item.id, { blurb: next })
                       }}
                     />
                   ) : (
-                    <label className='flex items-center gap-2 text-sm text-pp-muted'>
+                    <label className="flex items-center gap-2 text-sm text-pp-muted">
                       <input
-                        type='checkbox'
+                        type="checkbox"
                         checked={item.eyebrow ?? false}
-                        onChange={event => void patch(item.id, { eyebrow: event.target.checked })}
+                        onChange={event =>
+                          void patch(item.id, { eyebrow: event.target.checked })
+                        }
                       />
-                      Print &ldquo;{item.name}&rdquo; above the title on the card
+                      Print &ldquo;{item.name}&rdquo; above the title on the
+                      card
                     </label>
                   )}
                 </div>
@@ -411,17 +441,20 @@ export default function TaxonomyDialog({
           )}
         </div>
 
-        <div className='mt-6 rounded-[1.3rem] border border-dashed border-pp-line bg-white/60 p-4'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+        <div className="mt-6 rounded-[1.3rem] border border-dashed border-pp-line bg-white/60 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
             {resource === 'series' ? 'New series' : 'New kind'}
           </p>
-          <div className='mt-3 space-y-2'>
+          <div className="mt-3 space-y-2">
             <div>
-              <label className={labelCls} htmlFor='new-entry-slug'>
+              <label
+                className={labelCls}
+                htmlFor="new-entry-slug"
+              >
                 Slug
               </label>
               <input
-                id='new-entry-slug'
+                id="new-entry-slug"
                 className={inputCls}
                 value={newSlug}
                 onChange={event => setNewSlug(event.target.value)}
@@ -434,20 +467,20 @@ export default function TaxonomyDialog({
               value={newName}
               onChange={event => setNewName(event.target.value)}
               placeholder={config.namePlaceholder}
-              aria-label='Name'
+              aria-label="Name"
             />
             {resource === 'series' ? (
               <input
                 className={inputCls}
                 value={newBlurb}
                 onChange={event => setNewBlurb(event.target.value)}
-                placeholder='Blurb (optional)'
-                aria-label='New series blurb'
+                placeholder="Blurb (optional)"
+                aria-label="New series blurb"
               />
             ) : (
-              <label className='flex items-center gap-2 text-sm text-pp-muted'>
+              <label className="flex items-center gap-2 text-sm text-pp-muted">
                 <input
-                  type='checkbox'
+                  type="checkbox"
                   checked={newEyebrow}
                   onChange={event => setNewEyebrow(event.target.checked)}
                 />
@@ -456,18 +489,25 @@ export default function TaxonomyDialog({
             )}
           </div>
           <button
-            type='button'
+            type="button"
             className={`${primaryBtnCls} mt-3 gap-2 px-4 py-2 text-xs`}
             disabled={busy || !newSlug.trim() || !newName.trim()}
             onClick={() => void create()}
           >
-            <Plus aria-hidden size={14} />
+            <Plus
+              aria-hidden
+              size={14}
+            />
             {resource === 'series' ? 'Add series' : 'Add kind'}
           </button>
         </div>
 
-        <div className='mt-6 flex justify-end'>
-          <button type='button' className={secondaryBtnCls} onClick={onClose}>
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            className={secondaryBtnCls}
+            onClick={onClose}
+          >
             Done
           </button>
         </div>

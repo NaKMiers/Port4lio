@@ -24,7 +24,8 @@ const PROPS = {
   bandLabel: 'Superior',
   certificateName: 'Nguyễn Văn A',
   resultUrl: 'https://example.test/vi/iq/result/AbCd1234EfGh5678IjKl90',
-  certificateUrl: 'https://example.test/vi/iq/certificate/ZzYy9876XxWw5432VvUu10',
+  certificateUrl:
+    'https://example.test/vi/iq/certificate/ZzYy9876XxWw5432VvUu10',
 }
 
 describe('IqResultEmail', () => {
@@ -39,7 +40,9 @@ describe('IqResultEmail', () => {
   })
 
   it('interpolates the percentile and raw score rather than leaving placeholders', async () => {
-    const text = await render(IqResultEmail({ locale: 'en', ...PROPS }), { plainText: true })
+    const text = await render(IqResultEmail({ locale: 'en', ...PROPS }), {
+      plainText: true,
+    })
 
     expect(text).toContain('97')
     expect(text).toContain('21')
@@ -52,7 +55,9 @@ describe('IqResultEmail', () => {
   it('renders a plain-text alternative with the links intact', async () => {
     // A multipart message reads better in text-only clients and scores lower with spam
     // filters. A text part that dropped the links would be a dead end.
-    const text = await render(IqResultEmail({ locale: 'vi', ...PROPS }), { plainText: true })
+    const text = await render(IqResultEmail({ locale: 'vi', ...PROPS }), {
+      plainText: true,
+    })
 
     expect(text).toContain(PROPS.resultUrl)
     expect(text).toContain(PROPS.certificateUrl)

@@ -4,7 +4,11 @@ import { jsonError } from '@/lib/api-response'
 import { connectDatabase } from '@/lib/mongodb'
 import { checkRateLimit, clientIpFrom, EVENT_LIMIT } from '@/lib/rate-limit'
 import { recordAttribution, recordShare } from '@/lib/share'
-import { assertClientPostable, ServerOnlyEventError, recordEvent } from '@/lib/test-events'
+import {
+  assertClientPostable,
+  ServerOnlyEventError,
+  recordEvent,
+} from '@/lib/test-events'
 import { isTokenShaped } from '@/lib/tokens'
 import { dayBucket, testEventId } from '@/models/TestEvent'
 
@@ -52,9 +56,7 @@ const MAX_SESSION_ID = 64
  */
 export async function POST(request: NextRequest) {
   const contentLength = Number(request.headers.get('content-length') ?? 0)
-  if (contentLength > MAX_BODY_BYTES) {
-    return jsonError('Payload too large', 413)
-  }
+  if (contentLength > MAX_BODY_BYTES) return jsonError('Payload too large', 413)
 
   // Before the rate-limit check, not after: `checkRateLimit` writes its counter to Mongo
   // and fails OPEN on error, so a cold invocation with no connection yet would silently
@@ -62,12 +64,14 @@ export async function POST(request: NextRequest) {
   await connectDatabase()
 
   const limit = await checkRateLimit(clientIpFrom(request), EVENT_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
   // Read as text rather than `request.json()`. `navigator.sendBeacon` sends `text/plain`
   // unless the caller wraps the payload in a typed `Blob`, and a beacon that silently
@@ -80,22 +84,21 @@ export async function POST(request: NextRequest) {
     return jsonError('Invalid JSON body', 400)
   }
 
-  const { product, kind, event, sessionId, shareToken, furthest, total } = (body ?? {}) as {
-    product?: unknown
-    kind?: unknown
-    event?: unknown
-    sessionId?: unknown
-    shareToken?: unknown
-    furthest?: unknown
-    total?: unknown
-  }
+  const { product, kind, event, sessionId, shareToken, furthest, total } =
+    (body ?? {}) as {
+      product?: unknown
+      kind?: unknown
+      event?: unknown
+      sessionId?: unknown
+      shareToken?: unknown
+      furthest?: unknown
+      total?: unknown
+    }
 
-  if (typeof product !== 'string' || !/^[a-z]{2,16}$/.test(product)) {
+  if (typeof product !== 'string' || !/^[a-z]{2,16}$/.test(product))
     return jsonError('Invalid product', 400)
-  }
-  if (typeof kind !== 'string') {
-    return jsonError('Invalid kind', 400)
-  }
+
+  if (typeof kind !== 'string') return jsonError('Invalid kind', 400)
 
   const eventName = typeof event === 'string' ? event : null
 
@@ -106,39 +109,51 @@ export async function POST(request: NextRequest) {
       // 403 rather than 400: the request is well-formed, it is just not something a
       // browser is allowed to assert. Logged because a real one means either a bug in our
       // own client or somebody probing the funnel.
-      console.warn(`[api/event] refused server-authoritative event: ${kind}:${eventName ?? ''}`)
+      console.warn(
+        `[api/event] refused server-authoritative event: ${kind}:${eventName ?? ''}`
+      )
       return jsonError('Not client-reportable', 403)
     }
     throw error
   }
 
-  const session = typeof sessionId === 'string' ? sessionId.slice(0, MAX_SESSION_ID) : ''
+  const session =
+    typeof sessionId === 'string' ? sessionId.slice(0, MAX_SESSION_ID) : ''
 
   if (kind === 'share') {
     // `type` is whatever public artifact the share points at - an MBTI type today. Bounded
     // because it lands in a document, and never trusted for anything but display.
-    const shareType = typeof (body as { type?: unknown })?.type === 'string'
-      ? String((body as { type?: unknown }).type).slice(0, 32)
-      : ''
-    if (typeof shareToken !== 'string' || !isTokenShaped(shareToken)) {
+    const shareType =
+      typeof (body as { type?: unknown })?.type === 'string'
+        ? String((body as { type?: unknown }).type).slice(0, 32)
+        : ''
+    if (typeof shareToken !== 'string' || !isTokenShaped(shareToken))
       return jsonError('Invalid share token', 400)
-    }
+
     await recordShare(product, shareToken, { type: shareType })
     return new NextResponse(null, { status: 204 })
   }
 
   if (kind === 'attribute') {
-    if (typeof shareToken !== 'string' || !isTokenShaped(shareToken) || !session) {
+    if (
+      typeof shareToken !== 'string' ||
+      !isTokenShaped(shareToken) ||
+      !session
+    )
       return jsonError('Invalid attribution', 400)
-    }
+
     await recordAttribution(product, shareToken, session)
     return new NextResponse(null, { status: 204 })
   }
 
   if (kind === 'progress') {
     if (!session) return jsonError('Missing sessionId', 400)
-    const furthestQuestion = Number.isFinite(Number(furthest)) ? Math.max(0, Math.floor(Number(furthest))) : 0
-    const totalQuestions = Number.isFinite(Number(total)) ? Math.max(0, Math.floor(Number(total))) : 0
+    const furthestQuestion = Number.isFinite(Number(furthest))
+      ? Math.max(0, Math.floor(Number(furthest)))
+      : 0
+    const totalQuestions = Number.isFinite(Number(total))
+      ? Math.max(0, Math.floor(Number(total)))
+      : 0
     await recordEvent({
       id: testEventId.progress(product, session),
       product,

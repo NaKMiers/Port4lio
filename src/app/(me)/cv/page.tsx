@@ -44,7 +44,12 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: resume.name,
       images: [{ url: '/opengraph-image' }],
     },
-    twitter: { card: 'summary_large_image', title, description, images: ['/opengraph-image'] },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/opengraph-image'],
+    },
   }
 }
 
@@ -87,8 +92,18 @@ export default async function CVPage() {
           '@context': 'https://schema.org',
           '@type': 'BreadcrumbList',
           itemListElement: [
-            { '@type': 'ListItem', position: 1, name: 'Home', item: `${origin}/` },
-            { '@type': 'ListItem', position: 2, name: 'CV', item: `${origin}/cv` },
+            {
+              '@type': 'ListItem',
+              position: 1,
+              name: 'Home',
+              item: `${origin}/`,
+            },
+            {
+              '@type': 'ListItem',
+              position: 2,
+              name: 'CV',
+              item: `${origin}/cv`,
+            },
           ],
         }}
       />

@@ -87,13 +87,12 @@ export async function fulfilIqPayment(
   if (!existing) return { outcome: 'unknown-order-code' }
 
   // Never trust the reported amount: it has to match the figure we signed.
-  if (Math.round(amount) !== Math.round(existing.amount)) {
+  if (Math.round(amount) !== Math.round(existing.amount))
     return {
       outcome: 'amount-mismatch',
       payment: existing,
       message: `Amount mismatch (received ${amount}, expected ${existing.amount})`,
     }
-  }
 
   if (existing.status === 'paid') {
     const attempt = await IqAttemptModel.findById(existing.attemptToken).lean()
@@ -168,11 +167,11 @@ export async function fulfilIqPayment(
       { new: true, lean: true }
     )
 
-    if (!unlocked) {
+    if (!unlocked)
       // The attempt expired or was deleted between checkout and payment. The money is
       // real, so this is a refund conversation, not something to swallow.
       failure = `Attempt ${claimed.attemptToken} no longer exists - paid result cannot be unlocked`
-    } else {
+    else {
       unlockedNow = true
       // Read back rather than trusting `mintedId`: if a concurrent path already issued a
       // certificate for this attempt, the stored id is the one that is public.
@@ -180,7 +179,10 @@ export async function fulfilIqPayment(
     }
   } catch (error) {
     console.error(`[IQ Fulfil] Unlock threw for ${orderCode}:`, error)
-    failure = error instanceof Error ? error.message : 'Unknown error unlocking the attempt'
+    failure =
+      error instanceof Error
+        ? error.message
+        : 'Unknown error unlocking the attempt'
   }
 
   /**
@@ -191,18 +193,18 @@ export async function fulfilIqPayment(
    * sets `failure`, which is what logs PAID BUT UNDELIVERED - a metrics blip must never be
    * reported as a payment that did not settle.
    */
-  if (unlockedNow) {
-    recordFunnelDetached('iq', FUNNEL_EVENTS.paid)
-  }
+  if (unlockedNow) recordFunnelDetached('iq', FUNNEL_EVENTS.paid)
 
-  if (!failure) {
+  if (!failure)
     try {
       await deliver(claimed)
     } catch (error) {
       console.error(`[IQ Fulfil] Result email failed for ${orderCode}:`, error)
-      failure = error instanceof Error ? error.message : 'Unknown error sending the result email'
+      failure =
+        error instanceof Error
+          ? error.message
+          : 'Unknown error sending the result email'
     }
-  }
 
   if (failure) {
     // The result page still unlocks on the next visit if the attempt survived - the link is
@@ -211,7 +213,12 @@ export async function fulfilIqPayment(
     console.error(
       `[IQ Fulfil] PAID BUT UNDELIVERED orderCode=${orderCode} attempt=${claimed.attemptToken} amount=${claimed.amount}: ${failure}`
     )
-    return { outcome: 'delivery-failed', payment: claimed, certificateId, message: failure }
+    return {
+      outcome: 'delivery-failed',
+      payment: claimed,
+      certificateId,
+      message: failure,
+    }
   }
 
   return { outcome: 'fulfilled', payment: claimed, certificateId }

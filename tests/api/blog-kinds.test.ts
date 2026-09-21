@@ -59,7 +59,9 @@ describe('seeding', () => {
   it('carries the eyebrow flag that used to be a literal in PostCard', async () => {
     await ensureKindsSeeded()
 
-    const byslug = Object.fromEntries((await KindModel.find({}).lean()).map(r => [r.slug, r]))
+    const byslug = Object.fromEntries(
+      (await KindModel.find({}).lean()).map(r => [r.slug, r])
+    )
     expect(byslug.note?.eyebrow).toBe(true)
     expect(byslug.article?.eyebrow).toBe(false)
   })
@@ -158,7 +160,9 @@ describe('kindPresentationMap - what PostCard renders from', () => {
 
 describe('the schema after the enum was removed', () => {
   it('still REQUIRES a kind - the field lost its enum and its default, not its requirement', async () => {
-    await expect(PostModel.create({ title: 'No kind', slug: 'nk' })).rejects.toThrow()
+    await expect(
+      PostModel.create({ title: 'No kind', slug: 'nk' })
+    ).rejects.toThrow()
   })
 
   it('accepts any string, because validation moved to the write path', async () => {

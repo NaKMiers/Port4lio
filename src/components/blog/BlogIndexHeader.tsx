@@ -38,33 +38,38 @@ export default function BlogIndexHeader({
 
   return (
     <header>
-      <div className='flex flex-wrap items-start justify-between gap-4'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
           {copy.eyebrow}
         </p>
         <BlogLocaleSwitcher />
       </div>
 
-      <h1 className='mt-2 font-display text-3xl font-semibold tracking-tight text-pp-text sm:text-4xl'>
+      <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-pp-text sm:text-4xl">
         {copy.title}
       </h1>
 
-      <p className='mt-3 text-sm text-pp-muted'>
+      <p className="mt-3 text-sm text-pp-muted">
         {copy.writtenBy}{' '}
-        <Link href='/' className='font-semibold text-pp-text no-underline hover:text-pp-blue'>
+        <Link
+          href="/"
+          className="font-semibold text-pp-text no-underline hover:text-pp-blue"
+        >
           Anh Khoa Nguyen
         </Link>{' '}
         &middot; {copy.role}
       </p>
 
-      <p className='mt-5 max-w-[62ch] text-lg leading-relaxed text-pp-muted'>{copy.intro}</p>
+      <p className="mt-5 max-w-[62ch] text-lg leading-relaxed text-pp-muted">
+        {copy.intro}
+      </p>
 
       {/*
         The count is rendered rather than hidden, which is the opposite bet from the old
         card-level decision to omit dates for fear of looking new. A reader can see how long
         the list is anyway; stating it reads as confidence, and hiding it reads as nothing.
       */}
-      <p className='mt-4 text-sm text-pp-muted'>
+      <p className="mt-4 text-sm text-pp-muted">
         {postCount === 1 ? copy.postsCountOne : copy.postsCountMany(postCount)}
         {topics.length > 0 ? (
           <>

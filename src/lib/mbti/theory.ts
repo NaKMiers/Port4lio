@@ -127,7 +127,8 @@ export function lettersOf(
 
 // MARK: Cognitive functions
 
-export type CognitiveFunction = 'Te' | 'Ti' | 'Fe' | 'Fi' | 'Se' | 'Si' | 'Ne' | 'Ni'
+export type CognitiveFunction =
+  'Te' | 'Ti' | 'Fe' | 'Fi' | 'Se' | 'Si' | 'Ne' | 'Ni'
 
 /** Position in the stack. Each has a distinct role, which is the useful part. */
 export type FunctionRole = 'dominant' | 'auxiliary' | 'tertiary' | 'inferior'
@@ -151,7 +152,9 @@ const OPPOSITE: Record<string, string> = { T: 'F', F: 'T', S: 'N', N: 'S' }
  * `tests/unit/mbti-theory.test.ts`, which pins every one. A subtly wrong rule here would
  * put confidently incorrect theory on 32 indexed pages, which is worse than omitting it.
  */
-export function functionStack(type: MbtiType): { role: FunctionRole; fn: CognitiveFunction }[] {
+export function functionStack(
+  type: MbtiType
+): { role: FunctionRole; fn: CognitiveFunction }[] {
   const [ei, sn, tf, jp] = type.split('')
 
   const extraverted = jp === 'J' ? tf : sn
@@ -170,73 +173,92 @@ export function functionStack(type: MbtiType): { role: FunctionRole; fn: Cogniti
   ]
 }
 
-export const FUNCTION_COPY: Record<Locale, Record<CognitiveFunction, LetterCopy>> = {
+export const FUNCTION_COPY: Record<
+  Locale,
+  Record<CognitiveFunction, LetterCopy>
+> = {
   vi: {
     Te: {
       name: 'Tư duy hướng ngoại (Te)',
-      summary: 'Sắp xếp thế giới bên ngoài cho hiệu quả: mục tiêu, quy trình, kết quả đo được.',
+      summary:
+        'Sắp xếp thế giới bên ngoài cho hiệu quả: mục tiêu, quy trình, kết quả đo được.',
     },
     Ti: {
       name: 'Tư duy hướng nội (Ti)',
-      summary: 'Xây một hệ thống logic nhất quán bên trong và kiểm tra mọi thứ dựa trên nó.',
+      summary:
+        'Xây một hệ thống logic nhất quán bên trong và kiểm tra mọi thứ dựa trên nó.',
     },
     Fe: {
       name: 'Cảm xúc hướng ngoại (Fe)',
-      summary: 'Đọc và điều hòa cảm xúc của nhóm, giữ cho mối quan hệ chung không đứt gãy.',
+      summary:
+        'Đọc và điều hòa cảm xúc của nhóm, giữ cho mối quan hệ chung không đứt gãy.',
     },
     Fi: {
       name: 'Cảm xúc hướng nội (Fi)',
-      summary: 'Đối chiếu mọi việc với hệ giá trị riêng, rất khó thỏa hiệp khi thấy sai.',
+      summary:
+        'Đối chiếu mọi việc với hệ giá trị riêng, rất khó thỏa hiệp khi thấy sai.',
     },
     Se: {
       name: 'Giác quan hướng ngoại (Se)',
-      summary: 'Bắt nhịp với hiện tại và phản ứng nhanh với những gì đang thực sự diễn ra.',
+      summary:
+        'Bắt nhịp với hiện tại và phản ứng nhanh với những gì đang thực sự diễn ra.',
     },
     Si: {
       name: 'Giác quan hướng nội (Si)',
-      summary: 'So sánh hiện tại với kinh nghiệm đã có, nhớ chi tiết và tin vào cái đã kiểm chứng.',
+      summary:
+        'So sánh hiện tại với kinh nghiệm đã có, nhớ chi tiết và tin vào cái đã kiểm chứng.',
     },
     Ne: {
       name: 'Trực giác hướng ngoại (Ne)',
-      summary: 'Bung ra nhiều khả năng từ một tình huống, liên tục hỏi "còn cách nào khác".',
+      summary:
+        'Bung ra nhiều khả năng từ một tình huống, liên tục hỏi "còn cách nào khác".',
     },
     Ni: {
       name: 'Trực giác hướng nội (Ni)',
-      summary: 'Gom nhiều tín hiệu rời rạc thành một hướng đi duy nhất, thường trước khi giải thích được.',
+      summary:
+        'Gom nhiều tín hiệu rời rạc thành một hướng đi duy nhất, thường trước khi giải thích được.',
     },
   },
   en: {
     Te: {
       name: 'Extraverted Thinking (Te)',
-      summary: 'Organises the outside world for efficiency: goals, process, measurable outcomes.',
+      summary:
+        'Organises the outside world for efficiency: goals, process, measurable outcomes.',
     },
     Ti: {
       name: 'Introverted Thinking (Ti)',
-      summary: 'Builds one internally consistent logical system and tests everything against it.',
+      summary:
+        'Builds one internally consistent logical system and tests everything against it.',
     },
     Fe: {
       name: 'Extraverted Feeling (Fe)',
-      summary: 'Reads and regulates the mood of a group, keeping the shared relationship intact.',
+      summary:
+        'Reads and regulates the mood of a group, keeping the shared relationship intact.',
     },
     Fi: {
       name: 'Introverted Feeling (Fi)',
-      summary: 'Checks everything against a private value system, and will not compromise it easily.',
+      summary:
+        'Checks everything against a private value system, and will not compromise it easily.',
     },
     Se: {
       name: 'Extraverted Sensing (Se)',
-      summary: 'Tunes into the present moment and responds fast to what is actually happening.',
+      summary:
+        'Tunes into the present moment and responds fast to what is actually happening.',
     },
     Si: {
       name: 'Introverted Sensing (Si)',
-      summary: 'Compares now against remembered experience, holding detail and trusting what is proven.',
+      summary:
+        'Compares now against remembered experience, holding detail and trusting what is proven.',
     },
     Ne: {
       name: 'Extraverted Intuition (Ne)',
-      summary: 'Fans one situation out into many possibilities, always asking what else it could be.',
+      summary:
+        'Fans one situation out into many possibilities, always asking what else it could be.',
     },
     Ni: {
       name: 'Introverted Intuition (Ni)',
-      summary: 'Converges scattered signals into a single direction, often before it can be explained.',
+      summary:
+        'Converges scattered signals into a single direction, often before it can be explained.',
     },
   },
 }
@@ -267,6 +289,7 @@ export const ROLE_HINT: Record<Locale, Record<FunctionRole, string>> = {
     dominant: 'Your default mode - the strongest and most automatic.',
     auxiliary: 'The second support, balancing out the dominant.',
     tertiary: 'Develops later, and tends to surface when you are relaxed.',
-    inferior: 'The persistent blind spot, most visible under stress or exhaustion.',
+    inferior:
+      'The persistent blind spot, most visible under stress or exhaustion.',
   },
 }

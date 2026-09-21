@@ -62,10 +62,16 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang='en'>
-      <body className={`${sora.variable} ${montserrat.variable} ${sourceSans3.variable} min-h-screen antialiased`}>
+    <html lang="en">
+      <body
+        className={`${sora.variable} ${montserrat.variable} ${sourceSans3.variable} min-h-screen antialiased`}
+      >
         {children}
       </body>
     </html>

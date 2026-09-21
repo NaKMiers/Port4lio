@@ -21,15 +21,22 @@ describe('attempt retention', () => {
 
   it('computes an expiry that many days out', () => {
     const now = new Date('2026-01-01T00:00:00.000Z')
-    expect(attemptExpiryFrom(now).toISOString()).toBe('2026-01-22T00:00:00.000Z')
+    expect(attemptExpiryFrom(now).toISOString()).toBe(
+      '2026-01-22T00:00:00.000Z'
+    )
   })
 
   it('never writes the retention number into UI copy', () => {
     // The whole point of the `{days}` placeholder. A literal number here is a promise that
     // silently goes stale the moment ATTEMPT_TTL_DAYS changes.
     for (const locale of LOCALES) {
-      expect(UI[locale].resultKeepLink, `${locale} resultKeepLink`).toContain('{days}')
-      expect(UI[locale].resultKeepLink, `${locale} hardcodes a day count`).not.toMatch(/\d+\s*(ngày|days)/)
+      expect(UI[locale].resultKeepLink, `${locale} resultKeepLink`).toContain(
+        '{days}'
+      )
+      expect(
+        UI[locale].resultKeepLink,
+        `${locale} hardcodes a day count`
+      ).not.toMatch(/\d+\s*(ngày|days)/)
     }
   })
 })
@@ -51,7 +58,8 @@ describe('attempt retention', () => {
 describe('test event retention', () => {
   it('is still 21 days, the same window as Attempt', () => {
     const now = new Date('2026-01-01T00:00:00.000Z')
-    const elapsedDays = (testEventExpiryFrom(now).getTime() - now.getTime()) / 86_400_000
+    const elapsedDays =
+      (testEventExpiryFrom(now).getTime() - now.getTime()) / 86_400_000
 
     expect(elapsedDays).toBe(21)
     expect(elapsedDays).toBe(ATTEMPT_TTL_DAYS)

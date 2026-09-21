@@ -50,7 +50,9 @@ function payment(overrides: Record<string, unknown> = {}) {
 
 /** `findOne(...).lean()` */
 function findOneReturns(value: unknown) {
-  paymentModel.findOne.mockReturnValueOnce({ lean: () => Promise.resolve(value) })
+  paymentModel.findOne.mockReturnValueOnce({
+    lean: () => Promise.resolve(value),
+  })
 }
 
 beforeEach(() => {
@@ -67,10 +69,15 @@ beforeEach(() => {
 describe('fulfilIqPayment', () => {
   it('fulfils a pending payment and delivers the result', async () => {
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
     const deliver = vi.fn().mockResolvedValue(undefined)
 
-    const result = await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, deliver)
+    const result = await fulfilIqPayment(
+      { orderCode: ORDER_CODE, amount: 5000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('fulfilled')
     expect(deliver).toHaveBeenCalledOnce()
@@ -80,7 +87,9 @@ describe('fulfilIqPayment', () => {
     // One update, because it is one purchase. Unlocking without minting would leave a buyer
     // who paid for both holding one, with no record of which half is missing.
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
 
     await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, vi.fn())
 
@@ -97,7 +106,9 @@ describe('fulfilIqPayment', () => {
     // Paying opens the result; it does not buy indefinite storage of the answers. The email
     // is the buyer's permanent copy, and the certificate lives on its own id.
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
 
     await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, vi.fn())
 
@@ -107,7 +118,9 @@ describe('fulfilIqPayment', () => {
 
   it('claims atomically on "not already paid", not on "pending"', async () => {
     findOneReturns(payment({ status: 'cancelled' }))
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
 
     await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, vi.fn())
 
@@ -120,7 +133,9 @@ describe('fulfilIqPayment', () => {
 
   it('clears the payment TTL so a paid record is kept', async () => {
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
 
     await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, vi.fn())
 
@@ -134,7 +149,10 @@ describe('fulfilIqPayment', () => {
     // must get a 2XX.
     findOneReturns(null)
 
-    const result = await fulfilIqPayment({ orderCode: 1, amount: 5000 }, vi.fn())
+    const result = await fulfilIqPayment(
+      { orderCode: 1, amount: 5000 },
+      vi.fn()
+    )
 
     expect(result.outcome).toBe('unknown-order-code')
     expect(paymentModel.findOneAndUpdate).not.toHaveBeenCalled()
@@ -144,7 +162,10 @@ describe('fulfilIqPayment', () => {
     findOneReturns(payment({ amount: 5000 }))
     const deliver = vi.fn()
 
-    const result = await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 1 }, deliver)
+    const result = await fulfilIqPayment(
+      { orderCode: ORDER_CODE, amount: 1 },
+      deliver
+    )
 
     expect(result.outcome).toBe('amount-mismatch')
     expect(paymentModel.findOneAndUpdate).not.toHaveBeenCalled()
@@ -155,7 +176,10 @@ describe('fulfilIqPayment', () => {
     findOneReturns(payment({ status: 'paid' }))
     const deliver = vi.fn()
 
-    const result = await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, deliver)
+    const result = await fulfilIqPayment(
+      { orderCode: ORDER_CODE, amount: 5000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('already-processed')
     // No second certificate, and no second email because PayOS retried.
@@ -168,7 +192,10 @@ describe('fulfilIqPayment', () => {
     paymentModel.findOneAndUpdate.mockResolvedValueOnce(null)
     const deliver = vi.fn()
 
-    const result = await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, deliver)
+    const result = await fulfilIqPayment(
+      { orderCode: ORDER_CODE, amount: 5000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('already-processed')
     expect(attemptModel.findByIdAndUpdate).not.toHaveBeenCalled()
@@ -180,25 +207,37 @@ describe('fulfilIqPayment', () => {
     // already paid and reports success - so the payment reads as delivered while the buyer
     // got nothing and nobody was told.
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
     const deliver = vi.fn().mockRejectedValue(new Error('SMTP down'))
 
-    const result = await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, deliver)
+    const result = await fulfilIqPayment(
+      { orderCode: ORDER_CODE, amount: 5000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('delivery-failed')
     expect(result.message).toContain('SMTP down')
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('PAID BUT UNDELIVERED'))
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('PAID BUT UNDELIVERED')
+    )
   })
 
   it('reports delivery-failed, and does not email, when the attempt has vanished', async () => {
     // Paid for a result that expired between checkout and settlement. Real money, nothing
     // to unlock - a refund conversation, not something to swallow.
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
     attemptModel.findByIdAndUpdate.mockResolvedValueOnce(null)
     const deliver = vi.fn()
 
-    const result = await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, deliver)
+    const result = await fulfilIqPayment(
+      { orderCode: ORDER_CODE, amount: 5000 },
+      deliver
+    )
 
     expect(result.outcome).toBe('delivery-failed')
     expect(deliver).not.toHaveBeenCalled()
@@ -206,10 +245,17 @@ describe('fulfilIqPayment', () => {
 
   it('never throws, whatever the database does', async () => {
     findOneReturns(payment())
-    paymentModel.findOneAndUpdate.mockResolvedValueOnce(payment({ status: 'paid' }))
-    attemptModel.findByIdAndUpdate.mockRejectedValueOnce(new Error('connection lost'))
+    paymentModel.findOneAndUpdate.mockResolvedValueOnce(
+      payment({ status: 'paid' })
+    )
+    attemptModel.findByIdAndUpdate.mockRejectedValueOnce(
+      new Error('connection lost')
+    )
 
-    const result = await fulfilIqPayment({ orderCode: ORDER_CODE, amount: 5000 }, vi.fn())
+    const result = await fulfilIqPayment(
+      { orderCode: ORDER_CODE, amount: 5000 },
+      vi.fn()
+    )
 
     expect(result.outcome).toBe('delivery-failed')
   })

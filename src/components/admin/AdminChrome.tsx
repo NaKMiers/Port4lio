@@ -40,13 +40,17 @@ import AdminHomeLink from './AdminHomeLink'
  * sticky`, and `overflow-hidden` here would give it a scrollport that never scrolls. See the
  * rule's own comment in `globals.css`.
  */
-export default function AdminChrome({ children }: { children: React.ReactNode }) {
+export default function AdminChrome({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div className='portfolio-public-root clip-decorations relative flex min-h-screen flex-col text-pp-text'>
+    <div className="portfolio-public-root clip-decorations relative flex min-h-screen flex-col text-pp-text">
       <AdminBackdrop />
       <ProfileFetchStatus />
       <AdminHomeLink />
-      <div className='relative flex-1'>{children}</div>
+      <div className="relative flex-1">{children}</div>
     </div>
   )
 }

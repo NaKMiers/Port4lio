@@ -33,13 +33,21 @@ const EMAIL = `e2e-${Date.now()}@example.com`
 test.describe.configure({ mode: 'serial' })
 
 test('a signup is accepted', async ({ request }) => {
-  const res = await request.post('/api/blog/subscribe', { data: { email: EMAIL }, headers: ip(21) })
+  const res = await request.post('/api/blog/subscribe', {
+    data: { email: EMAIL },
+    headers: ip(21),
+  })
   expect(res.status()).toBe(202)
 })
 
-test('a repeat signup is INDISTINGUISHABLE from the first', async ({ request }) => {
+test('a repeat signup is INDISTINGUISHABLE from the first', async ({
+  request,
+}) => {
   // The email-address oracle. If these two bodies ever differ, anyone can enumerate readers.
-  const first = await request.post('/api/blog/subscribe', { data: { email: EMAIL }, headers: ip(22) })
+  const first = await request.post('/api/blog/subscribe', {
+    data: { email: EMAIL },
+    headers: ip(22),
+  })
   const second = await request.post('/api/blog/subscribe', {
     data: { email: `fresh-${Date.now()}@example.com` },
     headers: ip(23),
@@ -54,18 +62,33 @@ test('a repeat signup is INDISTINGUISHABLE from the first', async ({ request }) 
 
 test('a malformed address is refused', async ({ request }) => {
   expect(
-    (await request.post('/api/blog/subscribe', { data: { email: 'not-an-email' }, headers: ip(24) })).status()
+    (
+      await request.post('/api/blog/subscribe', {
+        data: { email: 'not-an-email' },
+        headers: ip(24),
+      })
+    ).status()
   ).toBe(400)
-  expect((await request.post('/api/blog/subscribe', { data: {}, headers: ip(25) })).status()).toBe(400)
+  expect(
+    (
+      await request.post('/api/blog/subscribe', { data: {}, headers: ip(25) })
+    ).status()
+  ).toBe(400)
 })
 
-test('an unknown confirm token lands on the invalid page rather than erroring', async ({ page }) => {
-  await page.goto('/api/blog/subscribe/confirm?token=definitely-not-a-real-token')
+test('an unknown confirm token lands on the invalid page rather than erroring', async ({
+  page,
+}) => {
+  await page.goto(
+    '/api/blog/subscribe/confirm?token=definitely-not-a-real-token'
+  )
   await expect(page).toHaveURL(/state=invalid/)
   await expect(page.locator('h1')).toContainText('did not work')
 })
 
-test('unsubscribing reports success even for an unknown token', async ({ page }) => {
+test('unsubscribing reports success even for an unknown token', async ({
+  page,
+}) => {
   // Deliberate: the person clicking wants to stop receiving email. An error page tells them
   // they failed at something they cannot fix and sends them to the spam button.
   await page.goto('/api/blog/unsubscribe?token=definitely-not-a-real-token')
@@ -73,7 +96,9 @@ test('unsubscribing reports success even for an unknown token', async ({ page })
   await expect(page.locator('h1')).toContainText('Unsubscribed')
 })
 
-test('the subscribe form is on the index, below the posts', async ({ page }) => {
+test('the subscribe form is on the index, below the posts', async ({
+  page,
+}) => {
   await page.goto('/blog')
   await expect(page.locator('#subscribe-email')).toBeVisible()
   // No modal, no scroll trigger, no article wall.

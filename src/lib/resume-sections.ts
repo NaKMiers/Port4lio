@@ -15,7 +15,9 @@ export const RESUME_SECTION_KEYS = [
   'projects',
 ] as const
 
-export const DEFAULT_RESUME_SECTION_ORDER: ResumeSectionKey[] = [...RESUME_SECTION_KEYS]
+export const DEFAULT_RESUME_SECTION_ORDER: ResumeSectionKey[] = [
+  ...RESUME_SECTION_KEYS,
+]
 
 /** Editor-facing names, so the settings tab and the print order stay in sync. */
 export const RESUME_SECTION_LABELS: Record<ResumeSectionKey, string> = {
@@ -41,23 +43,27 @@ export function normalizeResumeSectionOrder(raw: unknown): ResumeSectionKey[] {
   const seen = new Set<ResumeSectionKey>()
   const order: ResumeSectionKey[] = []
 
-  for (const entry of Array.isArray(raw) ? raw : []) {
+  for (const entry of Array.isArray(raw) ? raw : [])
     if (isSectionKey(entry) && !seen.has(entry)) {
       seen.add(entry)
       order.push(entry)
     }
-  }
 
-  for (const key of RESUME_SECTION_KEYS) {
-    if (!seen.has(key)) order.push(key)
-  }
+  for (const key of RESUME_SECTION_KEYS) if (!seen.has(key)) order.push(key)
 
   return order
 }
 
 /** Moves one entry of a list to another index, returning a new list. */
 export function moveItem<T>(list: T[], from: number, to: number): T[] {
-  if (from === to || from < 0 || from >= list.length || to < 0 || to >= list.length) return list
+  if (
+    from === to ||
+    from < 0 ||
+    from >= list.length ||
+    to < 0 ||
+    to >= list.length
+  )
+    return list
   const next = [...list]
   const [moved] = next.splice(from, 1)
   next.splice(to, 0, moved)

@@ -2,9 +2,16 @@ import React from 'react'
 
 import AddMoreButton from '@/components/settings/AddMoreButton'
 import DragList from '@/components/settings/DragList'
-import ListTextarea, { itemsToText, textToItems } from '@/components/settings/ListTextarea'
+import ListTextarea, {
+  itemsToText,
+  textToItems,
+} from '@/components/settings/ListTextarea'
 import Section from '@/components/settings/Section'
-import { replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
+import {
+  replaceAt,
+  resumeOf,
+  updateResume,
+} from '@/components/settings/resume-utils'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -46,7 +53,10 @@ export default function ResumeSkillsSection({
   }
 
   const moveBlock = (from: number, to: number) => {
-    updateResume(setProfile, r => ({ ...r, skillBlocks: moveItem(r.skillBlocks, from, to) }))
+    updateResume(setProfile, r => ({
+      ...r,
+      skillBlocks: moveItem(r.skillBlocks, from, to),
+    }))
     onFitPageBreak?.()
   }
 
@@ -55,24 +65,36 @@ export default function ResumeSkillsSection({
       const block = r.skillBlocks[blockIdx]
       return {
         ...r,
-        skillBlocks: replaceAt(r.skillBlocks, blockIdx, { rows: moveItem(block.rows, from, to) }),
+        skillBlocks: replaceAt(r.skillBlocks, blockIdx, {
+          rows: moveItem(block.rows, from, to),
+        }),
       }
     })
     onFitPageBreak?.()
   }
 
   return (
-    <Section id='cv-skills' title='CV Skills' badge='rows are layout' handle={handle}>
-      <div className='space-y-4'>
+    <Section
+      id="cv-skills"
+      title="CV Skills"
+      badge="rows are layout"
+      handle={handle}
+    >
+      <div className="space-y-4">
         <p className={helpTextCls}>
-          Each row justifies edge to edge on the printed page, so row membership is a layout
-          decision, not a grouping one - nine short items fit a row comfortably, five long ones do
-          not. Separate items with commas or newlines. Blocks print in the order shown here.
+          Each row justifies edge to edge on the printed page, so row membership
+          is a layout decision, not a grouping one - nine short items fit a row
+          comfortably, five long ones do not. Separate items with commas or
+          newlines. Blocks print in the order shown here.
         </p>
 
-        <div className='flex items-center justify-between'>
-          <h2 className='text-sm font-semibold'>Skill blocks</h2>
-          <button type='button' className={secondaryBtnCls} onClick={addBlock}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Skill blocks</h2>
+          <button
+            type="button"
+            className={secondaryBtnCls}
+            onClick={addBlock}
+          >
             + Add block
           </button>
         </div>
@@ -84,18 +106,18 @@ export default function ResumeSkillsSection({
         <DragList
           ids={resume.skillBlocks.map((_, idx) => `block-${idx}`)}
           onReorder={moveBlock}
-          itemLabel='skill block'
+          itemLabel="skill block"
         >
           {(blockIdx, blockHandle) => {
             const block = resume.skillBlocks[blockIdx]
             return (
               <div className={itemCardCls}>
-                <div className='flex items-end gap-2'>
-                  <div className='min-w-0 flex-1 space-y-2'>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <label className={labelCls}>Heading</label>
                     <input
                       className={inputCls}
-                      placeholder='TECHNICAL SKILLS'
+                      placeholder="TECHNICAL SKILLS"
                       value={block.heading}
                       onChange={e =>
                         updateResume(setProfile, r => ({
@@ -107,21 +129,21 @@ export default function ResumeSkillsSection({
                       }
                     />
                   </div>
-                  <div className='pb-2'>{blockHandle}</div>
+                  <div className="pb-2">{blockHandle}</div>
                 </div>
 
-                <div className='mt-4'>
+                <div className="mt-4">
                   <DragList
                     ids={block.rows.map((_, idx) => `row-${idx}`)}
                     onReorder={(from, to) => moveRow(blockIdx, from, to)}
-                    itemLabel='skill row'
+                    itemLabel="skill row"
                   >
                     {(rowIdx, rowHandle) => {
                       const row = block.rows[rowIdx]
                       return (
                         <div className={nestedItemCardCls}>
-                          <div className='flex items-start gap-2'>
-                            <div className='min-w-0 flex-1 space-y-2'>
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1 space-y-2">
                               <label className={labelCls}>
                                 Row {rowIdx + 1} · {row.items.length} items
                               </label>
@@ -131,21 +153,29 @@ export default function ResumeSkillsSection({
                                 value={row.items}
                                 join={itemsToText}
                                 parse={textToItems}
-                                onChange={items => updateRow(blockIdx, rowIdx, items)}
+                                onChange={items =>
+                                  updateRow(blockIdx, rowIdx, items)
+                                }
                               />
                             </div>
-                            <div className='pt-6'>{rowHandle}</div>
+                            <div className="pt-6">{rowHandle}</div>
                           </div>
-                          <div className='mt-3 flex justify-end'>
+                          <div className="mt-3 flex justify-end">
                             <button
-                              type='button'
+                              type="button"
                               className={ghostBtnCls}
                               onClick={() =>
                                 updateResume(setProfile, r => ({
                                   ...r,
-                                  skillBlocks: replaceAt(r.skillBlocks, blockIdx, {
-                                    rows: block.rows.filter((_, i) => i !== rowIdx),
-                                  }),
+                                  skillBlocks: replaceAt(
+                                    r.skillBlocks,
+                                    blockIdx,
+                                    {
+                                      rows: block.rows.filter(
+                                        (_, i) => i !== rowIdx
+                                      ),
+                                    }
+                                  ),
                                 }))
                               }
                             >
@@ -158,9 +188,9 @@ export default function ResumeSkillsSection({
                   </DragList>
                 </div>
 
-                <div className='mt-3 flex justify-between'>
+                <div className="mt-3 flex justify-between">
                   <button
-                    type='button'
+                    type="button"
                     className={secondaryBtnCls}
                     onClick={() =>
                       updateResume(setProfile, r => ({
@@ -174,12 +204,14 @@ export default function ResumeSkillsSection({
                     + Add row
                   </button>
                   <button
-                    type='button'
+                    type="button"
                     className={ghostBtnCls}
                     onClick={() =>
                       updateResume(setProfile, r => ({
                         ...r,
-                        skillBlocks: r.skillBlocks.filter((_, i) => i !== blockIdx),
+                        skillBlocks: r.skillBlocks.filter(
+                          (_, i) => i !== blockIdx
+                        ),
                       }))
                     }
                   >
@@ -192,7 +224,10 @@ export default function ResumeSkillsSection({
         </DragList>
 
         {resume.skillBlocks.length > 0 ? (
-          <AddMoreButton label='+ Add skill block' onClick={addBlock} />
+          <AddMoreButton
+            label="+ Add skill block"
+            onClick={addBlock}
+          />
         ) : null}
       </div>
     </Section>

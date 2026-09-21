@@ -54,7 +54,9 @@ export async function GET(request: NextRequest) {
       cannot leave the board without a count.
     */
     const posts = await PostModel.find({})
-      .select('slug title kind series isPillar status language coverImage publishedAt contentUpdatedAt updatedAt +bodyMarkdown')
+      .select(
+        'slug title kind series isPillar status language coverImage publishedAt contentUpdatedAt updatedAt +bodyMarkdown'
+      )
       .sort({ updatedAt: -1 })
       .lean()
 
@@ -66,11 +68,17 @@ export async function GET(request: NextRequest) {
      * that, so a `postEvents` outage should cost the counts and nothing else - a board that
      * 500s because an aggregation failed is a board that cannot publish a post over a metric.
      */
-    let metrics = new Map<string, { views: number; shares: number; attributions: number }>()
+    let metrics = new Map<
+      string,
+      { views: number; shares: number; attributions: number }
+    >()
     try {
       metrics = await aggregatePostMetrics()
     } catch (error) {
-      console.error('[api/admin/blog] metrics unavailable - listing posts without them', error)
+      console.error(
+        '[api/admin/blog] metrics unavailable - listing posts without them',
+        error
+      )
     }
 
     return NextResponse.json({
@@ -81,7 +89,11 @@ export async function GET(request: NextRequest) {
         return {
           ...rest,
           unresolvedImages: findImagePlaceholders(bodyMarkdown ?? '').length,
-          metrics: metrics.get(post.slug) ?? { views: 0, shares: 0, attributions: 0 },
+          metrics: metrics.get(post.slug) ?? {
+            views: 0,
+            shares: 0,
+            attributions: 0,
+          },
         }
       }),
     })
@@ -95,17 +107,21 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return denied
 
-  const parsed = await readJsonBody<{ slug?: unknown; title?: unknown }>(request, {
-    maxBytes: CREATE_MAX_BODY_BYTES,
-  })
+  const parsed = await readJsonBody<{ slug?: unknown; title?: unknown }>(
+    request,
+    {
+      maxBytes: CREATE_MAX_BODY_BYTES,
+    }
+  )
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
-  const slug = typeof parsed.body?.slug === 'string' ? parsed.body.slug.trim() : ''
-  const title = typeof parsed.body?.title === 'string' ? parsed.body.title.trim() : ''
+  const slug =
+    typeof parsed.body?.slug === 'string' ? parsed.body.slug.trim() : ''
+  const title =
+    typeof parsed.body?.title === 'string' ? parsed.body.title.trim() : ''
 
-  if (!SLUG_PATTERN.test(slug)) {
+  if (!SLUG_PATTERN.test(slug))
     return jsonError('Slug must match ^[a-z0-9-]{1,80}$.', 400)
-  }
 
   /**
    * The denylist is checked here as well as in the schema, and that duplication is wanted.
@@ -115,18 +131,20 @@ export async function POST(request: NextRequest) {
    * on, naming the slug and the rule, instead of a mongoose ValidationError surfaced as a
    * generic 400. Belt and braces, where the braces are also legible.
    */
-  if (isReservedSlug(slug)) {
-    return jsonError(`"${slug}" is reserved by a route and cannot be a post slug.`, 400)
-  }
+  if (isReservedSlug(slug))
+    return jsonError(
+      `"${slug}" is reserved by a route and cannot be a post slug.`,
+      400
+    )
 
-  if (!title) {
-    return jsonError('A title is required.', 400)
-  }
+  if (!title) return jsonError('A title is required.', 400)
 
   try {
     await connectDatabase()
 
-    const existing = await PostModel.findOne({ slug }).select('slug status').lean()
+    const existing = await PostModel.findOne({ slug })
+      .select('slug status')
+      .lean()
     if (existing) {
       // Named rather than generic, because the non-obvious case is a soft-deleted post still
       // holding the slug. An author who deleted something an hour ago and gets "already
@@ -146,14 +164,24 @@ export async function POST(request: NextRequest) {
       null branch is unreachable rather than merely unlikely.
     */
     const kind = await defaultKindSlug()
-    if (!kind) {
-      return jsonError('No post kinds exist. Create one before writing a post.', 409)
-    }
+    if (!kind)
+      return jsonError(
+        'No post kinds exist. Create one before writing a post.',
+        409
+      )
 
-    const created = await PostModel.create({ slug, title, kind, status: 'draft' })
+    const created = await PostModel.create({
+      slug,
+      title,
+      kind,
+      status: 'draft',
+    })
 
     // No revalidation here on purpose: a draft has no public surface to invalidate.
-    return NextResponse.json({ id: String(created._id), slug: created.slug }, { status: 201 })
+    return NextResponse.json(
+      { id: String(created._id), slug: created.slug },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('[api/admin/blog] create failed', error)
     return jsonError('Unable to create the post right now.', 500)

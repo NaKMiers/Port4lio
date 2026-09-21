@@ -23,21 +23,21 @@ function reordered(order: ResumeSectionKey[]): Resume {
 
 describe('normalizeResumeSectionOrder', () => {
   it('fills in an absent order with the default', () => {
-    expect(normalizeResumeSectionOrder(undefined)).toEqual(DEFAULT_RESUME_SECTION_ORDER)
+    expect(normalizeResumeSectionOrder(undefined)).toEqual(
+      DEFAULT_RESUME_SECTION_ORDER
+    )
   })
 
   it('drops unknown and duplicate keys, then appends whatever is missing', () => {
-    expect(normalizeResumeSectionOrder(['projects', 'nope', 'projects', 'summary'])).toEqual([
-      'projects',
-      'summary',
-      'education',
-      'skills',
-      'certifications',
-    ])
+    expect(
+      normalizeResumeSectionOrder(['projects', 'nope', 'projects', 'summary'])
+    ).toEqual(['projects', 'summary', 'education', 'skills', 'certifications'])
   })
 
   it('survives a stored value that is not an array', () => {
-    expect(normalizeResumeSectionOrder('summary')).toEqual(DEFAULT_RESUME_SECTION_ORDER)
+    expect(normalizeResumeSectionOrder('summary')).toEqual(
+      DEFAULT_RESUME_SECTION_ORDER
+    )
     expect(normalizeResume({ sectionOrder: 42 }).sectionOrder).toEqual(
       DEFAULT_RESUME_SECTION_ORDER
     )
@@ -79,7 +79,13 @@ describe('flattenResume', () => {
 
   it('re-derives the gaps when sections move', () => {
     const shaped = shape(
-      reordered(['certifications', 'skills', 'summary', 'education', 'projects'])
+      reordered([
+        'certifications',
+        'skills',
+        'summary',
+        'education',
+        'projects',
+      ])
     )
 
     expect(shaped.slice(0, 4)).toEqual([
@@ -94,8 +100,12 @@ describe('flattenResume', () => {
 
   it('emits every section exactly once whatever the stored order says', () => {
     const junk = reordered(['projects', 'projects'] as ResumeSectionKey[])
-    expect(shape(junk).filter(kind => kind === 'certifications')).toHaveLength(1)
-    expect(shape(junk).filter(kind => kind === 'skillRows').length).toBeGreaterThan(0)
+    expect(shape(junk).filter(kind => kind === 'certifications')).toHaveLength(
+      1
+    )
+    expect(
+      shape(junk).filter(kind => kind === 'skillRows').length
+    ).toBeGreaterThan(0)
   })
 })
 
@@ -116,7 +126,13 @@ describe('planResumeSheets', () => {
 
   it('pushes sections ordered after projects onto sheet 2', () => {
     const { first, second } = planResumeSheets(
-      reordered(['summary', 'education', 'skills', 'projects', 'certifications'])
+      reordered([
+        'summary',
+        'education',
+        'skills',
+        'projects',
+        'certifications',
+      ])
     )
 
     expect(first.some(item => item.kind === 'certifications')).toBe(false)
@@ -126,7 +142,11 @@ describe('planResumeSheets', () => {
   it('keeps everything on sheet 1 when the break coordinate addresses nothing', () => {
     const resume: Resume = {
       ...RESUME_SEED,
-      pageBreak: { sectionIndex: 99, projectIndex: 0, highlightsOnFirstSheet: 0 },
+      pageBreak: {
+        sectionIndex: 99,
+        projectIndex: 0,
+        highlightsOnFirstSheet: 0,
+      },
     }
     expect(planResumeSheets(resume).second).toHaveLength(0)
   })

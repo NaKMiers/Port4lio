@@ -24,15 +24,15 @@ const CHECKSUM_KEY = 'test-checksum-key'
 
 describe('payos signature serialisation', () => {
   it('sorts keys alphabetically', () => {
-    expect(Object.keys(sortObjDataByKey({ zebra: 1, alpha: 2, mid: 3 }))).toEqual([
-      'alpha',
-      'mid',
-      'zebra',
-    ])
+    expect(
+      Object.keys(sortObjDataByKey({ zebra: 1, alpha: 2, mid: 3 }))
+    ).toEqual(['alpha', 'mid', 'zebra'])
   })
 
   it('serialises to an alphabetical key=value query string', () => {
-    expect(convertObjToQueryStr(sortObjDataByKey({ b: 2, a: 1, c: 3 }))).toBe('a=1&b=2&c=3')
+    expect(convertObjToQueryStr(sortObjDataByKey({ b: 2, a: 1, c: 3 }))).toBe(
+      'a=1&b=2&c=3'
+    )
   })
 
   it('collapses null-ish values to an empty string', () => {
@@ -55,7 +55,9 @@ describe('payos signature serialisation', () => {
   })
 
   it('JSON-encodes arrays with each element key-sorted', () => {
-    expect(convertObjToQueryStr({ items: [{ z: 1, a: 2 }] })).toBe('items=[{"a":2,"z":1}]')
+    expect(convertObjToQueryStr({ items: [{ z: 1, a: 2 }] })).toBe(
+      'items=[{"a":2,"z":1}]'
+    )
   })
 })
 
@@ -89,11 +91,15 @@ describe('verifyPayosData', () => {
 
   it('rejects a tampered amount', () => {
     // The attack this exists to stop: pay 2000, claim 200000, or claim a payment never made.
-    expect(verifyPayosData({ ...data, amount: 1 }, sign(data), CHECKSUM_KEY)).toBe(false)
+    expect(
+      verifyPayosData({ ...data, amount: 1 }, sign(data), CHECKSUM_KEY)
+    ).toBe(false)
   })
 
   it('rejects a signature made with a different checksum key', () => {
-    expect(verifyPayosData(data, sign(data, 'other-key'), CHECKSUM_KEY)).toBe(false)
+    expect(verifyPayosData(data, sign(data, 'other-key'), CHECKSUM_KEY)).toBe(
+      false
+    )
   })
 
   it('rejects a missing or non-string signature', () => {
@@ -133,9 +139,15 @@ describe('create-link signature', () => {
 
   it('changes when any signed field changes', () => {
     const base = signCreateLink(input, CHECKSUM_KEY)
-    expect(signCreateLink({ ...input, amount: 2001 }, CHECKSUM_KEY)).not.toBe(base)
-    expect(signCreateLink({ ...input, orderCode: 1 }, CHECKSUM_KEY)).not.toBe(base)
-    expect(signCreateLink({ ...input, description: 'other' }, CHECKSUM_KEY)).not.toBe(base)
+    expect(signCreateLink({ ...input, amount: 2001 }, CHECKSUM_KEY)).not.toBe(
+      base
+    )
+    expect(signCreateLink({ ...input, orderCode: 1 }, CHECKSUM_KEY)).not.toBe(
+      base
+    )
+    expect(
+      signCreateLink({ ...input, description: 'other' }, CHECKSUM_KEY)
+    ).not.toBe(base)
   })
 })
 

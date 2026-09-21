@@ -22,7 +22,9 @@ import { useState } from 'react'
  */
 export default function SubscribeForm() {
   const [email, setEmail] = useState('')
-  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
+  const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>(
+    'idle'
+  )
   const [message, setMessage] = useState('')
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -53,33 +55,40 @@ export default function SubscribeForm() {
   }
 
   return (
-    <section className='mt-16 rounded-panel border border-pp-line bg-[var(--pp-panel)] p-6'>
-      <h2 className='font-display text-lg font-semibold text-pp-text'>
+    <section className="mt-16 rounded-panel border border-pp-line bg-[var(--pp-panel)] p-6">
+      <h2 className="font-display text-lg font-semibold text-pp-text">
         Told when there is something new
       </h2>
-      <p className='mt-2 max-w-[58ch] text-sm leading-relaxed text-pp-muted'>
-        A handful of write-ups a year, sent by hand. No newsletter cadence, no drip sequence,
-        nothing else ever. Unsubscribe from any of them in one click.
+      <p className="mt-2 max-w-[58ch] text-sm leading-relaxed text-pp-muted">
+        A handful of write-ups a year, sent by hand. No newsletter cadence, no
+        drip sequence, nothing else ever. Unsubscribe from any of them in one
+        click.
       </p>
 
-      <form onSubmit={submit} className='mt-4 flex flex-wrap gap-3'>
-        <label className='sr-only' htmlFor='subscribe-email'>
+      <form
+        onSubmit={submit}
+        className="mt-4 flex flex-wrap gap-3"
+      >
+        <label
+          className="sr-only"
+          htmlFor="subscribe-email"
+        >
           Email address
         </label>
         <input
-          id='subscribe-email'
-          type='email'
+          id="subscribe-email"
+          type="email"
           required
           value={email}
           disabled={state === 'sending'}
           onChange={event => setEmail(event.target.value)}
-          placeholder='you@example.com'
-          className='min-w-[14rem] flex-1 rounded-full border border-pp-line bg-white/78 px-5 py-2.5 text-sm text-pp-text outline-none transition focus:border-pp-blue/55'
+          placeholder="you@example.com"
+          className="bg-white/78 min-w-[14rem] flex-1 rounded-full border border-pp-line px-5 py-2.5 text-sm text-pp-text outline-none transition focus:border-pp-blue/55"
         />
         <button
-          type='submit'
+          type="submit"
           disabled={state === 'sending'}
-          className='inline-flex min-h-[44px] items-center rounded-full bg-pp-text px-6 py-2.5 font-display text-sm font-semibold text-[var(--pp-bg)] disabled:opacity-60'
+          className="inline-flex min-h-[44px] items-center rounded-full bg-pp-text px-6 py-2.5 font-display text-sm font-semibold text-[var(--pp-bg)] disabled:opacity-60"
         >
           {state === 'sending' ? 'Sending...' : 'Subscribe'}
         </button>
@@ -88,15 +97,15 @@ export default function SubscribeForm() {
       {message ? (
         <p
           role={state === 'error' ? 'alert' : 'status'}
-          className='mt-3 text-sm text-pp-muted'
+          className="mt-3 text-sm text-pp-muted"
         >
           {message}
         </p>
       ) : null}
 
-      <p className='mt-3 text-xs text-pp-muted'>
-        You will get one email asking you to confirm. Ignore it and nothing happens - you are
-        not on any list until you click it.
+      <p className="mt-3 text-xs text-pp-muted">
+        You will get one email asking you to confirm. Ignore it and nothing
+        happens - you are not on any list until you click it.
       </p>
     </section>
   )

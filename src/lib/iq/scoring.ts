@@ -87,30 +87,48 @@ export class InvalidIqAnswersError extends Error {
  * array would hand back a real-looking number for a test nobody sat.
  */
 export function parseIqAnswers(raw: unknown): number[] {
-  if (!Array.isArray(raw)) throw new InvalidIqAnswersError('answers must be an array')
-  if (raw.length !== ITEM_COUNT) {
-    throw new InvalidIqAnswersError(`expected ${ITEM_COUNT} answers, got ${raw.length}`)
-  }
+  if (!Array.isArray(raw))
+    throw new InvalidIqAnswersError('answers must be an array')
+  if (raw.length !== ITEM_COUNT)
+    throw new InvalidIqAnswersError(
+      `expected ${ITEM_COUNT} answers, got ${raw.length}`
+    )
+
   return raw.map((value, index) => {
     const parsed = Number(value)
-    if (!Number.isInteger(parsed) || parsed < -1 || parsed > 5) {
-      throw new InvalidIqAnswersError(`answer ${index} is not an option index or -1`)
-    }
+    if (!Number.isInteger(parsed) || parsed < -1 || parsed > 5)
+      throw new InvalidIqAnswersError(
+        `answer ${index} is not an option index or -1`
+      )
+
     return parsed
   })
 }
 
 export function bandFor(raw: number): ScoreBand {
-  return BANDS.find(band => raw >= band.minRaw) ?? (BANDS[BANDS.length - 1] as ScoreBand)
+  return (
+    BANDS.find(band => raw >= band.minRaw) ??
+    (BANDS[BANDS.length - 1] as ScoreBand)
+  )
 }
 
-export function scoreIq(answers: readonly number[], answerKey: readonly number[]): IqResult {
+export function scoreIq(
+  answers: readonly number[],
+  answerKey: readonly number[]
+): IqResult {
   const raw = answers.reduce(
-    (total, answer, index) => (answer >= 0 && answer === answerKey[index] ? total + 1 : total),
+    (total, answer, index) =>
+      answer >= 0 && answer === answerKey[index] ? total + 1 : total,
     0
   )
   const band = bandFor(raw)
-  return { raw, total: answerKey.length, score: band.score, percentile: band.percentile, band: band.key }
+  return {
+    raw,
+    total: answerKey.length,
+    score: band.score,
+    percentile: band.percentile,
+    band: band.key,
+  }
 }
 
 /** Whether a submission arrived inside the clock. Server time only; the client display is a mirror. */

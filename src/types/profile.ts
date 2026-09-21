@@ -145,7 +145,8 @@ export type ResumeProjectSection = {
  * `projects` is the stream that spills onto sheet 2; sections placed after it therefore
  * print after the page break.
  */
-export type ResumeSectionKey = 'summary' | 'education' | 'skills' | 'certifications' | 'projects'
+export type ResumeSectionKey =
+  'summary' | 'education' | 'skills' | 'certifications' | 'projects'
 
 /**
  * Where sheet 1 ends. The source splits mid bullet list, so the coordinate addresses a

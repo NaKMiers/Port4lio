@@ -143,7 +143,11 @@ const COPY = {
   },
 } as const
 
-export default async function MbtiPrivacyPage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function MbtiPrivacyPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
   const { lang } = await params
   if (!isLocale(lang)) notFound()
 
@@ -152,34 +156,42 @@ export default async function MbtiPrivacyPage({ params }: { params: Promise<{ la
   return (
     <main>
       <SectionFrame
-        aria-labelledby='privacy-heading'
+        aria-labelledby="privacy-heading"
         disableReveal
-        className='pb-section-sm pt-10 md:pt-14'
-        innerClassName='max-w-2xl'
+        className="pb-section-sm pt-10 md:pt-14"
+        innerClassName="max-w-2xl"
       >
         <Link
           href={`/${lang}/mbti`}
-          className='inline-flex items-center gap-2 text-sm font-semibold text-pp-muted no-underline transition hover:text-pp-text'
+          className="inline-flex items-center gap-2 text-sm font-semibold text-pp-muted no-underline transition hover:text-pp-text"
         >
-          <Chevron direction='left' />
+          <Chevron direction="left" />
           {UI[lang].backToStart}
         </Link>
 
         <h1
-          id='privacy-heading'
-          className='mt-6 font-display text-[clamp(1.875rem,4.5vw,2.75rem)] font-semibold leading-tight tracking-tight text-pp-text'
+          id="privacy-heading"
+          className="mt-6 font-display text-[clamp(1.875rem,4.5vw,2.75rem)] font-semibold leading-tight tracking-tight text-pp-text"
         >
           {copy.title}
         </h1>
-        <p className='mt-4 text-base leading-relaxed text-pp-muted md:text-lg'>{copy.intro}</p>
+        <p className="mt-4 text-base leading-relaxed text-pp-muted md:text-lg">
+          {copy.intro}
+        </p>
 
-        <div className='mt-10 space-y-3'>
+        <div className="mt-10 space-y-3">
           {copy.sections.map(section => (
-            <EditorialPanel key={section.heading} variant='strong' className='p-5 md:p-6'>
-              <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+            <EditorialPanel
+              key={section.heading}
+              variant="strong"
+              className="p-5 md:p-6"
+            >
+              <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
                 {section.heading}
               </h2>
-              <p className='mt-2.5 text-sm leading-relaxed text-pp-muted'>{section.body}</p>
+              <p className="mt-2.5 text-sm leading-relaxed text-pp-muted">
+                {section.body}
+              </p>
             </EditorialPanel>
           ))}
         </div>

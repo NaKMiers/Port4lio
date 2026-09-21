@@ -25,7 +25,10 @@ export default function SkillsSection({
   setProfile: React.Dispatch<React.SetStateAction<Profile>>
   setIconPickerTarget: React.Dispatch<React.SetStateAction<IconPickerTarget>>
 }) {
-  const updateSkillGroup = (idx: number, patch: Partial<Profile['skills'][number]>) => {
+  const updateSkillGroup = (
+    idx: number,
+    patch: Partial<Profile['skills'][number]>
+  ) => {
     setProfile(p => {
       const next = [...p.skills]
       next[idx] = { ...next[idx], ...patch }
@@ -33,7 +36,11 @@ export default function SkillsSection({
     })
   }
 
-  const addGroup = () => setProfile(p => ({ ...p, skills: [...p.skills, { groupName: '', items: [] }] }))
+  const addGroup = () =>
+    setProfile(p => ({
+      ...p,
+      skills: [...p.skills, { groupName: '', items: [] }],
+    }))
 
   const addItem = (gIdx: number) =>
     setProfile(p => {
@@ -44,12 +51,17 @@ export default function SkillsSection({
     })
 
   return (
-    <Section id='skills' title='Skills' badge='groups & items' defaultOpen>
-      <div className='space-y-4'>
-        <div className='flex items-center justify-between'>
-          <h2 className='text-sm font-semibold'>Skill Groups</h2>
+    <Section
+      id="skills"
+      title="Skills"
+      badge="groups & items"
+      defaultOpen
+    >
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Skill Groups</h2>
           <button
-            type='button'
+            type="button"
             className={secondaryBtnCls}
             onClick={addGroup}
           >
@@ -57,38 +69,50 @@ export default function SkillsSection({
           </button>
         </div>
 
-        {profile.skills.length === 0 ? <div className={emptyStateCls}>No skills yet.</div> : null}
+        {profile.skills.length === 0 ? (
+          <div className={emptyStateCls}>No skills yet.</div>
+        ) : null}
 
         {profile.skills.map((group, gIdx) => (
-          <div key={gIdx} className={itemCardCls}>
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end'>
-              <div className='space-y-2'>
+          <div
+            key={gIdx}
+            className={itemCardCls}
+          >
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
+              <div className="space-y-2">
                 <label className={labelCls}>Group name</label>
                 <input
                   className={inputCls}
                   value={group.groupName}
-                  onChange={e => updateSkillGroup(gIdx, { groupName: e.target.value })}
-                  placeholder='e.g. Frontend'
+                  onChange={e =>
+                    updateSkillGroup(gIdx, { groupName: e.target.value })
+                  }
+                  placeholder="e.g. Frontend"
                 />
               </div>
-              <div className='flex justify-end'>
+              <div className="flex justify-end">
                 <button
-                  type='button'
+                  type="button"
                   className={ghostBtnCls}
-                  onClick={() => setProfile(p => ({ ...p, skills: p.skills.filter((_, i) => i !== gIdx) }))}
+                  onClick={() =>
+                    setProfile(p => ({
+                      ...p,
+                      skills: p.skills.filter((_, i) => i !== gIdx),
+                    }))
+                  }
                 >
                   Remove group
                 </button>
               </div>
             </div>
 
-            <div className='my-4 h-px bg-[linear-gradient(90deg,rgba(31,28,26,0.08),rgba(31,28,26,0.03),transparent)]' />
+            <div className="my-4 h-px bg-[linear-gradient(90deg,rgba(31,28,26,0.08),rgba(31,28,26,0.03),transparent)]" />
 
-            <div className='space-y-3'>
-              <div className='flex items-center justify-between'>
-                <h3 className='text-sm font-semibold'>Items</h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Items</h3>
                 <button
-                  type='button'
+                  type="button"
                   className={secondaryBtnCls}
                   onClick={() => addItem(gIdx)}
                 >
@@ -100,20 +124,27 @@ export default function SkillsSection({
                 <div className={emptyStateCls}>No items in this group.</div>
               ) : null}
 
-              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {group.items.map((it, iIdx) => (
-                  <div key={iIdx} className={nestedItemCardCls}>
-                    <div className='space-y-3'>
-                      <div className='space-y-2'>
+                  <div
+                    key={iIdx}
+                    className={nestedItemCardCls}
+                  >
+                    <div className="space-y-3">
+                      <div className="space-y-2">
                         <label className={labelCls}>Icon code</label>
-                        <div className='flex items-center gap-2'>
+                        <div className="flex items-center gap-2">
                           <button
-                            type='button'
+                            type="button"
                             className={`${iconPreviewCls} transition hover:-translate-y-0.5 hover:border-pp-blue/35`}
                             onClick={() =>
-                              setIconPickerTarget({ kind: 'skill', groupIndex: gIdx, itemIndex: iIdx })
+                              setIconPickerTarget({
+                                kind: 'skill',
+                                groupIndex: gIdx,
+                                itemIndex: iIdx,
+                              })
                             }
-                            title='Pick icon'
+                            title="Pick icon"
                           >
                             {resolveIconFromCode(it.icon, 18)}
                           </button>
@@ -125,16 +156,19 @@ export default function SkillsSection({
                                 const next = [...p.skills]
                                 const cur = next[gIdx]
                                 const nextItems = [...cur.items]
-                                nextItems[iIdx] = { ...nextItems[iIdx], icon: e.target.value }
+                                nextItems[iIdx] = {
+                                  ...nextItems[iIdx],
+                                  icon: e.target.value,
+                                }
                                 next[gIdx] = { ...cur, items: nextItems }
                                 return { ...p, skills: next }
                               })
                             }}
-                            placeholder='e.g. fa:FaReact'
+                            placeholder="e.g. fa:FaReact"
                           />
                         </div>
                       </div>
-                      <div className='space-y-2'>
+                      <div className="space-y-2">
                         <label className={labelCls}>Name</label>
                         <input
                           className={inputCls}
@@ -144,24 +178,30 @@ export default function SkillsSection({
                               const next = [...p.skills]
                               const cur = next[gIdx]
                               const nextItems = [...cur.items]
-                              nextItems[iIdx] = { ...nextItems[iIdx], name: e.target.value }
+                              nextItems[iIdx] = {
+                                ...nextItems[iIdx],
+                                name: e.target.value,
+                              }
                               next[gIdx] = { ...cur, items: nextItems }
                               return { ...p, skills: next }
                             })
                           }}
-                          placeholder='e.g. TypeScript'
+                          placeholder="e.g. TypeScript"
                         />
                       </div>
                     </div>
-                    <div className='mt-3 flex justify-end'>
+                    <div className="mt-3 flex justify-end">
                       <button
-                        type='button'
+                        type="button"
                         className={ghostBtnCls}
                         onClick={() => {
                           setProfile(p => {
                             const next = [...p.skills]
                             const cur = next[gIdx]
-                            next[gIdx] = { ...cur, items: cur.items.filter((_, i) => i !== iIdx) }
+                            next[gIdx] = {
+                              ...cur,
+                              items: cur.items.filter((_, i) => i !== iIdx),
+                            }
                             return { ...p, skills: next }
                           })
                         }}
@@ -174,17 +214,22 @@ export default function SkillsSection({
               </div>
 
               {group.items.length > 0 ? (
-                <AddMoreButton label='+ Add item' onClick={() => addItem(gIdx)} />
+                <AddMoreButton
+                  label="+ Add item"
+                  onClick={() => addItem(gIdx)}
+                />
               ) : null}
             </div>
           </div>
         ))}
 
         {profile.skills.length > 0 ? (
-          <AddMoreButton label='+ Add skill group' onClick={addGroup} />
+          <AddMoreButton
+            label="+ Add skill group"
+            onClick={addGroup}
+          />
         ) : null}
       </div>
     </Section>
   )
 }
-

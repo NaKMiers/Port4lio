@@ -9,7 +9,8 @@ import Chevron from '@/components/mbti/Chevron'
 import type { Locale } from '@/lib/i18n'
 import type { Answer } from '@/lib/mbti/scoring'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 /**
  * The question's typography, shared by the visible heading and the invisible sizers that
@@ -106,7 +107,10 @@ export default function TestClient({
         total: questions.length,
       })
       try {
-        navigator.sendBeacon('/api/event', new Blob([payload], { type: 'application/json' }))
+        navigator.sendBeacon(
+          '/api/event',
+          new Blob([payload], { type: 'application/json' })
+        )
       } catch {
         // A blocked or unavailable beacon costs one uncounted session. It must never
         // interfere with the test the visitor is in the middle of.
@@ -164,52 +168,54 @@ export default function TestClient({
     const next = [...answers, answer]
     setAnswers(next)
 
-    if (next.length === questions.length) {
-      void submit(next)
-    }
+    if (next.length === questions.length) void submit(next)
   }
 
-  if (submitting || !current) {
+  if (submitting || !current)
     return (
-      <div className='flex min-h-[60vh] flex-col items-center justify-center gap-4 py-24'>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 py-24">
         <span
-          className='h-3 w-3 rounded-full bg-[linear-gradient(135deg,var(--pp-violet),var(--pp-blue))] pp-pulse-soft'
+          className="pp-pulse-soft h-3 w-3 rounded-full bg-[linear-gradient(135deg,var(--pp-violet),var(--pp-blue))]"
           aria-hidden
         />
         <p
-          className={cx('text-center text-lg', error ? 'text-[#c2410c]' : 'text-pp-muted')}
-          role='status'
-          aria-live='polite'
+          className={cx(
+            'text-center text-lg',
+            error ? 'text-[#c2410c]' : 'text-pp-muted'
+          )}
+          role="status"
+          aria-live="polite"
         >
           {error ?? copy.submitting}
         </p>
       </div>
     )
-  }
 
   const answered = index
   const percent = Math.round((answered / questions.length) * 100)
 
   return (
-    <div className='py-10 md:py-14'>
-      <div className='flex items-baseline justify-between gap-4'>
-        <p className='font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+    <div className="py-10 md:py-14">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted">
           {copy.questionProgress
             .replace('{current}', String(index + 1))
             .replace('{total}', String(questions.length))}
         </p>
-        <p className='font-display text-xs font-semibold tabular-nums text-pp-muted'>{percent}%</p>
+        <p className="font-display text-xs font-semibold tabular-nums text-pp-muted">
+          {percent}%
+        </p>
       </div>
 
       <div
-        className='mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(31,28,26,0.07)]'
-        role='progressbar'
+        className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-[rgba(31,28,26,0.07)]"
+        role="progressbar"
         aria-valuemin={0}
         aria-valuemax={questions.length}
         aria-valuenow={answered}
       >
         <div
-          className='h-full rounded-full bg-[linear-gradient(90deg,var(--pp-violet),var(--pp-blue))] transition-all duration-300'
+          className="h-full rounded-full bg-[linear-gradient(90deg,var(--pp-violet),var(--pp-blue))] transition-all duration-300"
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -251,7 +257,7 @@ export default function TestClient({
         measured at the wrong weight and leading, wrapped differently from the heading and
         reserved a height that matched nothing. `div` is not styled globally here.
       */}
-      <div className='mt-9 grid'>
+      <div className="mt-9 grid">
         {questions.map(question => (
           <div
             key={question.id}
@@ -261,41 +267,48 @@ export default function TestClient({
             {question.prompt}
           </div>
         ))}
-        <h1 className={cx(PROMPT_TYPE, 'col-start-1 row-start-1')}>{current.prompt}</h1>
+        <h1 className={cx(PROMPT_TYPE, 'col-start-1 row-start-1')}>
+          {current.prompt}
+        </h1>
       </div>
 
-      <div className='mt-8 space-y-3'>
+      <div className="mt-8 space-y-3">
         {(['a', 'b'] as const).map(key => (
           <button
             key={key}
-            type='button'
+            type="button"
             onClick={() => choose(key)}
-            className='group flex w-full items-center gap-4 rounded-panel border border-pp-line bg-pp-panel px-5 py-4 text-left shadow-panel backdrop-blur-md transition hover:border-[rgba(123,109,255,0.45)] hover:bg-pp-panel-strong focus-visible:border-[rgba(123,109,255,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(123,109,255,0.35)] motion-safe:hover:-translate-y-0.5'
+            className="group flex w-full items-center gap-4 rounded-panel border border-pp-line bg-pp-panel px-5 py-4 text-left shadow-panel backdrop-blur-md transition hover:border-[rgba(123,109,255,0.45)] hover:bg-pp-panel-strong focus-visible:border-[rgba(123,109,255,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(123,109,255,0.35)] motion-safe:hover:-translate-y-0.5"
           >
             <span
-              className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-pp-line bg-white/80 font-display text-xs font-semibold uppercase text-pp-muted transition group-hover:border-[rgba(123,109,255,0.4)] group-hover:text-pp-text'
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-pp-line bg-white/80 font-display text-xs font-semibold uppercase text-pp-muted transition group-hover:border-[rgba(123,109,255,0.4)] group-hover:text-pp-text"
               aria-hidden
             >
               {key}
             </span>
-            <span className='text-base leading-relaxed text-pp-text md:text-lg'>{current[key]}</span>
+            <span className="text-base leading-relaxed text-pp-text md:text-lg">
+              {current[key]}
+            </span>
           </button>
         ))}
       </div>
 
       {index > 0 && (
         <button
-          type='button'
+          type="button"
           onClick={() => setAnswers(answers.slice(0, -1))}
-          className='mt-8 inline-flex items-center gap-2 text-sm font-semibold text-pp-muted transition hover:text-pp-text'
+          className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-pp-muted transition hover:text-pp-text"
         >
-          <Chevron direction='left' />
+          <Chevron direction="left" />
           {copy.back}
         </button>
       )}
 
       {error && (
-        <p className='mt-6 text-sm text-[#c2410c]' role='alert'>
+        <p
+          className="mt-6 text-sm text-[#c2410c]"
+          role="alert"
+        >
           {error}
         </p>
       )}

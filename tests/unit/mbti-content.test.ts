@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { LOCALES } from '@/lib/i18n'
 import { getQuestionContent, getTypeContent, UI } from '@/lib/mbti/content'
 import { QUESTIONS } from '@/lib/mbti/questions'
-import { groupOfType, MBTI_TYPES, TYPE_GROUPS, typesInGroup } from '@/lib/mbti/types'
+import {
+  groupOfType,
+  MBTI_TYPES,
+  TYPE_GROUPS,
+  typesInGroup,
+} from '@/lib/mbti/types'
 import { isTokenShaped, mintToken, TOKEN_LENGTH } from '@/lib/tokens'
 
 /**
@@ -15,23 +20,30 @@ import { isTokenShaped, mintToken, TOKEN_LENGTH } from '@/lib/tokens'
  */
 describe('question content', () => {
   it('has wording for every question in every locale', () => {
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       for (const question of QUESTIONS) {
         const content = getQuestionContent(locale, question.id)
-        expect(content.prompt.length, `${locale} q${question.id} prompt`).toBeGreaterThan(0)
-        expect(content.a.length, `${locale} q${question.id} answer a`).toBeGreaterThan(0)
-        expect(content.b.length, `${locale} q${question.id} answer b`).toBeGreaterThan(0)
+        expect(
+          content.prompt.length,
+          `${locale} q${question.id} prompt`
+        ).toBeGreaterThan(0)
+        expect(
+          content.a.length,
+          `${locale} q${question.id} answer a`
+        ).toBeGreaterThan(0)
+        expect(
+          content.b.length,
+          `${locale} q${question.id} answer b`
+        ).toBeGreaterThan(0)
       }
-    }
   })
 
   it('never gives a question two identical answers', () => {
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       for (const question of QUESTIONS) {
         const content = getQuestionContent(locale, question.id)
         expect(content.a, `${locale} q${question.id}`).not.toBe(content.b)
       }
-    }
   })
 
   it('throws loudly for an id with no wording', () => {
@@ -41,16 +53,30 @@ describe('question content', () => {
 
 describe('type content', () => {
   it('covers all 16 types in every locale', () => {
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       for (const type of MBTI_TYPES) {
         const content = getTypeContent(locale, type)
-        expect(content.tagline.length, `${locale} ${type} tagline`).toBeGreaterThan(0)
-        expect(content.overview.length, `${locale} ${type} overview`).toBeGreaterThan(0)
-        expect(content.strengths.length, `${locale} ${type} strengths`).toBeGreaterThan(0)
-        expect(content.growth.length, `${locale} ${type} growth`).toBeGreaterThan(0)
-        expect(content.inRelationships.length, `${locale} ${type}`).toBeGreaterThan(0)
+        expect(
+          content.tagline.length,
+          `${locale} ${type} tagline`
+        ).toBeGreaterThan(0)
+        expect(
+          content.overview.length,
+          `${locale} ${type} overview`
+        ).toBeGreaterThan(0)
+        expect(
+          content.strengths.length,
+          `${locale} ${type} strengths`
+        ).toBeGreaterThan(0)
+        expect(
+          content.growth.length,
+          `${locale} ${type} growth`
+        ).toBeGreaterThan(0)
+        expect(
+          content.inRelationships.length,
+          `${locale} ${type}`
+        ).toBeGreaterThan(0)
       }
-    }
   })
 
   it('localizes the nickname rather than leaving it in English', () => {
@@ -60,7 +86,9 @@ describe('type content', () => {
     // fails, so the next type added cannot quietly ship untranslated.
     for (const type of MBTI_TYPES) {
       const vi = getTypeContent('vi', type).nickname
-      expect(vi, `${type} nickname is untranslated`).not.toBe(getTypeContent('en', type).nickname)
+      expect(vi, `${type} nickname is untranslated`).not.toBe(
+        getTypeContent('en', type).nickname
+      )
       expect(vi, `${type} nickname looks English`).not.toMatch(/^The /)
     }
   })
@@ -70,13 +98,16 @@ describe('type content', () => {
     // rendering bug. Cheap to prevent, invisible until someone screenshots the page.
     for (const locale of LOCALES) {
       const groupLabels = new Set(
-        TYPE_GROUPS.map(group => UI[locale].groupLabels[group].toLowerCase()),
+        TYPE_GROUPS.map(group => UI[locale].groupLabels[group].toLowerCase())
       )
       for (const type of MBTI_TYPES) {
-        const nickname = getTypeContent(locale, type).nickname.replace(/^The /, '').toLowerCase()
-        expect(groupLabels.has(nickname), `${locale} ${type} collides with a group label`).toBe(
-          false,
-        )
+        const nickname = getTypeContent(locale, type)
+          .nickname.replace(/^The /, '')
+          .toLowerCase()
+        expect(
+          groupLabels.has(nickname),
+          `${locale} ${type} collides with a group label`
+        ).toBe(false)
       }
     }
   })
@@ -86,9 +117,10 @@ describe('ui strings', () => {
   it('defines the same keys in every locale', () => {
     const [first, ...rest] = LOCALES
     const expected = Object.keys(UI[first]).sort()
-    for (const locale of rest) {
-      expect(Object.keys(UI[locale]).sort(), `locale ${locale}`).toEqual(expected)
-    }
+    for (const locale of rest)
+      expect(Object.keys(UI[locale]).sort(), `locale ${locale}`).toEqual(
+        expected
+      )
   })
 
   it('keeps both placeholders in the progress template', () => {
@@ -100,17 +132,17 @@ describe('ui strings', () => {
 
   it('keeps the count placeholder in the test summary', () => {
     // Without it the landing page advertises a literal "{count} questions".
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       expect(UI[locale].testMeta).toContain('{count}')
-    }
   })
 
   it('names every temperament group in every locale', () => {
-    for (const locale of LOCALES) {
-      for (const group of TYPE_GROUPS) {
-        expect(UI[locale].groupLabels[group]?.length, `${locale} ${group}`).toBeGreaterThan(0)
-      }
-    }
+    for (const locale of LOCALES)
+      for (const group of TYPE_GROUPS)
+        expect(
+          UI[locale].groupLabels[group]?.length,
+          `${locale} ${group}`
+        ).toBeGreaterThan(0)
   })
 })
 
@@ -124,9 +156,8 @@ describe('temperament groups', () => {
   it('splits the sixteen types evenly, four per group', () => {
     // Four groups of four is what the landing page grid assumes; an uneven split there
     // would be a content bug that only shows up as a ragged row.
-    for (const group of TYPE_GROUPS) {
+    for (const group of TYPE_GROUPS)
       expect(typesInGroup(group), group).toHaveLength(4)
-    }
   })
 
   it('follows the standard pairings', () => {
@@ -188,16 +219,19 @@ describe('capability tokens', () => {
  * assume it has already been seen.
  */
 describe('the MBTI paywall lead', () => {
-  it.each(LOCALES)('promises the type rather than assuming it in %s', locale => {
-    const lead = UI[locale].paywallLead.toLowerCase()
+  it.each(LOCALES)(
+    'promises the type rather than assuming it in %s',
+    locale => {
+      const lead = UI[locale].paywallLead.toLowerCase()
 
-    // What is being sold, said out loud - the reader's own four letters.
-    expect(lead).toMatch(/bốn chữ|four-letter/)
+      // What is being sold, said out loud - the reader's own four letters.
+      expect(lead).toMatch(/bốn chữ|four-letter/)
 
-    // The presupposition that broke. Matching the phrasings rather than a single string, so
-    // a reworded version of the same mistake still trips this.
-    expect(lead).not.toMatch(/bạn đã biết|you already know|as you know/)
-  })
+      // The presupposition that broke. Matching the phrasings rather than a single string, so
+      // a reworded version of the same mistake still trips this.
+      expect(lead).not.toMatch(/bạn đã biết|you already know|as you know/)
+    }
+  )
 
   it.each(LOCALES)('still interpolates the price in %s', locale => {
     // The rewrite above touched this string; a lost placeholder would render the paywall

@@ -34,21 +34,29 @@ export default function BasicsSection({
   setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
   setError: React.Dispatch<React.SetStateAction<string | null>>
 }) {
-  const addJobTitle = () => setProfile(p => ({ ...p, jobTitle: [...p.jobTitle, ''] }))
+  const addJobTitle = () =>
+    setProfile(p => ({ ...p, jobTitle: [...p.jobTitle, ''] }))
 
   return (
-    <Section id='basics' title='Basics' badge='avatar, CV, headings' defaultOpen>
-      <div className='grid grid-cols-1 gap-5 md:grid-cols-2'>
-        <div className='space-y-2'>
-          <div className='flex items-center justify-between gap-3'>
+    <Section
+      id="basics"
+      title="Basics"
+      badge="avatar, CV, headings"
+      defaultOpen
+    >
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
             <label className={labelCls}>Avatar</label>
-            {uploading.avatar ? <Spinner className='text-pp-muted' /> : null}
+            {uploading.avatar ? <Spinner className="text-pp-muted" /> : null}
           </div>
-          <p className={helpTextCls}>Max {MAX_UPLOAD_MB_LABEL} MB per image. Uploads immediately.</p>
+          <p className={helpTextCls}>
+            Max {MAX_UPLOAD_MB_LABEL} MB per image. Uploads immediately.
+          </p>
           <input
-            type='file'
-            aria-label='Upload avatar image'
-            accept='image/*'
+            type="file"
+            aria-label="Upload avatar image"
+            accept="image/*"
             disabled={uploading.avatar}
             className={uploadInputCls}
             onChange={async e => {
@@ -71,29 +79,35 @@ export default function BasicsSection({
               }
             }}
           />
-          {uploading.avatar ? <p className={helpTextCls}>Uploading...</p> : null}
+          {uploading.avatar ? (
+            <p className={helpTextCls}>Uploading...</p>
+          ) : null}
           {preview.av ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={preview.av}
-              alt='Avatar preview'
-              className='h-24 w-24 rounded-full border border-pp-line object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]'
+              alt="Avatar preview"
+              className="h-24 w-24 rounded-full border border-pp-line object-cover shadow-[0_14px_28px_rgba(46,35,28,0.08)]"
             />
           ) : (
             <div className={emptyStateCls}>Optional</div>
           )}
         </div>
 
-        <div className='space-y-2'>
-          <div className='flex items-center justify-between gap-3'>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
             <label className={labelCls}>Background Image</label>
-            {uploading.background ? <Spinner className='text-pp-muted' /> : null}
+            {uploading.background ? (
+              <Spinner className="text-pp-muted" />
+            ) : null}
           </div>
-          <p className={helpTextCls}>Max {MAX_UPLOAD_MB_LABEL} MB per image. Uploads immediately.</p>
+          <p className={helpTextCls}>
+            Max {MAX_UPLOAD_MB_LABEL} MB per image. Uploads immediately.
+          </p>
           <input
-            type='file'
-            aria-label='Upload background image'
-            accept='image/*'
+            type="file"
+            aria-label="Upload background image"
+            accept="image/*"
             disabled={uploading.background}
             className={uploadInputCls}
             onChange={async e => {
@@ -116,67 +130,80 @@ export default function BasicsSection({
               }
             }}
           />
-          {uploading.background ? <p className={helpTextCls}>Uploading...</p> : null}
+          {uploading.background ? (
+            <p className={helpTextCls}>Uploading...</p>
+          ) : null}
           {preview.bg ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={preview.bg}
-              alt='Background preview'
-              className='h-28 w-full rounded-[1.1rem] border border-pp-line object-cover shadow-[0_12px_24px_rgba(46,35,28,0.06)]'
+              alt="Background preview"
+              className="h-28 w-full rounded-[1.1rem] border border-pp-line object-cover shadow-[0_12px_24px_rgba(46,35,28,0.06)]"
             />
           ) : (
             <div className={emptyStateCls}>Optional</div>
           )}
         </div>
 
-        <div className='space-y-2'>
+        <div className="space-y-2">
           <label className={labelCls}>Profile description</label>
           <input
             className={inputCls}
             value={profile.description}
-            onChange={e => setProfile(p => ({ ...p, description: e.target.value }))}
-            placeholder='Short intro (e.g. Full-stack developer)'
+            onChange={e =>
+              setProfile(p => ({ ...p, description: e.target.value }))
+            }
+            placeholder="Short intro (e.g. Full-stack developer)"
           />
         </div>
 
-        <div className='space-y-2'>
+        <div className="space-y-2">
           <label className={labelCls}>Full name</label>
           <input
             className={inputCls}
             value={profile.fullName}
-            onChange={e => setProfile(p => ({ ...p, fullName: e.target.value }))}
-            placeholder='Your full name'
+            onChange={e =>
+              setProfile(p => ({ ...p, fullName: e.target.value }))
+            }
+            placeholder="Your full name"
           />
         </div>
 
-        <div className='space-y-2'>
+        <div className="space-y-2">
           <label className={labelCls}>Username</label>
           <input
             className={inputCls}
             value={profile.username}
-            onChange={e => setProfile(p => ({ ...p, username: e.target.value }))}
-            placeholder='Your name/handle'
+            onChange={e =>
+              setProfile(p => ({ ...p, username: e.target.value }))
+            }
+            placeholder="Your name/handle"
           />
         </div>
 
-        <div className='space-y-3 md:col-span-2'>
-          <div className='flex items-center justify-between gap-3'>
+        <div className="space-y-3 md:col-span-2">
+          <div className="flex items-center justify-between gap-3">
             <label className={labelCls}>Job Titles</label>
             <button
-              type='button'
+              type="button"
               className={secondaryBtnCls}
               onClick={addJobTitle}
             >
               + Add
             </button>
           </div>
-          {profile.jobTitle.length === 0 ? <div className={emptyStateCls}>No job titles yet.</div> : null}
-          <div className='space-y-2'>
+          {profile.jobTitle.length === 0 ? (
+            <div className={emptyStateCls}>No job titles yet.</div>
+          ) : null}
+          <div className="space-y-2">
             {profile.jobTitle.map((title, idx) => (
-              <div key={idx} className={itemCardCls}>
-                <div className='flex items-center gap-2'>
+              <div
+                key={idx}
+                className={itemCardCls}
+              >
+                <div className="flex items-center gap-2">
                   <input
-                    type='text'
+                    type="text"
                     className={inputCls}
                     value={title}
                     onChange={e =>
@@ -186,13 +213,16 @@ export default function BasicsSection({
                         return { ...p, jobTitle: next }
                       })
                     }
-                    placeholder='e.g. Frontend Developer'
+                    placeholder="e.g. Frontend Developer"
                   />
                   <button
-                    type='button'
+                    type="button"
                     className={ghostBtnCls}
                     onClick={() =>
-                      setProfile(p => ({ ...p, jobTitle: p.jobTitle.filter((_, i) => i !== idx) }))
+                      setProfile(p => ({
+                        ...p,
+                        jobTitle: p.jobTitle.filter((_, i) => i !== idx),
+                      }))
                     }
                   >
                     Remove
@@ -201,28 +231,35 @@ export default function BasicsSection({
               </div>
             ))}
             {profile.jobTitle.length > 0 ? (
-              <AddMoreButton label='+ Add job title' onClick={addJobTitle} />
+              <AddMoreButton
+                label="+ Add job title"
+                onClick={addJobTitle}
+              />
             ) : null}
           </div>
         </div>
 
-        <div className='space-y-2 md:col-span-2'>
+        <div className="space-y-2 md:col-span-2">
           <label className={labelCls}>Profile Heading</label>
           <input
             className={inputCls}
             value={profile.profileHeading}
-            onChange={e => setProfile(p => ({ ...p, profileHeading: e.target.value }))}
-            placeholder='Main heading'
+            onChange={e =>
+              setProfile(p => ({ ...p, profileHeading: e.target.value }))
+            }
+            placeholder="Main heading"
           />
         </div>
 
-        <div className='space-y-2 md:col-span-2'>
+        <div className="space-y-2 md:col-span-2">
           <label className={labelCls}>Profile Sub-heading</label>
           <input
             className={inputCls}
             value={profile.profileSubHeading}
-            onChange={e => setProfile(p => ({ ...p, profileSubHeading: e.target.value }))}
-            placeholder='Secondary heading'
+            onChange={e =>
+              setProfile(p => ({ ...p, profileSubHeading: e.target.value }))
+            }
+            placeholder="Secondary heading"
           />
         </div>
       </div>

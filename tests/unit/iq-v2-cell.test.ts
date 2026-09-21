@@ -40,13 +40,19 @@ describe('cellKey collapses encodings that render alike', () => {
     // A square in the frame slot and the same square centred in the inner slot are one
     // picture. A key that told them apart would let a rule offer both as options.
     const asFrame: Cell = { frame: { class: 'frame', ...body() } }
-    const asInner: Cell = { inner: { class: 'inner', anchor: 'center', ...body() } }
+    const asInner: Cell = {
+      inner: { class: 'inner', anchor: 'center', ...body() },
+    }
     expect(cellKey(asFrame)).toBe(cellKey(asInner))
   })
 
   it('reduces rotation by each shape symmetry', () => {
     const at = (kind: ShapeBody['kind'], deg: number): Cell => ({
-      inner: { class: 'inner', anchor: 'center', ...body({ kind, rotationDeg: deg }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ kind, rotationDeg: deg }),
+      },
     })
 
     // A square repeats every 90 degrees, a triangle every 120, a hexagon every 60.
@@ -63,7 +69,11 @@ describe('cellKey collapses encodings that render alike', () => {
     // A circle is invariant under every rotation, so its angle must not reach the key at all
     // - otherwise a rule could offer the "same circle turned 30 degrees" as a wrong answer.
     const at = (deg: number): Cell => ({
-      inner: { class: 'inner', anchor: 'center', ...body({ kind: 'circle', rotationDeg: deg }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ kind: 'circle', rotationDeg: deg }),
+      },
     })
     expect(cellKey(at(0))).toBe(cellKey(at(37)))
     expect(cellKey(at(0))).toBe(cellKey(at(211)))
@@ -73,7 +83,11 @@ describe('cellKey collapses encodings that render alike', () => {
     // 360/7 is 51.428..., so reducing an integer angle by it lands on values that differ in
     // the fifteenth decimal place. Bucketing is what stops that becoming two keys.
     const at = (deg: number): Cell => ({
-      inner: { class: 'inner', anchor: 'center', ...body({ kind: 'heptagon', rotationDeg: deg }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ kind: 'heptagon', rotationDeg: deg }),
+      },
     })
     expect(cellKey(at(0))).toBe(cellKey(at(Math.round(360 / 7))))
     expect(cellKey(at(0))).toBe(cellKey(at(360)))
@@ -86,14 +100,27 @@ describe('cellKey collapses encodings that render alike', () => {
   })
 
   it('separates cells that really do differ', () => {
-    const base: Cell = { inner: { class: 'inner', anchor: 'center', ...body() } }
+    const base: Cell = {
+      inner: { class: 'inner', anchor: 'center', ...body() },
+    }
     const moved: Cell = { inner: { class: 'inner', anchor: 'ne', ...body() } }
     const filled: Cell = {
-      inner: { class: 'inner', anchor: 'center', ...body({ shading: 'filled' }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ shading: 'filled' }),
+      },
     }
-    const bigger: Cell = { inner: { class: 'inner', anchor: 'center', ...body({ sizeStep: 12 }) } }
+    const bigger: Cell = {
+      inner: { class: 'inner', anchor: 'center', ...body({ sizeStep: 12 }) },
+    }
 
-    const keys = new Set([cellKey(base), cellKey(moved), cellKey(filled), cellKey(bigger)])
+    const keys = new Set([
+      cellKey(base),
+      cellKey(moved),
+      cellKey(filled),
+      cellKey(bigger),
+    ])
     expect(keys.size).toBe(4)
   })
 
@@ -109,7 +136,11 @@ describe('noHiddenLayers', () => {
     // keying differently for each - six options, one picture, five marked wrong.
     const hidden: Cell = {
       frame: { class: 'frame', ...body({ shading: 'filled', sizeStep: 12 }) },
-      inner: { class: 'inner', anchor: 'center', ...body({ kind: 'circle', sizeStep: 2 }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ kind: 'circle', sizeStep: 2 }),
+      },
     }
     expect(noHiddenLayers(hidden)).toBe(false)
   })
@@ -119,7 +150,11 @@ describe('noHiddenLayers', () => {
     // is what keeps this case allowed.
     const fine: Cell = {
       frame: { class: 'frame', ...body({ shading: 'outline', sizeStep: 12 }) },
-      inner: { class: 'inner', anchor: 'center', ...body({ kind: 'circle', shading: 'filled', sizeStep: 2 }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ kind: 'circle', shading: 'filled', sizeStep: 2 }),
+      },
     }
     expect(noHiddenLayers(fine)).toBe(true)
   })
@@ -127,19 +162,28 @@ describe('noHiddenLayers', () => {
   it('rejects a filled shape swallowing lattice dots', () => {
     const swallowed: Cell = {
       field: { class: 'field', size: 3, filled: [0, 1, 2, 3, 4, 5, 6, 7, 8] },
-      inner: { class: 'inner', anchor: 'center', ...body({ shading: 'filled', sizeStep: 13 }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ shading: 'filled', sizeStep: 13 }),
+      },
     }
     expect(noHiddenLayers(swallowed)).toBe(false)
   })
 
   it('accepts a plain single-element cell', () => {
-    expect(noHiddenLayers({ inner: { class: 'inner', anchor: 'center', ...body() } })).toBe(true)
+    expect(
+      noHiddenLayers({ inner: { class: 'inner', anchor: 'center', ...body() } })
+    ).toBe(true)
     expect(noHiddenLayers({})).toBe(true)
   })
 })
 
 describe('perceptuallyDistinct', () => {
-  const inner = (over: Partial<ShapeBody> = {}, anchor: 'center' | 'ne' = 'center'): Cell => ({
+  const inner = (
+    over: Partial<ShapeBody> = {},
+    anchor: 'center' | 'ne' = 'center'
+  ): Cell => ({
     inner: { class: 'inner', anchor, ...body(over) },
   })
 
@@ -147,28 +191,53 @@ describe('perceptuallyDistinct', () => {
     // The floor exists because structural inequality is not enough: `cellKey` separates
     // adjacent size steps, and a panel built on that alone offers six options where two look
     // identical. Steps are 0.06 apart, so one step is 3 cell units - invisible at render size.
-    expect(perceptuallyDistinct(inner({ sizeStep: 6 }), inner({ sizeStep: 7 }))).toBe(false)
-    expect(perceptuallyDistinct(inner({ sizeStep: 6 }), inner({ sizeStep: 8 }))).toBe(true)
+    expect(
+      perceptuallyDistinct(inner({ sizeStep: 6 }), inner({ sizeStep: 7 }))
+    ).toBe(false)
+    expect(
+      perceptuallyDistinct(inner({ sizeStep: 6 }), inner({ sizeStep: 8 }))
+    ).toBe(true)
   })
 
   it('measures rotation the short way around the symmetry', () => {
     // A square at 5 and at 95 degrees is ten degrees apart, not ninety. Getting this wrong
     // would let a rule offer a near-identical rotation as a wrong answer.
-    expect(perceptuallyDistinct(inner({ rotationDeg: 5 }), inner({ rotationDeg: 95 }))).toBe(false)
-    expect(perceptuallyDistinct(inner({ rotationDeg: 0 }), inner({ rotationDeg: 10 }))).toBe(false)
-    expect(perceptuallyDistinct(inner({ rotationDeg: 0 }), inner({ rotationDeg: 45 }))).toBe(true)
+    expect(
+      perceptuallyDistinct(
+        inner({ rotationDeg: 5 }),
+        inner({ rotationDeg: 95 })
+      )
+    ).toBe(false)
+    expect(
+      perceptuallyDistinct(
+        inner({ rotationDeg: 0 }),
+        inner({ rotationDeg: 10 })
+      )
+    ).toBe(false)
+    expect(
+      perceptuallyDistinct(
+        inner({ rotationDeg: 0 }),
+        inner({ rotationDeg: 45 })
+      )
+    ).toBe(true)
   })
 
   it('treats categorical changes as always visible', () => {
     expect(perceptuallyDistinct(inner(), inner({ kind: 'circle' }))).toBe(true)
-    expect(perceptuallyDistinct(inner(), inner({ shading: 'filled' }))).toBe(true)
+    expect(perceptuallyDistinct(inner(), inner({ shading: 'filled' }))).toBe(
+      true
+    )
     expect(perceptuallyDistinct(inner(), inner({}, 'ne'))).toBe(true)
   })
 
   it('notices a slot appearing or disappearing', () => {
     const withMark: Cell = {
       ...inner(),
-      mark: { class: 'mark', anchor: 'ne', ...body({ kind: 'circle', sizeStep: 1 }) },
+      mark: {
+        class: 'mark',
+        anchor: 'ne',
+        ...body({ kind: 'circle', sizeStep: 1 }),
+      },
     }
     expect(perceptuallyDistinct(inner(), withMark)).toBe(true)
   })
@@ -216,9 +285,17 @@ describe('perceptuallyDistinct', () => {
       inner(),
       { field: { class: 'field', size: 3, filled: [1, 5] } },
       { tally: { class: 'tally', count: 5, anchor: 's' } },
-      { frame: { class: 'frame', ...body() }, inner: { class: 'inner', anchor: 'nw', ...body({ kind: 'star5', sizeStep: 2 }) } },
+      {
+        frame: { class: 'frame', ...body() },
+        inner: {
+          class: 'inner',
+          anchor: 'nw',
+          ...body({ kind: 'star5', sizeStep: 2 }),
+        },
+      },
     ]
-    for (const cell of cells) expect(perceptuallyDistinct(cell, cell)).toBe(false)
+    for (const cell of cells)
+      expect(perceptuallyDistinct(cell, cell)).toBe(false)
   })
 })
 
@@ -229,7 +306,11 @@ describe('cellSvg', () => {
     // is actually a wrong answer on screen.
     const twoHalves: Cell = {
       frame: { class: 'frame', ...body({ shading: 'half', sizeStep: 12 }) },
-      inner: { class: 'inner', anchor: 'center', ...body({ kind: 'circle', shading: 'half', sizeStep: 4 }) },
+      inner: {
+        class: 'inner',
+        anchor: 'center',
+        ...body({ kind: 'circle', shading: 'half', sizeStep: 4 }),
+      },
     }
     const svg = cellSvg(twoHalves, 'q1o2')
     const ids = svg.match(/id="h-[^"]+"/g) ?? []
@@ -259,15 +340,37 @@ describe('cellSvg', () => {
     const extremes: Cell[] = [
       { tally: { class: 'tally', count: 1, anchor: 'center' } },
       { tally: { class: 'tally', count: 7, anchor: 'center' } },
-      { inner: { class: 'inner', anchor: 'nw', ...body({ sizeStep: SIZE_STEPS.length - 1 }) } },
-      { inner: { class: 'inner', anchor: 'se', ...body({ sizeStep: SIZE_STEPS.length - 1 }) } },
+      {
+        inner: {
+          class: 'inner',
+          anchor: 'nw',
+          ...body({ sizeStep: SIZE_STEPS.length - 1 }),
+        },
+      },
+      {
+        inner: {
+          class: 'inner',
+          anchor: 'se',
+          ...body({ sizeStep: SIZE_STEPS.length - 1 }),
+        },
+      },
     ]
-    for (const cell of extremes) {
+    for (const cell of extremes)
       for (const { draw } of cellDraws(cell)) {
         const box =
           draw.form === 'stroke'
-            ? { x0: draw.cx - draw.w / 2, x1: draw.cx + draw.w / 2, y0: draw.cy - draw.h / 2, y1: draw.cy + draw.h / 2 }
-            : { x0: draw.cx - draw.r, x1: draw.cx + draw.r, y0: draw.cy - draw.r, y1: draw.cy + draw.r }
+            ? {
+                x0: draw.cx - draw.w / 2,
+                x1: draw.cx + draw.w / 2,
+                y0: draw.cy - draw.h / 2,
+                y1: draw.cy + draw.h / 2,
+              }
+            : {
+                x0: draw.cx - draw.r,
+                x1: draw.cx + draw.r,
+                y0: draw.cy - draw.r,
+                y1: draw.cy + draw.r,
+              }
         // A generous margin: a shape at a corner anchor legitimately overhangs a little, but
         // it must never reach the next cell, which starts 12 units past the edge.
         expect(box.x0, JSON.stringify(draw)).toBeGreaterThan(-12)
@@ -275,6 +378,5 @@ describe('cellSvg', () => {
         expect(box.x1, JSON.stringify(draw)).toBeLessThan(112)
         expect(box.y1, JSON.stringify(draw)).toBeLessThan(112)
       }
-    }
   })
 })

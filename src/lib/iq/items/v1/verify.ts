@@ -42,7 +42,7 @@ export type VerifyResult = { ok: true } | { ok: false; reason: string }
 function identity(cell: Item['answer']): string {
   if (cell.type !== 'shape') return cellKey(cell)
   const period = SYMMETRY[cell.spec.kind] ?? 360
-  const rotation = ((cell.spec.rotation ?? 0) % period + period) % period
+  const rotation = (((cell.spec.rotation ?? 0) % period) + period) % period
   return `s:${cell.spec.kind}:${cell.spec.shading}:${rotation}:${(cell.spec.scale ?? 0.78).toFixed(2)}`
 }
 
@@ -85,7 +85,8 @@ function setLogicOperatorIsUnique(item: Item): boolean {
 
   const consistent = (Object.keys(ops) as (keyof typeof ops)[]).filter(op =>
     rows.every(([a, b, c]) => {
-      for (let i = 0; i < total; i += 1) if (ops[op](a, b, i) !== c.has(i)) return false
+      for (let i = 0; i < total; i += 1)
+        if (ops[op](a, b, i) !== c.has(i)) return false
       return true
     })
   )
@@ -94,34 +95,46 @@ function setLogicOperatorIsUnique(item: Item): boolean {
 }
 
 export function verifyItem(item: Item): VerifyResult {
-  if (item.cells.length !== 8) {
-    return { ok: false, reason: `expected 8 given cells, got ${item.cells.length}` }
-  }
+  if (item.cells.length !== 8)
+    return {
+      ok: false,
+      reason: `expected 8 given cells, got ${item.cells.length}`,
+    }
 
-  if (item.rule === 'set-logic' && !setLogicOperatorIsUnique(item)) {
-    return { ok: false, reason: 'the given rows are consistent with more than one operator' }
-  }
-  if (item.distractors.length !== 5) {
-    return { ok: false, reason: `expected 5 distractors, got ${item.distractors.length}` }
-  }
+  if (item.rule === 'set-logic' && !setLogicOperatorIsUnique(item))
+    return {
+      ok: false,
+      reason: 'the given rows are consistent with more than one operator',
+    }
+
+  if (item.distractors.length !== 5)
+    return {
+      ok: false,
+      reason: `expected 5 distractors, got ${item.distractors.length}`,
+    }
 
   const answerKey = identity(item.answer)
   const seen = new Set<string>([answerKey])
 
   for (const distractor of item.distractors) {
     const key = identity(distractor)
-    if (key === answerKey) {
-      return { ok: false, reason: `a distractor is identical to the answer (${key})` }
-    }
-    if (seen.has(key)) {
+    if (key === answerKey)
+      return {
+        ok: false,
+        reason: `a distractor is identical to the answer (${key})`,
+      }
+
+    if (seen.has(key))
       return { ok: false, reason: `two options are identical (${key})` }
-    }
+
     seen.add(key)
   }
 
-  if (seen.size !== 6) {
-    return { ok: false, reason: `expected 6 distinct options, got ${seen.size}` }
-  }
+  if (seen.size !== 6)
+    return {
+      ok: false,
+      reason: `expected 6 distinct options, got ${seen.size}`,
+    }
 
   return { ok: true }
 }

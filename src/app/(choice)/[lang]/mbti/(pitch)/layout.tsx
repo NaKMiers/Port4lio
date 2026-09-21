@@ -83,7 +83,7 @@ export default async function MbtiPitchLayout({
   return (
     <TestProductShell
       locale={lang}
-      product='mbti'
+      product="mbti"
       footerSlot={<AvailabilityBlock locale={lang} />}
     >
       {children}

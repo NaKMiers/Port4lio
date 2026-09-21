@@ -13,7 +13,11 @@ import {
 import { chatCompletion, extractJsonObject, LlmError } from '@/lib/blog/llm'
 import { DEFAULT_MODEL } from '@/lib/blog/generation-fields'
 import { connectDatabase } from '@/lib/mongodb'
-import { BLOG_IMAGE_PROMPT_LIMIT, checkRateLimit, clientIpFrom } from '@/lib/rate-limit'
+import {
+  BLOG_IMAGE_PROMPT_LIMIT,
+  checkRateLimit,
+  clientIpFrom,
+} from '@/lib/rate-limit'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { PostModel } from '@/models/Post'
@@ -67,33 +71,47 @@ export async function POST(
   try {
     await connectDatabase()
   } catch (error) {
-    console.error('[api/admin/blog/[id]/image-prompt] database unreachable', error)
+    console.error(
+      '[api/admin/blog/[id]/image-prompt] database unreachable',
+      error
+    )
     return jsonError('Unable to reach the database right now.', 503)
   }
 
-  const limit = await checkRateLimit(clientIpFrom(request), BLOG_IMAGE_PROMPT_LIMIT)
-  if (!limit.ok) {
+  const limit = await checkRateLimit(
+    clientIpFrom(request),
+    BLOG_IMAGE_PROMPT_LIMIT
+  )
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many prompt rewrites. Give it a minute.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
-  const parsed = await readJsonBody<{ target?: unknown; key?: unknown }>(request, {
-    maxBytes: MAX_BODY_BYTES,
-  })
+  const parsed = await readJsonBody<{ target?: unknown; key?: unknown }>(
+    request,
+    {
+      maxBytes: MAX_BODY_BYTES,
+    }
+  )
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
   const wantsCover = parsed.body?.target === 'cover'
   const key = typeof parsed.body?.key === 'string' ? parsed.body.key.trim() : ''
 
-  if (!wantsCover && !key) {
-    return jsonError('Ask for the cover, or name the placeholder to rewrite.', 400)
-  }
+  if (!wantsCover && !key)
+    return jsonError(
+      'Ask for the cover, or name the placeholder to rewrite.',
+      400
+    )
 
   try {
     const { id } = await params
-    if (!mongoose.Types.ObjectId.isValid(id)) return jsonError('Post not found.', 404)
+    if (!mongoose.Types.ObjectId.isValid(id))
+      return jsonError('Post not found.', 404)
 
     const post = await PostModel.findById(id).select('+bodyMarkdown')
     if (!post) return jsonError('Post not found.', 404)
@@ -101,16 +119,20 @@ export async function POST(
     // Same refusal the generate route makes on a deleted target. A soft-deleted post is one
     // the author has already thrown away; spending a model call to write a prompt into it is
     // paying for a field nothing will ever render.
-    if (post.status === 'deleted') {
-      return jsonError('That post is deleted. Restore it before rewriting its image prompts.', 409)
-    }
+    if (post.status === 'deleted')
+      return jsonError(
+        'That post is deleted. Restore it before rewriting its image prompts.',
+        409
+      )
 
-    if (!post.bodyMarkdown.trim()) {
+    if (!post.bodyMarkdown.trim())
       // The editor hides both surfaces on an empty body, so this is only reachable from a
       // stale tab or a direct call. Named rather than generic: a prompt written from an empty
       // post is a prompt about nothing, and returning one would look like success.
-      return jsonError('Write the post first. An image prompt is written from the body.', 409)
-    }
+      return jsonError(
+        'Write the post first. An image prompt is written from the body.',
+        409
+      )
 
     /*
       The placeholder has to still be in the body.
@@ -120,9 +142,11 @@ export async function POST(
       keys it finds in the text, so a prompt written for a key the author has since deleted
       would be saved, invisible, and never reachable again.
     */
-    if (!wantsCover && !findImagePlaceholders(post.bodyMarkdown).some(item => item.key === key)) {
+    if (
+      !wantsCover &&
+      !findImagePlaceholders(post.bodyMarkdown).some(item => item.key === key)
+    )
       return jsonError(`"${key}" is no longer in the post body.`, 409)
-    }
 
     /*
       The cap is checked BEFORE the model call, not discovered at `save()` after it.
@@ -137,12 +161,11 @@ export async function POST(
       !wantsCover &&
       post.imagePrompts.length >= MAX_IMAGE_PROMPTS &&
       !post.imagePrompts.some(entry => entry.key === key)
-    ) {
+    )
       return jsonError(
         `This post already carries ${MAX_IMAGE_PROMPTS} image prompts, which is the limit. Remove a placeholder from the body before adding another.`,
         409
       )
-    }
 
     const target: ImagePromptTarget = wantsCover
       ? { kind: 'cover' }
@@ -171,20 +194,18 @@ export async function POST(
       timeoutMs: 60_000,
     })
 
-    const prompt = normaliseImagePrompt(extractJsonObject(completion.text).prompt)
-    if (!prompt) {
+    const prompt = normaliseImagePrompt(
+      extractJsonObject(completion.text).prompt
+    )
+    if (!prompt)
       return jsonError('The model returned an empty prompt. Try again.', 422)
-    }
 
-    if (wantsCover) {
-      post.coverImagePrompt = prompt
-    } else {
+    if (wantsCover) post.coverImagePrompt = prompt
+    else {
       const existing = post.imagePrompts.findIndex(entry => entry.key === key)
-      if (existing === -1) {
-        post.imagePrompts.push({ key, prompt })
-      } else {
-        post.imagePrompts[existing].prompt = prompt
-      }
+      if (existing === -1) post.imagePrompts.push({ key, prompt })
+      else post.imagePrompts[existing].prompt = prompt
+
       // A subdocument mutated in place is not seen by mongoose's change tracking on every
       // path shape, so the array is marked explicitly. Without it the push saves and the
       // in-place edit silently does not - which reads as "regenerate works the first time".
@@ -197,14 +218,14 @@ export async function POST(
     // cached page that could be showing a stale version of it.
     return NextResponse.json({ prompt, key: wantsCover ? null : key })
   } catch (error) {
-    if (error instanceof LlmError) {
+    if (error instanceof LlmError)
       return jsonError(error.message, error.status === 429 ? 429 : 502)
-    }
+
     // Both siblings map a schema rejection to 4xx rather than 500 - it is the caller's data,
     // not our outage, and a 500 invites a retry that will fail identically.
-    if (error instanceof mongoose.Error.ValidationError) {
+    if (error instanceof mongoose.Error.ValidationError)
       return jsonError(error.message, 400)
-    }
+
     console.error('[api/admin/blog/[id]/image-prompt] failed', error)
     return jsonError('Could not write an image prompt right now.', 500)
   }

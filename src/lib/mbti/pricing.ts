@@ -32,7 +32,9 @@ function readPrice(): number {
 
   const parsed = Number(raw)
   if (!Number.isFinite(parsed)) {
-    console.error(`[pricing] MBTI_RESULT_PRICE is not a number ("${raw}") - treating as free`)
+    console.error(
+      `[pricing] MBTI_RESULT_PRICE is not a number ("${raw}") - treating as free`
+    )
     return 0
   }
 
@@ -56,9 +58,8 @@ export function getResultPrice(): number {
   if (price < PAYOS_MIN_AMOUNT) {
     const message = `MBTI_RESULT_PRICE is ${price}, below the PayOS minimum of ${PAYOS_MIN_AMOUNT}. Every checkout would fail.`
 
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development')
       throw new Error(`[pricing] ${message}`)
-    }
 
     console.error(`[pricing] ${message} Falling back to free results.`)
     return 0

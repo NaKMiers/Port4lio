@@ -49,7 +49,12 @@ export type SeriesDocument = {
 
 const seriesSchema = new Schema<SeriesDocument>(
   {
-    slug: { type: String, required: true, match: SERIES_SLUG_PATTERN, unique: true },
+    slug: {
+      type: String,
+      required: true,
+      match: SERIES_SLUG_PATTERN,
+      unique: true,
+    },
     title: { type: String, required: true, maxlength: 80 },
     blurb: { type: String, default: '', maxlength: 240 },
     order: { type: Number, default: 0 },

@@ -11,7 +11,11 @@ import {
   Text,
 } from '@react-email/components'
 
-import { EMAIL_CARD_WIDTH, EMAIL_COLOR, EMAIL_FONT } from '@/components/email/theme'
+import {
+  EMAIL_CARD_WIDTH,
+  EMAIL_COLOR,
+  EMAIL_FONT,
+} from '@/components/email/theme'
 import type { Locale } from '@/lib/i18n'
 import type { TypeContent } from '@/lib/mbti/content/types'
 import { AXES, type Axis } from '@/lib/mbti/types'
@@ -64,17 +68,23 @@ const COPY = {
   },
 } as const
 
-function AxisBar({ axis, score }: { axis: Axis; score: { a: number; b: number } }) {
+function AxisBar({
+  axis,
+  score,
+}: {
+  axis: Axis
+  score: { a: number; b: number }
+}) {
   const total = score.a + score.b
   const aPercent = total > 0 ? Math.round((score.a / total) * 100) : 50
   const leansA = aPercent >= 50
 
   return (
     <table
-      width='100%'
+      width="100%"
       cellPadding={0}
       cellSpacing={0}
-      role='presentation'
+      role="presentation"
       style={{ marginBottom: '14px' }}
     >
       <tbody>
@@ -90,7 +100,7 @@ function AxisBar({ axis, score }: { axis: Axis; score: { a: number; b: number } 
             {axis[0]} {aPercent}%
           </td>
           <td
-            align='right'
+            align="right"
             style={{
               fontFamily: EMAIL_FONT.display,
               fontSize: '13px',
@@ -102,16 +112,19 @@ function AxisBar({ axis, score }: { axis: Axis; score: { a: number; b: number } 
           </td>
         </tr>
         <tr>
-          <td colSpan={2} style={{ paddingTop: '6px' }}>
+          <td
+            colSpan={2}
+            style={{ paddingTop: '6px' }}
+          >
             {/*
               A two-cell table, not a div with a nested width. Outlook collapses a
               percentage-width div inside a table cell, which would render every bar full.
             */}
             <table
-              width='100%'
+              width="100%"
               cellPadding={0}
               cellSpacing={0}
-              role='presentation'
+              role="presentation"
               style={{
                 backgroundColor: EMAIL_COLOR.track,
                 borderRadius: '999px',
@@ -122,7 +135,11 @@ function AxisBar({ axis, score }: { axis: Axis; score: { a: number; b: number } 
                 <tr>
                   <td
                     width={`${aPercent}%`}
-                    style={{ backgroundColor: EMAIL_COLOR.violet, height: '8px', lineHeight: '8px' }}
+                    style={{
+                      backgroundColor: EMAIL_COLOR.violet,
+                      height: '8px',
+                      lineHeight: '8px',
+                    }}
                   >
                     &nbsp;
                   </td>
@@ -189,7 +206,7 @@ export default function MbtiResultEmail({
           </Text>
 
           <Heading
-            as='h1'
+            as="h1"
             style={{
               fontFamily: EMAIL_FONT.display,
               fontSize: '56px',
@@ -215,7 +232,14 @@ export default function MbtiResultEmail({
             {content.nickname}
           </Text>
 
-          <Text style={{ fontSize: '16px', lineHeight: 1.6, color: EMAIL_COLOR.muted, margin: '14px 0 0' }}>
+          <Text
+            style={{
+              fontSize: '16px',
+              lineHeight: 1.6,
+              color: EMAIL_COLOR.muted,
+              margin: '14px 0 0',
+            }}
+          >
             {content.tagline}
           </Text>
 
@@ -236,7 +260,11 @@ export default function MbtiResultEmail({
           </Text>
 
           {AXES.map(axis => (
-            <AxisBar key={axis} axis={axis} score={scores[axis]} />
+            <AxisBar
+              key={axis}
+              axis={axis}
+              score={scores[axis]}
+            />
           ))}
 
           <Hr style={{ borderColor: EMAIL_COLOR.line, margin: '28px 0' }} />
@@ -244,7 +272,12 @@ export default function MbtiResultEmail({
           {content.overview.map(paragraph => (
             <Text
               key={paragraph}
-              style={{ fontSize: '15px', lineHeight: 1.7, color: EMAIL_COLOR.muted, margin: '0 0 14px' }}
+              style={{
+                fontSize: '15px',
+                lineHeight: 1.7,
+                color: EMAIL_COLOR.muted,
+                margin: '0 0 14px',
+              }}
             >
               {paragraph}
             </Text>
@@ -256,7 +289,11 @@ export default function MbtiResultEmail({
               an <a>, and a table-cell button is the standard workaround. This keeps the
               pill shape everywhere else and degrades to a plain link where it does not.
             */}
-            <table cellPadding={0} cellSpacing={0} role='presentation'>
+            <table
+              cellPadding={0}
+              cellSpacing={0}
+              role="presentation"
+            >
               <tbody>
                 <tr>
                   <td
@@ -286,13 +323,29 @@ export default function MbtiResultEmail({
             </table>
           </Section>
 
-          <Text style={{ fontSize: '13px', lineHeight: 1.6, color: EMAIL_COLOR.muted, margin: '20px 0 0' }}>
+          <Text
+            style={{
+              fontSize: '13px',
+              lineHeight: 1.6,
+              color: EMAIL_COLOR.muted,
+              margin: '20px 0 0',
+            }}
+          >
             {copy.keepLink.replace('{days}', String(ATTEMPT_TTL_DAYS))}
           </Text>
 
-          <Hr style={{ borderColor: EMAIL_COLOR.line, margin: '28px 0 16px' }} />
+          <Hr
+            style={{ borderColor: EMAIL_COLOR.line, margin: '28px 0 16px' }}
+          />
 
-          <Text style={{ fontSize: '12px', lineHeight: 1.6, color: EMAIL_COLOR.muted, margin: 0 }}>
+          <Text
+            style={{
+              fontSize: '12px',
+              lineHeight: 1.6,
+              color: EMAIL_COLOR.muted,
+              margin: 0,
+            }}
+          >
             {copy.footer}
           </Text>
         </Container>

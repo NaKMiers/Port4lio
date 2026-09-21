@@ -57,7 +57,9 @@ export default function PaymentCountdown({
 }) {
   const deadline = new Date(expiresAt).getTime()
 
-  const [countdown, setCountdown] = useState(() => countdownFrom(deadline, Date.now()))
+  const [countdown, setCountdown] = useState(() =>
+    countdownFrom(deadline, Date.now())
+  )
 
   useEffect(() => {
     // Recomputed from the deadline every tick rather than decremented, so a backgrounded
@@ -77,7 +79,7 @@ export default function PaymentCountdown({
   const { label: remaining, urgent } = countdown
 
   return (
-    <p className='flex items-center justify-center gap-2.5 text-sm text-pp-muted'>
+    <p className="flex items-center justify-center gap-2.5 text-sm text-pp-muted">
       <span>{label}</span>
       <time
         dateTime={expiresAt}

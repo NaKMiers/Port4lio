@@ -13,7 +13,13 @@ import { isLocale } from '@/lib/i18n'
 import { getTypeContent, UI } from '@/lib/mbti/content'
 import { formatPrice, getResultPrice, isPaidMode } from '@/lib/mbti/pricing'
 import { connectDatabase } from '@/lib/mongodb'
-import { AXES, groupOfType, isMbtiType, slugFromType, type MbtiType } from '@/lib/mbti/types'
+import {
+  AXES,
+  groupOfType,
+  isMbtiType,
+  slugFromType,
+  type MbtiType,
+} from '@/lib/mbti/types'
 import { mintShareToken } from '@/lib/share'
 import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { isTokenShaped } from '@/lib/tokens'
@@ -93,7 +99,10 @@ export default async function MbtiResultPage({
 
   // Fire-and-forget: a counter must never delay or fail a render, least of all one someone
   // paid for. `recordFunnelDetached` swallows everything internally.
-  recordFunnelDetached('mbti', locked ? FUNNEL_EVENTS.paywallSeen : FUNNEL_EVENTS.resultViewed)
+  recordFunnelDetached(
+    'mbti',
+    locked ? FUNNEL_EVENTS.paywallSeen : FUNNEL_EVENTS.resultViewed
+  )
 
   /**
    * A locked result renders the paywall and NOTHING ELSE - same shape as the IQ page.
@@ -112,14 +121,17 @@ export default async function MbtiResultPage({
    * `waived` and `MBTI_RESULT_PRICE=0` both flow through `locked`, so a free result still
    * shows everything - the gate closes on unpaid attempts only.
    */
-  if (locked) {
+  if (locked)
     return (
       <main>
-        <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
+        <SectionFrame
+          className="py-section-sm"
+          innerClassName="max-w-2xl"
+        >
           <TestPaywall
             token={id}
             locale={lang}
-            endpoint='/api/mbti/checkout'
+            endpoint="/api/mbti/checkout"
             // Formatted here rather than in the client so đồng formatting lives in one
             // place and the client never has to know the raw amount.
             price={formatPrice(getResultPrice())}
@@ -144,20 +156,19 @@ export default async function MbtiResultPage({
             lands on a paywall for a stranger's result with no way into the product - the
             loop stops on the exact page it is supposed to continue from. One link fixes it.
           */}
-          <div className='mt-8 border-t border-pp-line pt-6'>
-            <p className='text-sm text-pp-muted'>{copy.lockedRecruitLead}</p>
+          <div className="mt-8 border-t border-pp-line pt-6">
+            <p className="text-sm text-pp-muted">{copy.lockedRecruitLead}</p>
             <Link
               href={`/${lang}/mbti/test`}
-              className='mt-3 inline-flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text'
+              className="mt-3 inline-flex items-center gap-2.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-pp-text"
             >
               {copy.lockedRecruitCta}
-              <Chevron direction='right' />
+              <Chevron direction="right" />
             </Link>
           </div>
         </SectionFrame>
       </main>
     )
-  }
 
   /**
    * Minted per render, recorded only if the visitor actually taps share.
@@ -172,29 +183,32 @@ export default async function MbtiResultPage({
   return (
     <main>
       <SectionFrame
-        aria-labelledby='result-heading'
+        aria-labelledby="result-heading"
         disableReveal
-        className='border-b border-pp-line pb-section-sm pt-10 md:pt-14'
-        innerClassName='max-w-3xl'
+        className="border-b border-pp-line pb-section-sm pt-10 md:pt-14"
+        innerClassName="max-w-3xl"
       >
-        <p className='font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted">
           {copy.yourType}
         </p>
         <h1
-          id='result-heading'
-          className='mt-3 font-display text-[clamp(3rem,9vw,5.5rem)] font-semibold leading-[0.95] tracking-tight text-pp-text'
+          id="result-heading"
+          className="mt-3 font-display text-[clamp(3rem,9vw,5.5rem)] font-semibold leading-[0.95] tracking-tight text-pp-text"
         >
           {type}
         </h1>
         <p className={`mt-3 font-display text-xl font-semibold ${accent.text}`}>
           {content.nickname}
         </p>
-        <p className='mt-4 max-w-2xl text-base leading-relaxed text-pp-muted md:text-lg'>
+        <p className="mt-4 max-w-2xl text-base leading-relaxed text-pp-muted md:text-lg">
           {content.tagline}
         </p>
       </SectionFrame>
 
-      <SectionFrame className='py-section-sm' innerClassName='max-w-3xl'>
+      <SectionFrame
+        className="py-section-sm"
+        innerClassName="max-w-3xl"
+      >
         {/*
           The waiver, said out loud, above the result it applies to. Same reasoning as the
           IQ page: a free result with no explanation reads as arbitrary pricing, and the
@@ -202,26 +216,32 @@ export default async function MbtiResultPage({
           point - they have now seen the product.
         */}
         {explainWaiver ? (
-          <EditorialPanel variant='strong' className='mb-8 p-6 md:p-7'>
-            <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+          <EditorialPanel
+            variant="strong"
+            className="mb-8 p-6 md:p-7"
+          >
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
               {copy.waivedTitle}
             </h2>
-            <p className='mt-3 text-pp-muted'>{copy.waivedBody}</p>
+            <p className="mt-3 text-pp-muted">{copy.waivedBody}</p>
             <Link
               href={`/${lang}/mbti/test`}
-              className='mt-5 inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline'
+              className="mt-5 inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline"
             >
               {copy.retake}
-              <Chevron direction='right' />
+              <Chevron direction="right" />
             </Link>
           </EditorialPanel>
         ) : null}
 
-        <EditorialPanel variant='strong' className='p-6 md:p-7'>
-          <h2 className='font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text'>
+        <EditorialPanel
+          variant="strong"
+          className="p-6 md:p-7"
+        >
+          <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-pp-text">
             {copy.axisBreakdown}
           </h2>
-          <dl className='mt-5 space-y-4'>
+          <dl className="mt-5 space-y-4">
             {AXES.map(axis => {
               const score = attempt.scores[axis]
               const total = score.a + score.b
@@ -231,7 +251,7 @@ export default async function MbtiResultPage({
               const leansA = aPercent >= 50
               return (
                 <div key={axis}>
-                  <dt className='flex items-baseline justify-between gap-4 font-display text-sm font-semibold tabular-nums'>
+                  <dt className="flex items-baseline justify-between gap-4 font-display text-sm font-semibold tabular-nums">
                     <span className={leansA ? 'text-pp-text' : 'text-pp-muted'}>
                       {axis[0]} {aPercent}%
                     </span>
@@ -240,11 +260,11 @@ export default async function MbtiResultPage({
                     </span>
                   </dt>
                   <dd
-                    className='mt-1.5 h-2 overflow-hidden rounded-full bg-[rgba(31,28,26,0.07)]'
+                    className="mt-1.5 h-2 overflow-hidden rounded-full bg-[rgba(31,28,26,0.07)]"
                     aria-label={`${axis}: ${aPercent}% ${axis[0]}, ${100 - aPercent}% ${axis[1]}`}
                   >
                     <div
-                      className='h-full rounded-full bg-[linear-gradient(90deg,var(--pp-violet),var(--pp-blue))]'
+                      className="h-full rounded-full bg-[linear-gradient(90deg,var(--pp-violet),var(--pp-blue))]"
                       style={{ width: `${aPercent}%` }}
                     />
                   </dd>
@@ -254,24 +274,27 @@ export default async function MbtiResultPage({
           </dl>
         </EditorialPanel>
 
-        <div className='mt-8 space-y-4'>
+        <div className="mt-8 space-y-4">
           {content.overview.map(paragraph => (
-            <p key={paragraph} className='text-pp-muted'>
+            <p
+              key={paragraph}
+              className="text-pp-muted"
+            >
               {paragraph}
             </p>
           ))}
         </div>
 
-        <div className='mt-9 flex flex-wrap items-center gap-4'>
+        <div className="mt-9 flex flex-wrap items-center gap-4">
           <Link
             href={`/${lang}/mbti/${slugFromType(type)}`}
-            className='inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline shadow-[0_16px_32px_rgba(31,28,26,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_38px_rgba(31,28,26,0.22)] motion-reduce:hover:translate-y-0'
+            className="inline-flex items-center gap-2.5 rounded-full bg-pp-text px-7 py-3.5 font-display text-sm font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] no-underline shadow-[0_16px_32px_rgba(31,28,26,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_38px_rgba(31,28,26,0.22)] motion-reduce:hover:translate-y-0"
           >
             {copy.readFullType} {type}
-            <Chevron direction='right' />
+            <Chevron direction="right" />
           </Link>
           <ShareControl
-            product='mbti'
+            product="mbti"
             shareToken={shareToken}
             type={slugFromType(type)}
             url={shareUrl}
@@ -285,18 +308,21 @@ export default async function MbtiResultPage({
           />
           <Link
             href={`/${lang}/mbti/test`}
-            className='text-sm font-semibold text-pp-muted no-underline transition hover:text-pp-text'
+            className="text-sm font-semibold text-pp-muted no-underline transition hover:text-pp-text"
           >
             {copy.retake}
           </Link>
         </div>
 
         <EditorialPanel
-          variant='default'
-          className='mt-10 flex gap-3.5 border-[rgba(255,159,64,0.3)] bg-[rgba(255,159,64,0.07)] p-5'
+          variant="default"
+          className="mt-10 flex gap-3.5 border-[rgba(255,159,64,0.3)] bg-[rgba(255,159,64,0.07)] p-5"
         >
-          <span className='mt-1 h-2 w-2 shrink-0 rounded-full bg-pp-orange' aria-hidden />
-          <p className='text-sm leading-relaxed text-pp-muted'>
+          <span
+            className="mt-1 h-2 w-2 shrink-0 rounded-full bg-pp-orange"
+            aria-hidden
+          />
+          <p className="text-sm leading-relaxed text-pp-muted">
             {copy.resultKeepLink.replace('{days}', String(ATTEMPT_TTL_DAYS))}
           </p>
         </EditorialPanel>

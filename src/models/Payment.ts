@@ -124,9 +124,11 @@ paymentSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
  * payment would settle the wrong one.
  */
 paymentSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[Payment] Index build FAILED - orderCode uniqueness is not enforced', error)
-  }
+  if (error)
+    console.error(
+      '[Payment] Index build FAILED - orderCode uniqueness is not enforced',
+      error
+    )
 })
 
 export const PaymentModel: mongoose.Model<PaymentDocument> =

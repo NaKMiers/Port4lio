@@ -44,9 +44,15 @@ import { testNav, type TestProduct } from '@/lib/test-kit/nav'
  * `TestChrome`'s header explains what the two groups mean.
  */
 
-const PRODUCT_COPY: Record<TestProduct, (locale: Locale) => { brand: string; privacy: string }> = {
+const PRODUCT_COPY: Record<
+  TestProduct,
+  (locale: Locale) => { brand: string; privacy: string }
+> = {
   mbti: locale => ({ brand: UI[locale].brand, privacy: UI[locale].privacy }),
-  iq: locale => ({ brand: iqUi(locale).brand, privacy: iqUi(locale).privacyLink }),
+  iq: locale => ({
+    brand: iqUi(locale).brand,
+    privacy: iqUi(locale).privacyLink,
+  }),
 }
 
 export default function TestProductShell({

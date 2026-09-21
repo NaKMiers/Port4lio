@@ -47,79 +47,79 @@ export default async function IqLandingOpenGraphImage({
 
   // Satori cannot render a useful error, so an unexpected param produces a blank card
   // rather than failing the build.
-  if (!isLocale(lang)) {
-    return new ImageResponse(<div style={{ width: '100%', height: '100%' }} />, size)
-  }
+  if (!isLocale(lang))
+    return new ImageResponse(
+      <div style={{ width: '100%', height: '100%' }} />,
+      size
+    )
 
   const copy = iqUi(lang)
 
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '80px',
-          background: EMAIL_COLOR.page,
-          color: EMAIL_COLOR.text,
-          fontFamily: 'sans-serif',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div
-            style={{
-              width: '20px',
-              height: '20px',
-              borderRadius: '999px',
-              background: EMAIL_COLOR.blue,
-              display: 'flex',
-            }}
-          />
-          <div
-            style={{
-              fontSize: '26px',
-              fontWeight: 600,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: EMAIL_COLOR.muted,
-              display: 'flex',
-            }}
-          >
-            {IQ_SEO[lang].name}
-          </div>
-        </div>
-
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '80px',
+        background: EMAIL_COLOR.page,
+        color: EMAIL_COLOR.text,
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div
           style={{
-            fontSize: '68px',
-            fontWeight: 700,
-            lineHeight: 1.12,
-            letterSpacing: '-0.02em',
-            marginTop: '38px',
-            maxWidth: '1010px',
+            width: '20px',
+            height: '20px',
+            borderRadius: '999px',
+            background: EMAIL_COLOR.blue,
             display: 'flex',
           }}
-        >
-          {copy.landingTitle}
-        </div>
-
+        />
         <div
           style={{
-            fontSize: '30px',
-            lineHeight: 1.45,
+            fontSize: '26px',
+            fontWeight: 600,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
             color: EMAIL_COLOR.muted,
-            marginTop: '30px',
-            maxWidth: '950px',
             display: 'flex',
           }}
         >
-          {copy.landingLead}
+          {IQ_SEO[lang].name}
         </div>
       </div>
-    ),
+
+      <div
+        style={{
+          fontSize: '68px',
+          fontWeight: 700,
+          lineHeight: 1.12,
+          letterSpacing: '-0.02em',
+          marginTop: '38px',
+          maxWidth: '1010px',
+          display: 'flex',
+        }}
+      >
+        {copy.landingTitle}
+      </div>
+
+      <div
+        style={{
+          fontSize: '30px',
+          lineHeight: 1.45,
+          color: EMAIL_COLOR.muted,
+          marginTop: '30px',
+          maxWidth: '950px',
+          display: 'flex',
+        }}
+      >
+        {copy.landingLead}
+      </div>
+    </div>,
     size
   )
 }

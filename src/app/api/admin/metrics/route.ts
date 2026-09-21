@@ -48,19 +48,23 @@ export type ProductMetrics = {
  */
 export async function GET(request: NextRequest) {
   const authCookie = request.cookies.get(getAuthCookieName())?.value
-  if (!hasOwnerAccess(authCookie)) {
+  if (!hasOwnerAccess(authCookie))
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
 
   try {
     await connectDatabase()
 
     const entries = await Promise.all(
-      TEST_PRODUCTS.map(async product => [product, await readProduct(product)] as const)
+      TEST_PRODUCTS.map(
+        async product => [product, await readProduct(product)] as const
+      )
     )
 
     return NextResponse.json({
-      products: Object.fromEntries(entries) as Record<TestProduct, ProductMetrics>,
+      products: Object.fromEntries(entries) as Record<
+        TestProduct,
+        ProductMetrics
+      >,
     })
   } catch (error) {
     console.error('[api/admin/metrics] read failed', error)
@@ -88,7 +92,10 @@ async function readProduct(product: TestProduct): Promise<ProductMetrics> {
    * single-document fetch, regardless of how many sessions exist.
    */
   const medianDoc = progressSessions
-    ? await TestEventModel.find({ product, kind: 'progress' }, { 'data.furthest': 1 })
+    ? await TestEventModel.find(
+        { product, kind: 'progress' },
+        { 'data.furthest': 1 }
+      )
         .sort({ 'data.furthest': 1 })
         .skip(Math.floor(progressSessions / 2))
         .limit(1)
@@ -96,7 +103,8 @@ async function readProduct(product: TestProduct): Promise<ProductMetrics> {
     : []
 
   const medianFurthest = medianDoc.length
-    ? Number((medianDoc[0]?.data as { furthest?: unknown })?.furthest ?? 0) || null
+    ? Number((medianDoc[0]?.data as { furthest?: unknown })?.furthest ?? 0) ||
+      null
     : null
 
   return {

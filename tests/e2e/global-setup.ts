@@ -43,11 +43,10 @@ export const STORAGE_STATE = path.resolve(__dirname, '.auth/owner.json')
 export default async function globalSetup() {
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3100'
 
-  if (!process.env.AUTH_SECRET) {
+  if (!process.env.AUTH_SECRET)
     throw new Error(
       'AUTH_SECRET is not set. tests/e2e signs its own owner cookie, so it cannot run without it. Check .env exists and playwright.config.ts loaded it.'
     )
-  }
 
   /**
    * REFUSE TO RUN AGAINST A DATABASE THAT IS NOT DISPOSABLE.
@@ -68,14 +67,16 @@ export default async function globalSetup() {
    * the same cluster is fine and a production database on localhost is not. Set
    * `E2E_ALLOW_DB=<name>` to state out loud which database is disposable.
    */
-  const dbName = (process.env.MONGODB_URI ?? '').match(/\/([^/?]+)\?/)?.[1] ?? ''
+  const dbName =
+    (process.env.MONGODB_URI ?? '').match(/\/([^/?]+)\?/)?.[1] ?? ''
   const allowed = process.env.E2E_ALLOW_DB
 
-  if (!dbName) {
-    throw new Error('Could not read a database name out of MONGODB_URI. Refusing to run.')
-  }
+  if (!dbName)
+    throw new Error(
+      'Could not read a database name out of MONGODB_URI. Refusing to run.'
+    )
 
-  if (dbName !== allowed) {
+  if (dbName !== allowed)
     throw new Error(
       [
         `tests/e2e refuses to run against the "${dbName}" database.`,
@@ -91,7 +92,6 @@ export default async function globalSetup() {
         '  MONGODB_URI=mongodb://127.0.0.1:27017/port4lio_e2e E2E_ALLOW_DB=port4lio_e2e npm run test:e2e',
       ].join('\n')
     )
-  }
 
   const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
   const token = makeAuthToken(Date.now() + THIRTY_DAYS_MS)
@@ -102,11 +102,10 @@ export default async function globalSetup() {
     headers: { cookie: `${getAuthCookieName()}=${token}` },
   })
 
-  if (!res.ok) {
+  if (!res.ok)
     throw new Error(
       `Minted an owner token but ${baseURL}/api/auth/me rejected it (${res.status}). The server under test is verifying with a different AUTH_SECRET than this process signed with - likely PLAYWRIGHT_USE_EXISTING_SERVER against a server started from a different env.`
     )
-  }
 
   const { mkdir, writeFile } = await import('node:fs/promises')
   await mkdir(path.dirname(STORAGE_STATE), { recursive: true })

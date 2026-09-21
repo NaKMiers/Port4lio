@@ -1,5 +1,10 @@
 import { boxOf, GAP, holeAt, svgDocument } from '@/lib/iq/items/frame'
-import { barStripSvg, CELL, dotGridSvg, shapeSvg } from '@/lib/iq/items/primitives'
+import {
+  barStripSvg,
+  CELL,
+  dotGridSvg,
+  shapeSvg,
+} from '@/lib/iq/items/primitives'
 import type { Cell, Item } from '@/lib/iq/items/v1/types'
 
 /**
@@ -61,7 +66,9 @@ export function renderMatrix(item: Item, label: string): string {
       parts.push(holeAt(x, y))
       continue
     }
-    parts.push(boxOf(cellSvg(item.cells[index] as Cell, `m${index}`), x, y, true))
+    parts.push(
+      boxOf(cellSvg(item.cells[index] as Cell, `m${index}`), x, y, true)
+    )
   }
 
   return svgDocument(width, width, parts.join(''), label)

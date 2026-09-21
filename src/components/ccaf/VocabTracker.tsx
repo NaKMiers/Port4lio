@@ -1,13 +1,34 @@
 'use client'
 
-import { ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Shuffle } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  Shuffle,
+} from 'lucide-react'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
 
-import { cx, eyebrowCls, fieldCls, secondaryBtnCls } from '@/components/ccaf/ccaf-ui'
+import {
+  cx,
+  eyebrowCls,
+  fieldCls,
+  secondaryBtnCls,
+} from '@/components/ccaf/ccaf-ui'
 import { EditorialPanel } from '@/components/portfolio/primitives/EditorialPanel'
 import TabNav from '@/components/settings/TabNav'
-import { VOCAB_CATEGORIES, VOCAB_DECK, type VocabWord } from '@/lib/ccaf/vocab-data'
+import {
+  VOCAB_CATEGORIES,
+  VOCAB_DECK,
+  type VocabWord,
+} from '@/lib/ccaf/vocab-data'
 
 /**
  * Keyed by term, and `-v2` because the first version keyed by deck position.
@@ -23,8 +44,16 @@ const MASTERY_STORAGE_KEY = 'portfolio:ccaf:vocab-mastery-v2'
 type Level = 0 | 1 | 2
 type MasteryMap = Record<string, Level>
 
-const LEVEL_LABELS: [string, string, string] = ['Chưa học', 'Đang học', 'Đã thuộc']
-const LEVEL_DOT: [string, string, string] = ['bg-pp-muted/50', 'bg-pp-orange', 'bg-pp-green']
+const LEVEL_LABELS: [string, string, string] = [
+  'Chưa học',
+  'Đang học',
+  'Đã thuộc',
+]
+const LEVEL_DOT: [string, string, string] = [
+  'bg-pp-muted/50',
+  'bg-pp-orange',
+  'bg-pp-green',
+]
 const LEVEL_SEL: [string, string, string] = [
   'border-pp-muted/50 bg-pp-muted/10 text-pp-text',
   'border-pp-orange/50 bg-pp-orange/10 text-pp-orange',
@@ -52,8 +81,11 @@ const LEVEL_EDGE_BACK: [string, string, string] = [
 function readStoredMastery(): MasteryMap {
   if (typeof window === 'undefined') return {}
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(MASTERY_STORAGE_KEY) ?? 'null')
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(MASTERY_STORAGE_KEY) ?? 'null'
+    )
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return {}
     return Object.fromEntries(
       Object.entries(parsed as Record<string, unknown>).filter(
         ([, v]) => v === 0 || v === 1 || v === 2
@@ -77,7 +109,9 @@ function useVocabMastery() {
   }, [mastery])
 
   const setLevel = useCallback((term: string, level: Level) => {
-    setMastery(prev => (prev[term] === level ? prev : { ...prev, [term]: level }))
+    setMastery(prev =>
+      prev[term] === level ? prev : { ...prev, [term]: level }
+    )
   }, [])
 
   return { mastery, setLevel }
@@ -96,7 +130,9 @@ function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   return (
-    target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.isContentEditable
   )
 }
 
@@ -124,7 +160,9 @@ export default function VocabTracker() {
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [onlyUnmastered, setOnlyUnmastered] = useState(false)
-  const [deckOrder, setDeckOrder] = useState<number[]>(() => VOCAB_DECK.map(w => w.order))
+  const [deckOrder, setDeckOrder] = useState<number[]>(() =>
+    VOCAB_DECK.map(w => w.order)
+  )
   const [idx, setIdx] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [openRows, setOpenRows] = useState<Set<number>>(() => new Set())
@@ -136,13 +174,20 @@ export default function VocabTracker() {
       .filter((w): w is VocabWord => {
         if (!w) return false
         if (selectedCat && w.cat !== selectedCat) return false
-        if (q && !`${w.term} ${w.vi} ${w.ex} ${w.cat}`.toLowerCase().includes(q)) return false
+        if (
+          q &&
+          !`${w.term} ${w.vi} ${w.ex} ${w.cat}`.toLowerCase().includes(q)
+        )
+          return false
         return true
       })
   }, [deckOrder, selectedCat, search])
 
   const pool = useMemo(
-    () => (onlyUnmastered ? filteredWords.filter(w => (mastery[w.term] ?? 0) < 2) : filteredWords),
+    () =>
+      onlyUnmastered
+        ? filteredWords.filter(w => (mastery[w.term] ?? 0) < 2)
+        : filteredWords,
     [filteredWords, onlyUnmastered, mastery]
   )
 
@@ -211,58 +256,75 @@ export default function VocabTracker() {
       else if (e.key === ' ') {
         e.preventDefault()
         setFlipped(f => !f)
-      } else if (e.key === '1' || e.key === '2' || e.key === '3') {
+      } else if (e.key === '1' || e.key === '2' || e.key === '3')
         if (current) setLevel(current.term, (Number(e.key) - 1) as Level)
-      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [tab, current, goNext, goPrev, setLevel])
 
-  const masteredPct = overall.total ? (overall.mastered / overall.total) * 100 : 0
-  const learningPct = overall.total ? (overall.learning / overall.total) * 100 : 0
+  const masteredPct = overall.total
+    ? (overall.mastered / overall.total) * 100
+    : 0
+  const learningPct = overall.total
+    ? (overall.learning / overall.total) * 100
+    : 0
 
   return (
-    <EditorialPanel className='flex h-full min-h-0 flex-col overflow-hidden lg:flex-row'>
+    <EditorialPanel className="flex h-full min-h-0 flex-col overflow-hidden lg:flex-row">
       {/* Filter rail - fixed on lg+, its category list scrolling on its own. */}
-      <aside className='flex shrink-0 flex-col border-b border-pp-line lg:w-[19.5rem] lg:border-b-0 lg:border-r'>
-        <div className='space-y-4 p-5'>
-          <div className='flex items-start justify-between gap-2'>
+      <aside className="flex shrink-0 flex-col border-b border-pp-line lg:w-[19.5rem] lg:border-b-0 lg:border-r">
+        <div className="space-y-4 p-5">
+          <div className="flex items-start justify-between gap-2">
             <div>
               <p className={eyebrowCls}>CCA-F</p>
-              <h1 className='mt-1.5 font-display text-2xl font-semibold tracking-tight text-pp-text'>
+              <h1 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-pp-text">
                 Từ vựng
               </h1>
             </div>
             {/* Stands in for the `AdminHomeLink` pill this board hides, so the frame can
                 own the full viewport without the page losing its only way out. */}
             <Link
-              href='/admin'
-              aria-label='All boards'
-              title='All boards'
-              className='inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-pp-line bg-pp-panel-strong text-pp-muted no-underline transition hover:text-pp-text'
+              href="/admin"
+              aria-label="All boards"
+              title="All boards"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-pp-line bg-pp-panel-strong text-pp-muted no-underline transition hover:text-pp-text"
             >
-              <LayoutGrid aria-hidden size={14} />
+              <LayoutGrid
+                aria-hidden
+                size={14}
+              />
             </Link>
           </div>
 
           <div>
-            <div className='flex items-baseline justify-between'>
-              <span className='font-display text-xl font-bold text-pp-text'>
+            <div className="flex items-baseline justify-between">
+              <span className="font-display text-xl font-bold text-pp-text">
                 {Math.round(masteredPct)}%
               </span>
-              <span className='text-[11px] text-pp-muted'>
+              <span className="text-[11px] text-pp-muted">
                 {overall.mastered}/{overall.total} đã thuộc
               </span>
             </div>
-            <div className='mt-2 flex h-2 overflow-hidden rounded-full bg-pp-line'>
-              <div className='h-full bg-pp-green' style={{ width: `${masteredPct}%` }} />
-              <div className='h-full bg-pp-orange' style={{ width: `${learningPct}%` }} />
+            <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-pp-line">
+              <div
+                className="h-full bg-pp-green"
+                style={{ width: `${masteredPct}%` }}
+              />
+              <div
+                className="h-full bg-pp-orange"
+                style={{ width: `${learningPct}%` }}
+              />
             </div>
-            <div className='mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-pp-muted'>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-pp-muted">
               {LEVEL_LABELS.map((label, level) => (
-                <span key={label} className='flex items-center gap-1.5'>
-                  <i className={cx('h-1.5 w-1.5 rounded-full', LEVEL_DOT[level])} />
+                <span
+                  key={label}
+                  className="flex items-center gap-1.5"
+                >
+                  <i
+                    className={cx('h-1.5 w-1.5 rounded-full', LEVEL_DOT[level])}
+                  />
                   {label}
                 </span>
               ))}
@@ -270,18 +332,18 @@ export default function VocabTracker() {
           </div>
 
           <input
-            type='text'
+            type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder='Tìm từ hoặc nghĩa...'
+            placeholder="Tìm từ hoặc nghĩa..."
             className={fieldCls}
           />
         </div>
 
         {/* Horizontal strip on small screens, a vertical list once there is a rail. */}
-        <div className='flex min-h-0 gap-2 overflow-x-auto px-5 pb-5 lg:flex-1 lg:flex-col lg:gap-1 lg:overflow-x-visible lg:overflow-y-auto'>
+        <div className="flex min-h-0 gap-2 overflow-x-auto px-5 pb-5 lg:flex-1 lg:flex-col lg:gap-1 lg:overflow-y-auto lg:overflow-x-visible">
           <CategoryButton
-            label='Tất cả'
+            label="Tất cả"
             count={VOCAB_DECK.length}
             active={selectedCat === null}
             onClick={() => setSelectedCat(null)}
@@ -299,11 +361,11 @@ export default function VocabTracker() {
       </aside>
 
       {/* Content column - toolbar pinned, only the panel below it scrolls. */}
-      <section className='flex min-h-0 min-w-0 flex-1 flex-col'>
-        <div className='flex flex-wrap items-center justify-between gap-3 border-b border-pp-line px-5 py-3'>
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-pp-line px-5 py-3">
           {/* `TabNav` bakes in a bottom margin for its usual stacked position; this toolbar
               supplies its own spacing, so the margin is dropped rather than doubled. */}
-          <div className='[&>[role=tablist]]:mb-0'>
+          <div className="[&>[role=tablist]]:mb-0">
             <TabNav
               tabs={[
                 { id: 'study', label: 'Học theo thẻ' },
@@ -311,33 +373,33 @@ export default function VocabTracker() {
               ]}
               activeId={tab}
               onChange={id => setTab(id as 'study' | 'browse')}
-              ariaLabel='Vocab view'
+              ariaLabel="Vocab view"
             />
           </div>
 
-          <div className='flex items-center gap-3 text-[11px] text-pp-muted'>
-            <label className='flex cursor-pointer items-center gap-2'>
+          <div className="flex items-center gap-3 text-[11px] text-pp-muted">
+            <label className="flex cursor-pointer items-center gap-2">
               <input
-                type='checkbox'
+                type="checkbox"
                 checked={onlyUnmastered}
                 onChange={() => setOnlyUnmastered(v => !v)}
-                className='h-3.5 w-3.5 accent-pp-blue'
+                className="h-3.5 w-3.5 accent-pp-blue"
               />
               Chỉ từ chưa thuộc
             </label>
-            <span className='font-mono'>
+            <span className="font-mono">
               {pool.length} / {VOCAB_DECK.length} từ
             </span>
           </div>
         </div>
 
-        <div className='min-h-0 flex-1 overflow-y-auto p-5'>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
           {tab === 'study' ? (
             <StudyView
               word={current}
               position={pool.length ? idx + 1 : 0}
               total={pool.length}
-              level={current ? mastery[current.term] ?? 0 : 0}
+              level={current ? (mastery[current.term] ?? 0) : 0}
               flipped={flipped}
               onFlip={() => setFlipped(f => !f)}
               onPrev={goPrev}
@@ -352,7 +414,9 @@ export default function VocabTracker() {
               mastery={mastery}
               onSetLevel={setLevel}
               openRows={openRows}
-              onToggleRow={order => setOpenRows(prev => toggleInSet(prev, order))}
+              onToggleRow={order =>
+                setOpenRows(prev => toggleInSet(prev, order))
+              }
             />
           )}
         </div>
@@ -374,7 +438,7 @@ function CategoryButton({
 }) {
   return (
     <button
-      type='button'
+      type="button"
       onClick={onClick}
       className={cx(
         'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-semibold transition lg:w-full lg:justify-between lg:whitespace-normal lg:rounded-xl lg:px-3 lg:py-2 lg:text-left',
@@ -383,8 +447,13 @@ function CategoryButton({
           : 'border-pp-line bg-pp-panel-strong text-pp-muted hover:text-pp-text'
       )}
     >
-      <span className='lg:leading-snug'>{label}</span>
-      <span className={cx('font-mono text-[10px]', active ? 'text-white/70' : 'text-pp-muted/70')}>
+      <span className="lg:leading-snug">{label}</span>
+      <span
+        className={cx(
+          'font-mono text-[10px]',
+          active ? 'text-white/70' : 'text-pp-muted/70'
+        )}
+      >
         {count}
       </span>
     </button>
@@ -414,9 +483,9 @@ function StudyView({
   onShuffle: () => void
   onSetLevel: (level: Level) => void
 }) {
-  if (!word) {
+  if (!word)
     return (
-      <div className='flex h-full min-h-[16rem] items-center justify-center rounded-panel border border-dashed border-pp-line text-center text-sm text-pp-muted'>
+      <div className="flex h-full min-h-[16rem] items-center justify-center rounded-panel border border-dashed border-pp-line text-center text-sm text-pp-muted">
         <p>
           Không còn từ nào trong bộ lọc hiện tại.
           <br />
@@ -424,11 +493,10 @@ function StudyView({
         </p>
       </div>
     )
-  }
 
   return (
-    <div className='flex h-full min-h-0 flex-col gap-5 xl:flex-row'>
-      <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-4'>
+    <div className="flex h-full min-h-0 flex-col gap-5 xl:flex-row">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
         {/*
           The flip is a horizontal squash-and-open, not a `rotateY`.
 
@@ -443,7 +511,7 @@ function StudyView({
           opening, which is what makes it read as one card turning instead of two fading.
         */}
         <div
-          role='button'
+          role="button"
           tabIndex={0}
           aria-pressed={flipped}
           onClick={onFlip}
@@ -453,32 +521,43 @@ function StudyView({
               onFlip()
             }
           }}
-          className='relative min-h-[20rem] flex-1 cursor-pointer select-none rounded-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pp-blue'
+          className="relative min-h-[20rem] flex-1 cursor-pointer select-none rounded-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pp-blue"
         >
-          <CardFace level={level} word={word} hidden={flipped}>
-            <div className='flex flex-1 flex-col items-center justify-center gap-2 text-center'>
-              <div className='font-display text-3xl font-semibold text-pp-text sm:text-4xl'>
+          <CardFace
+            level={level}
+            word={word}
+            hidden={flipped}
+          >
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+              <div className="font-display text-3xl font-semibold text-pp-text sm:text-4xl">
                 {word.term}
               </div>
-              <div className='text-sm italic text-pp-muted'>{word.pos}</div>
-              <p className='mt-3 text-[11px] uppercase tracking-[0.14em] text-pp-muted/70'>
+              <div className="text-sm italic text-pp-muted">{word.pos}</div>
+              <p className="mt-3 text-[11px] uppercase tracking-[0.14em] text-pp-muted/70">
                 Ấn để xem nghĩa
               </p>
             </div>
           </CardFace>
 
-          <CardFace level={level} word={word} hidden={!flipped} back>
-            <div className='flex min-h-0 flex-1 flex-col justify-center gap-4 overflow-y-auto py-4'>
-              <div className='text-center'>
-                <div className='font-display text-2xl font-semibold text-pp-green'>{word.vi}</div>
-                <div className='mt-1 text-xs italic text-pp-muted'>
+          <CardFace
+            level={level}
+            word={word}
+            hidden={!flipped}
+            back
+          >
+            <div className="flex min-h-0 flex-1 flex-col justify-center gap-4 overflow-y-auto py-4">
+              <div className="text-center">
+                <div className="font-display text-2xl font-semibold text-pp-green">
+                  {word.vi}
+                </div>
+                <div className="mt-1 text-xs italic text-pp-muted">
                   {word.term} · {word.pos}
                 </div>
               </div>
-              <div className='rounded-xl border border-pp-line text-center bg-pp-panel/70 p-4 text-sm leading-relaxed text-pp-muted'>
+              <div className="rounded-xl border border-pp-line bg-pp-panel/70 p-4 text-center text-sm leading-relaxed text-pp-muted">
                 {word.ex}
                 {word.exVi ? (
-                  <div className='mt-2 border-t border-dashed border-pp-line pt-2 text-xs italic text-pp-blue'>
+                  <div className="mt-2 border-t border-dashed border-pp-line pt-2 text-xs italic text-pp-blue">
                     {word.exVi}
                   </div>
                 ) : null}
@@ -487,51 +566,71 @@ function StudyView({
           </CardFace>
         </div>
 
-        <div className='flex flex-wrap items-center justify-center gap-2'>
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <button
-            type='button'
+            type="button"
             className={secondaryBtnCls}
             onClick={onPrev}
             disabled={position <= 1}
           >
-            <ChevronLeft aria-hidden size={15} className='mr-1' />
+            <ChevronLeft
+              aria-hidden
+              size={15}
+              className="mr-1"
+            />
             Trước
           </button>
-          <button type='button' className={secondaryBtnCls} onClick={onFlip}>
+          <button
+            type="button"
+            className={secondaryBtnCls}
+            onClick={onFlip}
+          >
             Lật thẻ
           </button>
           <button
-            type='button'
+            type="button"
             className={secondaryBtnCls}
             onClick={onNext}
             disabled={position >= total}
           >
             Sau
-            <ChevronRight aria-hidden size={15} className='ml-1' />
+            <ChevronRight
+              aria-hidden
+              size={15}
+              className="ml-1"
+            />
           </button>
-          <button type='button' className={secondaryBtnCls} onClick={onShuffle}>
-            <Shuffle aria-hidden size={14} className='mr-1.5' />
+          <button
+            type="button"
+            className={secondaryBtnCls}
+            onClick={onShuffle}
+          >
+            <Shuffle
+              aria-hidden
+              size={14}
+              className="mr-1.5"
+            />
             Xáo bài
           </button>
         </div>
       </div>
 
       {/* The card's sidecar: position, marking, shortcuts - always reachable without a flip. */}
-      <aside className='flex shrink-0 flex-col gap-4 rounded-panel border border-pp-line bg-pp-panel/60 p-4 xl:w-56'>
+      <aside className="flex shrink-0 flex-col gap-4 rounded-panel border border-pp-line bg-pp-panel/60 p-4 xl:w-56">
         <div>
           <p className={eyebrowCls}>Vị trí</p>
-          <p className='mt-1 font-mono text-sm text-pp-text'>
+          <p className="mt-1 font-mono text-sm text-pp-text">
             {position} / {total}
           </p>
         </div>
 
         <div>
           <p className={eyebrowCls}>Đánh dấu</p>
-          <div className='mt-2 grid grid-cols-3 gap-2 xl:grid-cols-1'>
+          <div className="mt-2 grid grid-cols-3 gap-2 xl:grid-cols-1">
             {([0, 1, 2] as Level[]).map(l => (
               <button
                 key={l}
-                type='button'
+                type="button"
                 onClick={() => onSetLevel(l)}
                 className={cx(
                   'flex items-center justify-center gap-2 rounded-xl border px-2 py-2 text-xs font-semibold transition xl:justify-start',
@@ -540,27 +639,29 @@ function StudyView({
                     : 'border-pp-line bg-pp-panel-strong text-pp-muted hover:text-pp-text'
                 )}
               >
-                <i className={cx('h-2 w-2 shrink-0 rounded-full', LEVEL_DOT[l])} />
+                <i
+                  className={cx('h-2 w-2 shrink-0 rounded-full', LEVEL_DOT[l])}
+                />
                 {LEVEL_LABELS[l]}
               </button>
             ))}
           </div>
         </div>
 
-        <div className='hidden xl:block'>
+        <div className="hidden xl:block">
           <p className={eyebrowCls}>Phím tắt</p>
-          <dl className='mt-2 space-y-1 text-[11px] text-pp-muted'>
-            <div className='flex justify-between gap-2'>
+          <dl className="mt-2 space-y-1 text-[11px] text-pp-muted">
+            <div className="flex justify-between gap-2">
               <dt>Lật thẻ</dt>
-              <dd className='font-mono'>Space</dd>
+              <dd className="font-mono">Space</dd>
             </div>
-            <div className='flex justify-between gap-2'>
+            <div className="flex justify-between gap-2">
               <dt>Chuyển thẻ</dt>
-              <dd className='font-mono'>← →</dd>
+              <dd className="font-mono">← →</dd>
             </div>
-            <div className='flex justify-between gap-2'>
+            <div className="flex justify-between gap-2">
               <dt>Đánh dấu</dt>
-              <dd className='font-mono'>1 2 3</dd>
+              <dd className="font-mono">1 2 3</dd>
             </div>
           </dl>
         </div>
@@ -596,13 +697,17 @@ function CardFace({
       className={cx(
         'absolute inset-0 flex flex-col overflow-hidden rounded-panel border border-pp-line bg-pp-panel-strong p-6 shadow-panel',
         'motion-safe:transition-transform motion-safe:duration-[180ms] motion-safe:ease-out',
-        back ? cx('border-r-4', LEVEL_EDGE_BACK[level]) : cx('border-l-4', LEVEL_EDGE[level]),
+        back
+          ? cx('border-r-4', LEVEL_EDGE_BACK[level])
+          : cx('border-l-4', LEVEL_EDGE[level]),
         hidden ? 'scale-x-0 delay-0' : 'scale-x-100 motion-safe:delay-[180ms]'
       )}
     >
-      <div className='flex items-start justify-between gap-3'>
-        <span className='font-mono text-[11px] text-pp-muted'>#{word.order}</span>
-        <span className='max-w-[60%] text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-pp-muted'>
+      <div className="flex items-start justify-between gap-3">
+        <span className="font-mono text-[11px] text-pp-muted">
+          #{word.order}
+        </span>
+        <span className="max-w-[60%] text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-pp-muted">
           {word.cat}
         </span>
       </div>
@@ -630,16 +735,15 @@ function BrowseView({
     .map(cat => ({ cat, items: words.filter(w => w.cat === cat) }))
     .filter(g => g.items.length > 0)
 
-  if (groups.length === 0) {
+  if (groups.length === 0)
     return (
-      <div className='flex h-full min-h-[16rem] items-center justify-center rounded-panel border border-dashed border-pp-line text-sm text-pp-muted'>
+      <div className="flex h-full min-h-[16rem] items-center justify-center rounded-panel border border-dashed border-pp-line text-sm text-pp-muted">
         Không tìm thấy từ nào khớp bộ lọc hiện tại.
       </div>
     )
-  }
 
   return (
-    <div className='space-y-6'>
+    <div className="space-y-6">
       {groups.map(({ cat, items }) => {
         const total = VOCAB_DECK.filter(w => w.cat === cat).length
         const masteredCount = VOCAB_DECK.filter(
@@ -648,10 +752,10 @@ function BrowseView({
 
         return (
           <section key={cat}>
-            <div className='mb-3 flex items-center gap-3'>
-              <h2 className='text-sm font-semibold text-pp-text'>{cat}</h2>
-              <span className='h-px flex-1 bg-pp-line' />
-              <span className='shrink-0 font-mono text-[11px] text-pp-muted'>
+            <div className="mb-3 flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-pp-text">{cat}</h2>
+              <span className="h-px flex-1 bg-pp-line" />
+              <span className="shrink-0 font-mono text-[11px] text-pp-muted">
                 {masteredCount}/{total}
               </span>
             </div>
@@ -659,7 +763,7 @@ function BrowseView({
             {/* `items-start` because grid rows stretch by default: without it, expanding
                 one card grew every other card in its row to match, leaving them padded out
                 with empty space around a single line of text. */}
-            <div className='grid items-start gap-3 sm:grid-cols-2 2xl:grid-cols-3'>
+            <div className="2xl:grid-cols-3 grid items-start gap-3 sm:grid-cols-2">
               {items.map(word => (
                 <VocabCard
                   key={word.order}
@@ -699,39 +803,44 @@ function VocabCard({
       )}
     >
       <button
-        type='button'
+        type="button"
         onClick={onToggle}
-        className='flex w-full items-start justify-between gap-2 text-left'
+        className="flex w-full items-start justify-between gap-2 text-left"
       >
-        <span className='min-w-0'>
-          <span className='block text-sm font-semibold text-pp-text'>{word.term}</span>
-          <span className='mt-0.5 block text-[11px] italic text-pp-muted'>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-pp-text">
+            {word.term}
+          </span>
+          <span className="mt-0.5 block text-[11px] italic text-pp-muted">
             #{word.order} · {word.pos}
           </span>
         </span>
         <ChevronDown
           aria-hidden
           size={14}
-          className={cx('mt-0.5 shrink-0 text-pp-muted transition-transform', open && 'rotate-180')}
+          className={cx(
+            'mt-0.5 shrink-0 text-pp-muted transition-transform',
+            open && 'rotate-180'
+          )}
         />
       </button>
 
       {open ? (
-        <div className='mt-3 space-y-2'>
-          <div className='text-sm font-semibold text-pp-green'>{word.vi}</div>
-          <div className='rounded-lg border border-pp-line bg-pp-panel/60 p-2.5 text-[11px] leading-relaxed text-pp-muted'>
+        <div className="mt-3 space-y-2">
+          <div className="text-sm font-semibold text-pp-green">{word.vi}</div>
+          <div className="rounded-lg border border-pp-line bg-pp-panel/60 p-2.5 text-[11px] leading-relaxed text-pp-muted">
             {word.ex}
             {word.exVi ? (
-              <div className='mt-1.5 border-t border-dashed border-pp-line pt-1.5 italic text-pp-blue'>
+              <div className="mt-1.5 border-t border-dashed border-pp-line pt-1.5 italic text-pp-blue">
                 {word.exVi}
               </div>
             ) : null}
           </div>
-          <div className='grid grid-cols-3 gap-1.5'>
+          <div className="grid grid-cols-3 gap-1.5">
             {([0, 1, 2] as Level[]).map(l => (
               <button
                 key={l}
-                type='button'
+                type="button"
                 onClick={() => onSetLevel(l)}
                 className={cx(
                   'rounded-lg border px-1.5 py-1.5 text-[10px] font-semibold transition',

@@ -43,7 +43,9 @@ async function builtIndexes() {
 
 describe('slug rules', () => {
   it('accepts the documented charset', async () => {
-    await expect(PostModel.create({ ...BASE, slug: 'a-real-slug-2026' })).resolves.toBeDefined()
+    await expect(
+      PostModel.create({ ...BASE, slug: 'a-real-slug-2026' })
+    ).resolves.toBeDefined()
   })
 
   it.each([
@@ -98,7 +100,12 @@ describe('the pillar invariant', () => {
       isPillar: true,
     })
     await expect(
-      PostModel.create({ ...BASE, slug: 'p2', series: 'dev-career-vn', isPillar: true })
+      PostModel.create({
+        ...BASE,
+        slug: 'p2',
+        series: 'dev-career-vn',
+        isPillar: true,
+      })
     ).resolves.toBeDefined()
   })
 
@@ -124,7 +131,9 @@ describe('the pillar invariant', () => {
      * `$type: 'string'` is what makes the filter exclude them properly.
      */
     await PostModel.create({ ...BASE, slug: 'x1', isPillar: true })
-    await expect(PostModel.create({ ...BASE, slug: 'x2', isPillar: true })).resolves.toBeDefined()
+    await expect(
+      PostModel.create({ ...BASE, slug: 'x2', isPillar: true })
+    ).resolves.toBeDefined()
   })
 
   it('uses a PARTIAL filter with both clauses, not sparse', async () => {
@@ -134,7 +143,10 @@ describe('the pillar invariant', () => {
     })
 
     expect(pillar, 'the pillar unique index is missing').toBeDefined()
-    expect(pillar?.sparse, 'sparse would collide on series:null - see the test above').toBeUndefined()
+    expect(
+      pillar?.sparse,
+      'sparse would collide on series:null - see the test above'
+    ).toBeUndefined()
     expect(pillar?.partialFilterExpression).toEqual({
       isPillar: true,
       series: { $type: 'string' },
@@ -149,13 +161,17 @@ describe('the four indexes', () => {
     expect(keys).toContain(JSON.stringify({ slug: 1 }))
     expect(keys).toContain(JSON.stringify({ status: 1, publishedAt: -1 }))
     expect(keys).toContain(JSON.stringify({ series: 1, status: 1 }))
-    expect(keys.filter(key => key === JSON.stringify({ series: 1 }))).toHaveLength(1)
+    expect(
+      keys.filter(key => key === JSON.stringify({ series: 1 }))
+    ).toHaveLength(1)
   })
 
   it('has NO TTL index - a post is not a behavioural trace', async () => {
     // Asserted so nobody adds one by pattern-matching Attempt/TestEvent/IqAttempt, the same
     // reason ContactMessage asserts it. A post is published work, not stranger data.
-    const ttl = (await builtIndexes()).find(index => index.expireAfterSeconds !== undefined)
+    const ttl = (await builtIndexes()).find(
+      index => index.expireAfterSeconds !== undefined
+    )
     expect(ttl).toBeUndefined()
   })
 })
@@ -184,10 +200,18 @@ describe('field constraints', () => {
 
   it('caps relatedSlugs at 5 and tags at 8', async () => {
     await expect(
-      PostModel.create({ ...BASE, slug: 'r', relatedSlugs: ['a', 'b', 'c', 'd', 'e', 'f'] })
+      PostModel.create({
+        ...BASE,
+        slug: 'r',
+        relatedSlugs: ['a', 'b', 'c', 'd', 'e', 'f'],
+      })
     ).rejects.toThrow()
     await expect(
-      PostModel.create({ ...BASE, slug: 't', tags: Array.from({ length: 9 }, (_, i) => `t${i}`) })
+      PostModel.create({
+        ...BASE,
+        slug: 't',
+        tags: Array.from({ length: 9 }, (_, i) => `t${i}`),
+      })
     ).rejects.toThrow()
   })
 
@@ -224,14 +248,20 @@ describe('field constraints', () => {
   })
 
   it('rejects a tag outside the charset', async () => {
-    await expect(PostModel.create({ ...BASE, slug: 'tc', tags: ['Not Lower'] })).rejects.toThrow()
+    await expect(
+      PostModel.create({ ...BASE, slug: 'tc', tags: ['Not Lower'] })
+    ).rejects.toThrow()
   })
 
   it('accepts a note with no excerpt and no cover image', async () => {
     // Criterion A2: the cheap tier has to actually be cheap, or only the expensive one gets
     // written and the blog goes quiet - which is what happened to 10 of the 27 sites
     // reviewed.
-    const note = await PostModel.create({ ...BASE, slug: 'quick-note', kind: 'note' })
+    const note = await PostModel.create({
+      ...BASE,
+      slug: 'quick-note',
+      kind: 'note',
+    })
 
     expect(note.excerpt).toBe('')
     expect(note.coverImage).toBeNull()
@@ -246,14 +276,24 @@ describe('field constraints', () => {
   })
 
   it('excludes both bodies from a plain query', async () => {
-    await PostModel.create({ ...BASE, slug: 'heavy', bodyMarkdown: '# hi', bodyHtml: '<h1>hi</h1>' })
+    await PostModel.create({
+      ...BASE,
+      slug: 'heavy',
+      bodyMarkdown: '# hi',
+      bodyHtml: '<h1>hi</h1>',
+    })
 
     const listed = await PostModel.findOne({ slug: 'heavy' }).lean()
-    expect(listed?.bodyMarkdown, 'select:false was lost - list queries now ship the body').toBeUndefined()
+    expect(
+      listed?.bodyMarkdown,
+      'select:false was lost - list queries now ship the body'
+    ).toBeUndefined()
     expect(listed?.bodyHtml).toBeUndefined()
 
     // And are reachable when explicitly asked for, or the post page cannot render.
-    const full = await PostModel.findOne({ slug: 'heavy' }).select('+bodyHtml').lean()
+    const full = await PostModel.findOne({ slug: 'heavy' })
+      .select('+bodyHtml')
+      .lean()
     expect(full?.bodyHtml).toBe('<h1>hi</h1>')
   })
 })

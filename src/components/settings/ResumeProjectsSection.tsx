@@ -2,10 +2,18 @@ import React from 'react'
 
 import AddMoreButton from '@/components/settings/AddMoreButton'
 import DragList from '@/components/settings/DragList'
-import ListTextarea, { linesToText, textToLines } from '@/components/settings/ListTextarea'
+import ListTextarea, {
+  linesToText,
+  textToLines,
+} from '@/components/settings/ListTextarea'
 import NumberField from '@/components/settings/NumberField'
 import Section from '@/components/settings/Section'
-import { BOLD_HINT, replaceAt, resumeOf, updateResume } from '@/components/settings/resume-utils'
+import {
+  BOLD_HINT,
+  replaceAt,
+  resumeOf,
+  updateResume,
+} from '@/components/settings/resume-utils'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -24,16 +32,16 @@ import type { Resume, ResumeLink, ResumeProject } from '@/types/profile'
 
 /** Plain-English rendering of the page-break coordinate, plus whether it resolves. */
 function describePageBreak(resume: Resume): { text: string; valid: boolean } {
-  const { sectionIndex, projectIndex, highlightsOnFirstSheet } = resume.pageBreak
+  const { sectionIndex, projectIndex, highlightsOnFirstSheet } =
+    resume.pageBreak
   const section = resume.projectSections[sectionIndex]
   const project = section?.items[projectIndex]
 
-  if (!section || !project) {
+  if (!section || !project)
     return {
       text: `No project at section ${sectionIndex}, project ${projectIndex} - the break will fall back to the nearest project boundary.`,
       valid: false,
     }
-  }
 
   const total = project.highlights.length
   const title = stripInlineBold(project.title) || `project ${projectIndex + 1}`
@@ -73,7 +81,11 @@ export default function ResumeProjectsSection({
   const resume = resumeOf(profile)
   const summary = describePageBreak(resume)
 
-  const updateProject = (sectionIdx: number, projectIdx: number, patch: Partial<ResumeProject>) => {
+  const updateProject = (
+    sectionIdx: number,
+    projectIdx: number,
+    patch: Partial<ResumeProject>
+  ) => {
     updateResume(setProfile, r => {
       const section = r.projectSections[sectionIdx]
       return {
@@ -104,7 +116,10 @@ export default function ResumeProjectsSection({
     }))
 
   const setBreak = (patch: Partial<Resume['pageBreak']>) => {
-    updateResume(setProfile, r => ({ ...r, pageBreak: { ...r.pageBreak, ...patch } }))
+    updateResume(setProfile, r => ({
+      ...r,
+      pageBreak: { ...r.pageBreak, ...patch },
+    }))
   }
 
   const moveSection = (from: number, to: number) => {
@@ -129,7 +144,14 @@ export default function ResumeProjectsSection({
         }),
         pageBreak:
           r.pageBreak.sectionIndex === sectionIdx
-            ? { ...r.pageBreak, projectIndex: indexAfterMove(r.pageBreak.projectIndex, from, to) }
+            ? {
+                ...r.pageBreak,
+                projectIndex: indexAfterMove(
+                  r.pageBreak.projectIndex,
+                  from,
+                  to
+                ),
+              }
             : r.pageBreak,
       }
     })
@@ -137,22 +159,32 @@ export default function ResumeProjectsSection({
   }
 
   return (
-    <Section id='cv-projects' title='CV Projects' badge='personal & work' handle={handle}>
-      <div className='space-y-4'>
+    <Section
+      id="cv-projects"
+      title="CV Projects"
+      badge="personal & work"
+      handle={handle}
+    >
+      <div className="space-y-4">
         <div className={itemCardCls}>
-          <div className='flex flex-wrap items-center justify-between gap-2'>
-            <h2 className='text-sm font-semibold'>Page break</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Page break</h2>
             {onFitPageBreak ? (
-              <button type='button' className={secondaryBtnCls} onClick={onFitPageBreak}>
+              <button
+                type="button"
+                className={secondaryBtnCls}
+                onClick={onFitPageBreak}
+              >
                 Fit to sheet 1
               </button>
             ) : null}
           </div>
           <p className={`${helpTextCls} mt-1`}>
-            The CV is two fixed A4 sheets and content past the edge is clipped, not reflowed. This
-            coordinate says where sheet 1 stops. Reordering anything re-measures the real sheets
-            and moves it to the last bullet that still fits; <strong>Fit to sheet 1</strong> does
-            the same on demand, after an edit that changed how long the copy runs.
+            The CV is two fixed A4 sheets and content past the edge is clipped,
+            not reflowed. This coordinate says where sheet 1 stops. Reordering
+            anything re-measures the real sheets and moves it to the last bullet
+            that still fits; <strong>Fit to sheet 1</strong> does the same on
+            demand, after an edit that changed how long the copy runs.
           </p>
 
           <div
@@ -165,8 +197,8 @@ export default function ResumeProjectsSection({
             {summary.text}
           </div>
 
-          <div className='mt-3 grid grid-cols-1 gap-3 md:grid-cols-3'>
-            <div className='space-y-2'>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="space-y-2">
               <label className={labelCls}>Section index</label>
               <NumberField
                 className={inputCls}
@@ -174,7 +206,7 @@ export default function ResumeProjectsSection({
                 onChange={sectionIndex => setBreak({ sectionIndex })}
               />
             </div>
-            <div className='space-y-2'>
+            <div className="space-y-2">
               <label className={labelCls}>Project index</label>
               <NumberField
                 className={inputCls}
@@ -182,20 +214,26 @@ export default function ResumeProjectsSection({
                 onChange={projectIndex => setBreak({ projectIndex })}
               />
             </div>
-            <div className='space-y-2'>
+            <div className="space-y-2">
               <label className={labelCls}>Highlights on sheet 1</label>
               <NumberField
                 className={inputCls}
                 value={resume.pageBreak.highlightsOnFirstSheet}
-                onChange={highlightsOnFirstSheet => setBreak({ highlightsOnFirstSheet })}
+                onChange={highlightsOnFirstSheet =>
+                  setBreak({ highlightsOnFirstSheet })
+                }
               />
             </div>
           </div>
         </div>
 
-        <div className='flex items-center justify-between'>
-          <h2 className='text-sm font-semibold'>Project sections</h2>
-          <button type='button' className={secondaryBtnCls} onClick={addSection}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Project sections</h2>
+          <button
+            type="button"
+            className={secondaryBtnCls}
+            onClick={addSection}
+          >
             + Add section
           </button>
         </div>
@@ -207,49 +245,53 @@ export default function ResumeProjectsSection({
         <DragList
           ids={resume.projectSections.map((_, idx) => `section-${idx}`)}
           onReorder={moveSection}
-          itemLabel='project section'
+          itemLabel="project section"
         >
           {(sectionIdx, sectionHandle) => {
             const section = resume.projectSections[sectionIdx]
             return (
               <div className={itemCardCls}>
-                <div className='flex items-end gap-2'>
-                  <div className='min-w-0 flex-1 space-y-2'>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1 space-y-2">
                     <label className={labelCls}>Section heading</label>
                     <input
                       className={inputCls}
-                      placeholder='PERSONAL PROJECTS'
+                      placeholder="PERSONAL PROJECTS"
                       value={section.heading}
                       onChange={e =>
                         updateResume(setProfile, r => ({
                           ...r,
-                          projectSections: replaceAt(r.projectSections, sectionIdx, {
-                            heading: e.target.value,
-                          }),
+                          projectSections: replaceAt(
+                            r.projectSections,
+                            sectionIdx,
+                            {
+                              heading: e.target.value,
+                            }
+                          ),
                         }))
                       }
                     />
                   </div>
-                  <div className='pb-2'>{sectionHandle}</div>
+                  <div className="pb-2">{sectionHandle}</div>
                 </div>
 
-                <div className='mt-4'>
+                <div className="mt-4">
                   <DragList
                     ids={section.items.map((_, idx) => `project-${idx}`)}
                     onReorder={(from, to) => moveProject(sectionIdx, from, to)}
-                    itemLabel='project'
+                    itemLabel="project"
                   >
                     {(projectIdx, projectHandle) => {
                       const project = section.items[projectIdx]
                       return (
                         <div className={nestedItemCardCls}>
-                          <div className='flex items-start gap-2'>
-                            <div className='grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-3'>
-                              <div className='space-y-2'>
+                          <div className="flex items-start gap-2">
+                            <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-3">
+                              <div className="space-y-2">
                                 <label className={labelCls}>Employer</label>
                                 <input
                                   className={inputCls}
-                                  placeholder='Rikkeisoft (blank for personal)'
+                                  placeholder="Rikkeisoft (blank for personal)"
                                   value={project.employer}
                                   onChange={e =>
                                     updateProject(sectionIdx, projectIdx, {
@@ -258,21 +300,23 @@ export default function ResumeProjectsSection({
                                   }
                                 />
                               </div>
-                              <div className='space-y-2'>
+                              <div className="space-y-2">
                                 <label className={labelCls}>Title</label>
                                 <input
                                   className={inputCls}
                                   value={project.title}
                                   onChange={e =>
-                                    updateProject(sectionIdx, projectIdx, { title: e.target.value })
+                                    updateProject(sectionIdx, projectIdx, {
+                                      title: e.target.value,
+                                    })
                                   }
                                 />
                               </div>
-                              <div className='space-y-2'>
+                              <div className="space-y-2">
                                 <label className={labelCls}>Period</label>
                                 <input
                                   className={inputCls}
-                                  placeholder='02/2025 - current'
+                                  placeholder="02/2025 - current"
                                   value={project.period}
                                   onChange={e =>
                                     updateProject(sectionIdx, projectIdx, {
@@ -282,11 +326,13 @@ export default function ResumeProjectsSection({
                                 />
                               </div>
                             </div>
-                            <div className='pt-6'>{projectHandle}</div>
+                            <div className="pt-6">{projectHandle}</div>
                           </div>
 
-                          <div className='mt-3 space-y-2'>
-                            <label className={labelCls}>Details · one line each</label>
+                          <div className="mt-3 space-y-2">
+                            <label className={labelCls}>
+                              Details · one line each
+                            </label>
                             <ListTextarea
                               className={textareaCls}
                               rows={5}
@@ -294,12 +340,14 @@ export default function ResumeProjectsSection({
                               join={linesToText}
                               parse={textToLines}
                               onChange={details =>
-                                updateProject(sectionIdx, projectIdx, { details })
+                                updateProject(sectionIdx, projectIdx, {
+                                  details,
+                                })
                               }
                             />
                           </div>
 
-                          <div className='mt-3 space-y-2'>
+                          <div className="mt-3 space-y-2">
                             <label className={labelCls}>
                               Highlights · {project.highlights.length} bullets
                             </label>
@@ -310,50 +358,70 @@ export default function ResumeProjectsSection({
                               join={linesToText}
                               parse={textToLines}
                               onChange={highlights =>
-                                updateProject(sectionIdx, projectIdx, { highlights })
+                                updateProject(sectionIdx, projectIdx, {
+                                  highlights,
+                                })
                               }
                             />
                           </div>
 
-                          <div className='mt-3'>
+                          <div className="mt-3">
                             <DragList
-                              ids={project.demoLinks.map((_, idx) => `demo-${idx}`)}
+                              ids={project.demoLinks.map(
+                                (_, idx) => `demo-${idx}`
+                              )}
                               onReorder={(from, to) => {
                                 updateProject(sectionIdx, projectIdx, {
-                                  demoLinks: moveItem(project.demoLinks, from, to),
+                                  demoLinks: moveItem(
+                                    project.demoLinks,
+                                    from,
+                                    to
+                                  ),
                                 })
                                 onFitPageBreak?.()
                               }}
-                              itemLabel='demo link'
-                              className='space-y-2'
+                              itemLabel="demo link"
+                              className="space-y-2"
                             >
                               {(linkIdx, linkHandle) => {
                                 const link = project.demoLinks[linkIdx]
                                 return (
-                                  <div className='grid grid-cols-1 gap-2 md:grid-cols-[auto_1fr_2fr_auto] md:items-center'>
-                                    <div className='hidden md:block'>{linkHandle}</div>
+                                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[auto_1fr_2fr_auto] md:items-center">
+                                    <div className="hidden md:block">
+                                      {linkHandle}
+                                    </div>
                                     <input
                                       className={inputCls}
-                                      placeholder='App Store'
+                                      placeholder="App Store"
                                       value={link.label}
                                       onChange={e =>
-                                        updateDemoLink(sectionIdx, projectIdx, linkIdx, {
-                                          label: e.target.value,
-                                        })
+                                        updateDemoLink(
+                                          sectionIdx,
+                                          projectIdx,
+                                          linkIdx,
+                                          {
+                                            label: e.target.value,
+                                          }
+                                        )
                                       }
                                     />
                                     <input
                                       className={inputCls}
-                                      placeholder='https://…'
+                                      placeholder="https://…"
                                       value={link.href}
                                       onChange={e =>
-                                        updateDemoLink(sectionIdx, projectIdx, linkIdx, {
-                                          href: e.target.value,
-                                        })
+                                        updateDemoLink(
+                                          sectionIdx,
+                                          projectIdx,
+                                          linkIdx,
+                                          {
+                                            href: e.target.value,
+                                          }
+                                        )
                                       }
                                     />
                                     <button
-                                      type='button'
+                                      type="button"
                                       className={ghostBtnCls}
                                       onClick={() =>
                                         updateProject(sectionIdx, projectIdx, {
@@ -371,27 +439,36 @@ export default function ResumeProjectsSection({
                             </DragList>
                           </div>
 
-                          <div className='mt-3 flex justify-between'>
+                          <div className="mt-3 flex justify-between">
                             <button
-                              type='button'
+                              type="button"
                               className={secondaryBtnCls}
                               onClick={() =>
                                 updateProject(sectionIdx, projectIdx, {
-                                  demoLinks: [...project.demoLinks, { label: '', href: '' }],
+                                  demoLinks: [
+                                    ...project.demoLinks,
+                                    { label: '', href: '' },
+                                  ],
                                 })
                               }
                             >
                               + Add demo link
                             </button>
                             <button
-                              type='button'
+                              type="button"
                               className={ghostBtnCls}
                               onClick={() =>
                                 updateResume(setProfile, r => ({
                                   ...r,
-                                  projectSections: replaceAt(r.projectSections, sectionIdx, {
-                                    items: section.items.filter((_, i) => i !== projectIdx),
-                                  }),
+                                  projectSections: replaceAt(
+                                    r.projectSections,
+                                    sectionIdx,
+                                    {
+                                      items: section.items.filter(
+                                        (_, i) => i !== projectIdx
+                                      ),
+                                    }
+                                  ),
                                 }))
                               }
                             >
@@ -406,38 +483,44 @@ export default function ResumeProjectsSection({
 
                 <p className={`${helpTextCls} mt-3`}>{BOLD_HINT}</p>
 
-                <div className='mt-3 flex justify-between'>
+                <div className="mt-3 flex justify-between">
                   <button
-                    type='button'
+                    type="button"
                     className={secondaryBtnCls}
                     onClick={() =>
                       updateResume(setProfile, r => ({
                         ...r,
-                        projectSections: replaceAt(r.projectSections, sectionIdx, {
-                          items: [
-                            ...section.items,
-                            {
-                              employer: '',
-                              title: '',
-                              period: '',
-                              details: [],
-                              highlights: [],
-                              demoLinks: [],
-                            },
-                          ],
-                        }),
+                        projectSections: replaceAt(
+                          r.projectSections,
+                          sectionIdx,
+                          {
+                            items: [
+                              ...section.items,
+                              {
+                                employer: '',
+                                title: '',
+                                period: '',
+                                details: [],
+                                highlights: [],
+                                demoLinks: [],
+                              },
+                            ],
+                          }
+                        ),
                       }))
                     }
                   >
                     + Add project
                   </button>
                   <button
-                    type='button'
+                    type="button"
                     className={ghostBtnCls}
                     onClick={() =>
                       updateResume(setProfile, r => ({
                         ...r,
-                        projectSections: r.projectSections.filter((_, i) => i !== sectionIdx),
+                        projectSections: r.projectSections.filter(
+                          (_, i) => i !== sectionIdx
+                        ),
                       }))
                     }
                   >
@@ -450,7 +533,10 @@ export default function ResumeProjectsSection({
         </DragList>
 
         {resume.projectSections.length > 0 ? (
-          <AddMoreButton label='+ Add project section' onClick={addSection} />
+          <AddMoreButton
+            label="+ Add project section"
+            onClick={addSection}
+          />
         ) : null}
       </div>
     </Section>

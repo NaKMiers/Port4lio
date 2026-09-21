@@ -23,8 +23,11 @@ export default function PortfolioSectionScrollTarget() {
     if (!id || !PORTFOLIO_NAV_SECTION_ID_SET.has(id)) return
 
     requestAnimationFrame(() => {
-      const el = typeof document !== 'undefined' ? document.getElementById(id) : null
-      const behavior: ScrollBehavior = prefersReducedMotion() ? 'auto' : 'smooth'
+      const el =
+        typeof document !== 'undefined' ? document.getElementById(id) : null
+      const behavior: ScrollBehavior = prefersReducedMotion()
+        ? 'auto'
+        : 'smooth'
       el?.scrollIntoView({ behavior, block: 'start' })
     })
   }, [requestedSection])

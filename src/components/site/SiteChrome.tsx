@@ -4,10 +4,16 @@ import Header from '@/components/Header'
 import Nav from '@/components/Nav'
 import ProfileFetchStatus from '@/components/ProfileFetchStatus'
 
-export default function SiteChrome({ children }: { children: React.ReactNode }) {
+export default function SiteChrome({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <div className='page text-white font-sora relative'>
-      <Suspense fallback={<div className='fixed xl:right-[2%] z-50 xl:w-16 h-[60px]' />}>
+    <div className="page relative font-sora text-white">
+      <Suspense
+        fallback={<div className="fixed z-50 h-[60px] xl:right-[2%] xl:w-16" />}
+      >
         <Nav />
       </Suspense>
       <Header />

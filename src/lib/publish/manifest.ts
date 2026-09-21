@@ -97,7 +97,6 @@ export type StoredTargetState = {
   detail?: string
 }
 
-
 function driftFor(
   target: PublishTarget,
   state: StoredTargetState | undefined,
@@ -132,12 +131,11 @@ export function attachDrift(
   const byId = new Map((states ?? []).map(state => [state.targetId, state]))
   const targets = {} as Record<PublishTargetId, PublishTargetWithDrift>
 
-  for (const id of PUBLISH_TARGET_IDS) {
+  for (const id of PUBLISH_TARGET_IDS)
     targets[id] = {
       ...manifest.targets[id],
       drift: driftFor(manifest.targets[id], byId.get(id), manifest.generatedAt),
     }
-  }
 
   return { ...manifest, targets }
 }

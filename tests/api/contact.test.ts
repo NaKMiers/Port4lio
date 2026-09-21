@@ -1,6 +1,14 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { ContactMessageModel } from '@/models/ContactMessage'
 
@@ -135,14 +143,19 @@ describe('POST /api/contact - the attribution fields are optional', () => {
 
     expect(response.status).toBe(200)
     const saved = await ContactMessageModel.findOne({}).lean()
-    expect(saved, 'the message was thrown away with the bad slug').not.toBeNull()
+    expect(
+      saved,
+      'the message was thrown away with the bad slug'
+    ).not.toBeNull()
     expect(saved?.sourceSlug).toBeNull()
   })
 })
 
 describe('POST /api/contact - persistence outranks mail', () => {
   it('returns 200 and keeps the message when mail fails', async () => {
-    sendMail.mockRejectedValueOnce(new Error('Invalid login: 535 authentication failed'))
+    sendMail.mockRejectedValueOnce(
+      new Error('Invalid login: 535 authentication failed')
+    )
 
     const response = await post(VALID)
 
@@ -152,7 +165,10 @@ describe('POST /api/contact - persistence outranks mail', () => {
     expect(response.status).toBe(200)
 
     const saved = await ContactMessageModel.findOne({}).lean()
-    expect(saved, 'THE BUG: a mail failure destroyed the submission').not.toBeNull()
+    expect(
+      saved,
+      'THE BUG: a mail failure destroyed the submission'
+    ).not.toBeNull()
     // How the owner finds the messages that never reached an inbox.
     expect(saved?.mailed).toBe(false)
   })
@@ -178,7 +194,9 @@ describe('POST /api/contact - persistence outranks mail', () => {
     expect(sendMail).toHaveBeenCalledTimes(1)
     const mail = sendMail.mock.calls[0][0] as { html: string; text: string }
     expect(mail.html).toContain('/blog/a-post')
-    expect(mail.text).toContain('Heard about me via: <script>alert(1)</script> a friend')
+    expect(mail.text).toContain(
+      'Heard about me via: <script>alert(1)</script> a friend'
+    )
     // The owner's mail client would run this if the renderer stopped escaping.
     expect(mail.html).not.toContain('<script>')
     expect(mail.html).toContain('&lt;script&gt;')
@@ -208,7 +226,9 @@ describe('POST /api/contact - a malformed or oversized body is not a 500', () =>
 
     expect(response.status).toBe(400)
     // Never the parser's own text - `JSON.parse` echoes a slice of the input back.
-    await expect(response.json()).resolves.toEqual({ error: 'Invalid JSON body' })
+    await expect(response.json()).resolves.toEqual({
+      error: 'Invalid JSON body',
+    })
   })
 
   it('returns 413 on a body over the cap even with NO Content-Length to go by', async () => {
@@ -233,7 +253,10 @@ describe('POST /api/contact - a malformed or oversized body is not a 500', () =>
       // @ts-expect-error - undici requires this for a stream body; it is not in the DOM types.
       duplex: 'half',
     })
-    expect(request.headers.get('content-length'), 'chunked, so there is no header').toBeNull()
+    expect(
+      request.headers.get('content-length'),
+      'chunked, so there is no header'
+    ).toBeNull()
 
     const { POST } = await import('@/app/api/contact/route')
     const response = await POST(request as never)
@@ -275,9 +298,8 @@ describe('POST /api/contact - the rate limit', () => {
     sendMail.mockResolvedValue(undefined)
     const ip = { 'x-forwarded-for': '203.0.113.7' }
 
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 3; i += 1)
       expect((await post(VALID, ip)).status, `submission ${i + 1}`).toBe(200)
-    }
 
     const fourth = await post(VALID, ip)
     expect(fourth.status).toBe(429)
@@ -298,8 +320,13 @@ describe('POST /api/contact - the rate limit', () => {
     // second product, and `rate-limit.ts` keys routes apart inside the `_id` instead:
     // `<route>:<ip>:<window>`. Read back and filtered here rather than queried with a
     // `$regex`, which the driver's filter types reject on an untyped collection.
-    const rows = await mongoose.connection.collection('mbtiRateLimits').find({}).toArray()
-    const buckets = rows.filter(row => String(row._id).startsWith('contact:203.0.113.9:'))
+    const rows = await mongoose.connection
+      .collection('mbtiRateLimits')
+      .find({})
+      .toArray()
+    const buckets = rows.filter(row =>
+      String(row._id).startsWith('contact:203.0.113.9:')
+    )
 
     expect(buckets, 'the limiter never wrote, so it never ran').toHaveLength(1)
     expect(buckets[0].count).toBe(1)
@@ -320,10 +347,13 @@ describe('POST /api/contact - the process-local mail budget', () => {
   it('stops mailing after 20 in a window, and STILL persists every message', async () => {
     sendMail.mockResolvedValue(undefined)
 
-    for (let i = 0; i < 20; i += 1) {
+    for (let i = 0; i < 20; i += 1)
       expect((await post(VALID)).status, `submission ${i + 1}`).toBe(200)
-    }
-    expect(sendMail, 'the budget refused a mail it should have allowed').toHaveBeenCalledTimes(20)
+
+    expect(
+      sendMail,
+      'the budget refused a mail it should have allowed'
+    ).toHaveBeenCalledTimes(20)
 
     const overBudget = await post(VALID)
 
@@ -331,11 +361,16 @@ describe('POST /api/contact - the process-local mail budget', () => {
     // here would mean the abuse control had started destroying correspondence, which is the
     // bug this entire file exists to keep out of the handler.
     expect(overBudget.status).toBe(200)
-    expect(sendMail, 'the 21st mail escaped the ceiling').toHaveBeenCalledTimes(20)
+    expect(sendMail, 'the 21st mail escaped the ceiling').toHaveBeenCalledTimes(
+      20
+    )
     expect(await ContactMessageModel.countDocuments({})).toBe(21)
 
     const unmailed = await ContactMessageModel.countDocuments({ mailed: false })
-    expect(unmailed, 'the dropped notification is not discoverable from the rows').toBe(1)
+    expect(
+      unmailed,
+      'the dropped notification is not discoverable from the rows'
+    ).toBe(1)
   })
 
   it('refuses nothing once the window rolls', async () => {

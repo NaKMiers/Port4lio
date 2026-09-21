@@ -1,6 +1,9 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { allAttributeNames, blogSanitizeSchema } from '@/lib/blog/sanitize-schema'
+import {
+  allAttributeNames,
+  blogSanitizeSchema,
+} from '@/lib/blog/sanitize-schema'
 
 /**
  * The markdown pipeline, end to end, on real output.
@@ -38,18 +41,28 @@ describe('the sanitize schema itself', () => {
       attribute => Array.isArray(attribute) && attribute[0] === 'className'
     )
 
-    expect(classNameEntry, 'code lost its className entry - Shiki cannot pick a grammar').toBeDefined()
+    expect(
+      classNameEntry,
+      'code lost its className entry - Shiki cannot pick a grammar'
+    ).toBeDefined()
   })
 
   it('narrows the URL schemes it accepts', () => {
-    expect(blogSanitizeSchema.protocols?.href).toEqual(['http', 'https', 'mailto'])
+    expect(blogSanitizeSchema.protocols?.href).toEqual([
+      'http',
+      'https',
+      'mailto',
+    ])
     expect(blogSanitizeSchema.protocols?.src).toEqual(['https'])
   })
 })
 
 describe('renderMarkdown - hostile input', () => {
   it('drops a raw <script> block entirely', async () => {
-    const html = await renderMarkdown('before\n\n<script>alert(1)</script>\n\nafter', 'p')
+    const html = await renderMarkdown(
+      'before\n\n<script>alert(1)</script>\n\nafter',
+      'p'
+    )
 
     expect(html).not.toContain('<script')
     expect(html).not.toContain('alert(1)')
@@ -73,7 +86,10 @@ describe('renderMarkdown - hostile input', () => {
   })
 
   it('drops an author-written style attribute', async () => {
-    const html = await renderMarkdown('<p style="position:fixed;inset:0">x</p>', 'p')
+    const html = await renderMarkdown(
+      '<p style="position:fixed;inset:0">x</p>',
+      'p'
+    )
 
     expect(html).not.toContain('position:fixed')
   })
@@ -90,7 +106,8 @@ describe('renderMarkdown - hostile input', () => {
 
 describe('renderMarkdown - what must survive', () => {
   it('keeps our own Cloudinary image', async () => {
-    const url = 'https://res.cloudinary.com/demo-cloud/image/upload/v1/cover.png'
+    const url =
+      'https://res.cloudinary.com/demo-cloud/image/upload/v1/cover.png'
     const html = await renderMarkdown(`![alt](${url})`, 'p')
 
     expect(html).toContain(url)
@@ -131,7 +148,10 @@ describe('renderMarkdown - the error contract', () => {
     // downgraded on the way in, so Shiki is never handed a grammar it lacks.
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const html = await renderMarkdown('```brainfuck\n+[-->-[>>+>-----<<]<--<---]\n```', 'my-post')
+    const html = await renderMarkdown(
+      '```brainfuck\n+[-->-[>>+>-----<<]<--<---]\n```',
+      'my-post'
+    )
 
     expect(html).toContain('<pre')
     expect(html).toContain('+[--')
@@ -148,7 +168,10 @@ describe('renderMarkdown - the error contract', () => {
     // catching around the pipeline would lose the entire post's HTML for one bad block.
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    const html = await renderMarkdown('```nope\nx\n```\n\n```ts\nconst y = 2\n```', 'p')
+    const html = await renderMarkdown(
+      '```nope\nx\n```\n\n```ts\nconst y = 2\n```',
+      'p'
+    )
 
     expect(html).toContain('style=')
     logged.mockRestore()
@@ -166,7 +189,10 @@ describe('renderMarkdown - the error contract', () => {
     the value written has to stay inside the slug charset no matter what the heading says.
   */
   it('gives every h2/h3/h4 an id derived from its own text', async () => {
-    const html = await renderMarkdown('## First section\n\n### Nested `code` one', 'p')
+    const html = await renderMarkdown(
+      '## First section\n\n### Nested `code` one',
+      'p'
+    )
 
     expect(html).toContain('<h2 id="first-section">')
     expect(html).toContain('<h3 id="nested-code-one">')

@@ -22,7 +22,9 @@ const FOUNDER_QUOTE_MAX_CHARS = 420
 
 export function trimText(value: unknown): string {
   if (value === null || value === undefined) return ''
-  return String(value).replace(/\u00a0/g, ' ').trim()
+  return String(value)
+    .replace(/\u00a0/g, ' ')
+    .trim()
 }
 
 export function collapseWhitespace(value: string): string {
@@ -50,7 +52,10 @@ export function splitAboutParagraphs(aboutMe: string): string[] {
   const cleaned = trimText(aboutMe)
   if (!cleaned) return []
 
-  const byBlankLine = cleaned.split(/\n\s*\n/).map(p => collapseWhitespace(p)).filter(Boolean)
+  const byBlankLine = cleaned
+    .split(/\n\s*\n/)
+    .map(p => collapseWhitespace(p))
+    .filter(Boolean)
   if (byBlankLine.length > 1) return byBlankLine
 
   const single = byBlankLine[0] ?? cleaned
@@ -70,9 +75,17 @@ export function sanitizeBriefServices(briefServices: string[]): string[] {
   const expanded: string[] = []
   for (const raw of briefServices) {
     const piece = trimText(raw)
-    if (!piece || piece.toLowerCase() === 'null' || piece.toLowerCase() === 'undefined') continue
+    if (
+      !piece ||
+      piece.toLowerCase() === 'null' ||
+      piece.toLowerCase() === 'undefined'
+    )
+      continue
 
-    const lines = piece.split(/\r?\n/).map(l => trimText(l)).filter(Boolean)
+    const lines = piece
+      .split(/\r?\n/)
+      .map(l => trimText(l))
+      .filter(Boolean)
     if (lines.length > 1) {
       for (const line of lines) {
         const stripped = line.replace(/^[-*•]\s*/, '').trim()
@@ -81,7 +94,10 @@ export function sanitizeBriefServices(briefServices: string[]): string[] {
       continue
     }
 
-    const bulletSplit = piece.split(/\s*[•|]\s*/).map(s => trimText(s)).filter(Boolean)
+    const bulletSplit = piece
+      .split(/\s*[•|]\s*/)
+      .map(s => trimText(s))
+      .filter(Boolean)
     if (bulletSplit.length > 1) {
       expanded.push(...bulletSplit)
       continue
@@ -117,7 +133,10 @@ export function sanitizeStats(stats: Stat[]): Stat[] {
   return stats
     .map(s => ({
       label: collapseWhitespace(s.label),
-      value: typeof s.value === 'number' && !Number.isNaN(s.value) ? s.value : Number(s.value ?? 0),
+      value:
+        typeof s.value === 'number' && !Number.isNaN(s.value)
+          ? s.value
+          : Number(s.value ?? 0),
     }))
     .filter(s => s.label.length > 0 && Number.isFinite(s.value))
 }
@@ -148,9 +167,11 @@ function socialPlatformName(link: string): string | null {
 
     if (host.includes('github.com')) return 'GitHub'
     if (host.includes('linkedin.com')) return 'LinkedIn'
-    if (host.includes('youtube.com') || host.includes('youtu.be')) return 'YouTube'
+    if (host.includes('youtube.com') || host.includes('youtu.be'))
+      return 'YouTube'
     if (host.includes('instagram.com')) return 'Instagram'
-    if (host.includes('facebook.com') || host.includes('fb.com')) return 'Facebook'
+    if (host.includes('facebook.com') || host.includes('fb.com'))
+      return 'Facebook'
     if (host.includes('pinterest.')) return 'Pinterest'
     if (host.includes('zalo.me')) return 'Zalo'
     if (host.includes('x.com') || host.includes('twitter.com')) return 'X'
@@ -191,10 +212,17 @@ function socialDisplayName(name: string, link: string): string {
 
 function isSupportedSocialUrl(link: string): boolean {
   const t = link.trim()
-  return /^https?:\/\//i.test(t) || t.startsWith('/') || t.startsWith('mailto:') || t.startsWith('tel:')
+  return (
+    /^https?:\/\//i.test(t) ||
+    t.startsWith('/') ||
+    t.startsWith('mailto:') ||
+    t.startsWith('tel:')
+  )
 }
 
-export function sanitizeCertificates(certificates: Certificate[]): Certificate[] {
+export function sanitizeCertificates(
+  certificates: Certificate[]
+): Certificate[] {
   return certificates
     .map(c => ({
       name: collapseWhitespace(c.name),
@@ -282,7 +310,12 @@ export function sanitizeProjects(projects: ProjectItem[]): ProjectItem[] {
 function hasRenderableProject(p: ProjectItem): boolean {
   if (p.title.length > 0) return true
   if ((p.overview ?? '').length > 0) return true
-  return p.parts.some(part => part.image.length > 0 || part.description.length > 0 || part.link.length > 0)
+  return p.parts.some(
+    part =>
+      part.image.length > 0 ||
+      part.description.length > 0 ||
+      part.link.length > 0
+  )
 }
 
 /**
@@ -310,7 +343,9 @@ export function projectDetailLines(project: ProjectItem): string[] {
 const STORE_HOST_HINTS =
   /\b(apps\.apple\.com|itunes\.apple\.com|play\.google\.com|chrome\.google\.com\/webstore)\b/i
 
-export function extractStoreLinksFromProjects(projects: ProjectItem[]): { name: string; url: string }[] {
+export function extractStoreLinksFromProjects(
+  projects: ProjectItem[]
+): { name: string; url: string }[] {
   const out: { name: string; url: string }[] = []
   const seen = new Set<string>()
   for (const project of projects) {
@@ -333,7 +368,8 @@ export function labelOutboundHttpsUrl(url: string): string {
   try {
     const u = new URL(url)
     const h = u.hostname.replace(/^www\./, '')
-    if (h.includes('apps.apple.com') || h.includes('itunes.apple.com')) return 'App Store'
+    if (h.includes('apps.apple.com') || h.includes('itunes.apple.com'))
+      return 'App Store'
     if (h.includes('play.google.com')) return 'Google Play'
     if (h.includes('chrome.google.com')) return 'Chrome Web Store'
     if (h === 'github.com' || h.endsWith('.github.com')) return 'GitHub'
@@ -347,7 +383,9 @@ export function labelOutboundHttpsUrl(url: string): string {
 }
 
 /** Deduped HTTPS destinations preserved in project part order. */
-export function projectOutboundLinks(project: ProjectItem): { url: string; label: string }[] {
+export function projectOutboundLinks(
+  project: ProjectItem
+): { url: string; label: string }[] {
   const seen = new Set<string>()
   const out: { url: string; label: string }[] = []
   for (const part of project.parts) {
@@ -420,24 +458,36 @@ export function formatPortfolioPeriod(start: string, end: string): string {
   const sDate = utcDateFromInput(start)
   const eDate = utcDateFromInput(end)
   const ongoing = isOngoingEndDate(end)
-  const startLabel = sDate ? portfolioPeriodFormatter.format(sDate) : trimText(start)
-  const endLabel = ongoing ? 'Present' : eDate ? portfolioPeriodFormatter.format(eDate) : trimText(end)
+  const startLabel = sDate
+    ? portfolioPeriodFormatter.format(sDate)
+    : trimText(start)
+  const endLabel = ongoing
+    ? 'Present'
+    : eDate
+      ? portfolioPeriodFormatter.format(eDate)
+      : trimText(end)
   if (startLabel && endLabel) return `${startLabel} - ${endLabel}`
   return startLabel || endLabel || ''
 }
 
-export function sortExperienceRecent(items: ExperienceItem[]): ExperienceItem[] {
+export function sortExperienceRecent(
+  items: ExperienceItem[]
+): ExperienceItem[] {
   return [...items].sort((a, b) => {
-    const tb = parseExperienceSortTime(b.end) || parseExperienceSortTime(b.start)
-    const ta = parseExperienceSortTime(a.end) || parseExperienceSortTime(a.start)
+    const tb =
+      parseExperienceSortTime(b.end) || parseExperienceSortTime(b.start)
+    const ta =
+      parseExperienceSortTime(a.end) || parseExperienceSortTime(a.start)
     return tb - ta
   })
 }
 
 export function sortEducationRecent(items: EducationItem[]): EducationItem[] {
   return [...items].sort((a, b) => {
-    const tb = parseExperienceSortTime(b.end) || parseExperienceSortTime(b.start)
-    const ta = parseExperienceSortTime(a.end) || parseExperienceSortTime(a.start)
+    const tb =
+      parseExperienceSortTime(b.end) || parseExperienceSortTime(b.start)
+    const ta =
+      parseExperienceSortTime(a.end) || parseExperienceSortTime(a.start)
     return tb - ta
   })
 }

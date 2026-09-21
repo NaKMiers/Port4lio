@@ -62,12 +62,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
   const body = parsed.body ?? {}
 
-  if ('slug' in body && body.slug !== undefined) {
+  if ('slug' in body && body.slug !== undefined)
     return jsonError(
       'A kind slug cannot be changed - posts reference it. Create the new kind, move the posts, then delete the old one.',
       400
     )
-  }
 
   try {
     await connectDatabase()
@@ -82,9 +81,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       kind.label = label
     }
     if (typeof body.eyebrow === 'boolean') kind.eyebrow = body.eyebrow
-    if (typeof body.order === 'number' && Number.isFinite(body.order)) {
+    if (typeof body.order === 'number' && Number.isFinite(body.order))
       kind.order = Math.round(body.order)
-    }
 
     await kind.save()
     revalidatePath('/blog')
@@ -99,9 +97,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       },
     })
   } catch (error) {
-    if (error instanceof Error && error.name === 'ValidationError') {
+    if (error instanceof Error && error.name === 'ValidationError')
       return jsonError(error.message, 400)
-    }
+
     return jsonError('Unable to save the kind right now.', 500)
   }
 }
@@ -119,15 +117,14 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
 
     // Checked before the in-use count, because it is the one an owner cannot work around by
     // moving posts - saying so first avoids sending them to reassign posts pointlessly.
-    if ((await KindModel.countDocuments({})) <= 1) {
+    if ((await KindModel.countDocuments({})) <= 1)
       return jsonError(
         'This is the only kind left. Every post must have one, so create another before deleting this.',
         409
       )
-    }
 
     const inUse = await postsUsingKind(kind.slug)
-    if (inUse.length > 0) {
+    if (inUse.length > 0)
       return NextResponse.json(
         {
           error: `"${kind.label}" is still used by ${inUse.length} post${inUse.length === 1 ? '' : 's'}. Move them to another kind first.`,
@@ -135,7 +132,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
         },
         { status: 409 }
       )
-    }
 
     await kind.deleteOne()
     revalidatePath('/blog')

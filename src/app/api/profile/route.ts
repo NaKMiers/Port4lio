@@ -29,7 +29,8 @@ export async function GET() {
   try {
     return NextResponse.json({ profile: await loadPublicProfile() })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown server error'
+    const message =
+      error instanceof Error ? error.message : 'Unknown server error'
     return jsonError(message, 500)
   }
 }
@@ -39,20 +40,19 @@ export async function POST(request: NextRequest) {
     await connectDatabase()
 
     const authCookie = request.cookies.get(getAuthCookieName())?.value
-    if (!hasOwnerAccess(authCookie)) {
-      return jsonError('Unauthorized', 401)
-    }
+    if (!hasOwnerAccess(authCookie)) return jsonError('Unauthorized', 401)
 
     const contentType = request.headers.get('content-type') ?? ''
-    if (!contentType.includes('application/json')) {
+    if (!contentType.includes('application/json'))
       return jsonError('Expected Content-Type: application/json', 415)
-    }
 
     const raw = await request.text()
     const byteLength = new TextEncoder().encode(raw).length
-    if (byteLength > MAX_PROFILE_JSON_BYTES) {
-      return jsonError(`Profile JSON exceeds ${MAX_PROFILE_JSON_BYTES / (1024 * 1024)} MB`, 413)
-    }
+    if (byteLength > MAX_PROFILE_JSON_BYTES)
+      return jsonError(
+        `Profile JSON exceeds ${MAX_PROFILE_JSON_BYTES / (1024 * 1024)} MB`,
+        413
+      )
 
     const parsed = JSON.parse(raw || '{}') as Profile
     const now = new Date()
@@ -71,9 +71,7 @@ export async function POST(request: NextRequest) {
       { upsert: true, new: true, lean: true, runValidators: true }
     )
 
-    if (!updatedDoc) {
-      return jsonError('Failed to load updated profile', 500)
-    }
+    if (!updatedDoc) return jsonError('Failed to load updated profile', 500)
 
     revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')
 
@@ -82,7 +80,8 @@ export async function POST(request: NextRequest) {
       profile: toOwnerProfile(updatedDoc as Record<string, unknown>),
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown server error'
+    const message =
+      error instanceof Error ? error.message : 'Unknown server error'
     return jsonError(message, 500)
   }
 }

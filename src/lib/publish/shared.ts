@@ -17,9 +17,10 @@ import type { ManualField, RenderContext } from './types'
  * into the README badge row and the LinkedIn about text. Strip them.
  */
 export function publishableSocials(socials: SocialLink[]): SocialLink[] {
-  return sanitizeSocialLinks(socials).filter(social => /^https:\/\//i.test(trimText(social.link)))
+  return sanitizeSocialLinks(socials).filter(social =>
+    /^https:\/\//i.test(trimText(social.link))
+  )
 }
-
 
 /** Builds a paste-safe field that also reports how much was cut. */
 export function manualField(
@@ -50,8 +51,14 @@ export function manualBlockField(
   raw: string,
   hint?: string
 ): ManualField {
-  const source = raw.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
-  const value = source.length <= limit ? source : `${source.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
+  const source = raw
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  const value =
+    source.length <= limit
+      ? source
+      : `${source.slice(0, Math.max(0, limit - 1)).trimEnd()}…`
   return {
     key,
     label,
@@ -83,7 +90,11 @@ function utcDate(iso: string): Date | null {
  * `now` from {@link RenderContext} keeps artifacts - and therefore version hashes -
  * stable across calls.
  */
-export function formatPublishPeriod(start: string, end: string, now: Date): string {
+export function formatPublishPeriod(
+  start: string,
+  end: string,
+  now: Date
+): string {
   const s = utcDate(start)
   const e = utcDate(end)
   const endRaw = trimText(end).toLowerCase()
@@ -95,7 +106,11 @@ export function formatPublishPeriod(start: string, end: string, now: Date): stri
     (e !== null && e.getTime() > now.getTime())
 
   const startLabel = s ? PERIOD_FORMATTER.format(s) : trimText(start)
-  const endLabel = ongoing ? 'Present' : e ? PERIOD_FORMATTER.format(e) : trimText(end)
+  const endLabel = ongoing
+    ? 'Present'
+    : e
+      ? PERIOD_FORMATTER.format(e)
+      : trimText(end)
 
   if (startLabel && endLabel) return `${startLabel} - ${endLabel}`
   return startLabel || endLabel || ''
@@ -103,7 +118,11 @@ export function formatPublishPeriod(start: string, end: string, now: Date): stri
 
 /** Display name used across every artifact. */
 export function displayName(profile: PublicProfile): string {
-  return collapseWhitespace(profile.fullName) || collapseWhitespace(profile.username) || ''
+  return (
+    collapseWhitespace(profile.fullName) ||
+    collapseWhitespace(profile.username) ||
+    ''
+  )
 }
 
 /** The site URL a platform's "website" field should point at. */

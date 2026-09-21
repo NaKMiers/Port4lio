@@ -1,7 +1,16 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
 import { NextRequest } from 'next/server'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { MAX_IMAGE_PROMPTS } from '@/lib/blog/constants'
 import { PostModel } from '@/models/Post'
@@ -26,10 +35,12 @@ import { PostModel } from '@/models/Post'
  * completion already paid for.
  */
 
-let prompt = 'A flat vector diagram of a request crossing three services, teal and slate.'
+let prompt =
+  'A flat vector diagram of a request crossing three services, teal and slate.'
 
 vi.mock('@/lib/blog/llm', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
+  const actual =
+    await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
   return {
     ...actual,
     chatCompletion: vi.fn(async () => ({
@@ -41,7 +52,10 @@ vi.mock('@/lib/blog/llm', async () => {
 })
 
 let memory: MongoMemoryServer
-let POST: (request: NextRequest, ctx: { params: Promise<{ id: string }> }) => Promise<Response>
+let POST: (
+  request: NextRequest,
+  ctx: { params: Promise<{ id: string }> }
+) => Promise<Response>
 let chatCompletion: ReturnType<typeof vi.fn>
 
 beforeAll(async () => {
@@ -62,7 +76,8 @@ afterAll(async () => {
 })
 
 beforeEach(() => {
-  prompt = 'A flat vector diagram of a request crossing three services, teal and slate.'
+  prompt =
+    'A flat vector diagram of a request crossing three services, teal and slate.'
 })
 
 afterEach(async () => {
@@ -75,17 +90,21 @@ async function makePost(overrides: Record<string, unknown> = {}) {
     slug: 'a-post',
     title: 'A post',
     kind: 'article',
-    bodyMarkdown: '## Heading\n\nProse.\n\n![image](image1)\n\nMore prose.\n\n![image](image2)',
+    bodyMarkdown:
+      '## Heading\n\nProse.\n\n![image](image1)\n\nMore prose.\n\n![image](image2)',
     ...overrides,
   })
 }
 
 function call(id: string, body: Record<string, unknown>) {
-  const request = new NextRequest(`http://localhost/api/admin/blog/${id}/image-prompt`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const request = new NextRequest(
+    `http://localhost/api/admin/blog/${id}/image-prompt`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  )
   return POST(request, { params: Promise.resolve({ id }) })
 }
 
@@ -97,7 +116,9 @@ describe('writing the prompt to the document', () => {
 
     expect(response.status).toBe(200)
     const after = await PostModel.findById(post._id)
-    expect(after?.imagePrompts.find(entry => entry.key === 'image1')?.prompt).toBe(prompt)
+    expect(
+      after?.imagePrompts.find(entry => entry.key === 'image1')?.prompt
+    ).toBe(prompt)
   })
 
   it('OVERWRITES an existing prompt in place, which is what markModified exists for', async () => {
@@ -118,7 +139,9 @@ describe('writing the prompt to the document', () => {
 
     const after = await PostModel.findById(post._id)
     expect(after?.imagePrompts).toHaveLength(1)
-    expect(after?.imagePrompts[0].prompt).toBe('A completely different second prompt, to prove the write landed.')
+    expect(after?.imagePrompts[0].prompt).toBe(
+      'A completely different second prompt, to prove the write landed.'
+    )
   })
 
   it('saves a cover prompt to coverImagePrompt, not into the array', async () => {
@@ -139,7 +162,9 @@ describe('writing the prompt to the document', () => {
 
     await call(String(post._id), { key: 'image1' })
 
-    expect((await PostModel.findById(post._id))?.contentUpdatedAt?.toISOString()).toBe(before)
+    expect(
+      (await PostModel.findById(post._id))?.contentUpdatedAt?.toISOString()
+    ).toBe(before)
   })
 })
 
@@ -188,13 +213,20 @@ describe('refusals that happen BEFORE a completion is paid for', () => {
       prompt right now" for a condition that is permanent, fixable, and costs money each time
       the author retries.
     */
-    const keys = Array.from({ length: MAX_IMAGE_PROMPTS + 1 }, (_, n) => `image${n + 1}`)
+    const keys = Array.from(
+      { length: MAX_IMAGE_PROMPTS + 1 },
+      (_, n) => `image${n + 1}`
+    )
     const post = await makePost({
       bodyMarkdown: keys.map(key => `![image](${key})`).join('\n\n'),
-      imagePrompts: keys.slice(0, MAX_IMAGE_PROMPTS).map(key => ({ key, prompt: 'x' })),
+      imagePrompts: keys
+        .slice(0, MAX_IMAGE_PROMPTS)
+        .map(key => ({ key, prompt: 'x' })),
     })
 
-    const response = await call(String(post._id), { key: keys[MAX_IMAGE_PROMPTS] })
+    const response = await call(String(post._id), {
+      key: keys[MAX_IMAGE_PROMPTS],
+    })
     const body = (await response.json()) as { error?: string }
 
     expect(response.status).toBe(409)
@@ -205,7 +237,10 @@ describe('refusals that happen BEFORE a completion is paid for', () => {
   it('still rewrites an EXISTING key when the post is at the cap', async () => {
     // The control. A cap check that blocked rewrites would make a full post uneditable, which
     // is worse than the 500 it replaced.
-    const keys = Array.from({ length: MAX_IMAGE_PROMPTS }, (_, n) => `image${n + 1}`)
+    const keys = Array.from(
+      { length: MAX_IMAGE_PROMPTS },
+      (_, n) => `image${n + 1}`
+    )
     const post = await makePost({
       bodyMarkdown: keys.map(key => `![image](${key})`).join('\n\n'),
       imagePrompts: keys.map(key => ({ key, prompt: 'x' })),
@@ -230,7 +265,8 @@ describe('when the model does not cooperate', () => {
   })
 
   it('re-emits an upstream 429 as a 429', async () => {
-    const { LlmError } = await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
+    const { LlmError } =
+      await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
     chatCompletion.mockRejectedValueOnce(new LlmError('Rate limited.', 429))
     const post = await makePost()
 
@@ -238,8 +274,11 @@ describe('when the model does not cooperate', () => {
   })
 
   it('maps any other model failure to 502, not to our own 500', async () => {
-    const { LlmError } = await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
-    chatCompletion.mockRejectedValueOnce(new LlmError('Could not reach the model endpoint.', null))
+    const { LlmError } =
+      await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
+    chatCompletion.mockRejectedValueOnce(
+      new LlmError('Could not reach the model endpoint.', null)
+    )
     const post = await makePost()
 
     expect((await call(String(post._id), { key: 'image1' })).status).toBe(502)

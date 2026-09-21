@@ -79,7 +79,12 @@ function barGap(gaps: readonly BarGap[], index: number): BarGap {
 }
 
 function Bar({ gap }: { gap: BarGap }) {
-  return <span className='bar' style={{ marginLeft: u(gap.left), marginRight: u(gap.right) }} />
+  return (
+    <span
+      className="bar"
+      style={{ marginLeft: u(gap.left), marginRight: u(gap.right) }}
+    />
+  )
 }
 
 /** Joins nodes with a separator, without introducing a wrapper element. */
@@ -89,15 +94,28 @@ function joinNodes(nodes: ReactNode[], separator: string): ReactNode[] {
   )
 }
 
-function ContactRow({ contact, left }: { contact: ResumeContact; left: number }) {
-  const identity = [contact.email, contact.phone, contact.location].filter(Boolean)
+function ContactRow({
+  contact,
+  left,
+}: {
+  contact: ResumeContact
+  left: number
+}) {
+  const identity = [contact.email, contact.phone, contact.location].filter(
+    Boolean
+  )
 
   return (
-    <div className='contact' style={{ left: u(left), top: u(138.95) }}>
+    <div
+      className="contact"
+      style={{ left: u(left), top: u(138.95) }}
+    >
       <div>
         {identity.map((value, index) => (
           <span key={value}>
-            {index > 0 && <Bar gap={barGap(CONTACT_BAR_GAPS.identity, index - 1)} />}
+            {index > 0 && (
+              <Bar gap={barGap(CONTACT_BAR_GAPS.identity, index - 1)} />
+            )}
             {value}
           </span>
         ))}
@@ -105,9 +123,14 @@ function ContactRow({ contact, left }: { contact: ResumeContact; left: number })
       <div>
         {contact.links.map((link, index) => (
           <span key={link.href || link.text}>
-            {index > 0 && <Bar gap={barGap(CONTACT_BAR_GAPS.links, index - 1)} />}
+            {index > 0 && (
+              <Bar gap={barGap(CONTACT_BAR_GAPS.links, index - 1)} />
+            )}
             {link.label ? `${link.label}: ` : ''}
-            <a className='ul' href={link.href}>
+            <a
+              className="ul"
+              href={link.href}
+            >
               <b>{link.text}</b>
             </a>
           </span>
@@ -136,7 +159,7 @@ function TextBlock({
   gTop: boolean
 }) {
   return (
-    <div className={`p ${gTop ? 'gTop' : 'gBody'}${justify ? ' jt' : ''}`}>
+    <div className={`p ${gTop ? 'gTop' : 'gBody'}${justify ? 'jt' : ''}`}>
       {lines.map((line, index) => (
         <div key={index}>{renderInlineBold(line)}</div>
       ))}
@@ -172,7 +195,11 @@ function CertificationBody({
           {group.issuer && <b>{`${group.issuer}: `}</b>}
           {joinNodes(
             group.items.map(item => (
-              <a className='ul' key={item.link || item.name} href={item.link}>
+              <a
+                className="ul"
+                key={item.link || item.name}
+                href={item.link}
+              >
                 {item.name}
               </a>
             )),
@@ -186,10 +213,12 @@ function CertificationBody({
 
 /** The fixed page header: photo, name, role, rule, contact rows. Always sheet 1, always first. */
 function Masthead({ resume }: { resume: Resume }) {
-  const textLeft = resume.hidePhoto ? MASTHEAD_TEXT_LEFT_NO_PHOTO : MASTHEAD_TEXT_LEFT_WITH_PHOTO
+  const textLeft = resume.hidePhoto
+    ? MASTHEAD_TEXT_LEFT_NO_PHOTO
+    : MASTHEAD_TEXT_LEFT_WITH_PHOTO
 
   return (
-    <div className='mast'>
+    <div className="mast">
       {resume.hidePhoto ? null : (
         <div
           style={{
@@ -218,18 +247,31 @@ function Masthead({ resume }: { resume: Resume }) {
         </div>
       )}
 
-      <div className='name' style={{ left: u(textLeft), top: u(21.95) }}>
+      <div
+        className="name"
+        style={{ left: u(textLeft), top: u(21.95) }}
+      >
         {resume.name}
       </div>
-      <div className='role' style={{ left: u(textLeft), top: u(68.95) }}>
+      <div
+        className="role"
+        style={{ left: u(textLeft), top: u(68.95) }}
+      >
         {resume.role}
       </div>
       <div
-        className='rule'
-        style={{ left: u(textLeft), top: u(115.45), width: u(MASTHEAD_CONTENT_RIGHT - textLeft) }}
+        className="rule"
+        style={{
+          left: u(textLeft),
+          top: u(115.45),
+          width: u(MASTHEAD_CONTENT_RIGHT - textLeft),
+        }}
       />
 
-      <ContactRow contact={resume.contact} left={textLeft} />
+      <ContactRow
+        contact={resume.contact}
+        left={textLeft}
+      />
     </div>
   )
 }
@@ -241,38 +283,62 @@ function Masthead({ resume }: { resume: Resume }) {
 function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
   switch (item.kind) {
     case 'sectionHeading':
-      return <SectionRule heading={item.text} gap={gTop ? 'gTop' : item.gap} />
+      return (
+        <SectionRule
+          heading={item.text}
+          gap={gTop ? 'gTop' : item.gap}
+        />
+      )
 
     case 'text':
-      return <TextBlock lines={item.lines} justify={item.justify} gTop={gTop} />
+      return (
+        <TextBlock
+          lines={item.lines}
+          justify={item.justify}
+          gTop={gTop}
+        />
+      )
 
     case 'skillRows':
-      return <SkillRows rows={item.rows} gTop={gTop} />
+      return (
+        <SkillRows
+          rows={item.rows}
+          gTop={gTop}
+        />
+      )
 
     case 'certifications':
-      return <CertificationBody groups={item.groups} gTop={gTop} />
+      return (
+        <CertificationBody
+          groups={item.groups}
+          gTop={gTop}
+        />
+      )
 
     case 'projectHead':
       return (
         <div className={`p ${gTop ? 'gTop' : item.gap} hd`}>
           {item.employer ? (
             <b>
-              <span className='ul'>{item.employer}</span>
+              <span className="ul">{item.employer}</span>
               {': '}
               {renderInlineBold(item.title)}
             </b>
           ) : (
             <div>{renderInlineBold(item.title)}</div>
           )}
-          <span className='date'>{item.period}</span>
+          <span className="date">{item.period}</span>
         </div>
       )
 
     case 'details':
       return (
-        <div className={`p ind1${gTop ? ' gTop' : ''}`}>
+        <div className={`p ind1${gTop ? 'gTop' : ''}`}>
           {item.lines.map((line, index) => (
-            <div className='i1' key={index}>
+            <div
+              className="i1"
+              key={index}
+            >
               {renderInlineBold(line)}
             </div>
           ))}
@@ -281,9 +347,12 @@ function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
 
     case 'highlights':
       return (
-        <div className={`p ind2${gTop ? ' gTop' : ''}`}>
+        <div className={`p ind2${gTop ? 'gTop' : ''}`}>
           {item.lines.map((line, index) => (
-            <div className='i2' key={index}>
+            <div
+              className="i2"
+              key={index}
+            >
               {renderInlineBold(line)}
             </div>
           ))}
@@ -292,12 +361,16 @@ function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
 
     case 'demo':
       return (
-        <div className={`p ind1${gTop ? ' gTop' : ''}`}>
-          <div className='i1'>
+        <div className={`p ind1${gTop ? 'gTop' : ''}`}>
+          <div className="i1">
             <b>Demo:</b>{' '}
             {joinNodes(
               item.links.map(link => (
-                <a className='lnk' key={link.href} href={link.href}>
+                <a
+                  className="lnk"
+                  key={link.href}
+                  href={link.href}
+                >
                   {link.label}
                 </a>
               )),
@@ -317,18 +390,32 @@ export default function CvSheets({ resume }: { resume: Resume }) {
       <style dangerouslySetInnerHTML={{ __html: CV_SHEET_CSS }} />
 
       {/* ================================ PAGE 1 ================================ */}
-      <section className='sheet' aria-label='Curriculum vitae, page 1 of 2'>
+      <section
+        className="sheet"
+        aria-label="Curriculum vitae, page 1 of 2"
+      >
         <Masthead resume={resume} />
 
         {sheets.first.map((item, index) => (
-          <PrintItem key={index} item={item} gTop={false} />
+          <PrintItem
+            key={index}
+            item={item}
+            gTop={false}
+          />
         ))}
       </section>
 
       {/* ================================ PAGE 2 ================================ */}
-      <section className='sheet' aria-label='Curriculum vitae, page 2 of 2'>
+      <section
+        className="sheet"
+        aria-label="Curriculum vitae, page 2 of 2"
+      >
         {sheets.second.map((item, index) => (
-          <PrintItem key={index} item={item} gTop={index === 0} />
+          <PrintItem
+            key={index}
+            item={item}
+            gTop={index === 0}
+          />
         ))}
       </section>
     </>
@@ -355,11 +442,18 @@ export function CvFlowSheet({ resume }: { resume: Resume }) {
           a block formatting context, and without it the masthead's top margin collapses out
           through the top edge and every block below measures ~41px too high. With an auto
           height it clips nothing. */}
-      <section className='sheet' style={{ height: 'auto' }}>
+      <section
+        className="sheet"
+        style={{ height: 'auto' }}
+      >
         <Masthead resume={resume} />
 
         {flattenResume(resume).map((item, index) => (
-          <PrintItem key={index} item={item} gTop={false} />
+          <PrintItem
+            key={index}
+            item={item}
+            gTop={false}
+          />
         ))}
       </section>
     </>

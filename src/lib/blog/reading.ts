@@ -59,9 +59,13 @@ const HAS_LETTER_OR_DIGIT = /[0-9A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/
 export function countProseWords(html: string): number {
   if (!html) return 0
 
-  const text = html.replace(PRE_BLOCK, ' ').replace(TAG, ' ').replace(ENTITY, ' ')
+  const text = html
+    .replace(PRE_BLOCK, ' ')
+    .replace(TAG, ' ')
+    .replace(ENTITY, ' ')
 
-  return text.split(/\s+/).filter(token => HAS_LETTER_OR_DIGIT.test(token)).length
+  return text.split(/\s+/).filter(token => HAS_LETTER_OR_DIGIT.test(token))
+    .length
 }
 
 /** Minutes, never zero - a one-paragraph note still takes a moment. */

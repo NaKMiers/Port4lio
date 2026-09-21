@@ -24,7 +24,11 @@ function isBlank(value: string | undefined): boolean {
 
 function pruneSocials(socials: SocialLink[]): SocialLink[] {
   return socials
-    .map(s => ({ name: trimOrEmpty(s.name), icon: trimOrEmpty(s.icon), link: trimOrEmpty(s.link) }))
+    .map(s => ({
+      name: trimOrEmpty(s.name),
+      icon: trimOrEmpty(s.icon),
+      link: trimOrEmpty(s.link),
+    }))
     .filter(s => !isBlank(s.name) || !isBlank(s.icon) || !isBlank(s.link))
 }
 
@@ -73,7 +77,10 @@ function pruneEducation(education: EducationItem[]): EducationItem[] {
     }))
     .filter(
       item =>
-        !isBlank(item.schoolName) || !isBlank(item.major) || !isBlank(item.start) || !isBlank(item.end)
+        !isBlank(item.schoolName) ||
+        !isBlank(item.major) ||
+        !isBlank(item.start) ||
+        !isBlank(item.end)
     )
 }
 
@@ -90,7 +97,9 @@ function pruneServices(services: ServiceItem[]): ServiceItem[] {
       title: trimOrEmpty(sv.title),
       description: trimOrEmpty(sv.description),
     }))
-    .filter(sv => !isBlank(sv.icon) || !isBlank(sv.title) || !isBlank(sv.description))
+    .filter(
+      sv => !isBlank(sv.icon) || !isBlank(sv.title) || !isBlank(sv.description)
+    )
 }
 
 function pruneProjects(projects: ProjectItem[]): ProjectItem[] {
@@ -98,14 +107,21 @@ function pruneProjects(projects: ProjectItem[]): ProjectItem[] {
     .map(prj => {
       const title = trimOrEmpty(prj.title)
       const overview = trimOrEmpty(prj.overview)
-      const techStack = (prj.techStack ?? []).map(item => trimOrEmpty(item)).filter(Boolean)
+      const techStack = (prj.techStack ?? [])
+        .map(item => trimOrEmpty(item))
+        .filter(Boolean)
       const parts = (prj.parts ?? [])
         .map(part => ({
           image: trimOrEmpty(part.image),
           description: trimOrEmpty(part.description),
           link: trimOrEmpty(part.link),
         }))
-        .filter(part => !isBlank(part.image) || !isBlank(part.description) || !isBlank(part.link))
+        .filter(
+          part =>
+            !isBlank(part.image) ||
+            !isBlank(part.description) ||
+            !isBlank(part.link)
+        )
 
       return { ...prj, title, overview, techStack, parts }
     })
@@ -149,7 +165,9 @@ function pruneResume(resume: Resume | undefined): Resume | undefined {
       .map(block => ({
         heading: trimOrEmpty(block.heading),
         rows: (block.rows ?? [])
-          .map(row => ({ items: (row.items ?? []).map(trimOrEmpty).filter(Boolean) }))
+          .map(row => ({
+            items: (row.items ?? []).map(trimOrEmpty).filter(Boolean),
+          }))
           .filter(row => row.items.length > 0),
       }))
       .filter(block => !isBlank(block.heading) || block.rows.length > 0),
@@ -159,7 +177,10 @@ function pruneResume(resume: Resume | undefined): Resume | undefined {
         .map(group => ({
           issuer: trimOrEmpty(group.issuer),
           items: (group.items ?? [])
-            .map(item => ({ name: trimOrEmpty(item.name), link: trimOrEmpty(item.link) }))
+            .map(item => ({
+              name: trimOrEmpty(item.name),
+              link: trimOrEmpty(item.link),
+            }))
             .filter(item => !isBlank(item.name) || !isBlank(item.link)),
         }))
         .filter(group => !isBlank(group.issuer) || group.items.length > 0),
@@ -173,17 +194,30 @@ function pruneResume(resume: Resume | undefined): Resume | undefined {
             title: trimOrEmpty(project.title),
             period: trimOrEmpty(project.period),
             details: (project.details ?? []).map(trimOrEmpty).filter(Boolean),
-            highlights: (project.highlights ?? []).map(trimOrEmpty).filter(Boolean),
+            highlights: (project.highlights ?? [])
+              .map(trimOrEmpty)
+              .filter(Boolean),
             demoLinks: (project.demoLinks ?? [])
-              .map(link => ({ label: trimOrEmpty(link.label), href: trimOrEmpty(link.href) }))
+              .map(link => ({
+                label: trimOrEmpty(link.label),
+                href: trimOrEmpty(link.href),
+              }))
               .filter(link => !isBlank(link.href)),
           }))
-          .filter(project => !isBlank(project.title) || project.details.length > 0),
+          .filter(
+            project => !isBlank(project.title) || project.details.length > 0
+          ),
       }))
       .filter(section => !isBlank(section.heading) || section.items.length > 0),
     pageBreak: {
-      sectionIndex: Math.max(0, Math.trunc(resume.pageBreak?.sectionIndex ?? 0)),
-      projectIndex: Math.max(0, Math.trunc(resume.pageBreak?.projectIndex ?? 0)),
+      sectionIndex: Math.max(
+        0,
+        Math.trunc(resume.pageBreak?.sectionIndex ?? 0)
+      ),
+      projectIndex: Math.max(
+        0,
+        Math.trunc(resume.pageBreak?.projectIndex ?? 0)
+      ),
       highlightsOnFirstSheet: Math.max(
         0,
         Math.trunc(resume.pageBreak?.highlightsOnFirstSheet ?? 0)
@@ -232,7 +266,9 @@ export function cleanProfileForSave(profile: Profile): Partial<Profile> {
 
     serviceHeading: trimOrEmpty(profile.serviceHeading),
     serviceSubHeading: trimOrEmpty(profile.serviceSubHeading),
-    briefServices: (profile.briefServices ?? []).map(s => trimOrEmpty(s)).filter(Boolean),
+    briefServices: (profile.briefServices ?? [])
+      .map(s => trimOrEmpty(s))
+      .filter(Boolean),
     services: pruneServices(profile.services ?? []),
 
     workHeading: trimOrEmpty(profile.workHeading),

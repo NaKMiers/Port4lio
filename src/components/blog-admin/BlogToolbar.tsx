@@ -2,7 +2,11 @@ import { Maximize2, Minimize2 } from 'lucide-react'
 import Link from 'next/link'
 import React from 'react'
 
-import { ghostBtnCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
+import {
+  ghostBtnCls,
+  primaryBtnCls,
+  secondaryBtnCls,
+} from '@/components/settings/settings-utils'
 
 /**
  * The editor's header panel: where this post is, whether it is saved, and the transitions.
@@ -91,68 +95,86 @@ export default function BlogToolbar({
    */
   function confirmLeave(event: React.MouseEvent) {
     if (!dirty) return
-    if (!window.confirm('You have unsaved changes. Leave without saving?')) {
+    if (!window.confirm('You have unsaved changes. Leave without saving?'))
       event.preventDefault()
-    }
   }
 
   return (
-    <div className='relative mb-6 rounded-[2rem] border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(255,250,246,0.78))] p-6 shadow-panel backdrop-blur-md sm:p-7'>
+    <div className="relative mb-6 rounded-[2rem] border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.84),rgba(255,250,246,0.78))] p-6 shadow-panel backdrop-blur-md sm:p-7">
       {/* Top-right of this block, out of the way of the copy underneath - the same placement
           and the same pair of states the profile editor's toggle uses, because it is the same
           gesture on a second board and it should not have to be learned twice. */}
       <button
-        type='button'
+        type="button"
         onClick={onToggleFullWidth}
         aria-pressed={fullWidth}
-        title={fullWidth ? 'Return to the editorial column width' : 'Use the full browser width'}
-        className='absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-pp-line bg-white/86 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_10px_24px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white sm:right-5 sm:top-5'
+        title={
+          fullWidth
+            ? 'Return to the editorial column width'
+            : 'Use the full browser width'
+        }
+        className="bg-white/86 absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-pp-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_10px_24px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white sm:right-5 sm:top-5"
       >
-        {fullWidth ? <Minimize2 aria-hidden size={12} /> : <Maximize2 aria-hidden size={12} />}
+        {fullWidth ? (
+          <Minimize2
+            aria-hidden
+            size={12}
+          />
+        ) : (
+          <Maximize2
+            aria-hidden
+            size={12}
+          />
+        )}
         {fullWidth ? 'Shrink' : 'Extend'}
       </button>
 
-      <div className='flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between'>
-        <div className='max-w-3xl space-y-3'>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-3xl space-y-3">
           {/* Right padding keeps the badges from sliding under the Extend button. */}
-          <div className='flex flex-wrap items-center gap-2.5 pr-24'>
-            <span className='rounded-full border border-pp-line bg-white/82 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+          <div className="flex flex-wrap items-center gap-2.5 pr-24">
+            <span className="bg-white/82 rounded-full border border-pp-line px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
               Blog control room
             </span>
-            <span className='rounded-full bg-pp-text px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white'>
+            <span className="rounded-full bg-pp-text px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white">
               {status}
             </span>
             {uploading ? (
-              <span className='rounded-full border border-pp-orange/30 bg-pp-orange/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-text'>
+              <span className="rounded-full border border-pp-orange/30 bg-pp-orange/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-text">
                 Upload in progress
               </span>
             ) : null}
           </div>
 
           <div>
-            <h1 className='font-display text-3xl font-semibold tracking-tight text-pp-text sm:text-4xl'>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-pp-text sm:text-4xl">
               {title.trim() || 'Untitled post'}
             </h1>
-            <p className='mt-3 max-w-2xl text-sm leading-relaxed text-pp-muted sm:text-base'>
-              <code>/blog/{slug}</code> · <span role='status'>{savedLabel}</span>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-pp-muted sm:text-base">
+              <code>/blog/{slug}</code> ·{' '}
+              <span role="status">{savedLabel}</span>
             </p>
           </div>
 
-          <div className='flex flex-wrap gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
-            <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
+          <div className="flex flex-wrap gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
+            <span className="bg-white/76 rounded-full border border-pp-line px-3 py-1.5">
               Manual save only
             </span>
-            <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
+            <span className="bg-white/76 rounded-full border border-pp-line px-3 py-1.5">
               Preview rendered server-side
             </span>
-            <span className='rounded-full border border-pp-line bg-white/76 px-3 py-1.5'>
+            <span className="bg-white/76 rounded-full border border-pp-line px-3 py-1.5">
               Owner-gated access
             </span>
           </div>
         </div>
 
-        <div className='flex flex-wrap items-center gap-2.5 lg:justify-end'>
-          <Link className={secondaryBtnCls} href='/admin/blog' onClick={confirmLeave}>
+        <div className="flex flex-wrap items-center gap-2.5 lg:justify-end">
+          <Link
+            className={secondaryBtnCls}
+            href="/admin/blog"
+            onClick={confirmLeave}
+          >
             All posts
           </Link>
           {/*
@@ -163,20 +185,29 @@ export default function BlogToolbar({
           */}
           <button
             ref={saveButtonRef}
-            type='button'
+            type="button"
             onClick={onSave}
             disabled={saving || uploading || !dirty}
-            title={uploading ? 'Waiting for the image upload to finish' : 'Save now'}
+            title={
+              uploading ? 'Waiting for the image upload to finish' : 'Save now'
+            }
             className={secondaryBtnCls}
           >
             {saving ? 'Saving...' : 'Save now'}
           </button>
           {status === 'published' ? (
             <>
-              <Link className={secondaryBtnCls} href={`/blog/${slug}`} onClick={confirmLeave}>
+              <Link
+                className={secondaryBtnCls}
+                href={`/blog/${slug}`}
+                onClick={confirmLeave}
+              >
                 View live
               </Link>
-              <button className={ghostBtnCls} onClick={onArchive}>
+              <button
+                className={ghostBtnCls}
+                onClick={onArchive}
+              >
                 Archive
               </button>
             </>

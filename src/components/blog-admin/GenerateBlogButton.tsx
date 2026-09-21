@@ -55,7 +55,7 @@ export default function GenerateBlogButton({
 }) {
   return (
     <button
-      type='button'
+      type="button"
       onClick={onClick}
       disabled={disabled}
       className={[
@@ -65,7 +65,7 @@ export default function GenerateBlogButton({
         // position cannot travel across a gradient that is exactly the element's size.
         'bg-[linear-gradient(115deg,#241f1c,#4b3a6e_28%,#1f4f6b_52%,#6b3a5a_74%,#241f1c)] bg-[length:200%_200%]',
         'animate-aurora-drift motion-reduce:animate-none',
-        'shadow-[0_18px_34px_rgba(43,30,66,0.28)] ring-1 ring-white/12 transition duration-300',
+        'ring-white/12 shadow-[0_18px_34px_rgba(43,30,66,0.28)] ring-1 transition duration-300',
         'hover:-translate-y-0.5 hover:shadow-[0_26px_46px_rgba(43,30,66,0.36)] hover:ring-white/25',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pp-blue/60',
         'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0',
@@ -73,12 +73,12 @@ export default function GenerateBlogButton({
     >
       <span
         aria-hidden
-        className='pointer-events-none absolute inset-y-0 -left-1/3 -z-10 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.42),transparent)] opacity-0 group-hover:opacity-100 group-hover:animate-sheen-sweep motion-reduce:group-hover:animate-none'
+        className="pointer-events-none absolute inset-y-0 -left-1/3 -z-10 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.42),transparent)] opacity-0 group-hover:animate-sheen-sweep group-hover:opacity-100 motion-reduce:group-hover:animate-none"
       />
       <Sparkles
         aria-hidden
         size={16}
-        className='transition duration-300 group-hover:rotate-12 group-hover:scale-110 motion-reduce:transform-none'
+        className="transition duration-300 group-hover:rotate-12 group-hover:scale-110 motion-reduce:transform-none"
       />
       {label}
     </button>

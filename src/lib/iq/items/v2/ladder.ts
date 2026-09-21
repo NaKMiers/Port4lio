@@ -1,6 +1,10 @@
 import { ITEM_COUNT } from '@/lib/iq/items/config'
 import { rng } from '@/lib/iq/items/random'
-import { LAYOUTS, type LayoutId, type LayoutSpec } from '@/lib/iq/items/v2/layout'
+import {
+  LAYOUTS,
+  type LayoutId,
+  type LayoutSpec,
+} from '@/lib/iq/items/v2/layout'
 
 /**
  * The difficulty ladder, and the reason a raw score means anything.
@@ -109,28 +113,28 @@ type LadderRow = {
  */
 const LADDER_ROWS: readonly LadderRow[] = [
   //         d  c  layout          step       decoys   reference item this mirrors
-  /*  1 */ { d: 1, c: 0, l: '3x3-matrix', s: 'plain', k: 0 },   // Q1  bare shape, one invariant
-  /*  2 */ { d: 1, c: 0, l: '3x3-matrix', s: 'plain', k: 0 },   // Q2  element count, bare
+  /*  1 */ { d: 1, c: 0, l: '3x3-matrix', s: 'plain', k: 0 }, // Q1  bare shape, one invariant
+  /*  2 */ { d: 1, c: 0, l: '3x3-matrix', s: 'plain', k: 0 }, // Q2  element count, bare
   // Two dimensions, not one. A 2x2 confirms the rule ZERO times, so a single dimension there
   // leaves a solver nothing to cross-check against - and because the layout also demands an
   // ordinal track to pin its reading, one dimension means that track must be both the rule
   // and its own confirmation. Their item 3 reads as shape-count plus shape-identity anyway.
-  /*  3 */ { d: 2, c: 0, l: '2x2-matrix', s: 'plain', k: 0 },   // Q3  their only 2x2, and it is item 3
-  /*  4 */ { d: 2, c: 1, l: '3x3-matrix', s: 'plain', k: 0 },   // Q4  frame + inner starts here
-  /*  5 */ { d: 2, c: 2, l: '3x3-matrix', s: 'plain', k: 1 },   // Q5  sub-elements inside the cell
-  /*  6 */ { d: 2, c: 1, l: '3x3-matrix', s: 'plain', k: 0 },   // Q6  rotation + count
-  /*  7 */ { d: 1, c: 0, l: '3x3-matrix', s: 'plain', k: 0 },   // Q7  permutation, one dimension
-  /*  8 */ { d: 2, c: 2, l: '3x3-matrix', s: 'plain', k: 0 },   // Q8  overlay logic
+  /*  3 */ { d: 2, c: 0, l: '2x2-matrix', s: 'plain', k: 0 }, // Q3  their only 2x2, and it is item 3
+  /*  4 */ { d: 2, c: 1, l: '3x3-matrix', s: 'plain', k: 0 }, // Q4  frame + inner starts here
+  /*  5 */ { d: 2, c: 2, l: '3x3-matrix', s: 'plain', k: 1 }, // Q5  sub-elements inside the cell
+  /*  6 */ { d: 2, c: 1, l: '3x3-matrix', s: 'plain', k: 0 }, // Q6  rotation + count
+  /*  7 */ { d: 1, c: 0, l: '3x3-matrix', s: 'plain', k: 0 }, // Q7  permutation, one dimension
+  /*  8 */ { d: 2, c: 2, l: '3x3-matrix', s: 'plain', k: 0 }, // Q8  overlay logic
   /*  9 */ { d: 2, c: 2, l: '1x3-sequence', s: 'plain', k: 1 }, // Q9  FIRST SEQUENCE - theirs too
-  /* 10 */ { d: 2, c: 1, l: '3x3-matrix', s: 'plain', k: 0 },   // Q10 fill cycle + shape
+  /* 10 */ { d: 2, c: 1, l: '3x3-matrix', s: 'plain', k: 0 }, // Q10 fill cycle + shape
   /* 11 */ { d: 3, c: 3, l: '1x3-sequence', s: 'plain', k: 1 }, // Q11 FIRST 3-DIMENSION - theirs too
-  /* 12 */ { d: 1, c: 2, l: '3x3-matrix', s: 'plain', k: 1 },   // Q12 pacing dip, as theirs is
+  /* 12 */ { d: 1, c: 2, l: '3x3-matrix', s: 'plain', k: 1 }, // Q12 pacing dip, as theirs is
   /* 13 */ { d: 2, c: 2, l: '1x3-sequence', s: 'plain', k: 1 }, // Q13
   /* 14 */ { d: 2, c: 1, l: '3x3-matrix', s: 'oblique', k: 0 }, // Q14 back half opens
   /* 15 */ { d: 2, c: 1, l: '1x3-sequence', s: 'plain', k: 0 }, // Q15
   /* 16 */ { d: 2, c: 1, l: '3x3-matrix', s: 'oblique', k: 1 }, // Q16
-  /* 17 */ { d: 3, c: 2, l: '3x3-matrix', s: 'plain', k: 1 },   // Q17 three-dimension cluster
-  /* 18 */ { d: 1, c: 1, l: '3x3-matrix', s: 'plain', k: 0 },   // Q18 pacing dip, as theirs is
+  /* 17 */ { d: 3, c: 2, l: '3x3-matrix', s: 'plain', k: 1 }, // Q17 three-dimension cluster
+  /* 18 */ { d: 1, c: 1, l: '3x3-matrix', s: 'plain', k: 0 }, // Q18 pacing dip, as theirs is
   /* 19 */ { d: 3, c: 3, l: '1x3-sequence', s: 'plain', k: 1 }, // Q19 three element classes at once
   /* 20 */ { d: 2, c: 2, l: '3x3-matrix', s: 'oblique', k: 1 }, // Q20
   /* 21 */ { d: 2, c: 1, l: '1x3-sequence', s: 'plain', k: 0 }, // Q21 pacing dip, as theirs is
@@ -155,7 +159,9 @@ export function profileFor(rung: number): RungProfile {
   }
 }
 
-export const LADDER: readonly RungProfile[] = LADDER_ROWS.map((_, index) => profileFor(index + 1))
+export const LADDER: readonly RungProfile[] = LADDER_ROWS.map((_, index) =>
+  profileFor(index + 1)
+)
 
 /**
  * How hard a rung is, as one number.
@@ -210,7 +216,10 @@ export type RuleCapabilities = {
   composition: { min: 0 | 1 | 2 | 3; max: 0 | 1 | 2 | 3 }
 }
 
-export function canFill(capabilities: RuleCapabilities, profile: RungProfile): boolean {
+export function canFill(
+  capabilities: RuleCapabilities,
+  profile: RungProfile
+): boolean {
   return (
     profile.rung >= capabilities.rungs.min &&
     profile.rung <= capabilities.rungs.max &&
@@ -283,7 +292,10 @@ type PlanInput = {
   eligible: (family: string, profile: RungProfile) => boolean
 }
 
-export function planFamilies(seed: number, { weights, eligible }: PlanInput): string[] {
+export function planFamilies(
+  seed: number,
+  { weights, eligible }: PlanInput
+): string[] {
   const families = Object.keys(weights)
   if (!families.length) throw new Error('[iq] no families to plan with')
 
@@ -309,7 +321,11 @@ export function planFamilies(seed: number, { weights, eligible }: PlanInput): st
    * a later rung can be placed before an earlier one, and a one-sided check would let two of
    * a family land adjacent without noticing.
    */
-  const spacingHolds = (family: string, rung: number, spacing: number): boolean => {
+  const spacingHolds = (
+    family: string,
+    rung: number,
+    spacing: number
+  ): boolean => {
     for (let offset = 1; offset < spacing; offset += 1) {
       if (placed.get(rung - offset) === family) return false
       if (placed.get(rung + offset) === family) return false
@@ -334,7 +350,9 @@ export function planFamilies(seed: number, { weights, eligible }: PlanInput): st
       profile,
       candidates: families.filter(family => eligible(family, profile)).length,
     }))
-    .sort((a, b) => a.candidates - b.candidates || a.profile.rung - b.profile.rung)
+    .sort(
+      (a, b) => a.candidates - b.candidates || a.profile.rung - b.profile.rung
+    )
     .map(entry => entry.profile)
 
   for (const profile of order) {
@@ -355,7 +373,11 @@ export function planFamilies(seed: number, { weights, eligible }: PlanInput): st
       const candidates = families.filter(family => {
         if (!eligible(family, profile)) return false
         if ((uses.get(family) ?? 0) >= MAX_PER_FAMILY) return false
-        if (isSequence && (sequenceUses.get(family) ?? 0) >= MAX_SEQUENCE_PER_FAMILY) return false
+        if (
+          isSequence &&
+          (sequenceUses.get(family) ?? 0) >= MAX_SEQUENCE_PER_FAMILY
+        )
+          return false
         return spacingHolds(family, profile.rung, spacing)
       })
 
@@ -376,18 +398,21 @@ export function planFamilies(seed: number, { weights, eligible }: PlanInput): st
       })[0] as string
     }
 
-    if (!chosen) {
+    if (!chosen)
       // Not a tight-constraints problem - no family in the vocabulary can build this rung at
       // all. That is a real gap between the ladder and the rules, and it has to be loud.
       throw new Error(
         `[iq] no family can fill rung ${profile.rung} (${profile.layout.id}, ${profile.dimensions}d, composition ${profile.composition})`
       )
-    }
 
     placed.set(profile.rung, chosen)
     uses.set(chosen, (uses.get(chosen) ?? 0) + 1)
-    if (isSequence) sequenceUses.set(chosen, (sequenceUses.get(chosen) ?? 0) + 1)
+    if (isSequence)
+      sequenceUses.set(chosen, (sequenceUses.get(chosen) ?? 0) + 1)
   }
 
-  return Array.from({ length: ITEM_COUNT }, (_, index) => placed.get(index + 1) as string)
+  return Array.from(
+    { length: ITEM_COUNT },
+    (_, index) => placed.get(index + 1) as string
+  )
 }

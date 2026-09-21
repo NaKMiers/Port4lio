@@ -48,7 +48,14 @@ import type { Locale } from '@/lib/i18n'
 
 const COPY: Record<
   Locale,
-  { eyebrow: string; role: string; open: string; contact: string; portfolio: string; writing: string }
+  {
+    eyebrow: string
+    role: string
+    open: string
+    contact: string
+    portfolio: string
+    writing: string
+  }
 > = {
   vi: {
     eyebrow: 'Người làm trang này',
@@ -82,22 +89,24 @@ export default function AvailabilityBlock({ locale }: { locale: Locale }) {
       relationship, and `aria-labelledby` gives the landmark a name either way.
     */
     <aside
-      aria-labelledby='availability-heading'
-      className='border-t border-pp-line bg-[var(--pp-panel)]'
+      aria-labelledby="availability-heading"
+      className="border-t border-pp-line bg-[var(--pp-panel)]"
     >
-      <div className='mx-auto w-full max-w-editorial px-gutter py-10'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+      <div className="mx-auto w-full max-w-editorial px-gutter py-10">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
           {copy.eyebrow}
         </p>
         <h2
-          id='availability-heading'
-          className='mt-2 font-display text-lg font-semibold text-pp-text'
+          id="availability-heading"
+          className="mt-2 font-display text-lg font-semibold text-pp-text"
         >
           {copy.role}
         </h2>
-        <p className='mt-2 max-w-[60ch] text-sm leading-relaxed text-pp-muted'>{copy.open}</p>
+        <p className="mt-2 max-w-[60ch] text-sm leading-relaxed text-pp-muted">
+          {copy.open}
+        </p>
 
-        <div className='mt-5 flex flex-wrap items-center gap-3'>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           {/*
             `/#contact` and not `/`: the contact form is the last section of a long
             single-page portfolio, so landing at the top means scrolling past everything to
@@ -109,15 +118,18 @@ export default function AvailabilityBlock({ locale }: { locale: Locale }) {
             "portfolio" rather than promising a Vietnamese page that does not exist.
           */}
           <Link
-            href='/#contact'
-            className='inline-flex min-h-[44px] items-center gap-2 rounded-full bg-pp-text px-6 py-2.5 font-display text-sm font-semibold text-[var(--pp-bg)] no-underline shadow-panel transition-transform motion-safe:hover:-translate-y-0.5'
+            href="/#contact"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-full bg-pp-text px-6 py-2.5 font-display text-sm font-semibold text-[var(--pp-bg)] no-underline shadow-panel transition-transform motion-safe:hover:-translate-y-0.5"
           >
             {copy.contact}
-            <ArrowRight aria-hidden size={15} />
+            <ArrowRight
+              aria-hidden
+              size={15}
+            />
           </Link>
           <Link
-            href='/'
-            className='inline-flex min-h-[44px] items-center rounded-full border border-pp-line px-6 py-2.5 font-display text-sm font-semibold text-pp-text no-underline transition-colors hover:border-pp-blue/40'
+            href="/"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-pp-line px-6 py-2.5 font-display text-sm font-semibold text-pp-text no-underline transition-colors hover:border-pp-blue/40"
           >
             {copy.portfolio}
           </Link>
@@ -128,8 +140,8 @@ export default function AvailabilityBlock({ locale }: { locale: Locale }) {
             failure across the 27 sites reviewed for this feature.
           */}
           <Link
-            href='/blog'
-            className='inline-flex min-h-[44px] items-center rounded-full border border-pp-line px-6 py-2.5 font-display text-sm font-semibold text-pp-text no-underline transition-colors hover:border-pp-blue/40'
+            href="/blog"
+            className="inline-flex min-h-[44px] items-center rounded-full border border-pp-line px-6 py-2.5 font-display text-sm font-semibold text-pp-text no-underline transition-colors hover:border-pp-blue/40"
           >
             {copy.writing}
           </Link>

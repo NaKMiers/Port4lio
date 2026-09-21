@@ -4,7 +4,11 @@ import { LOCALES } from '@/lib/i18n'
 import { rng } from '@/lib/iq/items/random'
 import { IQ_LANDING_SECTIONS } from '@/lib/iq/content'
 import { cellKey } from '@/lib/iq/items/v2/cell'
-import { answerIndexFor, generateTest, optionsFor } from '@/lib/iq/items/v2/generate'
+import {
+  answerIndexFor,
+  generateTest,
+  optionsFor,
+} from '@/lib/iq/items/v2/generate'
 import { canFill, LADDER, MAX_PER_FAMILY } from '@/lib/iq/items/v2/ladder'
 import { FAMILY_WEIGHTS, RULES, RULES_BY_NAME } from '@/lib/iq/items/v2/rules'
 import { verifyItem } from '@/lib/iq/items/v2/verify'
@@ -33,18 +37,19 @@ describe('the published rule list', () => {
      * This was not hypothetical: after the rebuild the list still said "the six rules" and
      * still named set logic, which had not been ported yet.
      */
-    for (const locale of LOCALES) {
-      expect(IQ_LANDING_SECTIONS[locale].rules, `${locale} rule list`).toHaveLength(RULES.length)
-    }
+    for (const locale of LOCALES)
+      expect(
+        IQ_LANDING_SECTIONS[locale].rules,
+        `${locale} rule list`
+      ).toHaveLength(RULES.length)
   })
 
   it('describes every rule in both locales', () => {
-    for (const locale of LOCALES) {
+    for (const locale of LOCALES)
       for (const rule of IQ_LANDING_SECTIONS[locale].rules) {
         expect(rule.name.length, `${locale} name`).toBeGreaterThan(0)
         expect(rule.body.length, `${locale} body`).toBeGreaterThan(40)
       }
-    }
   })
 
   it('publishes the direction invariant, which the sequence items depend on', () => {
@@ -54,14 +59,22 @@ describe('the published rule list', () => {
      * that a series never reverses, two of the six options are defensible and one is marked
      * wrong. `cellKey` cannot see it - the options are genuinely different pictures.
      */
-    expect(IQ_LANDING_SECTIONS.en.rulesLead.toLowerCase()).toMatch(/same direction/)
-    expect(IQ_LANDING_SECTIONS.vi.rulesLead.toLowerCase()).toMatch(/cùng một chiều/)
+    expect(IQ_LANDING_SECTIONS.en.rulesLead.toLowerCase()).toMatch(
+      /same direction/
+    )
+    expect(IQ_LANDING_SECTIONS.vi.rulesLead.toLowerCase()).toMatch(
+      /cùng một chiều/
+    )
   })
 
   it('no longer claims every question is a 3x3 matrix', () => {
     // Nine of the 26 are sequences and one is a 2x2.
-    expect(IQ_LANDING_SECTIONS.en.rulesLead).not.toMatch(/Each question is a 3x3/)
-    expect(IQ_LANDING_SECTIONS.vi.rulesLead).not.toMatch(/Mỗi câu là một ma trận 3x3/)
+    expect(IQ_LANDING_SECTIONS.en.rulesLead).not.toMatch(
+      /Each question is a 3x3/
+    )
+    expect(IQ_LANDING_SECTIONS.vi.rulesLead).not.toMatch(
+      /Mỗi câu là một ma trận 3x3/
+    )
   })
 })
 
@@ -78,7 +91,9 @@ describe('rung coverage', () => {
     const shortfalls: string[] = []
 
     for (const rule of RULES) {
-      const claimed = LADDER.filter(profile => canFill(rule.capabilities, profile))
+      const claimed = LADDER.filter(profile =>
+        canFill(rule.capabilities, profile)
+      )
       let delivered = 0
 
       for (const profile of claimed) {
@@ -87,7 +102,10 @@ describe('rung coverage', () => {
         for (let attempt = 0; attempt < 24 && !built; attempt += 1) {
           // A different stream per attempt, so this measures the family rather than one
           // lucky corner of the PRNG.
-          const candidate = rule.build(rng(profile.rung * 104729 + attempt * 31337 + 17), profile)
+          const candidate = rule.build(
+            rng(profile.rung * 104729 + attempt * 31337 + 17),
+            profile
+          )
           if (!candidate) continue
           const verdict = verifyItem(candidate, profile)
           if (verdict.ok) built = true
@@ -119,7 +137,8 @@ describe('rung coverage', () => {
     }
 
     // Printed, not swallowed: a growing tail should be visible even while the test is green.
-    if (shortfalls.length) console.info(`rung coverage shortfalls:\n  ${shortfalls.join('\n  ')}`)
+    if (shortfalls.length)
+      console.info(`rung coverage shortfalls:\n  ${shortfalls.join('\n  ')}`)
   })
 })
 
@@ -131,23 +150,33 @@ describe('generated tests', () => {
       expect(items, `seed ${seed}`).toHaveLength(LADDER.length)
       for (const item of items) {
         const verdict = verifyItem(item, item.profile)
-        expect(verdict.ok, `seed ${seed} rung ${item.rung} (${item.rule}): ${!verdict.ok && verdict.reason}`).toBe(true)
+        expect(
+          verdict.ok,
+          `seed ${seed} rung ${item.rung} (${item.rule}): ${!verdict.ok && verdict.reason}`
+        ).toBe(true)
       }
     }
   })
 
   it('always places the answer among exactly six distinct options', () => {
-    for (const { seed, items } of tests) {
+    for (const { seed, items } of tests)
       items.forEach((item, index) => {
         const options = optionsFor(item, seed, index)
         expect(options, `seed ${seed} item ${index}`).toHaveLength(6)
-        expect(new Set(options.map(cellKey)).size, `seed ${seed} item ${index}`).toBe(6)
+        expect(
+          new Set(options.map(cellKey)).size,
+          `seed ${seed} item ${index}`
+        ).toBe(6)
 
         const answerIndex = answerIndexFor(item, seed, index)
-        expect(answerIndex, `seed ${seed} item ${index}`).toBeGreaterThanOrEqual(0)
-        expect(cellKey(options[answerIndex] as never)).toBe(cellKey(item.answer))
+        expect(
+          answerIndex,
+          `seed ${seed} item ${index}`
+        ).toBeGreaterThanOrEqual(0)
+        expect(cellKey(options[answerIndex] as never)).toBe(
+          cellKey(item.answer)
+        )
       })
-    }
   })
 
   it('never lets one family dominate a test', () => {
@@ -164,11 +193,17 @@ describe('generated tests', () => {
      */
     for (const { seed, items } of tests) {
       const tally = new Map<string, number>()
-      for (const item of items) tally.set(item.rule, (tally.get(item.rule) ?? 0) + 1)
-      for (const [family, count] of Array.from(tally.entries())) {
-        expect(count, `${family} on seed ${seed}`).toBeLessThanOrEqual(MAX_PER_FAMILY + 2)
-      }
-      expect(new Set(items.map(item => item.rule)).size, `seed ${seed}`).toBeGreaterThanOrEqual(6)
+      for (const item of items)
+        tally.set(item.rule, (tally.get(item.rule) ?? 0) + 1)
+      for (const [family, count] of Array.from(tally.entries()))
+        expect(count, `${family} on seed ${seed}`).toBeLessThanOrEqual(
+          MAX_PER_FAMILY + 2
+        )
+
+      expect(
+        new Set(items.map(item => item.rule)).size,
+        `seed ${seed}`
+      ).toBeGreaterThanOrEqual(6)
     }
   })
 
@@ -191,15 +226,22 @@ describe('generated tests', () => {
     const perFamily = new Map<string, { n: number; grids: Set<string> }>()
 
     for (const item of items) {
-      const entry = perFamily.get(item.rule) ?? { n: 0, grids: new Set<string>() }
+      const entry = perFamily.get(item.rule) ?? {
+        n: 0,
+        grids: new Set<string>(),
+      }
       entry.n += 1
-      entry.grids.add(item.cells.map(cell => (cell ? cellKey(cell) : '-')).join('|'))
+      entry.grids.add(
+        item.cells.map(cell => (cell ? cellKey(cell) : '-')).join('|')
+      )
       perFamily.set(item.rule, entry)
     }
 
-    for (const [family, { n, grids }] of Array.from(perFamily.entries())) {
-      expect(grids.size / n, `${family}: ${grids.size} distinct grids in ${n} items`).toBeGreaterThan(0.9)
-    }
+    for (const [family, { n, grids }] of Array.from(perFamily.entries()))
+      expect(
+        grids.size / n,
+        `${family}: ${grids.size} distinct grids in ${n} items`
+      ).toBeGreaterThan(0.9)
   })
 
   it('never concentrates a family answer on one shape', () => {
@@ -223,10 +265,15 @@ describe('generated tests', () => {
 
     for (const [family, counts] of Array.from(byFamily.entries())) {
       const total = Array.from(counts.values()).reduce((sum, n) => sum + n, 0)
-      const [kind, top] = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0] as [string, number]
+      const [kind, top] = Array.from(counts.entries()).sort(
+        (a, b) => b[1] - a[1]
+      )[0] as [string, number]
       // `side-progression` legitimately clusters at the ends of a five-shape ladder, so the
       // bar is "not overwhelming" rather than "uniform".
-      expect(top / total, `${family} answers ${kind} ${((top / total) * 100).toFixed(0)}% of the time`).toBeLessThan(0.6)
+      expect(
+        top / total,
+        `${family} answers ${kind} ${((top / total) * 100).toFixed(0)}% of the time`
+      ).toBeLessThan(0.6)
     }
   })
 
@@ -237,11 +284,16 @@ describe('generated tests', () => {
   })
 
   it('keeps every family the planner names in the vocabulary', () => {
-    for (const family of Object.keys(FAMILY_WEIGHTS)) {
-      expect(RULES_BY_NAME[family], `${family} has a weight but no rule`).toBeDefined()
-    }
-    for (const rule of RULES) {
-      expect(FAMILY_WEIGHTS[rule.name], `${rule.name} has a rule but no weight`).toBeDefined()
-    }
+    for (const family of Object.keys(FAMILY_WEIGHTS))
+      expect(
+        RULES_BY_NAME[family],
+        `${family} has a weight but no rule`
+      ).toBeDefined()
+
+    for (const rule of RULES)
+      expect(
+        FAMILY_WEIGHTS[rule.name],
+        `${rule.name} has a rule but no weight`
+      ).toBeDefined()
   })
 })

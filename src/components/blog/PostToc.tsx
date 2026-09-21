@@ -32,16 +32,16 @@ export default function PostToc({ entries }: { entries: TocEntry[] }) {
 
   return (
     <nav
-      aria-labelledby='post-toc-heading'
-      className='mb-10 rounded-panel border border-pp-line bg-[var(--pp-panel)] px-5 py-4'
+      aria-labelledby="post-toc-heading"
+      className="mb-10 rounded-panel border border-pp-line bg-[var(--pp-panel)] px-5 py-4"
     >
       <h2
-        id='post-toc-heading'
-        className='font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-ink-violet'
+        id="post-toc-heading"
+        className="font-display text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-ink-violet"
       >
         On this page
       </h2>
-      <ol className='mt-3 space-y-1.5 text-sm'>
+      <ol className="mt-3 space-y-1.5 text-sm">
         {entries.map(entry => (
           <li
             key={entry.id}
@@ -51,7 +51,10 @@ export default function PostToc({ entries }: { entries: TocEntry[] }) {
           >
             {/* `--pp-blue` is a 2.70:1 decoration colour - fine as a hover tint on a link
                 that is already legible, not fine as its resting state. `ink-blue` either way. */}
-            <a href={`#${entry.id}`} className='text-pp-muted no-underline hover:text-pp-ink-blue'>
+            <a
+              href={`#${entry.id}`}
+              className="text-pp-muted no-underline hover:text-pp-ink-blue"
+            >
               {entry.text}
             </a>
           </li>

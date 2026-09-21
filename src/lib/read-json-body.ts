@@ -59,9 +59,8 @@ export async function readJsonBody<T = unknown>(
     return { ok: false, status: 400, error: 'Could not read request body' }
   }
 
-  if (Buffer.byteLength(raw) > maxBytes) {
+  if (Buffer.byteLength(raw) > maxBytes)
     return { ok: false, status: 413, error: 'Payload too large' }
-  }
 
   try {
     return { ok: true, body: JSON.parse(raw) as T }

@@ -57,9 +57,9 @@ const APPROX_MINUTES = 8
  * from config at render time (see `lib/mbti/pricing.ts`).
  */
 export function priceLine(locale: Locale, price: number): string {
-  if (price <= 0) {
+  if (price <= 0)
     return locale === 'vi' ? 'Hoàn toàn miễn phí' : 'Completely free'
-  }
+
   // Short on purpose as well as figure-free: this sits inside a meta description with a
   // ~160-character budget, and the sentence it replaced was 30 characters longer, which
   // pushed the per-type descriptions past what Google renders.
@@ -116,7 +116,10 @@ export const SEO = {
   },
 } as const
 
-function fill(template: string, values: Record<string, string | number>): string {
+function fill(
+  template: string,
+  values: Record<string, string | number>
+): string {
   return Object.entries(values).reduce(
     (out, [key, value]) => out.replaceAll(`{${key}}`, String(value)),
     template
@@ -124,7 +127,10 @@ function fill(template: string, values: Record<string, string | number>): string
 }
 
 export function landingTitle(locale: Locale, price: number): string {
-  return fill(SEO[locale].landingTitle, { count: QUESTION_COUNT, price: priceLine(locale, price) })
+  return fill(SEO[locale].landingTitle, {
+    count: QUESTION_COUNT,
+    price: priceLine(locale, price),
+  })
 }
 
 export function landingDescription(locale: Locale, price: number): string {
@@ -141,7 +147,11 @@ export function typeTitle(locale: Locale, type: MbtiType): string {
   })
 }
 
-export function typeDescription(locale: Locale, type: MbtiType, price: number): string {
+export function typeDescription(
+  locale: Locale,
+  type: MbtiType,
+  price: number
+): string {
   return fill(SEO[locale].typeDescription, {
     type,
     nickname: getTypeContent(locale, type).nickname,
@@ -157,7 +167,9 @@ export function typeDescription(locale: Locale, type: MbtiType, price: number): 
  * neither Vietnamese nor English, and tends to pick one arbitrarily. Pointing it at the
  * Vietnamese page matches the audience this is built for.
  */
-export function alternateLanguages(path: (locale: Locale) => string): Record<string, string> {
+export function alternateLanguages(
+  path: (locale: Locale) => string
+): Record<string, string> {
   return {
     ...Object.fromEntries(LOCALES.map(locale => [locale, path(locale)])),
     'x-default': path('vi'),
@@ -211,7 +223,8 @@ export function quizJsonLd(locale: Locale, price: number): JsonLd {
     // until it does not.
     about: {
       '@type': 'Thing',
-      name: locale === 'vi' ? 'Trắc nghiệm tính cách' : 'Personality assessment',
+      name:
+        locale === 'vi' ? 'Trắc nghiệm tính cách' : 'Personality assessment',
     },
     // The `Product` block named no publisher, so the only thing tying this page to the
     // site's Person entity was `websiteJsonLd`. Stating it here too costs nothing and
@@ -293,7 +306,10 @@ export function typeArticleJsonLd(locale: Locale, type: MbtiType): JsonLd {
  * content targeting real long-tail queries ("mbti có chính xác không", "test mbti mất bao
  * lâu"), and that is what actually ranks.
  */
-export function faqEntries(locale: Locale, price: number): { q: string; a: string }[] {
+export function faqEntries(
+  locale: Locale,
+  price: number
+): { q: string; a: string }[] {
   const priceAnswer =
     price <= 0
       ? locale === 'vi'
@@ -303,7 +319,7 @@ export function faqEntries(locale: Locale, price: number): { q: string; a: strin
         ? 'Làm bài trắc nghiệm thì miễn phí, không cần tài khoản. Bản kết quả đầy đủ là tùy chọn có trả phí, và mức giá hiện ngay trên trang kết quả sau khi bạn làm xong.'
         : 'Taking the test is free, with no account. The full result is an optional paid unlock, and the price is shown on your result page once you finish.'
 
-  if (locale === 'vi') {
+  if (locale === 'vi')
     return [
       { q: 'Trắc nghiệm MBTI này có mất phí không?', a: priceAnswer },
       {
@@ -327,7 +343,6 @@ export function faqEntries(locale: Locale, price: number): { q: string; a: strin
         a: 'Bốn nhóm khí chất, mỗi nhóm bốn kiểu: Nhà phân tích (INTJ, INTP, ENTJ, ENTP), Nhà ngoại giao (INFJ, INFP, ENFJ, ENFP), Người gìn giữ (ISTJ, ISFJ, ESTJ, ESFJ) và Nhà thám hiểm (ISTP, ISFP, ESTP, ESFP).',
       },
     ]
-  }
 
   return [
     { q: 'Does this MBTI test cost anything?', a: priceAnswer },
@@ -366,7 +381,10 @@ export function faqEntries(locale: Locale, price: number): { q: string; a: strin
  * be present on the page, which it is - but restating a whole strengths list twice is
  * padding, and padding is what the helpful-content system looks for.
  */
-export function typeFaqEntries(locale: Locale, type: MbtiType): { q: string; a: string }[] {
+export function typeFaqEntries(
+  locale: Locale,
+  type: MbtiType
+): { q: string; a: string }[] {
   const content = getTypeContent(locale, type)
   const careers = getCareerContent(locale, type)
   const letters = lettersOf(locale, type)
@@ -376,7 +394,7 @@ export function typeFaqEntries(locale: Locale, type: MbtiType): { q: string; a: 
   const stackLine = stack.map(entry => entry.fn).join(' - ')
   const letterLine = letters.map(l => `${l.letter} (${l.name})`).join(', ')
 
-  if (locale === 'vi') {
+  if (locale === 'vi')
     return [
       {
         q: `${type} là gì?`,
@@ -403,7 +421,6 @@ export function typeFaqEntries(locale: Locale, type: MbtiType): { q: string; a: 
         a: content.inRelationships,
       },
     ]
-  }
 
   return [
     {
@@ -461,7 +478,10 @@ export function faqJsonLd(locale: Locale, price: number): JsonLd {
 }
 
 /** Every type as an ordered list, so the landing page reads as the index for all 16. */
-export function typeListJsonLd(locale: Locale, types: readonly MbtiType[]): JsonLd {
+export function typeListJsonLd(
+  locale: Locale,
+  types: readonly MbtiType[]
+): JsonLd {
   const origin = siteOrigin()
 
   return {

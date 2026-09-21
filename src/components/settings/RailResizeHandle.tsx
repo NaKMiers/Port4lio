@@ -2,7 +2,10 @@
 
 import React, { useRef, useState } from 'react'
 
-import { MAX_RAIL_WIDTH, MIN_RAIL_WIDTH } from '@/components/settings/useRailWidth'
+import {
+  MAX_RAIL_WIDTH,
+  MIN_RAIL_WIDTH,
+} from '@/components/settings/useRailWidth'
 
 /** One arrow press. Coarse enough to get somewhere, fine enough to land on a width. */
 const KEYBOARD_STEP = 24
@@ -36,7 +39,8 @@ export default function RailResizeHandle({
   const [dragging, setDragging] = useState(false)
   const handleRef = useRef<HTMLDivElement | null>(null)
 
-  const containerBox = () => containerRef.current?.getBoundingClientRect() ?? null
+  const containerBox = () =>
+    containerRef.current?.getBoundingClientRect() ?? null
 
   /**
    * Capture is an optimisation, not a requirement - the drag still works from the handle
@@ -66,14 +70,14 @@ export default function RailResizeHandle({
   return (
     <div
       ref={handleRef}
-      role='separator'
-      aria-orientation='vertical'
-      aria-label='Resize the preview rail'
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the preview rail"
       aria-valuenow={Math.round(width)}
       aria-valuemin={MIN_RAIL_WIDTH}
       aria-valuemax={MAX_RAIL_WIDTH}
       tabIndex={0}
-      title='Drag to resize · double-click to reset'
+      title="Drag to resize · double-click to reset"
       onPointerDown={event => {
         if (event.button !== 0) return
         event.preventDefault()
@@ -119,7 +123,9 @@ export default function RailResizeHandle({
       />
       {/* While dragging, a full-screen overlay keeps the cursor from flickering to a text
           caret over the form fields the pointer is sweeping across. */}
-      {dragging ? <span className='fixed inset-0 z-[80] cursor-col-resize' /> : null}
+      {dragging ? (
+        <span className="fixed inset-0 z-[80] cursor-col-resize" />
+      ) : null}
     </div>
   )
 }

@@ -45,7 +45,10 @@ export function verifyAuthToken(token: string | undefined): boolean {
   }
 
   try {
-    const json = Buffer.from(body.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+    const json = Buffer.from(
+      body.replace(/-/g, '+').replace(/_/g, '/'),
+      'base64'
+    ).toString('utf8')
     const parsed = JSON.parse(json) as { exp?: number }
     const exp = typeof parsed.exp === 'number' ? parsed.exp : 0
     return Date.now() < exp * 1000
@@ -78,15 +81,13 @@ export function getOtpTtlSeconds() {
 }
 
 export function parseOtpState(raw: string | undefined): OtpState | null {
-  if (!raw) {
-    return null
-  }
+  if (!raw) return null
 
   try {
     const parsed = JSON.parse(raw) as Partial<OtpState>
-    if (typeof parsed.hash !== 'string' || typeof parsed.exp !== 'number') {
+    if (typeof parsed.hash !== 'string' || typeof parsed.exp !== 'number')
       return null
-    }
+
     return { hash: parsed.hash, exp: parsed.exp }
   } catch {
     return null
@@ -94,9 +95,7 @@ export function parseOtpState(raw: string | undefined): OtpState | null {
 }
 
 export function verifyOtpCode(code: string, otp: OtpState): boolean {
-  if (Date.now() > otp.exp) {
-    return false
-  }
+  if (Date.now() > otp.exp) return false
 
   const hashed = hashOtp(code)
 
@@ -108,4 +107,3 @@ export function verifyOtpCode(code: string, otp: OtpState): boolean {
     return false
   }
 }
-

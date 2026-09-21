@@ -40,7 +40,9 @@ export function useCvPageBreakFit(
 ) {
   // `null` when idle. `onlyIfClipped` is how the on-open pass avoids touching a break the
   // owner chose deliberately - it repairs a clipping page and leaves a fitting one alone.
-  const [pending, setPending] = useState<{ onlyIfClipped: boolean } | null>(null)
+  const [pending, setPending] = useState<{ onlyIfClipped: boolean } | null>(
+    null
+  )
   const containerRef = useRef<HTMLDivElement | null>(null)
   const probeRef = useRef<HTMLDivElement | null>(null)
 
@@ -67,7 +69,11 @@ export function useCvPageBreakFit(
       const limitPx = probe.getBoundingClientRect().height
       if (limitPx <= 0) return
 
-      if (pending.onlyIfClipped && !resumeBreakOverflows(sheet, limitPx, resume)) return
+      if (
+        pending.onlyIfClipped &&
+        !resumeBreakOverflows(sheet, limitPx, resume)
+      )
+        return
 
       const next = fitResumePageBreak(sheet, limitPx, locateResumeItems(resume))
       if (!next) return
@@ -93,9 +99,7 @@ export function useCvPageBreakFit(
           window.clearTimeout(fallback)
           measure()
         })
-    } else {
-      measure()
-    }
+    } else measure()
 
     return () => {
       done = true
@@ -109,10 +113,18 @@ export function useCvPageBreakFit(
             ref={containerRef}
             className={`cv ${arimo.variable}`}
             aria-hidden
-            style={{ position: 'fixed', left: -99999, top: 0, width: SHEET_WIDTH_PX }}
+            style={{
+              position: 'fixed',
+              left: -99999,
+              top: 0,
+              width: SHEET_WIDTH_PX,
+            }}
           >
             {/* Outside the sheet so it cannot affect the flow being measured. */}
-            <div ref={probeRef} style={{ height: '297mm' }} />
+            <div
+              ref={probeRef}
+              style={{ height: '297mm' }}
+            />
             <CvFlowSheet resume={resume} />
           </div>,
           document.body

@@ -12,14 +12,18 @@ export default function AboutSection({
   setProfile: React.Dispatch<React.SetStateAction<Profile>>
 }) {
   return (
-    <Section id='about' title='About Me' badge='story'>
-      <div className='space-y-2'>
+    <Section
+      id="about"
+      title="About Me"
+      badge="story"
+    >
+      <div className="space-y-2">
         <label className={labelCls}>About Me</label>
         <textarea
           className={textareaCls}
           value={profile.aboutMe}
           onChange={e => setProfile(p => ({ ...p, aboutMe: e.target.value }))}
-          placeholder='Write a short bio...'
+          placeholder="Write a short bio..."
           rows={10}
         />
       </div>

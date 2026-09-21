@@ -3,7 +3,8 @@
 import { useBlogLocale } from '@/components/blog/BlogLocaleProvider'
 import { LOCALE_LABELS, LOCALES } from '@/lib/i18n'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 const SHORT_LABELS: Record<string, string> = { vi: 'VI', en: 'EN' }
 
@@ -24,16 +25,16 @@ export default function BlogLocaleSwitcher() {
 
   return (
     <div
-      className='inline-flex items-center gap-0.5 rounded-full border border-pp-line bg-white/70 p-0.5 shadow-[0_8px_18px_rgba(46,35,28,0.05)] backdrop-blur-md'
-      role='group'
-      aria-label='Language'
+      className="inline-flex items-center gap-0.5 rounded-full border border-pp-line bg-white/70 p-0.5 shadow-[0_8px_18px_rgba(46,35,28,0.05)] backdrop-blur-md"
+      role="group"
+      aria-label="Language"
     >
       {LOCALES.map(option => {
         const active = option === locale
         return (
           <button
             key={option}
-            type='button'
+            type="button"
             onClick={() => setLocale(option)}
             aria-pressed={active}
             title={LOCALE_LABELS[option]}
@@ -45,7 +46,7 @@ export default function BlogLocaleSwitcher() {
             )}
           >
             {SHORT_LABELS[option]}
-            <span className='sr-only'> - {LOCALE_LABELS[option]}</span>
+            <span className="sr-only"> - {LOCALE_LABELS[option]}</span>
           </button>
         )
       })}

@@ -4,7 +4,11 @@ import { jsonError } from '@/lib/api-response'
 import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/i18n'
 import { getResultPrice, isPaidMode } from '@/lib/mbti/pricing'
 import { connectDatabase } from '@/lib/mongodb'
-import { createPaymentLink, generatePayosOrderCode, PayosError } from '@/lib/payos'
+import {
+  createPaymentLink,
+  generatePayosOrderCode,
+  PayosError,
+} from '@/lib/payos'
 import { payosOrderCodeIsTaken } from '@/lib/payos-fulfil'
 import { checkRateLimit, CHECKOUT_LIMIT, clientIpFrom } from '@/lib/rate-limit'
 import { resolveSiteOrigin } from '@/lib/seo'
@@ -12,7 +16,11 @@ import { normaliseEmail } from '@/lib/test-kit/contact'
 import { FUNNEL_EVENTS, recordFunnelDetached } from '@/lib/test-events'
 import { isTokenShaped } from '@/lib/tokens'
 import { AttemptModel, type AttemptDocument } from '@/models/Attempt'
-import { PaymentModel, unpaidPaymentExpiryFrom, type PaymentDocument } from '@/models/Payment'
+import {
+  PaymentModel,
+  unpaidPaymentExpiryFrom,
+  type PaymentDocument,
+} from '@/models/Payment'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,25 +53,23 @@ const LINK_TTL_MINUTES = 15
  */
 export async function POST(request: NextRequest) {
   const contentLength = Number(request.headers.get('content-length') ?? 0)
-  if (contentLength > MAX_BODY_BYTES) {
-    return jsonError('Payload too large', 413)
-  }
+  if (contentLength > MAX_BODY_BYTES) return jsonError('Payload too large', 413)
 
   // Checked before anything else touches the database: if we are not charging, this route
   // has nothing to do and must not create payment records that would outlive the config.
-  if (!isPaidMode()) {
-    return jsonError('Results are currently free', 409)
-  }
+  if (!isPaidMode()) return jsonError('Results are currently free', 409)
 
   await connectDatabase()
 
   const limit = await checkRateLimit(clientIpFrom(request), CHECKOUT_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
   let body: unknown
   try {
@@ -78,36 +84,33 @@ export async function POST(request: NextRequest) {
     locale: rawLocale,
   } = (body ?? {}) as { token?: unknown; email?: unknown; locale?: unknown }
 
-  if (typeof rawToken !== 'string' || !isTokenShaped(rawToken)) {
+  if (typeof rawToken !== 'string' || !isTokenShaped(rawToken))
     return jsonError('Invalid result token', 400)
-  }
 
   const email = normaliseEmail(rawEmail)
-  if (!email) {
-    return jsonError('Please enter a valid email address', 400)
-  }
+  if (!email) return jsonError('Please enter a valid email address', 400)
 
   // Same narrowing rule as the submit route: a guard on an inline conditional refines the
   // expression, not the variable.
   const localeCandidate = typeof rawLocale === 'string' ? rawLocale : undefined
-  const locale: Locale = isLocale(localeCandidate) ? localeCandidate : DEFAULT_LOCALE
+  const locale: Locale = isLocale(localeCandidate)
+    ? localeCandidate
+    : DEFAULT_LOCALE
 
-  const attempt = (await AttemptModel.findById(rawToken).lean()) as AttemptDocument | null
-  if (!attempt) {
-    return jsonError('This result no longer exists', 404)
-  }
+  const attempt = (await AttemptModel.findById(
+    rawToken
+  ).lean()) as AttemptDocument | null
+  if (!attempt) return jsonError('This result no longer exists', 404)
 
   // Not an error worth charging for twice. The client treats this as "reload and read it".
-  if (attempt.paid) {
+  if (attempt.paid)
     return NextResponse.json({ alreadyPaid: true }, { status: 200 })
-  }
 
   // Already free, and the result page says so. Answered the same way as `paid` because it
   // is the same situation from the buyer's side: there is nothing left to buy, so reload
   // and read it. Taking money here would charge for something we already gave away.
-  if (attempt.waived) {
+  if (attempt.waived)
     return NextResponse.json({ alreadyPaid: true }, { status: 200 })
-  }
 
   const amount = getResultPrice()
 
@@ -126,9 +129,8 @@ export async function POST(request: NextRequest) {
     .sort({ createdAt: -1 })
     .lean()) as PaymentDocument | null
 
-  if (existing?.accountNumber) {
+  if (existing?.accountNumber)
     return NextResponse.json(await paymentResponse(existing), { status: 200 })
-  }
 
   const origin = resolveSiteOrigin().replace(/\/$/, '')
   const resultUrl = `${origin}/${locale}/mbti/result/${rawToken}`
@@ -178,13 +180,22 @@ export async function POST(request: NextRequest) {
     // QR code.
     recordFunnelDetached('mbti', FUNNEL_EVENTS.checkoutStarted)
 
-    return NextResponse.json(await paymentResponse(created.toObject() as PaymentDocument), {
-      status: 201,
-    })
+    return NextResponse.json(
+      await paymentResponse(created.toObject() as PaymentDocument),
+      {
+        status: 201,
+      }
+    )
   } catch (error) {
     if (error instanceof PayosError) {
-      console.error(`[mbti-checkout] PayOS refused (${error.code}):`, error.message)
-      return jsonError('Could not start the payment. Please try again in a moment.', 502)
+      console.error(
+        `[mbti-checkout] PayOS refused (${error.code}):`,
+        error.message
+      )
+      return jsonError(
+        'Could not start the payment. Please try again in a moment.',
+        502
+      )
     }
 
     console.error('[mbti-checkout] failed to create payment', error)
@@ -204,7 +215,7 @@ export async function POST(request: NextRequest) {
 async function paymentResponse(payment: PaymentDocument) {
   let qrDataUri: string | null = null
 
-  if (payment.qrCode) {
+  if (payment.qrCode)
     try {
       const { toDataURL } = await import('qrcode')
       qrDataUri = await toDataURL(payment.qrCode, { margin: 1, width: 520 })
@@ -213,7 +224,6 @@ async function paymentResponse(payment: PaymentDocument) {
       // fails to render is a degraded checkout, not a broken one.
       console.error('[mbti-checkout] QR render failed', error)
     }
-  }
 
   return {
     orderCode: payment.orderCode,

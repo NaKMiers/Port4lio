@@ -74,7 +74,13 @@ export type IqTestCopy = {
  * If that ever stops being true - if any user-supplied string reaches a render function -
  * this decision has to be revisited, and the comment above the render module says so too.
  */
-export default function IqTestClient({ locale, copy }: { locale: Locale; copy: IqTestCopy }) {
+export default function IqTestClient({
+  locale,
+  copy,
+}: {
+  locale: Locale
+  copy: IqTestCopy
+}) {
   const router = useRouter()
   const [token, setToken] = useState<string | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
@@ -110,7 +116,11 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ locale }),
     })
-      .then(response => (response.ok ? response.json() : Promise.reject(new Error('start failed'))))
+      .then(response =>
+        response.ok
+          ? response.json()
+          : Promise.reject(new Error('start failed'))
+      )
       .then(
         (data: {
           token: string
@@ -123,7 +133,9 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
           setAnswers(data.questions.map(() => -1))
           // Deadline from the SERVER's startedAt, not from when this response arrived, so
           // a slow round trip does not silently hand out extra time.
-          setDeadline(new Date(data.startedAt).getTime() + data.durationSeconds * 1000)
+          setDeadline(
+            new Date(data.startedAt).getTime() + data.durationSeconds * 1000
+          )
         }
       )
       .catch(() => setError(copy.genericError))
@@ -200,7 +212,10 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
         total: questions.length,
       })
       try {
-        navigator.sendBeacon('/api/event', new Blob([payload], { type: 'application/json' }))
+        navigator.sendBeacon(
+          '/api/event',
+          new Blob([payload], { type: 'application/json' })
+        )
       } catch {
         // One uncounted session. Never interferes with the test in progress.
       }
@@ -238,27 +253,28 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
   const question = questions[index]
   const lowTime = remaining !== null && remaining <= 120
 
-  if (error) {
+  if (error)
     return (
-      <div className='mx-auto max-w-2xl px-gutter py-16 text-center'>
-        <p className='text-pp-muted'>{error}</p>
+      <div className="mx-auto max-w-2xl px-gutter py-16 text-center">
+        <p className="text-pp-muted">{error}</p>
       </div>
     )
-  }
 
-  if (!question || !token) {
+  if (!question || !token)
     return (
-      <div className='mx-auto max-w-2xl px-gutter py-16 text-center'>
-        <p className='text-pp-muted'>{copy.submitting}</p>
+      <div className="mx-auto max-w-2xl px-gutter py-16 text-center">
+        <p className="text-pp-muted">{copy.submitting}</p>
       </div>
     )
-  }
 
   return (
-    <div className='mx-auto max-w-6xl px-gutter py-6'>
-      <div className='flex items-baseline justify-between gap-4'>
-        <p className='font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted'>
-          {fill(copy.questionProgress, { current: index + 1, total: questions.length })}
+    <div className="mx-auto max-w-6xl px-gutter py-6">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-pp-muted">
+          {fill(copy.questionProgress, {
+            current: index + 1,
+            total: questions.length,
+          })}
         </p>
         <p
           className={`font-display text-sm font-semibold tabular-nums ${lowTime ? 'text-[#c2410c]' : 'text-pp-muted'}`}
@@ -270,14 +286,14 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
       </div>
 
       <div
-        className='mt-2 h-1 w-full overflow-hidden rounded-full bg-[rgba(31,28,26,0.08)]'
-        role='progressbar'
+        className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[rgba(31,28,26,0.08)]"
+        role="progressbar"
         aria-valuenow={index + 1}
         aria-valuemin={1}
         aria-valuemax={questions.length}
       >
         <div
-          className='h-full rounded-full bg-[linear-gradient(90deg,var(--pp-violet),var(--pp-blue))] transition-[width]'
+          className="h-full rounded-full bg-[linear-gradient(90deg,var(--pp-violet),var(--pp-blue))] transition-[width]"
           style={{ width: `${((index + 1) / questions.length) * 100}%` }}
         />
       </div>
@@ -299,7 +315,7 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
         the point where a half-shaded cell is indistinguishable from a filled one - and
         shading is load-bearing in several rules.
       */}
-      <div className='mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start lg:gap-7'>
+      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-start lg:gap-7">
         {/*
           Height-capped, not width-capped, and the cap lives on the WRAPPER rather than on
           the SVG inside it - otherwise the white card stretches to the full grid column and
@@ -336,8 +352,10 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
           as a width cap would shrink a 4.5:1 sequence to a fifth of the space it could use.
         */}
         <div
-          className='mx-auto w-full rounded-2xl border border-pp-line bg-white p-3 md:p-5'
-          style={{ maxWidth: `min(100%, calc((100svh - 14rem) * ${question.aspect}))` }}
+          className="mx-auto w-full rounded-2xl border border-pp-line bg-white p-3 md:p-5"
+          style={{
+            maxWidth: `min(100%, calc((100svh - 14rem) * ${question.aspect}))`,
+          }}
         >
           {/*
             The ratio is on the CONTENT box, not the padded one.
@@ -349,7 +367,7 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
             side. Putting the ratio here makes the drawing fill the box it was measured for.
           */}
           <div
-            className='w-full [&>svg]:h-full [&>svg]:w-full'
+            className="w-full [&>svg]:h-full [&>svg]:w-full"
             style={{ aspectRatio: String(question.aspect) }}
             dangerouslySetInnerHTML={{ __html: question.matrix }}
           />
@@ -364,45 +382,55 @@ export default function IqTestClient({ locale, copy }: { locale: Locale; copy: I
           filled one, which is exactly the distinction that dies at small sizes.
         */}
         <div
-          className='grid grid-cols-3 gap-3.5 lg:sticky lg:top-24'
-          role='group'
-          aria-label={fill(copy.questionProgress, { current: index + 1, total: questions.length })}
+          className="grid grid-cols-3 gap-3.5 lg:sticky lg:top-24"
+          role="group"
+          aria-label={fill(copy.questionProgress, {
+            current: index + 1,
+            total: questions.length,
+          })}
         >
           {question.options.map((option, optionIndex) => (
             <button
               key={optionIndex}
-              type='button'
+              type="button"
               disabled={submitting}
               onClick={() => choose(optionIndex)}
               aria-label={`${optionIndex + 1}`}
-              className='aspect-square rounded-xl border border-pp-line bg-white p-2.5 transition hover:-translate-y-0.5 hover:border-pp-blue focus-visible:border-pp-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pp-blue/40 disabled:opacity-50 motion-reduce:hover:translate-y-0'
+              className="aspect-square rounded-xl border border-pp-line bg-white p-2.5 transition hover:-translate-y-0.5 hover:border-pp-blue focus-visible:border-pp-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pp-blue/40 disabled:opacity-50 motion-reduce:hover:translate-y-0"
             >
-              <span className='block h-full w-full [&>svg]:h-full [&>svg]:w-full' dangerouslySetInnerHTML={{ __html: option }} />
+              <span
+                className="block h-full w-full [&>svg]:h-full [&>svg]:w-full"
+                dangerouslySetInnerHTML={{ __html: option }}
+              />
             </button>
           ))}
         </div>
       </div>
 
-      <div className='mt-6 flex items-center justify-between gap-4 text-sm'>
+      <div className="mt-6 flex items-center justify-between gap-4 text-sm">
         <button
-          type='button'
+          type="button"
           onClick={() => setIndex(Math.max(0, index - 1))}
           disabled={index === 0 || submitting}
-          className='text-pp-muted underline underline-offset-[0.2em] disabled:opacity-40'
+          className="text-pp-muted underline underline-offset-[0.2em] disabled:opacity-40"
         >
           {copy.back}
         </button>
         <button
-          type='button'
+          type="button"
           onClick={() => choose(-1)}
           disabled={submitting}
-          className='text-pp-muted underline underline-offset-[0.2em] disabled:opacity-40'
+          className="text-pp-muted underline underline-offset-[0.2em] disabled:opacity-40"
         >
           {copy.skip}
         </button>
       </div>
 
-      {submitting ? <p className='mt-6 text-center text-sm text-pp-muted'>{copy.submitting}</p> : null}
+      {submitting ? (
+        <p className="mt-6 text-center text-sm text-pp-muted">
+          {copy.submitting}
+        </p>
+      ) : null}
     </div>
   )
 }

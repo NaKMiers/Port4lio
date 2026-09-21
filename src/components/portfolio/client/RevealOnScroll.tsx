@@ -4,7 +4,8 @@ import type { ReactNode } from 'react'
 import { motion, useInView, useReducedMotion } from 'framer-motion'
 import { useRef } from 'react'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 type RevealVariant = 'section' | 'dramatic' | 'soft'
 
@@ -50,15 +51,13 @@ export default function RevealOnScroll({
   })
   const prefersReducedMotion = useReducedMotion()
 
-  if (prefersReducedMotion) {
-    return <div className={className}>{children}</div>
-  }
+  if (prefersReducedMotion) return <div className={className}>{children}</div>
 
   return (
     <motion.div
       ref={ref}
       className={cx('will-change-transform', className)}
-      initial='hidden'
+      initial="hidden"
       animate={isInView ? 'visible' : 'hidden'}
       variants={revealVariants[variant]}
       transition={{

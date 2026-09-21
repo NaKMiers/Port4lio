@@ -41,8 +41,7 @@ export const iconPreviewCls =
 export const helpTextCls = 'text-xs leading-relaxed text-pp-muted'
 export const emptyStateCls =
   'rounded-[1rem] border border-dashed border-pp-line bg-white/42 px-4 py-3 text-xs font-medium text-pp-muted'
-export const uploadInputCls =
-  `${inputCls} file:mr-3 file:rounded-full file:border file:border-pp-line file:bg-[rgba(255,255,255,0.94)] file:px-3.5 file:py-2 file:text-[11px] file:font-semibold file:uppercase file:tracking-[0.14em] file:text-pp-text hover:file:bg-white`
+export const uploadInputCls = `${inputCls} file:mr-3 file:rounded-full file:border file:border-pp-line file:bg-[rgba(255,255,255,0.94)] file:px-3.5 file:py-2 file:text-[11px] file:font-semibold file:uppercase file:tracking-[0.14em] file:text-pp-text hover:file:bg-white`
 
 export async function uploadAssetToCloudinary(
   file: File,
@@ -51,15 +50,15 @@ export async function uploadAssetToCloudinary(
   kind: 'avatar' | 'background' | 'cv' | 'cv-photo' | 'project' | 'post',
   projectIndex?: number
 ): Promise<string> {
-  if (file.size > MAX_UPLOAD_BYTES) {
+  if (file.size > MAX_UPLOAD_BYTES)
     throw new Error(`File must be ${MAX_UPLOAD_MB_LABEL} MB or smaller`)
-  }
+
   const fd = new FormData()
   fd.append('file', file)
   fd.append('kind', kind)
-  if (kind === 'project' && projectIndex !== undefined) {
+  if (kind === 'project' && projectIndex !== undefined)
     fd.append('projectIndex', String(projectIndex))
-  }
+
   const res = await fetch('/api/upload', { method: 'POST', body: fd })
   const data = (await res.json()) as { url?: string; error?: string }
   if (!res.ok) throw new Error(data?.error || 'Upload failed')

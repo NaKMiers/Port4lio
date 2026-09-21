@@ -5,11 +5,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import Chevron from '@/components/mbti/Chevron'
 import PaymentCountdown from '@/components/mbti/PaymentCountdown'
-import TransferDetails, { type TransferDetailsCopy } from '@/components/mbti/TransferDetails'
+import TransferDetails, {
+  type TransferDetailsCopy,
+} from '@/components/mbti/TransferDetails'
 import type { Locale } from '@/lib/i18n'
 import { CERTIFICATE_NAME_MAX } from '@/lib/iq/pricing'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 /** The webhook usually lands first; this only has to cover the case where it does not. */
 const POLL_INTERVAL_MS = 3_000
@@ -146,7 +149,12 @@ export default function TestPaywall({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           // `name` is only read by the IQ checkout; the MBTI route ignores unknown fields.
-          body: JSON.stringify({ token, email, locale, ...(withName ? { name } : {}) }),
+          body: JSON.stringify({
+            token,
+            email,
+            locale,
+            ...(withName ? { name } : {}),
+          }),
         })
 
         if (response.status === 429) {
@@ -169,10 +177,15 @@ export default function TestPaywall({
           // 400 covers both fields, so the message follows whichever one the server named.
           // Without this an invalid name would read "that email is not valid" and the buyer
           // would keep retyping a correct address.
-          const badName = withName && typeof data?.error === 'string' && /name/i.test(data.error)
+          const badName =
+            withName &&
+            typeof data?.error === 'string' &&
+            /name/i.test(data.error)
           setError(
             response.status === 400
-              ? (badName ? (copy.invalidName ?? copy.genericError) : copy.invalidEmail)
+              ? badName
+                ? (copy.invalidName ?? copy.genericError)
+                : copy.invalidEmail
               : (data?.error ?? copy.genericError)
           )
           setStatus('idle')
@@ -200,7 +213,9 @@ export default function TestPaywall({
       if (orderCode === null) return
 
       try {
-        const response = await fetch(`/api/payos/status/${orderCode}`, { cache: 'no-store' })
+        const response = await fetch(`/api/payos/status/${orderCode}`, {
+          cache: 'no-store',
+        })
         if (!response.ok || cancelled) return
 
         const data = await response.json()
@@ -209,9 +224,8 @@ export default function TestPaywall({
           setStatus('paid')
           // The server component re-reads the attempt and renders the unlocked result.
           router.refresh()
-        } else if (data.status === 'cancelled' || data.status === 'expired') {
+        } else if (data.status === 'cancelled' || data.status === 'expired')
           setStatus('cancelled')
-        }
       } catch {
         // A dropped poll is not worth surfacing - the next tick retries, and the webhook is
         // still the primary path. Showing an error here would alarm someone mid-payment.
@@ -226,65 +240,68 @@ export default function TestPaywall({
 
   return (
     <section
-      className='rounded-panel border border-pp-line bg-pp-panel p-6 shadow-panel backdrop-blur-md md:p-7'
-      aria-labelledby='paywall-heading'
+      className="rounded-panel border border-pp-line bg-pp-panel p-6 shadow-panel backdrop-blur-md md:p-7"
+      aria-labelledby="paywall-heading"
     >
       <h2
-        id='paywall-heading'
-        className='font-display text-xl font-semibold tracking-tight text-pp-text'
+        id="paywall-heading"
+        className="font-display text-xl font-semibold tracking-tight text-pp-text"
       >
         {copy.title}
       </h2>
-      <p className='mt-2.5 text-sm leading-relaxed text-pp-muted'>
+      <p className="mt-2.5 text-sm leading-relaxed text-pp-muted">
         {copy.lead.replace('{price}', price)}
       </p>
 
       {status === 'idle' || status === 'creating' ? (
-        <form onSubmit={startCheckout} className='mt-6'>
+        <form
+          onSubmit={startCheckout}
+          className="mt-6"
+        >
           <label
-            htmlFor='paywall-email'
-            className='font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted'
+            htmlFor="paywall-email"
+            className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted"
           >
             {copy.emailLabel}
           </label>
           <input
-            id='paywall-email'
-            type='email'
+            id="paywall-email"
+            type="email"
             required
-            autoComplete='email'
-            inputMode='email'
+            autoComplete="email"
+            inputMode="email"
             value={email}
             onChange={event => setEmail(event.target.value)}
             placeholder={copy.emailPlaceholder}
-            className='mt-2 w-full rounded-full border border-pp-line bg-white/80 px-5 py-3 text-sm text-pp-text outline-none transition placeholder:text-pp-muted/70 focus:border-[rgba(123,109,255,0.6)] focus:ring-2 focus:ring-[rgba(123,109,255,0.25)]'
+            className="mt-2 w-full rounded-full border border-pp-line bg-white/80 px-5 py-3 text-sm text-pp-text outline-none transition placeholder:text-pp-muted/70 focus:border-[rgba(123,109,255,0.6)] focus:ring-2 focus:ring-[rgba(123,109,255,0.25)]"
           />
-          <p className='mt-2 text-xs text-pp-muted'>{copy.emailHint}</p>
+          <p className="mt-2 text-xs text-pp-muted">{copy.emailHint}</p>
 
           {withName ? (
-            <div className='mt-4'>
+            <div className="mt-4">
               <label
-                htmlFor='paywall-name'
-                className='font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted'
+                htmlFor="paywall-name"
+                className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted"
               >
                 {copy.nameLabel}
               </label>
               <input
-                id='paywall-name'
-                type='text'
+                id="paywall-name"
+                type="text"
                 required
-                autoComplete='name'
+                autoComplete="name"
                 maxLength={CERTIFICATE_NAME_MAX}
                 value={name}
                 onChange={event => setName(event.target.value)}
                 placeholder={copy.namePlaceholder}
-                className='mt-2 w-full rounded-full border border-pp-line bg-white/80 px-5 py-3 text-sm text-pp-text outline-none transition placeholder:text-pp-muted/70 focus:border-[rgba(123,109,255,0.6)] focus:ring-2 focus:ring-[rgba(123,109,255,0.25)]'
+                className="mt-2 w-full rounded-full border border-pp-line bg-white/80 px-5 py-3 text-sm text-pp-text outline-none transition placeholder:text-pp-muted/70 focus:border-[rgba(123,109,255,0.6)] focus:ring-2 focus:ring-[rgba(123,109,255,0.25)]"
               />
-              <p className='mt-2 text-xs text-pp-muted'>{copy.nameHint}</p>
+              <p className="mt-2 text-xs text-pp-muted">{copy.nameHint}</p>
             </div>
           ) : null}
 
           <button
-            type='submit'
+            type="submit"
             disabled={status === 'creating'}
             className={cx(
               'mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-pp-text px-6 py-3.5 font-display text-xs font-semibold uppercase tracking-[0.16em] text-[var(--pp-bg)] shadow-[0_14px_28px_rgba(31,28,26,0.16)] transition sm:w-auto',
@@ -294,26 +311,26 @@ export default function TestPaywall({
             )}
           >
             {status === 'creating' ? copy.preparing : copy.payButton}
-            {status === 'creating' ? null : <Chevron direction='right' />}
+            {status === 'creating' ? null : <Chevron direction="right" />}
           </button>
         </form>
       ) : null}
 
       {status === 'waiting' && payment ? (
-        <div className='mt-6'>
+        <div className="mt-6">
           {/*
             QR left, manual transfer right. They are two ways to do the same thing, so
             side by side lets someone pick rather than scroll past the one they cannot
             use. Stacks below `lg` because the transfer table needs the full width to
             keep an account number on one line.
           */}
-          <div className='grid gap-6 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:gap-8'>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)] lg:gap-8">
             {payment.qrDataUri ? (
-              <div className='flex flex-col'>
-                <p className='font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+              <div className="flex flex-col">
+                <p className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted">
                   {copy.scanTitle}
                 </p>
-                <p className='mt-1.5 text-sm text-pp-muted'>{copy.scanLead}</p>
+                <p className="mt-1.5 text-sm text-pp-muted">{copy.scanLead}</p>
                 {/*
                   A plain <img>, not next/image: this is an inline data URI, so there is no
                   URL for the optimiser to fetch and nothing for it to optimise. Decorative
@@ -322,10 +339,10 @@ export default function TestPaywall({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={payment.qrDataUri}
-                  alt=''
-                  className='mt-3 h-auto w-full max-w-[260px] rounded-panel border border-pp-line bg-white p-2'
+                  alt=""
+                  className="mt-3 h-auto w-full max-w-[260px] rounded-panel border border-pp-line bg-white p-2"
                 />
-                <div className='mt-3 max-w-[260px]'>
+                <div className="mt-3 max-w-[260px]">
                   <PaymentCountdown
                     expiresAt={payment.expiresAt}
                     label={copy.expiresIn}
@@ -345,14 +362,14 @@ export default function TestPaywall({
             />
           </div>
 
-          <div className='mt-7 space-y-3 border-t border-pp-line pt-5'>
+          <div className="mt-7 space-y-3 border-t border-pp-line pt-5">
             <p
-              className='flex items-center gap-2.5 text-sm font-semibold text-pp-text'
-              role='status'
-              aria-live='polite'
+              className="flex items-center gap-2.5 text-sm font-semibold text-pp-text"
+              role="status"
+              aria-live="polite"
             >
               <span
-                className='h-2 w-2 shrink-0 rounded-full bg-[linear-gradient(135deg,var(--pp-violet),var(--pp-blue))] pp-pulse-soft'
+                className="pp-pulse-soft h-2 w-2 shrink-0 rounded-full bg-[linear-gradient(135deg,var(--pp-violet),var(--pp-blue))]"
                 aria-hidden
               />
               {copy.waiting}
@@ -362,7 +379,7 @@ export default function TestPaywall({
               and a copy is emailed. Naming the address back is also a last chance to catch
               a typo before the only receipt goes somewhere the buyer cannot read.
             */}
-            <p className='text-sm leading-relaxed text-pp-muted'>
+            <p className="text-sm leading-relaxed text-pp-muted">
               {copy.deliveryNote.replace('{email}', email)}
             </p>
           </div>
@@ -370,38 +387,51 @@ export default function TestPaywall({
       ) : null}
 
       {status === 'expired' ? (
-        <div className='mt-6'>
-          <p className='text-sm text-[#c2410c]' role='alert'>
+        <div className="mt-6">
+          <p
+            className="text-sm text-[#c2410c]"
+            role="alert"
+          >
             {copy.expired}
           </p>
           <button
-            type='button'
+            type="button"
             onClick={() => {
               setPayment(null)
               setStatus('idle')
             }}
-            className='mt-4 inline-flex items-center gap-2 rounded-full border border-pp-line px-5 py-2.5 font-display text-xs font-semibold uppercase tracking-[0.16em] text-pp-text transition hover:border-pp-text'
+            className="mt-4 inline-flex items-center gap-2 rounded-full border border-pp-line px-5 py-2.5 font-display text-xs font-semibold uppercase tracking-[0.16em] text-pp-text transition hover:border-pp-text"
           >
             {copy.retry}
-            <Chevron direction='right' />
+            <Chevron direction="right" />
           </button>
         </div>
       ) : null}
 
       {status === 'paid' ? (
-        <p className='mt-6 text-sm font-semibold text-pp-text' role='status' aria-live='polite'>
+        <p
+          className="mt-6 text-sm font-semibold text-pp-text"
+          role="status"
+          aria-live="polite"
+        >
           {copy.done}
         </p>
       ) : null}
 
       {status === 'cancelled' ? (
-        <p className='mt-6 text-sm text-[#c2410c]' role='alert'>
+        <p
+          className="mt-6 text-sm text-[#c2410c]"
+          role="alert"
+        >
           {copy.cancelled}
         </p>
       ) : null}
 
       {error ? (
-        <p className='mt-4 text-sm text-[#c2410c]' role='alert'>
+        <p
+          className="mt-4 text-sm text-[#c2410c]"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}

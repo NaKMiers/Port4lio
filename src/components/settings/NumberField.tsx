@@ -28,9 +28,7 @@ export default function NumberField({
   if (value !== lastValue) {
     setLastValue(value)
     // Ignore our own commit echoing back; take anything else (e.g. a Save round-trip).
-    if (Number(draft) !== value) {
-      setDraft(String(value))
-    }
+    if (Number(draft) !== value) setDraft(String(value))
   }
 
   return (
@@ -39,8 +37,8 @@ export default function NumberField({
       // Deliberately not `type='number'`: the spinner's own value normalisation is the
       // other half of the caret problem, and it rejects the intermediate states this
       // component exists to allow.
-      type='text'
-      inputMode='numeric'
+      type="text"
+      inputMode="numeric"
       value={draft}
       onChange={event => {
         const text = event.target.value

@@ -37,7 +37,11 @@ export async function generateMetadata({
   }
 }
 
-export default async function MbtiTestPage({ params }: { params: Promise<{ lang: string }> }) {
+export default async function MbtiTestPage({
+  params,
+}: {
+  params: Promise<{ lang: string }>
+}) {
   const { lang } = await params
   if (!isLocale(lang)) notFound()
 
@@ -51,7 +55,7 @@ export default async function MbtiTestPage({ params }: { params: Promise<{ lang:
   }))
 
   return (
-    <main className='mx-auto w-full max-w-2xl px-gutter'>
+    <main className="mx-auto w-full max-w-2xl px-gutter">
       <TestClient
         locale={lang}
         questions={questions}

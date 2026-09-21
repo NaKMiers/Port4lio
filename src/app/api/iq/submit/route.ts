@@ -2,7 +2,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { jsonError } from '@/lib/api-response'
 import { answerKeyFor } from '@/lib/iq/items'
-import { InvalidIqAnswersError, parseIqAnswers, scoreIq, withinTimeLimit } from '@/lib/iq/scoring'
+import {
+  InvalidIqAnswersError,
+  parseIqAnswers,
+  scoreIq,
+  withinTimeLimit,
+} from '@/lib/iq/scoring'
 import { connectDatabase } from '@/lib/mongodb'
 import { checkRateLimit, clientIpFrom, IQ_SUBMIT_LIMIT } from '@/lib/rate-limit'
 import { iqEffortWaived, isEffortWaiverEnabled } from '@/lib/test-kit/effort'
@@ -46,12 +51,14 @@ export async function POST(request: NextRequest) {
   await connectDatabase()
 
   const limit = await checkRateLimit(clientIpFrom(request), IQ_SUBMIT_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
   let body: unknown
   try {
@@ -60,16 +67,21 @@ export async function POST(request: NextRequest) {
     return jsonError('Invalid JSON body', 400)
   }
 
-  const { token, answers: rawAnswers } = (body ?? {}) as { token?: unknown; answers?: unknown }
+  const { token, answers: rawAnswers } = (body ?? {}) as {
+    token?: unknown
+    answers?: unknown
+  }
 
   // Shape check before the query, so a garbage segment never becomes a database round trip.
-  if (typeof token !== 'string' || !isTokenShaped(token)) return jsonError('Invalid token', 400)
+  if (typeof token !== 'string' || !isTokenShaped(token))
+    return jsonError('Invalid token', 400)
 
   let answers: number[]
   try {
     answers = parseIqAnswers(rawAnswers)
   } catch (error) {
-    if (error instanceof InvalidIqAnswersError) return jsonError(error.message, 400)
+    if (error instanceof InvalidIqAnswersError)
+      return jsonError(error.message, 400)
     throw error
   }
 
@@ -77,7 +89,7 @@ export async function POST(request: NextRequest) {
   if (!attempt) return jsonError('Not found', 404)
 
   // Already scored: return what we have. See the idempotency note above.
-  if (attempt.submittedAt) {
+  if (attempt.submittedAt)
     return NextResponse.json({
       token,
       raw: attempt.raw,
@@ -86,14 +98,12 @@ export async function POST(request: NextRequest) {
       band: attempt.band,
       alreadySubmitted: true,
     })
-  }
 
   const now = new Date()
-  if (!withinTimeLimit(attempt.startedAt, now)) {
+  if (!withinTimeLimit(attempt.startedAt, now))
     // Deliberately not scored. Accepting a late submission would make the clock advisory,
     // and the clock is the only thing that makes scores comparable between takers.
     return jsonError('Time limit exceeded', 403)
-  }
 
   /**
    * Scored with the generator this attempt was BUILT by, not the current one.
@@ -171,9 +181,7 @@ export async function POST(request: NextRequest) {
   // as well double-counted every IQ attempt and halved every rate measured against it.
   //
   // Inside the claim, so a lost race counts nothing.
-  if (waived) {
-    recordFunnelDetached('iq', FUNNEL_EVENTS.waived)
-  }
+  if (waived) recordFunnelDetached('iq', FUNNEL_EVENTS.waived)
 
   return NextResponse.json({
     token,

@@ -59,7 +59,9 @@ describe('seeding', () => {
     await ensureSeriesSeeded()
 
     const rows = await SeriesModel.find({}).sort({ order: 1 }).lean()
-    expect(rows.map(row => row.slug)).toEqual(SEED_SERIES.map(series => series.slug))
+    expect(rows.map(row => row.slug)).toEqual(
+      SEED_SERIES.map(series => series.slug)
+    )
     // The copy comes with them. A seeded series with no title renders a headless cluster.
     expect(rows[0]?.title).toBe(SEED_SERIES[0].title)
     expect(rows[0]?.blurb).not.toBe('')
@@ -77,7 +79,9 @@ describe('seeding', () => {
     await ensureSeriesSeeded()
 
     expect(await SeriesModel.exists({ slug: 'dev-career-vn' })).toBeNull()
-    expect(await SeriesModel.estimatedDocumentCount()).toBe(SEED_SERIES.length - 1)
+    expect(await SeriesModel.estimatedDocumentCount()).toBe(
+      SEED_SERIES.length - 1
+    )
   })
 
   it('is idempotent', async () => {
@@ -92,7 +96,9 @@ describe('seeding', () => {
 describe('slug uniqueness', () => {
   it('refuses a duplicate slug at the index, not just in the route', async () => {
     await SeriesModel.create({ slug: 'dupe', title: 'One' })
-    await expect(SeriesModel.create({ slug: 'dupe', title: 'Two' })).rejects.toThrow()
+    await expect(
+      SeriesModel.create({ slug: 'dupe', title: 'Two' })
+    ).rejects.toThrow()
   })
 })
 
@@ -141,7 +147,12 @@ describe('the delete guard', () => {
    */
   it('counts soft-deleted posts as still using the series', async () => {
     await ensureSeriesSeeded()
-    await PostModel.create({ ...BASE, slug: 'gone', series: 'dev-career-vn', status: 'deleted' })
+    await PostModel.create({
+      ...BASE,
+      slug: 'gone',
+      series: 'dev-career-vn',
+      status: 'deleted',
+    })
 
     expect(await postsUsingSeries('dev-career-vn')).toHaveLength(1)
   })
@@ -152,12 +163,18 @@ describe('listSeriesWithCounts', () => {
     await ensureSeriesSeeded()
     await PostModel.create({ ...BASE, slug: 'a', series: 'dev-career-vn' })
     await PostModel.create({ ...BASE, slug: 'b', series: 'dev-career-vn' })
-    await PostModel.create({ ...BASE, slug: 'c', series: 'measured-in-production' })
+    await PostModel.create({
+      ...BASE,
+      slug: 'c',
+      series: 'measured-in-production',
+    })
     // A post with no series must not be attributed to one.
     await PostModel.create({ ...BASE, slug: 'd' })
 
     const rows = await listSeriesWithCounts()
-    const bySlug = Object.fromEntries(rows.map(row => [row.slug, row.postCount]))
+    const bySlug = Object.fromEntries(
+      rows.map(row => [row.slug, row.postCount])
+    )
 
     expect(bySlug['dev-career-vn']).toBe(2)
     expect(bySlug['measured-in-production']).toBe(1)

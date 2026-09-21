@@ -31,8 +31,11 @@ function readStored(): RailWidthMap {
   if (typeof window === 'undefined') return {}
 
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? 'null')
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) ?? 'null'
+    )
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return {}
 
     // The value is user-writable, so anything that is not a finite number is dropped rather
     // than trusted - a stale shape should fall back to the default, not lay out at `NaN`.
@@ -71,11 +74,18 @@ export function useRailWidth(tab: SettingTabId) {
     (next: number, containerWidth?: number) => {
       const ceiling =
         containerWidth && containerWidth > 0
-          ? Math.min(MAX_RAIL_WIDTH, Math.max(MIN_RAIL_WIDTH, containerWidth - MIN_EDITOR_WIDTH))
+          ? Math.min(
+              MAX_RAIL_WIDTH,
+              Math.max(MIN_RAIL_WIDTH, containerWidth - MIN_EDITOR_WIDTH)
+            )
           : MAX_RAIL_WIDTH
 
-      const clamped = Math.round(Math.min(ceiling, Math.max(MIN_RAIL_WIDTH, next)))
-      setWidths(prev => (prev[tab] === clamped ? prev : { ...prev, [tab]: clamped }))
+      const clamped = Math.round(
+        Math.min(ceiling, Math.max(MIN_RAIL_WIDTH, next))
+      )
+      setWidths(prev =>
+        prev[tab] === clamped ? prev : { ...prev, [tab]: clamped }
+      )
     },
     [tab]
   )

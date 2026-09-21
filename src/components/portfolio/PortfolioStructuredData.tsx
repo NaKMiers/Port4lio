@@ -13,7 +13,7 @@ export default function PortfolioStructuredData({
   const ld = serializePortfolioJsonLd(resolveSiteOrigin(), profile, viewModel)
   return (
     <script
-      type='application/ld+json'
+      type="application/ld+json"
       suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: ld }}
     />

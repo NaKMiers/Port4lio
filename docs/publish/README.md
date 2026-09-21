@@ -5,15 +5,15 @@ piece that lives outside this repo: the GitHub Actions workflow that applies it.
 
 ## What is automated and what is not
 
-| Target | How | Why |
-| --- | --- | --- |
-| `anhkhoa.info` | Native | It reads the profile directly |
-| `/cv` | Native | Reads `profile.resume` |
-| GitHub profile README | **Automated** | Contents API, default `GITHUB_TOKEN` |
-| GitHub account bio | **Automated** | `PATCH /user`, needs a PAT |
-| LinkedIn | **Manual** | No profile-write API exists outside partner access |
-| Upwork | **Manual** | GraphQL API is read-oriented; no self-profile mutation |
-| Fiverr | **Manual** | No public seller API at all |
+| Target                | How           | Why                                                    |
+| --------------------- | ------------- | ------------------------------------------------------ |
+| `anhkhoa.info`        | Native        | It reads the profile directly                          |
+| `/cv`                 | Native        | Reads `profile.resume`                                 |
+| GitHub profile README | **Automated** | Contents API, default `GITHUB_TOKEN`                   |
+| GitHub account bio    | **Automated** | `PATCH /user`, needs a PAT                             |
+| LinkedIn              | **Manual**    | No profile-write API exists outside partner access     |
+| Upwork                | **Manual**    | GraphQL API is read-oriented; no self-profile mutation |
+| Fiverr                | **Manual**    | No public seller API at all                            |
 
 The three manual platforms are served by `/publish`, which renders each field already
 shaped and length-capped for that platform, with a Copy button and a drift badge. Press
@@ -45,7 +45,7 @@ defaults to `NaKMiers`.
 existing `gh` CLI tokens (scopes `gist, read:org, repo, workflow`). Create a new one:
 
 - **Preferred** - a fine-grained PAT with **Account permissions → Profile → Read and
-  write** and *zero* repository permissions, 90-day expiry. That token cannot touch a
+  write** and _zero_ repository permissions, 90-day expiry. That token cannot touch a
   single repo.
 - **Fallback** - a classic PAT with only the `user` scope. This is a real downgrade:
   `user` also grants read/write on your email addresses and following list. Try
@@ -53,11 +53,11 @@ existing `gh` CLI tokens (scopes `gist, read:org, repo, workflow`). Create a new
 
 ### 3. Secrets on `NaKMiers/NaKMiers`
 
-| Name | Value |
-| --- | --- |
-| `PORTFOLIO_MANIFEST_URL` | `https://anhkhoa.info/api/publish/manifest` |
-| `PORTFOLIO_PUBLISH_TOKEN` | the `PUBLISH_TOKEN` value from step 1 |
-| `GH_PROFILE_TOKEN` | the PAT from step 2 |
+| Name                      | Value                                       |
+| ------------------------- | ------------------------------------------- |
+| `PORTFOLIO_MANIFEST_URL`  | `https://anhkhoa.info/api/publish/manifest` |
+| `PORTFOLIO_PUBLISH_TOKEN` | the `PUBLISH_TOKEN` value from step 1       |
+| `GH_PROFILE_TOKEN`        | the PAT from step 2                         |
 
 The URL is a secret rather than a variable so it is masked in the logs of a public repo.
 

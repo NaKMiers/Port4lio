@@ -66,8 +66,11 @@ export default function BlogSaveDock({
   if (anchorVisible) return null
 
   return (
-    <div className='fixed bottom-6 right-6 z-[55] flex items-center gap-3 rounded-full border border-pp-line bg-[rgba(255,253,250,0.98)] py-2 pl-5 pr-2 shadow-[0_18px_44px_rgba(17,17,17,0.22)] backdrop-blur-xl print:hidden'>
-      <span className='text-xs font-medium text-pp-muted' role='status'>
+    <div className="fixed bottom-6 right-6 z-[55] flex items-center gap-3 rounded-full border border-pp-line bg-[rgba(255,253,250,0.98)] py-2 pl-5 pr-2 shadow-[0_18px_44px_rgba(17,17,17,0.22)] backdrop-blur-xl print:hidden">
+      <span
+        className="text-xs font-medium text-pp-muted"
+        role="status"
+      >
         {saving
           ? 'Saving...'
           : dirty
@@ -77,10 +80,12 @@ export default function BlogSaveDock({
               : 'No changes yet'}
       </span>
       <button
-        type='button'
+        type="button"
         onClick={onSave}
         disabled={saving || uploading || !dirty}
-        title={uploading ? 'Waiting for the image upload to finish' : 'Save now'}
+        title={
+          uploading ? 'Waiting for the image upload to finish' : 'Save now'
+        }
         className={`${primaryBtnCls} px-4 py-2 text-xs`}
       >
         {saving ? 'Saving...' : uploading ? 'Uploading...' : 'Save now'}

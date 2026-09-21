@@ -32,7 +32,10 @@ export function canonicalJson(value: unknown): string {
  * and improving a renderer genuinely does make last month's paste out of date.
  */
 export function hashArtifact(value: unknown): string {
-  return crypto.createHash('sha256').update(canonicalJson(value), 'utf8').digest('hex')
+  return crypto
+    .createHash('sha256')
+    .update(canonicalJson(value), 'utf8')
+    .digest('hex')
 }
 
 /** Whole-manifest version: per-target hashes combined in a fixed target order. */
@@ -42,9 +45,6 @@ export function combineVersions(
 ): string {
   return crypto
     .createHash('sha256')
-    .update(
-      order.map(id => `${id}:${perTarget[id] ?? ''}`).join('|'),
-      'utf8'
-    )
+    .update(order.map(id => `${id}:${perTarget[id] ?? ''}`).join('|'), 'utf8')
     .digest('hex')
 }

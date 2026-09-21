@@ -61,7 +61,7 @@ export function buildSyndicationBundle({
   canonical: string
   tags: string[]
 }): string {
-  if (target === 'devto') {
+  if (target === 'devto')
     // DEV.to reads this front matter directly on paste, and `canonical_url` is what stops
     // the cross-post competing with the original in search results.
     return [
@@ -76,7 +76,6 @@ export function buildSyndicationBundle({
       '',
       FOOTER.devto(canonical),
     ].join('\n')
-  }
 
   // Viblo has no front-matter convention, so the metadata goes in as a comment the author
   // strips, and the canonical link is carried by the footer instead.

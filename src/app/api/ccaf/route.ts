@@ -30,9 +30,9 @@ const MAX_BODY_BYTES = 64 * 1024
  * from the write to the route.
  */
 export async function GET(request: NextRequest) {
-  if (!hasOwnerAccess(request.cookies.get(getAuthCookieName())?.value)) {
+  if (!hasOwnerAccess(request.cookies.get(getAuthCookieName())?.value))
     return jsonError('Unauthorized', 401)
-  }
+
   return NextResponse.json({ state: await loadCcafState() })
 }
 
@@ -63,14 +63,12 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   const contentType = request.headers.get('content-type') ?? ''
-  if (!contentType.includes('application/json')) {
+  if (!contentType.includes('application/json'))
     return jsonError('Expected Content-Type: application/json', 415)
-  }
 
   const raw = await request.text()
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
+  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES)
     return jsonError('Payload too large', 413)
-  }
 
   // Before the rate-limit check, not after: `checkRateLimit` writes its counter to Mongo
   // and fails open on error, so a cold invocation with no connection yet would skip the
@@ -78,7 +76,7 @@ export async function PUT(request: NextRequest) {
   await connectDatabase()
 
   const limit = await checkRateLimit(clientIpFrom(request), CCAF_SAVE_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many requests' },
       {
@@ -86,11 +84,9 @@ export async function PUT(request: NextRequest) {
         headers: { 'Retry-After': String(limit.retryAfterSeconds) },
       }
     )
-  }
 
-  if (!hasOwnerAccess(request.cookies.get(getAuthCookieName())?.value)) {
+  if (!hasOwnerAccess(request.cookies.get(getAuthCookieName())?.value))
     return jsonError('Unauthorized', 401)
-  }
 
   let body: unknown
   try {
@@ -102,9 +98,7 @@ export async function PUT(request: NextRequest) {
   const state = sanitizeState(
     (body as { state?: unknown } | null)?.state ?? body
   )
-  if (!state) {
-    return jsonError('Invalid progress state', 400)
-  }
+  if (!state) return jsonError('Invalid progress state', 400)
 
   const now = new Date()
   try {

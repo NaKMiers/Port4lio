@@ -1,6 +1,13 @@
 'use client'
 
-import { AlertTriangle, CheckCircle2, Loader2, PenLine, Sparkles, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  PenLine,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 
 import AutoManualSwitch from '@/components/blog-admin/AutoManualSwitch'
@@ -144,20 +151,30 @@ export default function GenerateBlogDialog({
         fetch('/api/admin/blog', { cache: 'no-store' }),
       ])
 
-      const kinds = (await kindsRes.json()) as { kinds?: { slug: string; label: string }[] }
-      const series = (await seriesRes.json()) as { series?: { slug: string; title: string }[] }
+      const kinds = (await kindsRes.json()) as {
+        kinds?: { slug: string; label: string }[]
+      }
+      const series = (await seriesRes.json()) as {
+        series?: { slug: string; title: string }[]
+      }
       const posts = (await postsRes.json()) as {
         posts?: { slug: string; title: string; status: string }[]
       }
 
       setOptions({
-        kinds: (kinds.kinds ?? []).map(kind => ({ value: kind.slug, label: kind.label })),
+        kinds: (kinds.kinds ?? []).map(kind => ({
+          value: kind.slug,
+          label: kind.label,
+        })),
         // The sentinel first, so a manual series defaults to "no series" rather than to
         // whichever cluster happens to sort first. Filing a post in the wrong cluster by
         // accident is the failure that costs something; leaving it unfiled is not.
         series: [
           { value: NO_SERIES, label: 'No series' },
-          ...(series.series ?? []).map(entry => ({ value: entry.slug, label: entry.title })),
+          ...(series.series ?? []).map(entry => ({
+            value: entry.slug,
+            label: entry.title,
+          })),
         ],
         // Published only. `relatedSlugs` renders as links on a live post, so pointing one at
         // a draft is a link to a 404 - the route enforces the same rule server-side.
@@ -218,7 +235,9 @@ export default function GenerateBlogDialog({
     setSpec(current => {
       const field = FIELD_BY_KEY.get(key)
       const value =
-        mode === 'manual' && field ? seedValue(field, current[key].value, options) : current[key].value
+        mode === 'manual' && field
+          ? seedValue(field, current[key].value, options)
+          : current[key].value
       return { ...current, [key]: { mode, value } }
     })
   }
@@ -258,7 +277,8 @@ export default function GenerateBlogDialog({
         replaced?: boolean
         error?: string
       }
-      if (!res.ok || !data.id) throw new Error(data.error ?? 'Could not generate the post')
+      if (!res.ok || !data.id)
+        throw new Error(data.error ?? 'Could not generate the post')
 
       setResult({
         id: data.id,
@@ -271,26 +291,30 @@ export default function GenerateBlogDialog({
       })
       onGenerated()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not generate the post')
+      setError(
+        cause instanceof Error ? cause.message : 'Could not generate the post'
+      )
     } finally {
       setBusy(false)
     }
   }
 
-  const manualCount = Object.values(spec).filter(entry => entry.mode === 'manual').length
+  const manualCount = Object.values(spec).filter(
+    entry => entry.mode === 'manual'
+  ).length
 
   return (
     <div
-      className='fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[rgba(31,28,26,0.42)] p-4 backdrop-blur-sm sm:p-8'
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-[rgba(31,28,26,0.42)] p-4 backdrop-blur-sm sm:p-8"
       onClick={event => {
         if (event.target === event.currentTarget && !busy) onClose()
       }}
     >
       <div
-        role='dialog'
-        aria-modal='true'
-        aria-labelledby='generate-dialog-title'
-        className='w-full max-w-3xl rounded-[1.75rem] border border-pp-line bg-[rgba(255,253,250,0.99)] shadow-[0_32px_64px_rgba(46,35,28,0.28)] backdrop-blur-xl'
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="generate-dialog-title"
+        className="w-full max-w-3xl rounded-[1.75rem] border border-pp-line bg-[rgba(255,253,250,0.99)] shadow-[0_32px_64px_rgba(46,35,28,0.28)] backdrop-blur-xl"
       >
         {/*
           `sticky` on the header, so the Generate button stays at the top-right of the dialog
@@ -298,14 +322,14 @@ export default function GenerateBlogDialog({
           top-right; on a scrolling panel those are two different places, and the one that is
           always reachable is the one that was meant.
         */}
-        <div className='sticky top-0 z-10 flex items-start justify-between gap-4 rounded-t-[1.75rem] border-b border-pp-line bg-[rgba(255,253,250,0.97)] px-6 py-5 backdrop-blur-xl sm:px-7'>
-          <div className='min-w-0'>
-            <p className='text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 rounded-t-[1.75rem] border-b border-pp-line bg-[rgba(255,253,250,0.97)] px-6 py-5 backdrop-blur-xl sm:px-7">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted">
               Blog board
             </p>
             <h2
-              id='generate-dialog-title'
-              className='mt-1 font-display text-2xl font-semibold tracking-tight text-pp-text'
+              id="generate-dialog-title"
+              className="mt-1 font-display text-2xl font-semibold tracking-tight text-pp-text"
             >
               {replaceTarget ? 'Regenerate this post' : 'Generate a post'}
             </h2>
@@ -324,38 +348,48 @@ export default function GenerateBlogDialog({
             </p>
           </div>
 
-          <div className='flex shrink-0 items-center gap-2'>
+          <div className="flex shrink-0 items-center gap-2">
             <button
-              type='button'
+              type="button"
               onClick={() => void generate()}
               disabled={busy}
               className={`${primaryBtnCls} gap-2 bg-[linear-gradient(120deg,#2a2320,#4a3a62_55%,#2a2320)] px-5`}
             >
               {busy ? (
                 <>
-                  <Loader2 aria-hidden size={15} className='animate-spin' />
+                  <Loader2
+                    aria-hidden
+                    size={15}
+                    className="animate-spin"
+                  />
                   {elapsed}s
                 </>
               ) : (
                 <>
-                  <Sparkles aria-hidden size={15} />
+                  <Sparkles
+                    aria-hidden
+                    size={15}
+                  />
                   {replaceTarget ? 'Replace' : 'Generate'}
                 </>
               )}
             </button>
             <button
-              type='button'
+              type="button"
               onClick={onClose}
               disabled={busy}
-              aria-label='Close'
-              className='rounded-full border border-pp-line bg-white/82 p-2 text-pp-muted transition hover:bg-white hover:text-pp-text disabled:cursor-not-allowed disabled:opacity-50'
+              aria-label="Close"
+              className="bg-white/82 rounded-full border border-pp-line p-2 text-pp-muted transition hover:bg-white hover:text-pp-text disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <X aria-hidden size={15} />
+              <X
+                aria-hidden
+                size={15}
+              />
             </button>
           </div>
         </div>
 
-        <div className='px-6 py-6 sm:px-7'>
+        <div className="px-6 py-6 sm:px-7">
           {/*
             Stated, not engineered around, and it is the only warning in this feature that is
             about losing work rather than about a field being wrong.
@@ -371,14 +405,23 @@ export default function GenerateBlogDialog({
             the kind of prompt people learn to dismiss, which makes the next one weaker too.
           */}
           {replaceTarget ? (
-            <div className='mb-5 flex gap-2.5 rounded-[1.15rem] border border-[rgba(163,120,47,0.22)] bg-[rgba(224,176,92,0.13)] px-3.5 py-3 text-sm leading-relaxed text-[#6b4d1c]'>
-              <AlertTriangle aria-hidden size={16} className='mt-0.5 shrink-0' />
+            <div className="mb-5 flex gap-2.5 rounded-[1.15rem] border border-[rgba(163,120,47,0.22)] bg-[rgba(224,176,92,0.13)] px-3.5 py-3 text-sm leading-relaxed text-[#6b4d1c]">
+              <AlertTriangle
+                aria-hidden
+                size={16}
+                className="mt-0.5 shrink-0"
+              />
               <span>
-                <strong className='font-semibold'>
-                  This replaces the whole post{replaceTarget.wordCount > 0 ? ` - all ${replaceTarget.wordCount} words of it` : ''}.
+                <strong className="font-semibold">
+                  This replaces the whole post
+                  {replaceTarget.wordCount > 0
+                    ? ` - all ${replaceTarget.wordCount} words of it`
+                    : ''}
+                  .
                 </strong>{' '}
-                Title, body, taxonomy and image prompts are all overwritten and the old text is
-                not kept. The cover image, the URL and the publish state stay as they are
+                Title, body, taxonomy and image prompts are all overwritten and
+                the old text is not kept. The cover image, the URL and the
+                publish state stay as they are
                 {replaceTarget.status === 'published'
                   ? ' - and this post is live, so the new text is what readers get as soon as it saves.'
                   : '.'}
@@ -387,42 +430,60 @@ export default function GenerateBlogDialog({
           ) : null}
 
           {error ? (
-            <div className='mb-5 flex gap-2.5 rounded-[1.15rem] border border-[rgba(163,49,47,0.16)] bg-[rgba(211,108,105,0.1)] px-3.5 py-2.5 text-sm text-[#7f2f2f]'>
-              <AlertTriangle aria-hidden size={16} className='mt-0.5 shrink-0' />
+            <div className="mb-5 flex gap-2.5 rounded-[1.15rem] border border-[rgba(163,49,47,0.16)] bg-[rgba(211,108,105,0.1)] px-3.5 py-2.5 text-sm text-[#7f2f2f]">
+              <AlertTriangle
+                aria-hidden
+                size={16}
+                className="mt-0.5 shrink-0"
+              />
               <span>{error}</span>
             </div>
           ) : null}
 
           {result ? (
-            <ResultCard result={result} onAnother={() => setResult(null)} onDone={onClose} />
+            <ResultCard
+              result={result}
+              onAnother={() => setResult(null)}
+              onDone={onClose}
+            />
           ) : busy ? (
             <p className={`${helpTextCls} mb-5`}>
-              Writing the post. This takes 20 to 90 seconds depending on the length and the
-              model - the request keeps running if you look away, and the post lands on the
-              board either way.
+              Writing the post. This takes 20 to 90 seconds depending on the
+              length and the model - the request keeps running if you look away,
+              and the post lands on the board either way.
             </p>
           ) : null}
 
-          <div className={result ? 'pointer-events-none mt-6 opacity-45' : ''} aria-hidden={result !== null}>
+          <div
+            className={result ? 'pointer-events-none mt-6 opacity-45' : ''}
+            aria-hidden={result !== null}
+          >
             {GROUP_ORDER.map(group => (
-              <section key={group} className='mb-7 last:mb-0'>
-                <h3 className='text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted'>
+              <section
+                key={group}
+                className="mb-7 last:mb-0"
+              >
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted">
                   {GROUP_LABELS[group]}
                 </h3>
-                <p className={`${helpTextCls} mt-1 max-w-[62ch]`}>{GROUP_INTROS[group]}</p>
+                <p className={`${helpTextCls} mt-1 max-w-[62ch]`}>
+                  {GROUP_INTROS[group]}
+                </p>
 
-                <div className='mt-3.5 space-y-2.5'>
-                  {GENERATION_FIELDS.filter(field => field.group === group).map(field => (
-                    <FieldRow
-                      key={field.key}
-                      field={field}
-                      setting={spec[field.key]}
-                      options={options}
-                      disabled={busy}
-                      onMode={mode => setMode(field.key, mode)}
-                      onValue={value => setValue(field.key, value)}
-                    />
-                  ))}
+                <div className="mt-3.5 space-y-2.5">
+                  {GENERATION_FIELDS.filter(field => field.group === group).map(
+                    field => (
+                      <FieldRow
+                        key={field.key}
+                        field={field}
+                        setting={spec[field.key]}
+                        options={options}
+                        disabled={busy}
+                        onMode={mode => setMode(field.key, mode)}
+                        onValue={value => setValue(field.key, value)}
+                      />
+                    )
+                  )}
                 </div>
               </section>
             ))}
@@ -445,10 +506,11 @@ function seedValue(
   current: FieldSetting['value'],
   options: DynamicOptions
 ): FieldSetting['value'] {
-  if (current !== '' && !(Array.isArray(current) && current.length === 0)) return current
-  if (field.optionsFrom && field.control === 'select') {
+  if (current !== '' && !(Array.isArray(current) && current.length === 0))
+    return current
+  if (field.optionsFrom && field.control === 'select')
     return options[field.optionsFrom][0]?.value ?? emptyValueFor(field)
-  }
+
   return emptyValueFor(field)
 }
 
@@ -473,12 +535,12 @@ function FieldRow({
     : (field.options ?? [])
 
   return (
-    <div className='rounded-[1.2rem] border border-pp-line bg-white/62 px-4 py-3 transition hover:bg-white/82'>
-      <div className='flex items-center justify-between gap-3'>
+    <div className="bg-white/62 hover:bg-white/82 rounded-[1.2rem] border border-pp-line px-4 py-3 transition">
+      <div className="flex items-center justify-between gap-3">
         <label
           id={`${inputId}-label`}
           htmlFor={inputId}
-          className='text-sm font-semibold text-pp-text'
+          className="text-sm font-semibold text-pp-text"
         >
           {field.label}
         </label>
@@ -493,7 +555,7 @@ function FieldRow({
       {setting.mode === 'auto' ? (
         <p className={`${helpTextCls} mt-1`}>{field.autoNote}</p>
       ) : (
-        <div className='mt-2'>
+        <div className="mt-2">
           <FieldControl
             field={field}
             inputId={inputId}
@@ -523,28 +585,31 @@ function FieldControl({
   disabled: boolean
   onValue: (value: FieldSetting['value']) => void
 }) {
-  if (field.control === 'boolean') {
+  if (field.control === 'boolean')
     return (
-      <label className='flex cursor-pointer items-center gap-2.5 text-sm text-pp-text'>
+      <label className="flex cursor-pointer items-center gap-2.5 text-sm text-pp-text">
         <input
           id={inputId}
-          type='checkbox'
+          type="checkbox"
           checked={value === true}
           disabled={disabled}
           onChange={event => onValue(event.target.checked)}
-          className='h-4 w-4 rounded border-pp-line accent-pp-text'
+          className="h-4 w-4 rounded border-pp-line accent-pp-text"
         />
         {value === true ? 'Yes' : 'No'}
       </label>
     )
-  }
 
   if (field.control === 'select') {
-    if (choices.length === 0) {
+    if (choices.length === 0)
       // A dynamic select whose list has not arrived, or is genuinely empty. Saying so beats
       // an empty dropdown, which reads as a broken control rather than as an empty list.
-      return <p className={helpTextCls}>Nothing to choose from yet - leave this on auto.</p>
-    }
+      return (
+        <p className={helpTextCls}>
+          Nothing to choose from yet - leave this on auto.
+        </p>
+      )
+
     return (
       <SelectField
         id={inputId}
@@ -558,19 +623,25 @@ function FieldControl({
 
   if (field.control === 'multiselect') {
     const selected = Array.isArray(value) ? value : []
-    if (choices.length === 0) {
-      return <p className={helpTextCls}>Nothing to choose from yet - leave this on auto.</p>
-    }
+    if (choices.length === 0)
+      return (
+        <p className={helpTextCls}>
+          Nothing to choose from yet - leave this on auto.
+        </p>
+      )
+
     return (
-      <div className='flex flex-wrap gap-1.5'>
+      <div className="flex flex-wrap gap-1.5">
         {choices.map(option => {
           const on = selected.includes(option.value)
           return (
             <button
               key={option.value}
-              type='button'
+              type="button"
               aria-pressed={on}
-              disabled={disabled || (!on && selected.length >= (field.maxItems ?? 8))}
+              disabled={
+                disabled || (!on && selected.length >= (field.maxItems ?? 8))
+              }
               onClick={() =>
                 onValue(
                   on
@@ -582,7 +653,7 @@ function FieldControl({
                 'rounded-full border px-3 py-1.5 text-xs font-medium transition',
                 on
                   ? 'border-pp-text bg-pp-text text-white'
-                  : 'border-pp-line bg-white/78 text-pp-muted hover:border-pp-blue/40 hover:text-pp-text',
+                  : 'bg-white/78 border-pp-line text-pp-muted hover:border-pp-blue/40 hover:text-pp-text',
                 'disabled:cursor-not-allowed disabled:opacity-40',
               ].join(' ')}
             >
@@ -594,7 +665,7 @@ function FieldControl({
     )
   }
 
-  if (field.control === 'textarea') {
+  if (field.control === 'textarea')
     return (
       <textarea
         id={inputId}
@@ -606,7 +677,6 @@ function FieldControl({
         onChange={event => onValue(event.target.value)}
       />
     )
-  }
 
   return (
     <input
@@ -638,24 +708,30 @@ function ResultCard({
   onDone: () => void
 }) {
   return (
-    <div className='rounded-[1.4rem] border border-pp-line bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,243,255,0.86))] p-5 shadow-[0_18px_36px_rgba(46,35,28,0.08)]'>
-      <div className='flex items-start gap-2.5'>
-        <CheckCircle2 aria-hidden size={18} className='mt-0.5 shrink-0 text-pp-text' />
-        <div className='min-w-0'>
-          <h3 className='font-display text-lg font-semibold tracking-tight text-pp-text'>
+    <div className="rounded-[1.4rem] border border-pp-line bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,243,255,0.86))] p-5 shadow-[0_18px_36px_rgba(46,35,28,0.08)]">
+      <div className="flex items-start gap-2.5">
+        <CheckCircle2
+          aria-hidden
+          size={18}
+          className="mt-0.5 shrink-0 text-pp-text"
+        />
+        <div className="min-w-0">
+          <h3 className="font-display text-lg font-semibold tracking-tight text-pp-text">
             {result.title}
           </h3>
           <p className={`${helpTextCls} mt-1`}>
             /blog/{result.slug} ·{' '}
             {result.replaced ? (
               <>
-                rewritten, still <strong className='text-pp-text'>{result.status}</strong>
+                rewritten, still{' '}
+                <strong className="text-pp-text">{result.status}</strong>
                 {result.status === 'published' ? ' and live' : ''}.
               </>
             ) : (
               <>
-                saved as <strong className='text-pp-text'>{result.status}</strong>, so nothing is
-                public until you press Publish.
+                saved as{' '}
+                <strong className="text-pp-text">{result.status}</strong>, so
+                nothing is public until you press Publish.
               </>
             )}
             {result.model ? ` Written by ${result.model}.` : ''}
@@ -664,12 +740,16 @@ function ResultCard({
       </div>
 
       {result.warnings.length > 0 ? (
-        <div className='mt-4 rounded-[1.1rem] border border-[rgba(163,120,47,0.2)] bg-[rgba(224,176,92,0.12)] px-3.5 py-3'>
-          <p className='flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5720]'>
-            <AlertTriangle aria-hidden size={13} />
-            {result.warnings.length} thing{result.warnings.length === 1 ? '' : 's'} to look at
+        <div className="mt-4 rounded-[1.1rem] border border-[rgba(163,120,47,0.2)] bg-[rgba(224,176,92,0.12)] px-3.5 py-3">
+          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5720]">
+            <AlertTriangle
+              aria-hidden
+              size={13}
+            />
+            {result.warnings.length} thing
+            {result.warnings.length === 1 ? '' : 's'} to look at
           </p>
-          <ul className='mt-2 space-y-1 text-sm text-[#6b4d1c]'>
+          <ul className="mt-2 space-y-1 text-sm text-[#6b4d1c]">
             {result.warnings.map(warning => (
               <li key={warning}>{warning}</li>
             ))}
@@ -677,23 +757,40 @@ function ResultCard({
         </div>
       ) : null}
 
-      <div className='mt-5 flex flex-wrap gap-2'>
+      <div className="mt-5 flex flex-wrap gap-2">
         {/*
           In rewrite mode the editor IS the page behind this panel, so a link to it would be a
           link to here. `onDone` closes instead, and the editor has already reloaded.
         */}
         {result.replaced ? (
-          <button type='button' className={`${primaryBtnCls} gap-2`} onClick={onDone}>
-            <PenLine aria-hidden size={15} />
+          <button
+            type="button"
+            className={`${primaryBtnCls} gap-2`}
+            onClick={onDone}
+          >
+            <PenLine
+              aria-hidden
+              size={15}
+            />
             Read it
           </button>
         ) : (
-          <a className={`${primaryBtnCls} gap-2`} href={`/admin/blog/${result.id}`}>
-            <PenLine aria-hidden size={15} />
+          <a
+            className={`${primaryBtnCls} gap-2`}
+            href={`/admin/blog/${result.id}`}
+          >
+            <PenLine
+              aria-hidden
+              size={15}
+            />
             Read it in the editor
           </a>
         )}
-        <button type='button' className={secondaryBtnCls} onClick={onAnother}>
+        <button
+          type="button"
+          className={secondaryBtnCls}
+          onClick={onAnother}
+        >
           {result.replaced ? 'Try again' : 'Generate another'}
         </button>
       </div>

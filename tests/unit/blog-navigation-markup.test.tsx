@@ -31,7 +31,10 @@ describe('Breadcrumbs', () => {
         trail={[
           { name: 'Home', href: '/' },
           { name: 'Writing', href: '/blog' },
-          { name: 'Measuring revalidatePath', href: '/blog/measuring-revalidatepath' },
+          {
+            name: 'Measuring revalidatePath',
+            href: '/blog/measuring-revalidatepath',
+          },
         ]}
       />
     )

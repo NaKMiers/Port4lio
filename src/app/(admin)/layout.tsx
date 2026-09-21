@@ -49,9 +49,16 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <AppProvider bootstrapOnMount endpoint='/api/admin/profile'>
+    <AppProvider
+      bootstrapOnMount
+      endpoint="/api/admin/profile"
+    >
       <AdminChrome>{children}</AdminChrome>
     </AppProvider>
   )

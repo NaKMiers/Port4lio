@@ -25,9 +25,8 @@ export function compileModel<TSchema>(
   name: string,
   schema: mongoose.Schema<TSchema>
 ): mongoose.Model<TSchema> {
-  if (process.env.NODE_ENV !== 'production' && mongoose.models[name]) {
+  if (process.env.NODE_ENV !== 'production' && mongoose.models[name])
     mongoose.deleteModel(name)
-  }
 
   return (
     (mongoose.models[name] as mongoose.Model<TSchema> | undefined) ??

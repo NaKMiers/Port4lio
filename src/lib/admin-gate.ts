@@ -11,9 +11,7 @@ import { verifyAuthToken } from '@/lib/auth'
  * unlock them. Turning the gate off there has to be a code change, not a config change.
  */
 export function isAdminRequired(): boolean {
-  if (process.env.NODE_ENV === 'production') {
-    return true
-  }
+  if (process.env.NODE_ENV === 'production') return true
 
   return process.env.REQUIRE_ADMIN !== 'false'
 }

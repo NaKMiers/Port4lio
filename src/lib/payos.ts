@@ -22,7 +22,8 @@ const DEFAULT_TIMEOUT_MS = 15_000
 /** PayOS writes `description` into the bank transfer memo, which the banks length-cap. */
 export const PAYOS_DESCRIPTION_MAX_LENGTH = 25
 
-export type PayosLinkStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'CANCELLED' | 'EXPIRED'
+export type PayosLinkStatus =
+  'PENDING' | 'PROCESSING' | 'PAID' | 'CANCELLED' | 'EXPIRED'
 
 export type PayosCreateLinkInput = {
   orderCode: number
@@ -120,7 +121,9 @@ export function isPayosConfigured(): boolean {
  * `tests/unit/payos-signature.test.ts` pins each of those behaviours for exactly this
  * reason.
  */
-export function sortObjDataByKey<T extends Record<string, unknown>>(object: T): T {
+export function sortObjDataByKey<T extends Record<string, unknown>>(
+  object: T
+): T {
   return Object.keys(object)
     .sort()
     .reduce((obj: Record<string, unknown>, key) => {
@@ -136,19 +139,24 @@ export function convertObjToQueryStr(object: Record<string, unknown>): string {
       let value: unknown = object[key]
 
       // Nested arrays are JSON-encoded with each element's keys sorted.
-      if (Array.isArray(value)) {
+      if (Array.isArray(value))
         value = JSON.stringify(
           value.map(val =>
-            val && typeof val === 'object' ? sortObjDataByKey(val as Record<string, unknown>) : val
+            val && typeof val === 'object'
+              ? sortObjDataByKey(val as Record<string, unknown>)
+              : val
           )
         )
-      }
 
       // Null-ish values collapse to an empty string - including the STRINGS 'null' and
       // 'undefined', which PayOS treats the same as the real thing.
-      if (value === null || value === undefined || value === 'null' || value === 'undefined') {
+      if (
+        value === null ||
+        value === undefined ||
+        value === 'null' ||
+        value === 'undefined'
+      )
         value = ''
-      }
 
       return `${key}=${value}`
     })
@@ -163,7 +171,8 @@ export function createSignature(payload: string, checksumKey: string): string {
 function safeEquals(a: string, b: string): boolean {
   if (a.length !== b.length) return false
   let diff = 0
-  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  for (let i = 0; i < a.length; i += 1)
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return diff === 0
 }
 
@@ -207,7 +216,10 @@ export function verifyPayosData(
   if (typeof signature !== 'string' || signature.length === 0) return false
   if (!data || typeof data !== 'object') return false
 
-  const expected = createSignature(convertObjToQueryStr(sortObjDataByKey(data)), checksumKey)
+  const expected = createSignature(
+    convertObjToQueryStr(sortObjDataByKey(data)),
+    checksumKey
+  )
 
   return safeEquals(expected, signature)
 }
@@ -230,7 +242,10 @@ export async function generatePayosOrderCode(
     if (!(await isTaken(orderCode))) return orderCode
   }
 
-  throw new PayosError('Could not allocate a payment reference', 'order-code-exhausted')
+  throw new PayosError(
+    'Could not allocate a payment reference',
+    'order-code-exhausted'
+  )
 }
 
 // MARK: API client
@@ -245,14 +260,18 @@ function authHeaders(): Record<string, string> {
 
 async function payosRequest<T>(
   path: string,
-  init: { method: 'GET' | 'POST'; body?: unknown; timeoutMs?: number } = { method: 'GET' }
-): Promise<T> {
-  if (!isPayosConfigured()) {
-    throw new PayosError('Payment gateway is not configured', 'not-configured')
+  init: { method: 'GET' | 'POST'; body?: unknown; timeoutMs?: number } = {
+    method: 'GET',
   }
+): Promise<T> {
+  if (!isPayosConfigured())
+    throw new PayosError('Payment gateway is not configured', 'not-configured')
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  const timer = setTimeout(
+    () => controller.abort(),
+    init.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  )
 
   let payload: { code?: string; desc?: string; data?: T } | null = null
 
@@ -267,36 +286,44 @@ async function payosRequest<T>(
 
     // Classified without echoing the response body, which can carry payment details into
     // logs that are usually less protected than the database.
-    if (response.status === 401) {
-      throw new PayosError('Payment gateway rejected our credentials', 'unauthorized')
-    }
-    if (response.status === 429) {
-      throw new PayosError('Payment gateway is rate limiting us', 'rate-limited')
-    }
+    if (response.status === 401)
+      throw new PayosError(
+        'Payment gateway rejected our credentials',
+        'unauthorized'
+      )
+
+    if (response.status === 429)
+      throw new PayosError(
+        'Payment gateway is rate limiting us',
+        'rate-limited'
+      )
 
     payload = await response.json()
   } catch (error) {
     if (error instanceof PayosError) throw error
-    if (error instanceof Error && error.name === 'AbortError') {
+    if (error instanceof Error && error.name === 'AbortError')
       throw new PayosError('Payment gateway did not respond', 'timeout')
-    }
+
     throw new PayosError('Could not reach the payment gateway', 'network-error')
   } finally {
     clearTimeout(timer)
   }
 
-  if (!payload || payload.code !== '00') {
-    throw new PayosError(payload?.desc || 'Payment gateway returned an error', payload?.code || 'unknown')
-  }
+  if (!payload || payload.code !== '00')
+    throw new PayosError(
+      payload?.desc || 'Payment gateway returned an error',
+      payload?.code || 'unknown'
+    )
 
-  if (!payload.data) {
+  if (!payload.data)
     throw new PayosError('Payment gateway returned no data', 'empty-data')
-  }
 
   return payload.data
 }
 
-export async function createPaymentLink(input: PayosCreateLinkInput): Promise<PayosPaymentLink> {
+export async function createPaymentLink(
+  input: PayosCreateLinkInput
+): Promise<PayosPaymentLink> {
   const description = input.description.slice(0, PAYOS_DESCRIPTION_MAX_LENGTH)
   const amount = Math.round(input.amount)
 
@@ -326,7 +353,9 @@ export async function createPaymentLink(input: PayosCreateLinkInput): Promise<Pa
   })
 }
 
-export async function getPaymentLinkInformation(id: string | number): Promise<PayosLinkInformation> {
+export async function getPaymentLinkInformation(
+  id: string | number
+): Promise<PayosLinkInformation> {
   return await payosRequest<PayosLinkInformation>(`/v2/payment-requests/${id}`)
 }
 

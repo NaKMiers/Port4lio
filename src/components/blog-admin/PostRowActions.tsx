@@ -4,7 +4,10 @@ import { MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
-import { ghostBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
+import {
+  ghostBtnCls,
+  secondaryBtnCls,
+} from '@/components/settings/settings-utils'
 
 /**
  * The per-post actions on `/admin/blog`, inline on a wide screen and behind one button on a
@@ -96,10 +99,15 @@ export default function PostRowActions({
   return (
     <>
       {/* Wide screens: unchanged behaviour, the five buttons in a row. */}
-      <span className='hidden flex-wrap gap-1 md:flex'>
+      <span className="hidden flex-wrap gap-1 md:flex">
         {actions.map(action =>
           action.href ? (
-            <Link key={action.key} className={ghostBtnCls} href={action.href} title={action.title}>
+            <Link
+              key={action.key}
+              className={ghostBtnCls}
+              href={action.href}
+              title={action.title}
+            >
               {action.label}
             </Link>
           ) : (
@@ -117,25 +125,31 @@ export default function PostRowActions({
       </span>
 
       {/* Narrow screens: one trigger. */}
-      <div ref={rootRef} className='relative md:hidden'>
+      <div
+        ref={rootRef}
+        className="relative md:hidden"
+      >
         <button
           ref={triggerRef}
-          type='button'
-          aria-haspopup='menu'
+          type="button"
+          aria-haspopup="menu"
           aria-expanded={open}
           aria-label={label}
           className={`${secondaryBtnCls} gap-1.5`}
           onClick={() => setOpen(value => !value)}
         >
-          <MoreHorizontal aria-hidden size={14} />
+          <MoreHorizontal
+            aria-hidden
+            size={14}
+          />
           Actions
         </button>
 
         {open ? (
           <div
-            role='menu'
+            role="menu"
             aria-label={label}
-            className='absolute right-0 z-30 mt-2 min-w-[11rem] overflow-hidden rounded-[1.1rem] border border-pp-line bg-[rgba(255,253,250,0.98)] p-1.5 shadow-[0_24px_48px_rgba(46,35,28,0.18)] backdrop-blur-xl'
+            className="absolute right-0 z-30 mt-2 min-w-[11rem] overflow-hidden rounded-[1.1rem] border border-pp-line bg-[rgba(255,253,250,0.98)] p-1.5 shadow-[0_24px_48px_rgba(46,35,28,0.18)] backdrop-blur-xl"
           >
             {actions.map(action => {
               const itemCls =
@@ -144,11 +158,14 @@ export default function PostRowActions({
               return (
                 <div key={action.key}>
                   {action.separated ? (
-                    <div className='my-1.5 h-px bg-pp-line' role='presentation' />
+                    <div
+                      className="my-1.5 h-px bg-pp-line"
+                      role="presentation"
+                    />
                   ) : null}
                   {action.href ? (
                     <Link
-                      role='menuitem'
+                      role="menuitem"
                       className={itemCls}
                       href={action.href}
                       title={action.title}
@@ -158,8 +175,8 @@ export default function PostRowActions({
                     </Link>
                   ) : (
                     <button
-                      role='menuitem'
-                      type='button'
+                      role="menuitem"
+                      type="button"
                       className={itemCls}
                       disabled={action.disabled}
                       title={action.title}

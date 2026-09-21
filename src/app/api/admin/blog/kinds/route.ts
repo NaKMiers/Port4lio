@@ -38,29 +38,34 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return denied
 
-  const parsed = await readJsonBody<{ slug?: unknown; label?: unknown; eyebrow?: unknown }>(
-    request,
-    { maxBytes: MAX_BODY_BYTES }
-  )
+  const parsed = await readJsonBody<{
+    slug?: unknown
+    label?: unknown
+    eyebrow?: unknown
+  }>(request, { maxBytes: MAX_BODY_BYTES })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
-  const slug = typeof parsed.body?.slug === 'string' ? parsed.body.slug.trim() : ''
-  const label = typeof parsed.body?.label === 'string' ? parsed.body.label.trim() : ''
+  const slug =
+    typeof parsed.body?.slug === 'string' ? parsed.body.slug.trim() : ''
+  const label =
+    typeof parsed.body?.label === 'string' ? parsed.body.label.trim() : ''
   const eyebrow = parsed.body?.eyebrow === true
 
-  if (!KIND_SLUG_PATTERN.test(slug)) {
+  if (!KIND_SLUG_PATTERN.test(slug))
     return jsonError('Kind slug must match ^[a-z0-9-]{1,48}$.', 400)
-  }
+
   if (!label) return jsonError('A label is required.', 400)
 
   try {
     await connectDatabase()
 
-    if (await KindModel.exists({ slug })) {
+    if (await KindModel.exists({ slug }))
       return jsonError(`The kind "${slug}" already exists.`, 409)
-    }
 
-    const last = await KindModel.findOne({}).sort({ order: -1 }).select('order').lean()
+    const last = await KindModel.findOne({})
+      .sort({ order: -1 })
+      .select('order')
+      .lean()
     const created = await KindModel.create({
       slug,
       label,

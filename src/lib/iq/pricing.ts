@@ -27,7 +27,9 @@ export function getIqResultPrice(): number {
 
   const parsed = Number(raw)
   if (!Number.isFinite(parsed)) {
-    console.error(`[iq-pricing] IQ_RESULT_PRICE is not a number ("${raw}") - treating as free`)
+    console.error(
+      `[iq-pricing] IQ_RESULT_PRICE is not a number ("${raw}") - treating as free`
+    )
     return 0
   }
 
@@ -41,7 +43,8 @@ export function getIqResultPrice(): number {
     // production, where throwing would take down the portfolio and the CV over a pricing
     // mistake - hours of free results are recoverable, an outage on the page recruiters
     // open is not.
-    if (process.env.NODE_ENV === 'development') throw new Error(`[iq-pricing] ${message}`)
+    if (process.env.NODE_ENV === 'development')
+      throw new Error(`[iq-pricing] ${message}`)
 
     console.error(`[iq-pricing] ${message} Falling back to free results.`)
     return 0

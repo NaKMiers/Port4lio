@@ -71,45 +71,55 @@ export default async function VerifyCertificatePage({
   // Shape-check before the query so a scan never becomes a database round trip. An
   // ill-formed id is simply not a certificate, which is the same answer as an unknown one.
   const attempt = isTokenShaped(id)
-    ? await connectDatabase().then(() => IqAttemptModel.findOne({ certificateId: id }).lean())
+    ? await connectDatabase().then(() =>
+        IqAttemptModel.findOne({ certificateId: id }).lean()
+      )
     : null
 
   const valid = Boolean(attempt?.certificateName && attempt?.score !== null)
 
   return (
     <main>
-      <SectionFrame className='py-section-sm' innerClassName='max-w-2xl'>
-        <EditorialPanel variant='strong' className='p-8 text-center md:p-10'>
+      <SectionFrame
+        className="py-section-sm"
+        innerClassName="max-w-2xl"
+      >
+        <EditorialPanel
+          variant="strong"
+          className="p-8 text-center md:p-10"
+        >
           {valid && attempt ? (
             <>
               <p
-                className='font-display text-sm font-semibold uppercase tracking-[0.2em]'
+                className="font-display text-sm font-semibold uppercase tracking-[0.2em]"
                 style={{ color: '#2e8fae' }}
               >
                 {copy.certificateVerified}
               </p>
-              <p className='mt-6 font-display text-xl font-semibold text-pp-text'>
+              <p className="mt-6 font-display text-xl font-semibold text-pp-text">
                 {attempt.certificateName}
               </p>
-              <p className='mt-4 font-display text-5xl font-semibold tabular-nums text-pp-text'>
+              <p className="mt-4 font-display text-5xl font-semibold tabular-nums text-pp-text">
                 {attempt.score}
               </p>
-              <p className='mt-2 text-pp-muted'>
+              <p className="mt-2 text-pp-muted">
                 {BAND_LABELS[lang][attempt.band ?? ''] ?? attempt.band}
                 {' · '}
-                {fill(copy.percentileLabel, { percentile: attempt.percentile ?? 0 })}
+                {fill(copy.percentileLabel, {
+                  percentile: attempt.percentile ?? 0,
+                })}
               </p>
-              <p className='mt-6 font-mono text-xs text-pp-muted'>{id}</p>
+              <p className="mt-6 font-mono text-xs text-pp-muted">{id}</p>
             </>
           ) : (
-            <p className='text-pp-muted'>{copy.certificateNotFound}</p>
+            <p className="text-pp-muted">{copy.certificateNotFound}</p>
           )}
         </EditorialPanel>
 
-        <div className='mt-8 text-center text-sm'>
+        <div className="mt-8 text-center text-sm">
           <Link
             href={`/${lang}/iq`}
-            className='font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue'
+            className="font-semibold text-pp-text underline decoration-pp-blue/50 underline-offset-[0.2em] hover:decoration-pp-blue"
           >
             {copy.startTest}
           </Link>

@@ -95,11 +95,9 @@ function buildBlogSanitizeSchema(): Schema {
 export function allAttributeNames(schema: Schema): string[] {
   const names: string[] = []
 
-  for (const entry of Object.values(schema.attributes ?? {})) {
-    for (const attribute of entry ?? []) {
+  for (const entry of Object.values(schema.attributes ?? {}))
+    for (const attribute of entry ?? [])
       names.push(typeof attribute === 'string' ? attribute : attribute[0])
-    }
-  }
 
   return names
 }

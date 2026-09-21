@@ -61,9 +61,7 @@ export default async function ChoiceLayout({
 }) {
   const { lang } = await params
 
-  if (!isLocale(lang)) {
-    notFound()
-  }
+  if (!isLocale(lang)) notFound()
 
   return children
 }

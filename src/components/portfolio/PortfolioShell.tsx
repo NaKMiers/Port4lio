@@ -22,15 +22,21 @@ type PortfolioShellProps = {
 }
 
 /** One-page composition root; section surfaces use portfolio primitives + tokens. */
-export default function PortfolioShell({ profile, viewModel }: PortfolioShellProps) {
+export default function PortfolioShell({
+  profile,
+  viewModel,
+}: PortfolioShellProps) {
   return (
     <>
       {/* Floating section nav client island (Chunk 3+). */}
       <FloatingSectionNav />
       <PortfolioSectionScrollTarget />
-      <main className='relative overflow-hidden pb-[5.25rem] md:pb-0'>
+      <main className="relative overflow-hidden pb-[5.25rem] md:pb-0">
         <PortfolioBackdropOrnaments />
-        <HeroSection hero={viewModel.hero} featuredProjects={viewModel.featuredProjects.projects} />
+        <HeroSection
+          hero={viewModel.hero}
+          featuredProjects={viewModel.featuredProjects.projects}
+        />
         <SocialProofStrip socialProof={viewModel.socialProof} />
         <FounderQuoteSection founderProof={viewModel.founderProof} />
         <AboutStorySection about={viewModel.about} />
@@ -45,7 +51,7 @@ export default function PortfolioShell({ profile, viewModel }: PortfolioShellPro
           this page that shows the work rather than describing it. Renders nothing until
           there is a published post - see WritingTeaser.
         */}
-        <div className='mx-auto w-full max-w-editorial px-gutter'>
+        <div className="mx-auto w-full max-w-editorial px-gutter">
           <WritingTeaser />
         </div>
         <ContactSection profile={profile} />

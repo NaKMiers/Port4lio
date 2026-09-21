@@ -45,9 +45,12 @@ export default function AttributionBeacon({ product }: { product: string }) {
     const shareToken = new URLSearchParams(window.location.search).get('s')
     // Shape-check here too, so an obviously bogus `?s=` never costs a request. The server
     // checks again - this is a courtesy, not the control.
-    if (!shareToken || !/^[A-Za-z0-9_-]+$/.test(shareToken) || shareToken.length !== TOKEN_LENGTH) {
+    if (
+      !shareToken ||
+      !/^[A-Za-z0-9_-]+$/.test(shareToken) ||
+      shareToken.length !== TOKEN_LENGTH
+    )
       return
-    }
 
     sent.current = true
     void fetch('/api/event', {

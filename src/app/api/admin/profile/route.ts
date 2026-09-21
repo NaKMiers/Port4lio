@@ -16,20 +16,21 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const authCookie = request.cookies.get(getAuthCookieName())?.value
-    if (!hasOwnerAccess(authCookie)) {
+    if (!hasOwnerAccess(authCookie))
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     await connectDatabase()
     const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).lean()
-    if (!doc) {
-      return NextResponse.json({ profile: null })
-    }
+    if (!doc) return NextResponse.json({ profile: null })
 
-    const { _id, createdAt, updatedAt, ...profile } = doc as Record<string, unknown>
+    const { _id, createdAt, updatedAt, ...profile } = doc as Record<
+      string,
+      unknown
+    >
     return NextResponse.json({ profile })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown server error'
+    const message =
+      error instanceof Error ? error.message : 'Unknown server error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

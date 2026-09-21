@@ -27,7 +27,11 @@ const failedCls =
 export default function DriftBadge({ drift }: { drift: PublishDrift }) {
   if (drift.lastResult === 'failed') {
     const when = formatDate(drift.lastRunAt)
-    return <span className={failedCls}>Last run failed{when ? ` · ${when}` : ''}</span>
+    return (
+      <span className={failedCls}>
+        Last run failed{when ? ` · ${when}` : ''}
+      </span>
+    )
   }
 
   if (drift.inSync) {
@@ -38,9 +42,8 @@ export default function DriftBadge({ drift }: { drift: PublishDrift }) {
   const changed = formatDate(drift.driftSince)
   const pasted = formatDate(drift.ackedAt)
 
-  if (!drift.ackedVersion) {
+  if (!drift.ackedVersion)
     return <span className={driftCls}>Never published</span>
-  }
 
   return (
     <span className={driftCls}>

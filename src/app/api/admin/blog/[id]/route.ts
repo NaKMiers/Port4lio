@@ -126,14 +126,18 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   }
 
   const limit = await checkRateLimit(clientIpFrom(request), BLOG_SAVE_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Saving too fast - the editor is retrying. Give it a moment.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
-  const parsed = await readJsonBody<PatchBody>(request, { maxBytes: PATCH_MAX_BODY_BYTES })
+  const parsed = await readJsonBody<PatchBody>(request, {
+    maxBytes: PATCH_MAX_BODY_BYTES,
+  })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
   const body = parsed.body ?? {}
@@ -152,21 +156,26 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
      * the question actually being asked.
      */
     if (typeof body.slug === 'string' && body.slug !== post.slug) {
-      if (post.publishedAt !== null) {
+      if (post.publishedAt !== null)
         return jsonError(
           'This post has been published, so its slug is frozen. Changing it would 404 every link and feed entry pointing at the old URL.',
           409
         )
-      }
-      if (!SLUG_PATTERN.test(body.slug)) {
-        return jsonError('Slug must match ^[a-z0-9-]{1,80}$.', 400)
-      }
-      if (isReservedSlug(body.slug)) {
-        return jsonError(`"${body.slug}" is reserved by a route and cannot be a post slug.`, 400)
-      }
 
-      const clash = await PostModel.findOne({ slug: body.slug }).select('_id').lean()
-      if (clash) return jsonError(`The slug "${body.slug}" is already taken.`, 409)
+      if (!SLUG_PATTERN.test(body.slug))
+        return jsonError('Slug must match ^[a-z0-9-]{1,80}$.', 400)
+
+      if (isReservedSlug(body.slug))
+        return jsonError(
+          `"${body.slug}" is reserved by a route and cannot be a post slug.`,
+          400
+        )
+
+      const clash = await PostModel.findOne({ slug: body.slug })
+        .select('_id')
+        .lean()
+      if (clash)
+        return jsonError(`The slug "${body.slug}" is already taken.`, 409)
 
       post.slug = body.slug
     }
@@ -188,15 +197,18 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
      * narrow case became the common one.
      */
     if (body.status && body.status !== post.status) {
-      if (post.status === 'archived' && body.status === 'draft' && post.publishedAt !== null) {
+      if (
+        post.status === 'archived' &&
+        body.status === 'draft' &&
+        post.publishedAt !== null
+      )
         return jsonError(
           'An archived post cannot go back to draft. Publish it again to make it live, or leave it archived - draft is the state where slugs are editable, and this URL has been public.',
           409
         )
-      }
-      if (body.status === 'deleted') {
+
+      if (body.status === 'deleted')
         return jsonError('Use DELETE to remove a post.', 400)
-      }
 
       post.status = body.status
     }
@@ -212,7 +224,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     if (typeof body.title === 'string') post.title = body.title.trim()
     if (typeof body.excerpt === 'string') post.excerpt = body.excerpt.trim()
-    if (typeof body.bodyMarkdown === 'string') post.bodyMarkdown = body.bodyMarkdown
+    if (typeof body.bodyMarkdown === 'string')
+      post.bodyMarkdown = body.bodyMarkdown
     /*
       The cover is the one image URL that reaches a reader WITHOUT passing the markdown
       pipeline, so the allowlist has to be applied here by hand.
@@ -227,18 +240,18 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       `null` still clears it. `isAllowedImageUrl` is the same predicate the renderer uses, so
       there is one definition of "an image we will serve".
     */
-    if (body.coverImage === null) {
-      post.coverImage = null
-    } else if (typeof body.coverImage === 'string') {
-      if (body.coverImage !== '' && !isAllowedImageUrl(body.coverImage)) {
+    if (body.coverImage === null) post.coverImage = null
+    else if (typeof body.coverImage === 'string') {
+      if (body.coverImage !== '' && !isAllowedImageUrl(body.coverImage))
         return jsonError(
           'The cover image must be uploaded through this editor. An off-site URL is refused by the renderer and would leak every reader to a third party.',
           400
         )
-      }
+
       post.coverImage = body.coverImage
     }
-    if (typeof body.coverCaption === 'string') post.coverCaption = body.coverCaption
+    if (typeof body.coverCaption === 'string')
+      post.coverCaption = body.coverCaption
     /*
       Image prompts, and note what is NOT below: neither of these is in `beforeContent`, so
       neither moves `contentUpdatedAt`.
@@ -250,9 +263,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       document's freshness date for it would be telling crawlers the post changed when nothing
       a crawler can read did.
     */
-    if (typeof body.coverImagePrompt === 'string') {
+    if (typeof body.coverImagePrompt === 'string')
       post.coverImagePrompt = normaliseImagePrompt(body.coverImagePrompt)
-    }
+
     if (Array.isArray(body.imagePrompts)) {
       /*
         Refused rather than truncated, and the key pattern is enforced.
@@ -268,22 +281,27 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         save, surfacing raw mongoose text like "Path `key` is required" to the client - and
         nothing bounded its length, so twelve 40KB keys were storable.
       */
-      if (body.imagePrompts.length > MAX_IMAGE_PROMPTS) {
+      if (body.imagePrompts.length > MAX_IMAGE_PROMPTS)
         return jsonError(
           `A post can carry at most ${MAX_IMAGE_PROMPTS} image prompts, and this save has ${body.imagePrompts.length}. Remove some placeholders from the body first.`,
           409
         )
-      }
+
       const malformed = body.imagePrompts.find(
         entry =>
           !entry ||
           typeof entry !== 'object' ||
           !/^image\d+$/.test(String((entry as { key?: unknown }).key ?? ''))
       )
-      if (malformed !== undefined) {
-        return jsonError('Every image prompt must be keyed to an "imageN" placeholder.', 400)
-      }
-      post.imagePrompts = (body.imagePrompts as { key: string; prompt: string }[]).map(entry => ({
+      if (malformed !== undefined)
+        return jsonError(
+          'Every image prompt must be keyed to an "imageN" placeholder.',
+          400
+        )
+
+      post.imagePrompts = (
+        body.imagePrompts as { key: string; prompt: string }[]
+      ).map(entry => ({
         key: entry.key,
         prompt: normaliseImagePrompt(entry.prompt),
       }))
@@ -295,9 +313,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       that is saving. Silently dropping the value would report success and change nothing.
     */
     if (typeof body.kind === 'string') {
-      if (!(await kindExists(body.kind))) {
-        return jsonError(`"${body.kind}" is not a kind. It may have been deleted.`, 400)
-      }
+      if (!(await kindExists(body.kind)))
+        return jsonError(
+          `"${body.kind}" is not a kind. It may have been deleted.`,
+          400
+        )
+
       post.kind = body.kind
     }
     if (body.series === null) post.series = null
@@ -314,13 +335,17 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       unchanged, and the author would have no way to tell.
     */
     if (typeof body.series === 'string') {
-      if (!(await seriesExists(body.series))) {
-        return jsonError(`"${body.series}" is not a series. It may have been deleted.`, 400)
-      }
+      if (!(await seriesExists(body.series)))
+        return jsonError(
+          `"${body.series}" is not a series. It may have been deleted.`,
+          400
+        )
+
       post.series = body.series
     }
     if (typeof body.isPillar === 'boolean') post.isPillar = body.isPillar
-    if (body.language === 'vi' || body.language === 'en') post.language = body.language
+    if (body.language === 'vi' || body.language === 'en')
+      post.language = body.language
     if (Array.isArray(body.tags)) post.tags = body.tags
     if (Array.isArray(body.relatedSlugs)) post.relatedSlugs = body.relatedSlugs
 
@@ -343,7 +368,10 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
      * which pipeline version produced this HTML, so a future change to the renderer has a
      * way to find every post whose stored output is stale.
      */
-    if (post.bodyMarkdown !== beforeContent.bodyMarkdown || post.renderedWith !== BLOG_PIPELINE_VERSION) {
+    if (
+      post.bodyMarkdown !== beforeContent.bodyMarkdown ||
+      post.renderedWith !== BLOG_PIPELINE_VERSION
+    ) {
       post.bodyHtml = await renderMarkdown(post.bodyMarkdown, post.slug)
       post.renderedWith = BLOG_PIPELINE_VERSION
     }
@@ -358,9 +386,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
      * crawler that learns the field lies stops using it, and then a post that genuinely
      * changed gets ignored too.
      */
-    if (contentChanged) {
-      post.contentUpdatedAt = new Date()
-    }
+    if (contentChanged) post.contentUpdatedAt = new Date()
 
     /**
      * `publishedAt` is stamped once and never reset.
@@ -370,9 +396,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
      * every feed reader that a months-old post is new - and it would also unfreeze nothing,
      * since the slug guard reads this exact field.
      */
-    if (post.status === 'published' && post.publishedAt === null) {
+    if (post.status === 'published' && post.publishedAt === null)
       post.publishedAt = new Date()
-    }
 
     await post.save()
 
@@ -382,17 +407,17 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ ok: true, slug: post.slug, status: post.status })
   } catch (error) {
-    if (error instanceof mongoose.Error.ValidationError) {
+    if (error instanceof mongoose.Error.ValidationError)
       return jsonError(error.message, 400)
-    }
-    if ((error as { code?: number }).code === 11000) {
+
+    if ((error as { code?: number }).code === 11000)
       // The pillar index, almost always. Named, because "E11000 duplicate key" tells an
       // author nothing about which rule they hit.
       return jsonError(
         'That series already has a pillar post. A series can have at most one hub.',
         409
       )
-    }
+
     console.error('[api/admin/blog/[id]] save failed', error)
     return jsonError('Unable to save the post right now.', 500)
   }
@@ -449,7 +474,8 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   if (denied) return denied
 
   const permanent = request.nextUrl.searchParams.get('permanent') === 'true'
-  const acknowledged = request.nextUrl.searchParams.get('acknowledge') === 'true'
+  const acknowledged =
+    request.nextUrl.searchParams.get('acknowledge') === 'true'
 
   try {
     await connectDatabase()
@@ -475,15 +501,16 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       reached in one call from any state a live post is in - not by a mistyped query string,
       not by a script, not by a stale tab holding a published post's id.
     */
-    if (post.status !== 'deleted') {
+    if (post.status !== 'deleted')
       return jsonError(
         'Delete the post first. Permanent removal is only available for a post that is already deleted.',
         409
       )
-    }
 
-    const contactMessages = await ContactMessageModel.countDocuments({ sourceSlug: post.slug })
-    if (contactMessages > 0 && !acknowledged) {
+    const contactMessages = await ContactMessageModel.countDocuments({
+      sourceSlug: post.slug,
+    })
+    if (contactMessages > 0 && !acknowledged)
       // Not an error the owner cannot pass - a number they have to see first. The client
       // re-sends with `acknowledge=true` after showing it.
       return NextResponse.json(
@@ -493,7 +520,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
         },
         { status: 409 }
       )
-    }
 
     /*
       Order matters, and it is post-first.
@@ -545,7 +571,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       revalidatePublishedPost(post.slug)
     } catch (error) {
       revalidated = false
-      console.error('[api/admin/blog/[id]] purged but could not revalidate', error)
+      console.error(
+        '[api/admin/blog/[id]] purged but could not revalidate',
+        error
+      )
     }
 
     return NextResponse.json({

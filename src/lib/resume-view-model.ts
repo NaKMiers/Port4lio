@@ -86,24 +86,37 @@ export function flattenResume(resume: Resume): ResumePrintItem[] {
  */
 export function locateResumeItems(resume: Resume): LocatedResumeItem[] {
   const out: LocatedResumeItem[] = []
-  const push = (item: ResumePrintItem, at = NOT_A_PROJECT) => out.push({ item, ...at })
+  const push = (item: ResumePrintItem, at = NOT_A_PROJECT) =>
+    out.push({ item, ...at })
   const lastItem = () => out[out.length - 1]?.item
 
-  for (const key of normalizeResumeSectionOrder(resume.sectionOrder)) {
+  for (const key of normalizeResumeSectionOrder(resume.sectionOrder))
     switch (key) {
       case 'summary':
-        push({ kind: 'sectionHeading', text: resume.summary.heading, gap: headingGap(lastItem()) })
+        push({
+          kind: 'sectionHeading',
+          text: resume.summary.heading,
+          gap: headingGap(lastItem()),
+        })
         push({ kind: 'text', lines: resume.summary.lines, justify: true })
         break
 
       case 'education':
-        push({ kind: 'sectionHeading', text: resume.education.heading, gap: headingGap(lastItem()) })
+        push({
+          kind: 'sectionHeading',
+          text: resume.education.heading,
+          gap: headingGap(lastItem()),
+        })
         push({ kind: 'text', lines: resume.education.lines, justify: false })
         break
 
       case 'skills':
         for (const block of resume.skillBlocks ?? []) {
-          push({ kind: 'sectionHeading', text: block.heading, gap: headingGap(lastItem()) })
+          push({
+            kind: 'sectionHeading',
+            text: block.heading,
+            gap: headingGap(lastItem()),
+          })
           push({ kind: 'skillRows', rows: block.rows ?? [] })
         }
         break
@@ -114,31 +127,39 @@ export function locateResumeItems(resume: Resume): LocatedResumeItem[] {
           text: resume.certifications.heading,
           gap: headingGap(lastItem()),
         })
-        push({ kind: 'certifications', groups: resume.certifications.groups ?? [] })
+        push({
+          kind: 'certifications',
+          groups: resume.certifications.groups ?? [],
+        })
         break
 
       case 'projects':
         pushProjects(resume, push, lastItem)
         break
     }
-  }
 
   return out
 }
 
 function pushProjects(
   resume: Resume,
-  push: (item: ResumePrintItem, at?: { sectionIndex: number; projectIndex: number }) => void,
+  push: (
+    item: ResumePrintItem,
+    at?: { sectionIndex: number; projectIndex: number }
+  ) => void,
   lastItem: () => ResumePrintItem | undefined
 ) {
   ;(resume.projectSections ?? []).forEach((section, sectionIndex) => {
     const items = Array.isArray(section.items) ? section.items : []
-    if (section.heading) {
+    if (section.heading)
       push(
-        { kind: 'sectionHeading', text: section.heading, gap: headingGap(lastItem()) },
+        {
+          kind: 'sectionHeading',
+          text: section.heading,
+          gap: headingGap(lastItem()),
+        },
         { sectionIndex, projectIndex: 0 }
       )
-    }
 
     items.forEach((project, projectIndex) => {
       const at = { sectionIndex, projectIndex }
@@ -157,7 +178,8 @@ function pushProjects(
       if (details.length > 0) push({ kind: 'details', lines: details }, at)
 
       const highlights = (project.highlights ?? []).filter(Boolean)
-      if (highlights.length > 0) push({ kind: 'highlights', lines: highlights }, at)
+      if (highlights.length > 0)
+        push({ kind: 'highlights', lines: highlights }, at)
 
       const links = (project.demoLinks ?? []).filter(link => link?.href)
       if (links.length > 0) push({ kind: 'demo', links }, at)
@@ -174,11 +196,12 @@ function pushProjects(
  */
 export function planResumeSheets(resume: Resume): ResumeSheetPlan {
   const located = locateResumeItems(resume)
-  const { sectionIndex, projectIndex, highlightsOnFirstSheet } = resume.pageBreak ?? {
-    sectionIndex: 0,
-    projectIndex: 0,
-    highlightsOnFirstSheet: 0,
-  }
+  const { sectionIndex, projectIndex, highlightsOnFirstSheet } =
+    resume.pageBreak ?? {
+      sectionIndex: 0,
+      projectIndex: 0,
+      highlightsOnFirstSheet: 0,
+    }
 
   const breakAt = located.findIndex(
     entry =>
@@ -193,7 +216,8 @@ export function planResumeSheets(resume: Resume): ResumeSheetPlan {
       entry =>
         entry.item.kind === 'projectHead' &&
         (entry.sectionIndex > sectionIndex ||
-          (entry.sectionIndex === sectionIndex && entry.projectIndex >= projectIndex))
+          (entry.sectionIndex === sectionIndex &&
+            entry.projectIndex >= projectIndex))
     )
     const cut = fallback === -1 ? located.length : fallback
     return {
@@ -204,13 +228,17 @@ export function planResumeSheets(resume: Resume): ResumeSheetPlan {
 
   const target = located[breakAt].item
   const lines = target.kind === 'highlights' ? target.lines : []
-  const keep = Math.max(0, Math.min(Math.trunc(highlightsOnFirstSheet) || 0, lines.length))
+  const keep = Math.max(
+    0,
+    Math.min(Math.trunc(highlightsOnFirstSheet) || 0, lines.length)
+  )
 
   const first = located.slice(0, breakAt).map(entry => entry.item)
   const second: ResumePrintItem[] = []
 
   if (keep > 0) first.push({ kind: 'highlights', lines: lines.slice(0, keep) })
-  if (keep < lines.length) second.push({ kind: 'highlights', lines: lines.slice(keep) })
+  if (keep < lines.length)
+    second.push({ kind: 'highlights', lines: lines.slice(keep) })
 
   second.push(...located.slice(breakAt + 1).map(entry => entry.item))
 
@@ -230,7 +258,10 @@ export function planResumeSheets(resume: Resume): ResumeSheetPlan {
  * here, so callers that only need the stored intent - the settings editor, which saves
  * whatever this returns - keep seeing the empty "inherit" value.
  */
-export function deriveResume(profile: Pick<Profile, 'resume'>, fallbackPhoto?: string): Resume {
+export function deriveResume(
+  profile: Pick<Profile, 'resume'>,
+  fallbackPhoto?: string
+): Resume {
   const resume = profile.resume ?? RESUME_SEED
   const photo = resume.photo || fallbackPhoto || ''
 

@@ -28,7 +28,8 @@ import {
  */
 
 const SEEDS = Array.from({ length: 40 }, (_, i) => i * 6151 + 17)
-const mean = (values: number[]) => values.reduce((sum, n) => sum + n, 0) / values.length
+const mean = (values: number[]) =>
+  values.reduce((sum, n) => sum + n, 0) / values.length
 
 describe('the ladder table', () => {
   it('has one row per item', () => {
@@ -49,7 +50,8 @@ describe('the ladder table', () => {
      * those fold into the matrix count and one - their item 26 - is a four-box sequence,
      * which is exactly what `1x3-sequence` is, so it counts as the ninth sequence here.
      */
-    const count = (id: string) => LADDER.filter(profile => profile.layout.id === id).length
+    const count = (id: string) =>
+      LADDER.filter(profile => profile.layout.id === id).length
     expect(count('3x3-matrix')).toBe(16)
     expect(count('1x3-sequence')).toBe(9)
     expect(count('2x2-matrix')).toBe(1)
@@ -65,12 +67,16 @@ describe('the ladder table', () => {
   it('introduces the sequence layout partway in, not at the start', () => {
     // Three given cells confirm a rule once where nine confirm it twice, so a sequence is a
     // harder container for the same rule. Opening the test with one would misgrade item 1.
-    const first = LADDER.findIndex(profile => profile.layout.id === '1x3-sequence')
+    const first = LADDER.findIndex(
+      profile => profile.layout.id === '1x3-sequence'
+    )
     expect(first + 1).toBe(9)
   })
 
   it('puts most of the tail in sequences', () => {
-    const tail = LADDER.slice(18).filter(profile => profile.layout.id === '1x3-sequence')
+    const tail = LADDER.slice(18).filter(
+      profile => profile.layout.id === '1x3-sequence'
+    )
     expect(tail.length).toBeGreaterThanOrEqual(5)
   })
 
@@ -100,7 +106,10 @@ describe('the ladder table', () => {
       values.forEach((value, index) => {
         const previous = high
         high = Math.max(high, value)
-        expect(high, `${name} envelope fell at rung ${index + 1}`).toBeGreaterThanOrEqual(previous)
+        expect(
+          high,
+          `${name} envelope fell at rung ${index + 1}`
+        ).toBeGreaterThanOrEqual(previous)
       })
       // ...and it must actually climb, not merely refuse to fall.
       expect(Math.max(...values), name).toBeGreaterThan(values[0] as number)
@@ -120,9 +129,10 @@ describe('the ladder table', () => {
     for (const rung of [12, 18, 21]) {
       const here = LADDER[rung - 1] as RungProfile
       const before = LADDER[rung - 2] as RungProfile
-      expect(difficultyIndex(here), `rung ${rung} should be a dip`).toBeLessThan(
-        difficultyIndex(before)
-      )
+      expect(
+        difficultyIndex(here),
+        `rung ${rung} should be a dip`
+      ).toBeLessThan(difficultyIndex(before))
     }
   })
 
@@ -148,21 +158,22 @@ describe('the ladder table', () => {
     // A single cyclic dimension over three cells has no determined continuation: the cycle
     // reading and the palindrome reading both fit. A co-active ordinal dimension is what
     // pins the direction, so a one-dimension sequence must not exist.
-    for (const profile of LADDER) {
-      if (profile.layout.id === '1x3-sequence') {
-        expect(profile.dimensions, `rung ${profile.rung}`).toBeGreaterThanOrEqual(2)
-      }
-    }
+    for (const profile of LADDER)
+      if (profile.layout.id === '1x3-sequence')
+        expect(
+          profile.dimensions,
+          `rung ${profile.rung}`
+        ).toBeGreaterThanOrEqual(2)
   })
 
   it('keeps the weakest layout out of the hardest slots', () => {
     // A 2x2 gives a row step and a column step and confirms neither, so it cannot honestly
     // carry three simultaneous dimensions.
-    for (const profile of LADDER) {
-      if (profile.layout.id === '2x2-matrix') {
-        expect(profile.dimensions, `rung ${profile.rung}`).toBeLessThanOrEqual(2)
-      }
-    }
+    for (const profile of LADDER)
+      if (profile.layout.id === '2x2-matrix')
+        expect(profile.dimensions, `rung ${profile.rung}`).toBeLessThanOrEqual(
+          2
+        )
   })
 
   it('never asks for more decoys than its composition can afford', () => {
@@ -175,16 +186,18 @@ describe('the ladder table', () => {
      * impossible". It cost real debugging time before it was written down, which is the
      * argument for asserting it rather than remembering it.
      */
-    for (const profile of LADDER) {
-      expect(profile.decoys, `rung ${profile.rung} wants more decoys than depth affords`)
-        .toBeLessThanOrEqual(profile.composition)
-    }
+    for (const profile of LADDER)
+      expect(
+        profile.decoys,
+        `rung ${profile.rung} wants more decoys than depth affords`
+      ).toBeLessThanOrEqual(profile.composition)
   })
 
   it('does not leave an easy slot at the very end', () => {
-    for (const profile of LADDER.slice(19)) {
-      expect(profile.dimensions, `rung ${profile.rung}`).toBeGreaterThanOrEqual(2)
-    }
+    for (const profile of LADDER.slice(19))
+      expect(profile.dimensions, `rung ${profile.rung}`).toBeGreaterThanOrEqual(
+        2
+      )
   })
 })
 
@@ -197,7 +210,8 @@ describe('canFill', () => {
   }
 
   it('accepts a family that can carry everything', () => {
-    for (const profile of LADDER) expect(canFill(permissive, profile)).toBe(true)
+    for (const profile of LADDER)
+      expect(canFill(permissive, profile)).toBe(true)
   })
 
   it('rejects on each capability independently', () => {
@@ -205,18 +219,27 @@ describe('canFill', () => {
     // last, is three-dimension, and is a sequence; rung 19 is where the deepest composition
     // sits now that the ladder mirrors the reference's ordering.
     const last = profileFor(26)
-    expect(canFill({ ...permissive, rungs: { min: 1, max: 20 } }, last)).toBe(false)
+    expect(canFill({ ...permissive, rungs: { min: 1, max: 20 } }, last)).toBe(
+      false
+    )
     expect(canFill({ ...permissive, maxDimensions: 2 }, last)).toBe(false)
-    expect(canFill({ ...permissive, layouts: ['3x3-matrix'] }, last)).toBe(false)
+    expect(canFill({ ...permissive, layouts: ['3x3-matrix'] }, last)).toBe(
+      false
+    )
 
     const deepest = profileFor(19)
     expect(deepest.composition).toBe(3)
-    expect(canFill({ ...permissive, composition: { min: 0, max: 2 } }, deepest)).toBe(false)
+    expect(
+      canFill({ ...permissive, composition: { min: 0, max: 2 } }, deepest)
+    ).toBe(false)
   })
 
   it('honours a maximum rung, which v1 had no way to express', () => {
     // The gap that let rung 26 draw the most trivial family in the vocabulary.
-    const easyOnly: RuleCapabilities = { ...permissive, rungs: { min: 1, max: 12 } }
+    const easyOnly: RuleCapabilities = {
+      ...permissive,
+      rungs: { min: 1, max: 12 },
+    }
     expect(canFill(easyOnly, profileFor(12))).toBe(true)
     expect(canFill(easyOnly, profileFor(13))).toBe(false)
   })
@@ -229,16 +252,66 @@ describe('planFamilies', () => {
    * constraints are a property of the planner, not of any particular rule set.
    */
   const CAPS: Record<string, RuleCapabilities> = {
-    alpha: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'], composition: { min: 0, max: 3 } },
-    beta: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'], composition: { min: 0, max: 3 } },
-    gamma: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence'], composition: { min: 0, max: 3 } },
-    delta: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '2x2-matrix'], composition: { min: 0, max: 3 } },
-    epsilon: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'], composition: { min: 0, max: 3 } },
-    zeta: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence'], composition: { min: 0, max: 3 } },
-    eta: { rungs: { min: 14, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence'], composition: { min: 1, max: 3 } },
-    theta: { rungs: { min: 14, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix'], composition: { min: 2, max: 3 } },
-    iota: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'], composition: { min: 0, max: 3 } },
-    kappa: { rungs: { min: 1, max: 26 }, maxDimensions: 3, layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'], composition: { min: 0, max: 3 } },
+    alpha: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'],
+      composition: { min: 0, max: 3 },
+    },
+    beta: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'],
+      composition: { min: 0, max: 3 },
+    },
+    gamma: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence'],
+      composition: { min: 0, max: 3 },
+    },
+    delta: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '2x2-matrix'],
+      composition: { min: 0, max: 3 },
+    },
+    epsilon: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'],
+      composition: { min: 0, max: 3 },
+    },
+    zeta: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence'],
+      composition: { min: 0, max: 3 },
+    },
+    eta: {
+      rungs: { min: 14, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence'],
+      composition: { min: 1, max: 3 },
+    },
+    theta: {
+      rungs: { min: 14, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix'],
+      composition: { min: 2, max: 3 },
+    },
+    iota: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'],
+      composition: { min: 0, max: 3 },
+    },
+    kappa: {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ['3x3-matrix', '1x3-sequence', '2x2-matrix'],
+      composition: { min: 0, max: 3 },
+    },
   }
 
   const QUOTA: Record<string, number> = {
@@ -257,7 +330,10 @@ describe('planFamilies', () => {
   const eligible = (family: string, profile: RungProfile) =>
     canFill(CAPS[family] as RuleCapabilities, profile)
 
-  const plans = SEEDS.map(seed => ({ seed, plan: planFamilies(seed, { weights: QUOTA, eligible }) }))
+  const plans = SEEDS.map(seed => ({
+    seed,
+    plan: planFamilies(seed, { weights: QUOTA, eligible }),
+  }))
 
   it('assigns exactly one family per item', () => {
     for (const { seed, plan } of plans) {
@@ -275,46 +351,53 @@ describe('planFamilies', () => {
      * A share target rather than an exact count, because exact counts turned planning into a
      * 3.8-million-node search whose only solutions were rigidly periodic. See `weights`.
      */
-    for (const { seed, plan } of plans) {
-      expect(new Set(plan).size, `seed ${seed} used too few families`).toBeGreaterThanOrEqual(
-        Math.min(7, Object.keys(QUOTA).length)
-      )
-    }
+    for (const { seed, plan } of plans)
+      expect(
+        new Set(plan).size,
+        `seed ${seed} used too few families`
+      ).toBeGreaterThanOrEqual(Math.min(7, Object.keys(QUOTA).length))
   })
 
   it('tracks the weights without being told exact counts', () => {
     // Proportionality has to emerge from the local least-used-relative-to-weight rule, or the
     // weights are decoration. Checked in aggregate, since one 26-item test is a small sample.
     const totals: Record<string, number> = {}
-    for (const { plan } of plans) for (const family of plan) totals[family] = (totals[family] ?? 0) + 1
+    for (const { plan } of plans)
+      for (const family of plan) totals[family] = (totals[family] ?? 0) + 1
 
-    const heaviest = Object.keys(QUOTA).sort((a, b) => (QUOTA[b] ?? 0) - (QUOTA[a] ?? 0))[0] as string
-    const lightest = Object.keys(QUOTA).sort((a, b) => (QUOTA[a] ?? 0) - (QUOTA[b] ?? 0))[0] as string
+    const heaviest = Object.keys(QUOTA).sort(
+      (a, b) => (QUOTA[b] ?? 0) - (QUOTA[a] ?? 0)
+    )[0] as string
+    const lightest = Object.keys(QUOTA).sort(
+      (a, b) => (QUOTA[a] ?? 0) - (QUOTA[b] ?? 0)
+    )[0] as string
     expect(totals[heaviest] ?? 0).toBeGreaterThan(totals[lightest] ?? 0)
   })
 
   it('caps how often one family can appear', () => {
     // The constraint that alone would have prevented the nine-of-26 bug.
-    for (const { seed, plan } of plans) {
-      for (const family of Array.from(new Set(plan))) {
-        expect(plan.filter(name => name === family).length, `${family} on seed ${seed}`)
-          .toBeLessThanOrEqual(MAX_PER_FAMILY)
-      }
-    }
+    for (const { seed, plan } of plans)
+      for (const family of Array.from(new Set(plan)))
+        expect(
+          plan.filter(name => name === family).length,
+          `${family} on seed ${seed}`
+        ).toBeLessThanOrEqual(MAX_PER_FAMILY)
   })
 
   it('spaces repeats out so the test does not feel repetitive locally', () => {
     // Global counts can be perfect while three of one family land back to back, which reads
     // as "the same question again" even when the totals say otherwise.
-    for (const { seed, plan } of plans) {
-      for (let i = 0; i < plan.length; i += 1) {
-        for (let j = i + 1; j < Math.min(i + FAMILY_SPACING, plan.length); j += 1) {
-          expect(plan[i], `seed ${seed}: ${plan[i]} repeats at ${i + 1} and ${j + 1}`).not.toBe(
-            plan[j]
-          )
-        }
-      }
-    }
+    for (const { seed, plan } of plans)
+      for (let i = 0; i < plan.length; i += 1)
+        for (
+          let j = i + 1;
+          j < Math.min(i + FAMILY_SPACING, plan.length);
+          j += 1
+        )
+          expect(
+            plan[i],
+            `seed ${seed}: ${plan[i]} repeats at ${i + 1} and ${j + 1}`
+          ).not.toBe(plan[j])
   })
 
   it('shares the sequence slots around', () => {
@@ -323,39 +406,44 @@ describe('planFamilies', () => {
     for (const { seed, plan } of plans) {
       const tally: Record<string, number> = {}
       plan.forEach((family, index) => {
-        if (LADDER[index]?.layout.id === '1x3-sequence') tally[family] = (tally[family] ?? 0) + 1
+        if (LADDER[index]?.layout.id === '1x3-sequence')
+          tally[family] = (tally[family] ?? 0) + 1
       })
-      for (const [family, count] of Object.entries(tally)) {
-        expect(count, `${family} on seed ${seed}`).toBeLessThanOrEqual(MAX_SEQUENCE_PER_FAMILY)
-      }
+      for (const [family, count] of Object.entries(tally))
+        expect(count, `${family} on seed ${seed}`).toBeLessThanOrEqual(
+          MAX_SEQUENCE_PER_FAMILY
+        )
     }
   })
 
   it('only ever assigns a family to a rung it can actually fill', () => {
-    for (const { seed, plan } of plans) {
+    for (const { seed, plan } of plans)
       plan.forEach((family, index) => {
         const profile = LADDER[index] as RungProfile
-        expect(eligible(family, profile), `${family} at rung ${index + 1} on seed ${seed}`).toBe(
-          true
-        )
+        expect(
+          eligible(family, profile),
+          `${family} at rung ${index + 1} on seed ${seed}`
+        ).toBe(true)
       })
-    }
   })
 
   it('varies the plan across seeds', () => {
     // A deterministic planner that ignored its seed would satisfy every constraint above and
     // hand every taker the same test.
-    expect(new Set(plans.map(({ plan }) => plan.join(','))).size).toBeGreaterThan(SEEDS.length / 2)
+    expect(
+      new Set(plans.map(({ plan }) => plan.join(','))).size
+    ).toBeGreaterThan(SEEDS.length / 2)
   })
 
   it('is deterministic for one seed', () => {
-    for (const { seed, plan } of plans.slice(0, 5)) {
+    for (const { seed, plan } of plans.slice(0, 5))
       expect(planFamilies(seed, { weights: QUOTA, eligible })).toEqual(plan)
-    }
   })
 
   it('throws with no vocabulary at all', () => {
-    expect(() => planFamilies(1, { weights: {}, eligible })).toThrow(/no families/)
+    expect(() => planFamilies(1, { weights: {}, eligible })).toThrow(
+      /no families/
+    )
   })
 
   it('relaxes spacing rather than refusing to build a test', () => {

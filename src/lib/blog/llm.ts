@@ -55,7 +55,10 @@ const DEFAULT_BASE_URL = 'https://9router-server.tail1e90ee.ts.net'
  */
 const DEFAULT_TIMEOUT_MS = 180_000
 
-export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
+export type ChatMessage = {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
 
 export type ChatUsage = {
   promptTokens: number
@@ -100,12 +103,11 @@ function baseUrl(): string {
  * points at the cause. Naming it costs four lines.
  */
 function assertNotStreamed(contentType: string | null, raw: string): void {
-  if (contentType?.includes('text/event-stream') || raw.startsWith('data:')) {
+  if (contentType?.includes('text/event-stream') || raw.startsWith('data:'))
     throw new LlmError(
       'The model endpoint streamed its reply. It was asked not to - `stream: false` is set on every request - so the router changed its default.',
       null
     )
-  }
 }
 
 export async function chatCompletion({
@@ -150,12 +152,12 @@ export async function chatCompletion({
       cache: 'no-store',
     })
   } catch (error) {
-    if (error instanceof Error && error.name === 'TimeoutError') {
+    if (error instanceof Error && error.name === 'TimeoutError')
       throw new LlmError(
         `The model did not answer within ${Math.round(timeoutMs / 1000)}s. A shorter post, or a faster model, usually gets through.`,
         null
       )
-    }
+
     // Deliberately not `String(error)`: a fetch failure can carry the URL, and the URL is a
     // private tailnet host.
     console.error('[blog/llm] request failed', error)
@@ -165,14 +167,26 @@ export async function chatCompletion({
   const raw = await response.text()
 
   if (!response.ok) {
-    console.error(`[blog/llm] ${response.status} from the router`, raw.slice(0, 500))
-    if (response.status === 401 || response.status === 403) {
-      throw new LlmError('The model endpoint refused our key. Check LLM_API_KEY.', response.status)
-    }
-    if (response.status === 429) {
-      throw new LlmError('The model endpoint is rate limiting us. Try again shortly.', 429)
-    }
-    throw new LlmError(`The model endpoint returned ${response.status}.`, response.status)
+    console.error(
+      `[blog/llm] ${response.status} from the router`,
+      raw.slice(0, 500)
+    )
+    if (response.status === 401 || response.status === 403)
+      throw new LlmError(
+        'The model endpoint refused our key. Check LLM_API_KEY.',
+        response.status
+      )
+
+    if (response.status === 429)
+      throw new LlmError(
+        'The model endpoint is rate limiting us. Try again shortly.',
+        429
+      )
+
+    throw new LlmError(
+      `The model endpoint returned ${response.status}.`,
+      response.status
+    )
   }
 
   assertNotStreamed(response.headers.get('content-type'), raw.trimStart())
@@ -180,19 +194,25 @@ export async function chatCompletion({
   let payload: {
     model?: unknown
     choices?: { message?: { content?: unknown } }[]
-    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown }
+    usage?: {
+      prompt_tokens?: unknown
+      completion_tokens?: unknown
+      total_tokens?: unknown
+    }
   }
   try {
     payload = JSON.parse(raw)
   } catch {
     console.error('[blog/llm] unparseable body', raw.slice(0, 500))
-    throw new LlmError('The model endpoint returned something that was not JSON.', null)
+    throw new LlmError(
+      'The model endpoint returned something that was not JSON.',
+      null
+    )
   }
 
   const text = payload.choices?.[0]?.message?.content
-  if (typeof text !== 'string' || !text.trim()) {
+  if (typeof text !== 'string' || !text.trim())
     throw new LlmError('The model returned an empty reply.', null)
-  }
 
   return {
     text,
@@ -240,9 +260,9 @@ export function extractJsonObject(text: string): Record<string, unknown> {
   if (!candidate.startsWith('{')) {
     const start = candidate.indexOf('{')
     const end = candidate.lastIndexOf('}')
-    if (start === -1 || end <= start) {
+    if (start === -1 || end <= start)
       throw new LlmError('The model did not return a JSON object.', null)
-    }
+
     candidate = candidate.slice(start, end + 1)
   }
 
@@ -258,9 +278,8 @@ export function extractJsonObject(text: string): Record<string, unknown> {
 
   // `Array.isArray` is not checked here and does not need to be: the span above always
   // begins at a `{`, so a top-level array has already been unwrapped to its first object.
-  if (!parsed || typeof parsed !== 'object') {
+  if (!parsed || typeof parsed !== 'object')
     throw new LlmError('The model returned JSON that was not an object.', null)
-  }
 
   return parsed as Record<string, unknown>
 }

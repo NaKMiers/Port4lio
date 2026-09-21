@@ -20,7 +20,9 @@ const LABELS: Record<TestProduct, string> = {
   iq: 'IQ',
 }
 
-export function testNav(locale: Locale): { key: TestProduct; label: string; href: string }[] {
+export function testNav(
+  locale: Locale
+): { key: TestProduct; label: string; href: string }[] {
   return TEST_PRODUCTS.map(product => ({
     key: product,
     label: LABELS[product],

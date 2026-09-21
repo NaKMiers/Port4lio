@@ -51,7 +51,11 @@ function readSheet(sheet: HTMLElement): SheetGeometry {
  * holds located items `0 .. first.length - 1`, and a trailing `highlights` block carrying
  * fewer lines than its source is the one that got split.
  */
-export function resumeBreakOverflows(sheet: HTMLElement, limitPx: number, resume: Resume): boolean {
+export function resumeBreakOverflows(
+  sheet: HTMLElement,
+  limitPx: number,
+  resume: Resume
+): boolean {
   const { blocks, bottomOf } = readSheet(sheet)
   const located = locateResumeItems(resume)
   const first = planResumeSheets(resume).first
@@ -87,8 +91,15 @@ export function fitResumePageBreak(
   // exist, which `planResumeSheets` clamps to "cut past the end".
   const lastBlock = blocks[blocks.length - 1]
   if (lastBlock && bottomOf(lastBlock) <= limitPx) {
-    const sections = located.reduce((max, entry) => Math.max(max, entry.sectionIndex + 1), 0)
-    return { sectionIndex: sections, projectIndex: 0, highlightsOnFirstSheet: 0 }
+    const sections = located.reduce(
+      (max, entry) => Math.max(max, entry.sectionIndex + 1),
+      0
+    )
+    return {
+      sectionIndex: sections,
+      projectIndex: 0,
+      highlightsOnFirstSheet: 0,
+    }
   }
 
   const candidates: Candidate[] = []
@@ -98,14 +109,25 @@ export function fitResumePageBreak(
     const element = blocks[index]
     if (!element) return
 
-    const at = { sectionIndex: entry.sectionIndex, projectIndex: entry.projectIndex }
+    const at = {
+      sectionIndex: entry.sectionIndex,
+      projectIndex: entry.projectIndex,
+    }
 
     // Keeping no lines moves the whole bullet list down, so sheet 1 ends at the block above.
     const previous = blocks[index - 1]
-    candidates.push({ ...at, highlightsOnFirstSheet: 0, bottom: previous ? bottomOf(previous) : 0 })
+    candidates.push({
+      ...at,
+      highlightsOnFirstSheet: 0,
+      bottom: previous ? bottomOf(previous) : 0,
+    })
 
     Array.from(element.children).forEach((line, lineIndex) => {
-      candidates.push({ ...at, highlightsOnFirstSheet: lineIndex + 1, bottom: bottomOf(line) })
+      candidates.push({
+        ...at,
+        highlightsOnFirstSheet: lineIndex + 1,
+        bottom: bottomOf(line),
+      })
     })
   })
 
@@ -113,9 +135,8 @@ export function fitResumePageBreak(
 
   // Candidates are already in stream order, so the last one that fits is the fullest page.
   let best: Candidate | undefined
-  for (const candidate of candidates) {
+  for (const candidate of candidates)
     if (candidate.bottom <= limitPx) best = candidate
-  }
 
   // Even the earliest cut overflows - the copy above the first bullet list is already taller
   // than a page. Take that earliest cut anyway: it is the least bad, and the editor's

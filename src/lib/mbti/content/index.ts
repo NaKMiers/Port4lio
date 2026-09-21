@@ -2,7 +2,11 @@ import { CAREERS_EN } from '@/lib/mbti/content/careers.en'
 import { CAREERS_VI } from '@/lib/mbti/content/careers.vi'
 import { QUESTIONS_EN } from '@/lib/mbti/content/questions.en'
 import { QUESTIONS_VI } from '@/lib/mbti/content/questions.vi'
-import type { CareerContent, QuestionContent, TypeContent } from '@/lib/mbti/content/types'
+import type {
+  CareerContent,
+  QuestionContent,
+  TypeContent,
+} from '@/lib/mbti/content/types'
 import { TYPES_EN } from '@/lib/mbti/content/types.en'
 import { TYPES_VI } from '@/lib/mbti/content/types.vi'
 import type { Locale } from '@/lib/i18n'
@@ -25,13 +29,16 @@ const TYPE_CONTENT: Record<Locale, Record<MbtiType, TypeContent>> = {
   en: TYPES_EN,
 }
 
-export function getQuestionContent(locale: Locale, id: number): QuestionContent {
+export function getQuestionContent(
+  locale: Locale,
+  id: number
+): QuestionContent {
   const content = QUESTION_CONTENT[locale][id]
-  if (!content) {
+  if (!content)
     // A structural question with no wording is a build-time authoring bug, not a runtime
     // condition to degrade around. Failing here beats rendering a blank question.
     throw new Error(`Missing ${locale} content for question ${id}`)
-  }
+
   return content
 }
 
@@ -44,7 +51,10 @@ const CAREER_CONTENT: Record<Locale, Record<MbtiType, CareerContent>> = {
   en: CAREERS_EN,
 }
 
-export function getCareerContent(locale: Locale, type: MbtiType): CareerContent {
+export function getCareerContent(
+  locale: Locale,
+  type: MbtiType
+): CareerContent {
   return CAREER_CONTENT[locale][type]
 }
 
@@ -184,7 +194,8 @@ export const UI = {
   en: {
     brand: 'MBTI',
     /** See the Vietnamese entry: keyword first, hook after the colon. */
-    landingTitle: 'MBTI personality test: how well do you actually know yourself?',
+    landingTitle:
+      'MBTI personality test: how well do you actually know yourself?',
     landingLead:
       'A 60-question test across four opposing pairs. Free, no account, no email required.',
     landingAxes: [

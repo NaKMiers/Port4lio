@@ -36,7 +36,9 @@ let postId = ''
 
 test.describe.configure({ mode: 'serial' })
 
-test('the slug 404s before it exists, and the 404 gets cached', async ({ request }) => {
+test('the slug 404s before it exists, and the 404 gets cached', async ({
+  request,
+}) => {
   const res = await request.get(`/blog/${SLUG}`)
   expect(res.status()).toBe(404)
 })
@@ -54,7 +56,9 @@ test('a draft is still 404 publicly', async ({ request }) => {
   expect((await request.get(`/blog/${SLUG}`)).status()).toBe(404)
 })
 
-test('THE FALSIFICATION: publishing makes the post immediately readable', async ({ request }) => {
+test('THE FALSIFICATION: publishing makes the post immediately readable', async ({
+  request,
+}) => {
   const patch = await request.patch(`/api/admin/blog/${postId}`, {
     data: {
       status: 'published',
@@ -75,24 +79,42 @@ test('THE FALSIFICATION: publishing makes the post immediately readable', async 
   const html = await res.text()
   expect(html).toContain('Falsification test post')
   // Rendered at save time by the real pipeline, Shiki included.
-  expect(html, 'bodyHtml was not rendered through the pipeline').toContain('shiki')
+  expect(html, 'bodyHtml was not rendered through the pipeline').toContain(
+    'shiki'
+  )
 })
 
-test('the published post appears in the sitemap and the feed', async ({ request }) => {
-  expect(await (await request.get('/sitemap.xml')).text()).toContain(`/blog/${SLUG}`)
-  expect(await (await request.get('/blog/rss.xml')).text()).toContain(`/blog/${SLUG}`)
+test('the published post appears in the sitemap and the feed', async ({
+  request,
+}) => {
+  expect(await (await request.get('/sitemap.xml')).text()).toContain(
+    `/blog/${SLUG}`
+  )
+  expect(await (await request.get('/blog/rss.xml')).text()).toContain(
+    `/blog/${SLUG}`
+  )
 })
 
 test('the slug is frozen once published (409)', async ({ request }) => {
-  const res = await request.patch(`/api/admin/blog/${postId}`, { data: { slug: `${SLUG}-renamed` } })
+  const res = await request.patch(`/api/admin/blog/${postId}`, {
+    data: { slug: `${SLUG}-renamed` },
+  })
   expect(res.status()).toBe(409)
   expect((await res.json()).error).toContain('frozen')
 })
 
 test('archived then back to draft is refused (409)', async ({ request }) => {
-  expect((await request.patch(`/api/admin/blog/${postId}`, { data: { status: 'archived' } })).status()).toBe(200)
+  expect(
+    (
+      await request.patch(`/api/admin/blog/${postId}`, {
+        data: { status: 'archived' },
+      })
+    ).status()
+  ).toBe(200)
 
-  const res = await request.patch(`/api/admin/blog/${postId}`, { data: { status: 'draft' } })
+  const res = await request.patch(`/api/admin/blog/${postId}`, {
+    data: { status: 'draft' },
+  })
   expect(
     res.status(),
     'archived → draft unlocks the slug of a URL that was public and is indexed'
@@ -100,25 +122,43 @@ test('archived then back to draft is refused (409)', async ({ request }) => {
 })
 
 test('re-publishing does not reset publishedAt', async ({ request }) => {
-  const before = (await (await request.get(`/api/admin/blog/${postId}`)).json()).post.publishedAt
+  const before = (await (await request.get(`/api/admin/blog/${postId}`)).json())
+    .post.publishedAt
   expect(before).toBeTruthy()
 
-  await request.patch(`/api/admin/blog/${postId}`, { data: { status: 'published' } })
+  await request.patch(`/api/admin/blog/${postId}`, {
+    data: { status: 'published' },
+  })
 
-  const after = (await (await request.get(`/api/admin/blog/${postId}`)).json()).post.publishedAt
-  expect(after, 'publishedAt moved - every feed reader is told a months-old post is new').toBe(before)
+  const after = (await (await request.get(`/api/admin/blog/${postId}`)).json())
+    .post.publishedAt
+  expect(
+    after,
+    'publishedAt moved - every feed reader is told a months-old post is new'
+  ).toBe(before)
 })
 
-test('delete is soft, 404s the page, and clears it from the sitemap', async ({ request }) => {
+test('delete is soft, 404s the page, and clears it from the sitemap', async ({
+  request,
+}) => {
   expect((await request.delete(`/api/admin/blog/${postId}`)).status()).toBe(200)
 
   // S-17 / F12: a control run proved that without revalidatePublishedPost on DELETE, the
   // deleted post still served and the sitemap still listed it.
   expect((await request.get(`/blog/${SLUG}`)).status()).toBe(404)
-  expect(await (await request.get('/sitemap.xml')).text()).not.toContain(`/blog/${SLUG}`)
+  expect(await (await request.get('/sitemap.xml')).text()).not.toContain(
+    `/blog/${SLUG}`
+  )
 
   // Soft: the slug is retained, so a new post cannot inherit its contact attributions.
-  const retry = await request.post('/api/admin/blog', { data: { slug: SLUG, title: 'Reuse' } })
-  expect(retry.status(), 'the slug was freed - a new post can inherit old attributions').toBe(409)
-  expect((await retry.json()).error).toContain('deleted post still holds this slug')
+  const retry = await request.post('/api/admin/blog', {
+    data: { slug: SLUG, title: 'Reuse' },
+  })
+  expect(
+    retry.status(),
+    'the slug was freed - a new post can inherit old attributions'
+  ).toBe(409)
+  expect((await retry.json()).error).toContain(
+    'deleted post still holds this slug'
+  )
 })

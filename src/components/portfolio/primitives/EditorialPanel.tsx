@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 type EditorialPanelVariant = 'default' | 'strong'
 
@@ -11,8 +12,10 @@ export type EditorialPanelProps = {
 } & Omit<HTMLAttributes<HTMLDivElement>, 'className' | 'children'>
 
 const variantClass: Record<EditorialPanelVariant, string> = {
-  default: 'border-pp-line bg-pp-panel text-pp-text shadow-panel backdrop-blur-md',
-  strong: 'border-pp-line bg-pp-panel-strong text-pp-text shadow-panel backdrop-blur-sm',
+  default:
+    'border-pp-line bg-pp-panel text-pp-text shadow-panel backdrop-blur-md',
+  strong:
+    'border-pp-line bg-pp-panel-strong text-pp-text shadow-panel backdrop-blur-sm',
 }
 
 /**
@@ -29,7 +32,7 @@ export function EditorialPanel({
       className={cx(
         'rounded-panel border border-solid',
         variantClass[variant],
-        className,
+        className
       )}
       {...rest}
     >

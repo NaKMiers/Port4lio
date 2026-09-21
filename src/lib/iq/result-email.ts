@@ -16,20 +16,20 @@ import type { IqPaymentDocument } from '@/models/IqPayment'
  * Throws on any failure. The caller catches it and reports `delivery-failed`; throwing here
  * rather than swallowing is what makes a silent non-delivery impossible.
  */
-export async function deliverIqResultEmail(payment: IqPaymentDocument): Promise<void> {
+export async function deliverIqResultEmail(
+  payment: IqPaymentDocument
+): Promise<void> {
   const attempt = await IqAttemptModel.findById(payment.attemptToken).lean()
 
-  if (!attempt) {
-    throw new Error(`IQ attempt ${payment.attemptToken} not found`)
-  }
-  if (attempt.score === null || attempt.percentile === null) {
+  if (!attempt) throw new Error(`IQ attempt ${payment.attemptToken} not found`)
+
+  if (attempt.score === null || attempt.percentile === null)
     throw new Error(`IQ attempt ${payment.attemptToken} has no score to send`)
-  }
-  if (!attempt.certificateId) {
+
+  if (!attempt.certificateId)
     // Fulfilment mints the id before delivery, so reaching here means the two got out of
     // order. Better to fail loudly than to mail a certificate link that 404s.
     throw new Error(`IQ attempt ${payment.attemptToken} has no certificate id`)
-  }
 
   // The locale the buyer was reading when they paid. Falls back rather than throwing: a
   // result in the wrong language still beats no email at all.

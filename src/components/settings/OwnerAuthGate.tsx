@@ -2,8 +2,17 @@
 
 import React, { useEffect, useState } from 'react'
 
-import { inputCls, labelCls, primaryBtnCls, secondaryBtnCls } from '@/components/settings/settings-utils'
-import { AUTH_DEFAULT_DAYS, AUTH_MAX_DAYS, AUTH_MIN_DAYS } from '@/lib/auth-limits'
+import {
+  inputCls,
+  labelCls,
+  primaryBtnCls,
+  secondaryBtnCls,
+} from '@/components/settings/settings-utils'
+import {
+  AUTH_DEFAULT_DAYS,
+  AUTH_MAX_DAYS,
+  AUTH_MIN_DAYS,
+} from '@/lib/auth-limits'
 
 /** `1 day` / `30 days`, without pulling in a formatter for one string. */
 function dayLabel(days: number): string {
@@ -93,95 +102,112 @@ export default function OwnerAuthGate({
     }
   }
 
-  if (checking) {
+  if (checking)
     return (
-      <div className='mx-auto w-full max-w-xl px-gutter py-10'>
-        <div className='rounded-[1.8rem] border border-pp-line bg-white/78 p-6 shadow-panel backdrop-blur-md'>
-          <div className='text-sm font-medium text-pp-muted'>Checking access...</div>
+      <div className="mx-auto w-full max-w-xl px-gutter py-10">
+        <div className="bg-white/78 rounded-[1.8rem] border border-pp-line p-6 shadow-panel backdrop-blur-md">
+          <div className="text-sm font-medium text-pp-muted">
+            Checking access...
+          </div>
         </div>
       </div>
     )
-  }
 
   if (authed) return <>{children}</>
 
   return (
-    <div className='mx-auto w-full max-w-xl px-gutter py-10'>
-      <div className='rounded-[1.9rem] border border-pp-line bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(255,250,246,0.76))] p-6 shadow-panel backdrop-blur-md'>
-        <div className='rounded-full border border-pp-line bg-white/82 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted'>
+    <div className="mx-auto w-full max-w-xl px-gutter py-10">
+      <div className="rounded-[1.9rem] border border-pp-line bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(255,250,246,0.76))] p-6 shadow-panel backdrop-blur-md">
+        <div className="bg-white/82 rounded-full border border-pp-line px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
           Protected editor
         </div>
-        <div className='mt-4 font-display text-3xl font-semibold tracking-tight text-pp-text'>
+        <div className="mt-4 font-display text-3xl font-semibold tracking-tight text-pp-text">
           Owner access required
         </div>
-        <div className='mt-2 text-sm leading-relaxed text-pp-muted'>
-          Request a login code. You choose how long this browser stays allowed - anything
-          from {dayLabel(AUTH_MIN_DAYS)} to {dayLabel(AUTH_MAX_DAYS)}.
+        <div className="mt-2 text-sm leading-relaxed text-pp-muted">
+          Request a login code. You choose how long this browser stays allowed -
+          anything from {dayLabel(AUTH_MIN_DAYS)} to {dayLabel(AUTH_MAX_DAYS)}.
         </div>
 
         {error ? (
-          <div className='mt-4 rounded-[1.15rem] border border-[rgba(163,49,47,0.16)] bg-[rgba(211,108,105,0.1)] px-3 py-2 text-sm text-[#7f2f2f]'>
+          <div className="mt-4 rounded-[1.15rem] border border-[rgba(163,49,47,0.16)] bg-[rgba(211,108,105,0.1)] px-3 py-2 text-sm text-[#7f2f2f]">
             {error}
           </div>
         ) : null}
         {info ? (
-          <div className='mt-4 rounded-[1.15rem] border border-[rgba(51,152,255,0.18)] bg-[rgba(51,152,255,0.08)] px-3 py-2 text-sm text-[#255f97]'>
+          <div className="mt-4 rounded-[1.15rem] border border-[rgba(51,152,255,0.18)] bg-[rgba(51,152,255,0.08)] px-3 py-2 text-sm text-[#255f97]">
             {info}
           </div>
         ) : null}
 
-        <div className='mt-5 space-y-4'>
+        <div className="mt-5 space-y-4">
           {step === 'request' ? (
-            <button type='button' className={primaryBtnCls} disabled={busy} onClick={requestCode}>
+            <button
+              type="button"
+              className={primaryBtnCls}
+              disabled={busy}
+              onClick={requestCode}
+            >
               {busy ? 'Sending...' : 'Send code to owner email'}
             </button>
           ) : (
             <>
-              <div className='space-y-2'>
-                <label className={labelCls} htmlFor='owner-auth-code'>
+              <div className="space-y-2">
+                <label
+                  className={labelCls}
+                  htmlFor="owner-auth-code"
+                >
                   6-digit code
                 </label>
                 <input
-                  id='owner-auth-code'
+                  id="owner-auth-code"
                   className={inputCls}
                   value={code}
                   onChange={e => setCode(e.target.value)}
-                  placeholder='123456'
-                  inputMode='numeric'
+                  placeholder="123456"
+                  inputMode="numeric"
                 />
               </div>
-              <div className='space-y-2'>
-                <label className={labelCls} htmlFor='owner-auth-days'>
+              <div className="space-y-2">
+                <label
+                  className={labelCls}
+                  htmlFor="owner-auth-days"
+                >
                   Stay signed in for
                 </label>
-                <div className='flex items-center gap-3'>
+                <div className="flex items-center gap-3">
                   <input
-                    id='owner-auth-days'
-                    type='number'
+                    id="owner-auth-days"
+                    type="number"
                     min={AUTH_MIN_DAYS}
                     max={AUTH_MAX_DAYS}
                     step={1}
                     value={days}
                     onChange={e => setDays(e.target.value)}
-                    inputMode='numeric'
-                    aria-describedby='owner-auth-days-hint'
+                    inputMode="numeric"
+                    aria-describedby="owner-auth-days-hint"
                     className={`${inputCls} w-24`}
                   />
                   <span
-                    id='owner-auth-days-hint'
-                    className='text-sm text-pp-muted'
+                    id="owner-auth-days-hint"
+                    className="text-sm text-pp-muted"
                   >
-                    {AUTH_MIN_DAYS}-{AUTH_MAX_DAYS} days. Longer means fewer emails, and
-                    longer for a borrowed laptop to stay signed in.
+                    {AUTH_MIN_DAYS}-{AUTH_MAX_DAYS} days. Longer means fewer
+                    emails, and longer for a borrowed laptop to stay signed in.
                   </span>
                 </div>
               </div>
-              <div className='flex flex-wrap items-center gap-2'>
-                <button type='button' className={primaryBtnCls} disabled={busy} onClick={verifyCode}>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={primaryBtnCls}
+                  disabled={busy}
+                  onClick={verifyCode}
+                >
                   {busy ? 'Verifying...' : 'Verify'}
                 </button>
                 <button
-                  type='button'
+                  type="button"
                   className={secondaryBtnCls}
                   disabled={busy}
                   onClick={() => {
@@ -193,7 +219,12 @@ export default function OwnerAuthGate({
                 >
                   Back
                 </button>
-                <button type='button' className={secondaryBtnCls} disabled={busy} onClick={requestCode}>
+                <button
+                  type="button"
+                  className={secondaryBtnCls}
+                  disabled={busy}
+                  onClick={requestCode}
+                >
                   Resend code
                 </button>
               </div>

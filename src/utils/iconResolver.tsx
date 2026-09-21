@@ -111,14 +111,29 @@ export function resolveIconFromCode(
   className?: string
 ): React.ReactNode {
   const code = resolveIconCode(input)
-  if (!code) return <BsIcons.BsCursor size={size} className={className} />
+  if (!code)
+    return (
+      <BsIcons.BsCursor
+        size={size}
+        className={className}
+      />
+    )
 
   const [pack, iconName] = code.split(':')
   const selectedPack = iconPacks[pack as IconPackName]
   const Icon = selectedPack?.[iconName]
-  if (!isIconComponent(Icon)) {
-    return <BsIcons.BsCursor size={size} className={className} />
-  }
-  return <Icon size={size} className={className} />
-}
+  if (!isIconComponent(Icon))
+    return (
+      <BsIcons.BsCursor
+        size={size}
+        className={className}
+      />
+    )
 
+  return (
+    <Icon
+      size={size}
+      className={className}
+    />
+  )
+}

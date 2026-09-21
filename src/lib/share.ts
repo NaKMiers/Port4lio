@@ -88,12 +88,17 @@ export async function recordShare(
  * token must render the page normally, never an error: the visitor did nothing wrong and
  * has no idea a token was involved.
  */
-export async function resolveShare(product: string, shareToken: string): Promise<ShareOrigin | null> {
+export async function resolveShare(
+  product: string,
+  shareToken: string
+): Promise<ShareOrigin | null> {
   if (!isTokenShaped(shareToken)) return null
 
   try {
     await connectDatabase()
-    const doc = await TestEventModel.findById(testEventId.share(product, shareToken)).lean()
+    const doc = await TestEventModel.findById(
+      testEventId.share(product, shareToken)
+    ).lean()
     if (!doc) return null
     const type = doc.data?.type
     return { product, type: typeof type === 'string' ? type : '' }

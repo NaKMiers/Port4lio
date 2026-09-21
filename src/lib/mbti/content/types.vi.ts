@@ -18,7 +18,8 @@ import type { MbtiType } from '@/lib/mbti/types'
 export const TYPES_VI: Record<MbtiType, TypeContent> = {
   ENFJ: {
     nickname: 'Người dẫn dắt',
-    tagline: 'Bạn đọc được không khí căn phòng trước khi đọc chương trình họp, và thường đã biết ai đang cần giúp.',
+    tagline:
+      'Bạn đọc được không khí căn phòng trước khi đọc chương trình họp, và thường đã biết ai đang cần giúp.',
     overview: [
       'Bạn nhận ra người khác cần gì trước khi họ nói ra, và rất khó để bạn ngồi yên với điều đó. Trong một nhóm, bạn thường là người giữ mọi thứ gắn kết gần như theo phản xạ, và ít ai gọi tên việc đó vì bạn làm nó trông quá nhẹ nhàng.',
       'Cái giá là sự chú ý của bạn luôn hướng ra ngoài. Bạn có thể dành cả tuần gỡ rối cho người khác, rồi đến Chủ nhật mới nhận ra mình chưa nghĩ gì cho bản thân.',
@@ -39,7 +40,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   ENFP: {
     nickname: 'Người truyền cảm hứng',
-    tagline: 'Bạn tìm ra được điểm thú vị trong hầu như mọi thứ, và đó là lý do bạn đã bắt đầu rất nhiều dự án.',
+    tagline:
+      'Bạn tìm ra được điểm thú vị trong hầu như mọi thứ, và đó là lý do bạn đã bắt đầu rất nhiều dự án.',
     overview: [
       'Khả năng là thứ khiến bạn chuyển động. Một cuộc trò chuyện về việc thứ gì đó có thể trở thành gì sẽ giữ bạn lâu hơn nhiều so với việc nó đang là gì, và bạn thật sự giỏi trong việc làm người khác nhìn thấy điều đó.',
       'Cũng chính điều đó khiến việc kết thúc trở nên khó. Ý tưởng sống động nhất ở lúc bắt đầu, và đến khoảng giữa nó đã thành công việc hậu cần, đúng phần mà sự chú ý của bạn hay trượt đi.',
@@ -60,7 +62,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   ENTJ: {
     nickname: 'Nhà điều hành',
-    tagline: 'Bạn nhìn ra chuyện này sẽ đi tới đâu và đã phân xong ai làm việc gì.',
+    tagline:
+      'Bạn nhìn ra chuyện này sẽ đi tới đâu và đã phân xong ai làm việc gì.',
     overview: [
       'Bạn sắp xếp theo bản năng. Đưa cho bạn một tình huống mơ hồ, bạn sẽ cho ra một hướng đi, một trình tự và người chịu trách nhiệm từng phần, thường nhanh hơn mức người ta yêu cầu.',
       'Sự quyết đoán đó vừa là giá trị vừa là điểm mù của bạn. Bạn đi trước khi có đồng thuận, và đôi khi thứ bạn cán qua là một phản đối hợp lý mà bạn đã không chậm lại đủ để nghe.',
@@ -102,7 +105,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   ESFJ: {
     nickname: 'Người chăm lo',
-    tagline: 'Bạn nhớ ai không ăn được sữa, và bạn để ý người kia đã im lặng từ hai mươi phút trước.',
+    tagline:
+      'Bạn nhớ ai không ăn được sữa, và bạn để ý người kia đã im lặng từ hai mươi phút trước.',
     overview: [
       'Bạn giữ cho phần đời sống thực tế của một nhóm không rời rạc. Bạn nhớ những chi tiết về con người khiến họ thấy mình được nhìn thấy, và bạn hành động theo đó mà không làm ầm lên.',
       'Vì sự hòa thuận quan trọng với bạn, xung đột hiện lên như thứ cần dập tắt hơn là thứ cần ngồi lại bên trong. Bản năng đó xử lý được rất nhiều va chạm nhỏ, và thỉnh thoảng chôn mất một bất đồng thật.',
@@ -123,7 +127,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   ESFP: {
     nickname: 'Người trình diễn',
-    tagline: 'Bạn có mặt trọn vẹn trong căn phòng, và đó là lý do căn phòng dễ chịu hơn khi có bạn.',
+    tagline:
+      'Bạn có mặt trọn vẹn trong căn phòng, và đó là lý do căn phòng dễ chịu hơn khi có bạn.',
     overview: [
       'Bạn sống ở hiện tại trọn vẹn hơn hầu hết mọi người làm được. Bạn cảm nhận được không khí, chất liệu, khoảnh khắc thật, và bạn kéo người khác vào đó cùng mình.',
       'Mặt còn lại là những thứ chỉ sinh lợi chậm và âm thầm thì hay bị bỏ quên. Kế hoạch dài hạn phải cạnh tranh với một hiện tại quá sống động, và hiện tại thường thắng.',
@@ -165,7 +170,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   ESTP: {
     nickname: 'Người quảng bá',
-    tagline: 'Bạn thà thử luôn cho biết còn hơn ngồi thêm một buổi họp nữa về nó.',
+    tagline:
+      'Bạn thà thử luôn cho biết còn hơn ngồi thêm một buổi họp nữa về nó.',
     overview: [
       'Bạn được hiệu chỉnh cho thời gian thực. Bạn đọc tình huống nhanh, hành động khi thông tin còn thiếu, và thường đúng đủ để ổn, một kỹ năng hiếm hơn người ta tưởng.',
       'Thiên hướng hành động đó khiến những việc chậm rãi và cân nhắc kỹ trở nên khó chịu. Bạn xuất sắc khi có chuyện xảy ra và bồn chồn khi chẳng có gì.',
@@ -186,7 +192,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   INFJ: {
     nickname: 'Người cố vấn',
-    tagline: 'Bạn hiểu chuyện gì đang xảy ra với họ trước khi họ có từ để gọi tên, và bạn không nói gì.',
+    tagline:
+      'Bạn hiểu chuyện gì đang xảy ra với họ trước khi họ có từ để gọi tên, và bạn không nói gì.',
     overview: [
       'Bạn nhận ra những quy luật ở con người mà không phải lúc nào cũng giải thích được. Bạn thường biết chuyện sẽ đi tới đâu từ rất sớm, trước khi có bằng chứng, và bạn đúng đủ nhiều lần để khiến người khác thấy hơi rợn.',
       'Bạn cũng kín đáo hơn vẻ ngoài. Bạn khiến người khác mở lòng dễ dàng rồi trả lại một phiên bản đã chọn lọc của mình, nên bạn có thể được nhiều người biết mà rất ít người hiểu.',
@@ -207,7 +214,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   INFP: {
     nickname: 'Người hòa giải',
-    tagline: 'Có một cách mà mọi thứ nên là, và bạn cảm nhận được chính xác phiên bản hiện tại còn cách nó bao xa.',
+    tagline:
+      'Có một cách mà mọi thứ nên là, và bạn cảm nhận được chính xác phiên bản hiện tại còn cách nó bao xa.',
     overview: [
       'Bạn đối chiếu mọi thứ với một chuẩn bên trong về điều đúng đắn. Điều đó khiến bạn rất khó lay chuyển ở những chuyện quan trọng và dễ tính đến bất ngờ ở những chuyện không.',
       'Chính cái chuẩn đó cũng quay vào trong. Bạn đo mình theo một phiên bản chưa tồn tại, và bạn khắt khe với bản thân hơn hẳn với bất kỳ ai khác.',
@@ -291,7 +299,8 @@ export const TYPES_VI: Record<MbtiType, TypeContent> = {
   },
   ISFP: {
     nickname: 'Người nghệ sĩ',
-    tagline: 'Bạn không giải thích nhiều, nhưng bạn biết chính xác mình muốn nó có cảm giác thế nào.',
+    tagline:
+      'Bạn không giải thích nhiều, nhưng bạn biết chính xác mình muốn nó có cảm giác thế nào.',
     overview: [
       'Bạn có trực giác mạnh về cái đẹp và cái đúng, và hiếm khi tranh luận cho nó. Bạn đơn giản là biết điều gì hợp, rồi sắp xếp đời mình quanh đó thay vì quanh một quan điểm được tuyên bố.',
       'Bạn kín đáo hơn mức người ta đoán từ sự ấm áp của bạn. Xung đột làm bạn thật sự khó chịu, nên bạn thường lùi lại hơn là đẩy tới, và nhiều chuyện bị để không nói suốt một thời gian dài.',

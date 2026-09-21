@@ -875,7 +875,7 @@ export const WEEKS: RoadmapWeek[] = [
               },
               {
                 vi: 'Viết 3 câu hỏi cụ thể còn lấn cấn (vd: hook chạy lúc nào? subagent trả kết quả ra sao?). Build xong Ex1 ngày 20/09 phải tự trả lời được.',
-                en: "Write 3 specific questions that still nag you (e.g. when does a hook run? how does a subagent return results?). Once Ex1 is built on 20/09 you must be able to answer them yourself.",
+                en: 'Write 3 specific questions that still nag you (e.g. when does a hook run? how does a subagent return results?). Once Ex1 is built on 20/09 you must be able to answer them yourself.',
               },
             ],
             doneWhen: {

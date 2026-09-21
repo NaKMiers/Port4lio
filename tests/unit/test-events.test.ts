@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { assertClientPostable, FUNNEL_EVENTS, ServerOnlyEventError } from '@/lib/test-events'
+import {
+  assertClientPostable,
+  FUNNEL_EVENTS,
+  ServerOnlyEventError,
+} from '@/lib/test-events'
 import { dayBucket, testEventId } from '@/models/TestEvent'
 
 /**
@@ -30,32 +34,40 @@ describe('assertClientPostable', () => {
      * is a denominator in the conversion rate `/metrics` reports, so forged rows would drag
      * that rate down while looking entirely plausible.
      */
-    expect(() => assertClientPostable('funnel', FUNNEL_EVENTS.paywallSeen)).toThrow(
-      ServerOnlyEventError
-    )
+    expect(() =>
+      assertClientPostable('funnel', FUNNEL_EVENTS.paywallSeen)
+    ).toThrow(ServerOnlyEventError)
   })
 
   it('REFUSES a forged paid event', () => {
     // The assertion this whole file exists for.
-    expect(() => assertClientPostable('funnel', FUNNEL_EVENTS.paid)).toThrow(ServerOnlyEventError)
+    expect(() => assertClientPostable('funnel', FUNNEL_EVENTS.paid)).toThrow(
+      ServerOnlyEventError
+    )
   })
 
   it('refuses the other server-authoritative funnel events', () => {
-    expect(() => assertClientPostable('funnel', FUNNEL_EVENTS.checkoutStarted)).toThrow(
-      ServerOnlyEventError
-    )
-    expect(() => assertClientPostable('funnel', FUNNEL_EVENTS.resultViewed)).toThrow(
-      ServerOnlyEventError
-    )
+    expect(() =>
+      assertClientPostable('funnel', FUNNEL_EVENTS.checkoutStarted)
+    ).toThrow(ServerOnlyEventError)
+    expect(() =>
+      assertClientPostable('funnel', FUNNEL_EVENTS.resultViewed)
+    ).toThrow(ServerOnlyEventError)
   })
 
   it('refuses a funnel event with no name, rather than defaulting to something', () => {
-    expect(() => assertClientPostable('funnel', null)).toThrow(ServerOnlyEventError)
-    expect(() => assertClientPostable('funnel', '')).toThrow(ServerOnlyEventError)
+    expect(() => assertClientPostable('funnel', null)).toThrow(
+      ServerOnlyEventError
+    )
+    expect(() => assertClientPostable('funnel', '')).toThrow(
+      ServerOnlyEventError
+    )
   })
 
   it('refuses an invented kind', () => {
-    expect(() => assertClientPostable('admin', null)).toThrow(ServerOnlyEventError)
+    expect(() => assertClientPostable('admin', null)).toThrow(
+      ServerOnlyEventError
+    )
     expect(() => assertClientPostable('', null)).toThrow(ServerOnlyEventError)
   })
 })
@@ -72,17 +84,25 @@ describe('testEventId', () => {
   })
 
   it('keys progress on the session alone, so tab switches collapse', () => {
-    expect(testEventId.progress('mbti', 's1')).toBe(testEventId.progress('mbti', 's1'))
-    expect(testEventId.progress('mbti', 's1')).not.toBe(testEventId.progress('mbti', 's2'))
+    expect(testEventId.progress('mbti', 's1')).toBe(
+      testEventId.progress('mbti', 's1')
+    )
+    expect(testEventId.progress('mbti', 's1')).not.toBe(
+      testEventId.progress('mbti', 's2')
+    )
   })
 
   it('namespaces by product, so IQ cannot collide with MBTI', () => {
-    expect(testEventId.progress('mbti', 's1')).not.toBe(testEventId.progress('iq', 's1'))
+    expect(testEventId.progress('mbti', 's1')).not.toBe(
+      testEventId.progress('iq', 's1')
+    )
   })
 
   it('buckets funnel counters by day so a time series falls out of the key', () => {
     const day = dayBucket(new Date('2026-09-02T23:59:59.000Z'))
     expect(day).toBe('2026-09-02')
-    expect(testEventId.funnel('mbti', 'paid', day)).toBe('mbti:funnel:paid:2026-09-02')
+    expect(testEventId.funnel('mbti', 'paid', day)).toBe(
+      'mbti:funnel:paid:2026-09-02'
+    )
   })
 })

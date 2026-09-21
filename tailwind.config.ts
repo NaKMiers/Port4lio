@@ -21,9 +21,9 @@ const ppColor = (token: string): string => {
   }: { opacityValue?: string | number } = {}): string => {
     const base = `var(--pp-${token})`
     const alpha = Number(opacityValue)
-    if (opacityValue === undefined || !Number.isFinite(alpha) || alpha >= 1) {
+    if (opacityValue === undefined || !Number.isFinite(alpha) || alpha >= 1)
       return base
-    }
+
     return `color-mix(in srgb, ${base} ${alpha * 100}%, transparent)`
   }
   // Tailwind takes a resolver here at runtime; its v3 `Config` type only admits strings.
@@ -103,8 +103,18 @@ const config: Config = {
        */
       fontFamily: {
         sora: [`var(--font-sora)`, 'sans-serif'],
-        display: [`var(--font-montserrat)`, 'Montserrat', 'system-ui', 'sans-serif'],
-        editorial: [`var(--font-source-sans-3)`, 'Source Sans 3', 'system-ui', 'sans-serif'],
+        display: [
+          `var(--font-montserrat)`,
+          'Montserrat',
+          'system-ui',
+          'sans-serif',
+        ],
+        editorial: [
+          `var(--font-source-sans-3)`,
+          'Source Sans 3',
+          'system-ui',
+          'sans-serif',
+        ],
       },
       maxWidth: {
         editorial: 'var(--pp-max)',

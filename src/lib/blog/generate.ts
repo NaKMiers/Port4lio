@@ -13,8 +13,15 @@ import {
   resolveTemperature,
   type GenerationSpec,
 } from '@/lib/blog/generation-fields'
-import { findImagePlaceholders, placeholderKeys, placeholderMarkdown } from '@/lib/blog/image-placeholders'
-import { IMAGE_PROMPT_RULES, normaliseImagePrompt } from '@/lib/blog/image-prompt'
+import {
+  findImagePlaceholders,
+  placeholderKeys,
+  placeholderMarkdown,
+} from '@/lib/blog/image-placeholders'
+import {
+  IMAGE_PROMPT_RULES,
+  normaliseImagePrompt,
+} from '@/lib/blog/image-prompt'
 
 /**
  * The brief that goes to the model, and the gate everything it says back has to pass.
@@ -99,7 +106,9 @@ const MAX_BODY_CHARS = 200_000
  */
 export function summariseList(values: string[], limit = 6): string {
   const head = values.slice(0, limit).map(value => value.slice(0, 40))
-  return values.length > limit ? `${head.join(', ')} and ${values.length - limit} more` : head.join(', ')
+  return values.length > limit
+    ? `${head.join(', ')} and ${values.length - limit} more`
+    : head.join(', ')
 }
 
 const WORD_TARGETS: Record<string, string> = {
@@ -142,7 +151,7 @@ const HOUSE_STYLE = [
 function markdownRules(codeLanguage: string | undefined): string[] {
   return [
     'Markdown only. No front matter, no HTML tags - raw HTML is dropped by the renderer, not escaped.',
-    'Start at `## `. The title is rendered above the body as the page\'s only h1, so the body must not contain one.',
+    "Start at `## `. The title is rendered above the body as the page's only h1, so the body must not contain one.",
     /*
       This used to be a flat "no images", which was right when there was nowhere for one to
       come from: `rehypeRestrictImageHosts` refuses every `src` that is not this site's own
@@ -155,10 +164,10 @@ function markdownRules(codeLanguage: string | undefined): string[] {
     'Never write a real image URL. You do not know one, and an invented one is refused by the renderer and published as a broken image.',
     codeLanguage
       ? `Fenced code blocks must be tagged \`${codeLanguage}\`.`
-      // Built from the option list rather than typed out, so adding a language to the dropdown
-      // cannot leave auto mode offering the old set. `blog-generation-fields.test.ts` already
-      // ties that list to `SHIKI_LANGUAGES`; this makes the prompt inherit the same guarantee.
-      : `Tag every fenced code block with one of: ${CODE_LANGUAGE_OPTIONS.map(option => option.value).join(', ')}. An untagged or unknown fence loses its highlighting.`,
+      : // Built from the option list rather than typed out, so adding a language to the dropdown
+        // cannot leave auto mode offering the old set. `blog-generation-fields.test.ts` already
+        // ties that list to `SHIKI_LANGUAGES`; this makes the prompt inherit the same guarantee.
+        `Tag every fenced code block with one of: ${CODE_LANGUAGE_OPTIONS.map(option => option.value).join(', ')}. An untagged or unknown fence loses its highlighting.`,
     'Links are welcome but must be real. Do not invent a URL to a doc page you are not sure exists.',
   ]
 }
@@ -176,9 +185,8 @@ const AUTO_IMAGE_CEILING = 2
  * distribution for a blog whose articles are about measurements.
  */
 function imageDirective(count: number | null): string[] {
-  if (count === 0) {
+  if (count === 0)
     return ['- Images: none. Do not write any image placeholder.']
-  }
 
   const exact = count !== null
   const keys = placeholderKeys(exact ? count : AUTO_IMAGE_CEILING)
@@ -193,7 +201,11 @@ function imageDirective(count: number | null): string[] {
 }
 
 /** `- Label: <what the model should do>` for one field, manual or auto. */
-function directive(label: string, manual: string | undefined, auto: string): string {
+function directive(
+  label: string,
+  manual: string | undefined,
+  auto: string
+): string {
   return manual ? `- ${label}: ${manual}` : `- ${label}: ${auto}`
 }
 
@@ -201,7 +213,9 @@ export function buildGenerationPrompt(
   spec: GenerationSpec,
   context: GenerationContext
 ): { system: string; user: string } {
-  const kindList = context.kinds.map(kind => `${kind.slug} (${kind.label})`).join(', ')
+  const kindList = context.kinds
+    .map(kind => `${kind.slug} (${kind.label})`)
+    .join(', ')
   const seriesList = context.series
     .map(entry => `${entry.slug} - ${entry.title}: ${entry.blurb}`)
     .join('\n  ')
@@ -215,7 +229,7 @@ export function buildGenerationPrompt(
   const manualSeries = manualString(spec, 'series')
 
   const system = [
-    'You write one blog post for a working software engineer\'s personal site and return it as a single JSON object.',
+    "You write one blog post for a working software engineer's personal site and return it as a single JSON object.",
     '',
     'The blog exists to make a senior engineer reading it believe the author thinks well. Prose that reads as machine-written fails at that, so the style rules below are requirements rather than preferences.',
     '',
@@ -263,8 +277,16 @@ export function buildGenerationPrompt(
       'you choose, from the series and genres below. Prefer something concrete and measured over a survey of a subject.'
     ),
     directive('Blog name', manualString(spec, 'title'), 'you choose'),
-    directive('Slug', manualString(spec, 'slug'), 'you choose, derived from the title'),
-    directive('Excerpt', manualString(spec, 'excerpt'), 'you choose, written after the body'),
+    directive(
+      'Slug',
+      manualString(spec, 'slug'),
+      'you choose, derived from the title'
+    ),
+    directive(
+      'Excerpt',
+      manualString(spec, 'excerpt'),
+      'you choose, written after the body'
+    ),
     directive(
       'Tags',
       manualString(spec, 'tags'),
@@ -273,18 +295,28 @@ export function buildGenerationPrompt(
     '',
     '## Placement',
     `- Kinds that exist: ${kindList || 'article'}`,
-    directive('Kind', manualString(spec, 'kind'), 'you choose, against the length below'),
-    context.series.length ? `- Series that exist:\n  ${seriesList}` : '- No series exist yet; return null.',
+    directive(
+      'Kind',
+      manualString(spec, 'kind'),
+      'you choose, against the length below'
+    ),
+    context.series.length
+      ? `- Series that exist:\n  ${seriesList}`
+      : '- No series exist yet; return null.',
     directive(
       'Series',
-      manualSeries === NO_SERIES ? 'null - this post belongs to no series' : manualSeries,
+      manualSeries === NO_SERIES
+        ? 'null - this post belongs to no series'
+        : manualSeries,
       'you choose one, or null if the topic fits none of them. Do not force a fit.'
     ),
     directive('Language', manualString(spec, 'language'), 'en'),
     context.relatedCandidates.length
       ? [
           '- Published posts you may reference in `relatedSlugs` (use the slug exactly, or return []):',
-          ...context.relatedCandidates.map(post => `  - ${post.slug} - ${post.title}`),
+          ...context.relatedCandidates.map(
+            post => `  - ${post.slug} - ${post.title}`
+          ),
         ].join('\n')
       : '- No published posts exist yet. `relatedSlugs` must be [].',
     manualList(spec, 'relatedSlugs')?.length
@@ -292,13 +324,21 @@ export function buildGenerationPrompt(
       : '- Related posts: you choose, at most five, only from the list above.',
     '',
     '## Craft',
-    directive('Style', manualString(spec, 'style'), 'you choose, matched to the topic'),
+    directive(
+      'Style',
+      manualString(spec, 'style'),
+      'you choose, matched to the topic'
+    ),
     directive('Tone', manualString(spec, 'tone'), 'plain and direct'),
     genres?.length
       ? `- Genres: ${genres.join(', ')}`
       : '- Genres: you choose, inferred from the topic',
     directive('Audience', manualString(spec, 'audience'), 'senior engineers'),
-    directive('Point of view', manualString(spec, 'pointOfView'), 'first person'),
+    directive(
+      'Point of view',
+      manualString(spec, 'pointOfView'),
+      'first person'
+    ),
     structure === 'seven-step'
       ? [
           '- Structure: the seven-step template, in this order, as `##` sections with your own headings:',
@@ -312,7 +352,11 @@ export function buildGenerationPrompt(
         ].join('\n')
       : directive('Structure', structure, 'you choose, matched to the style'),
     `- Length: ${wordTarget ?? 'you choose - a note is 150 to 500 words, an article is 800 to 2000'}`,
-    directive('Code examples', manualString(spec, 'codeExamples'), 'as many as the topic needs'),
+    directive(
+      'Code examples',
+      manualString(spec, 'codeExamples'),
+      'as many as the topic needs'
+    ),
     ...imageDirective(resolveImageCount(spec)),
     titleRule === true
       ? '- The title MUST contain a number or a named failure. "Five things Next.js 16 did that its docs did not say" or "revalidateTag did not invalidate anything", never "Some thoughts on caching".'
@@ -374,30 +418,33 @@ export function parseGeneratedDraft(
 ): { draft: GeneratedDraft; warnings: string[] } {
   const warnings: string[] = []
 
-  const bodyMarkdown = typeof payload.bodyMarkdown === 'string' ? payload.bodyMarkdown.trim() : ''
+  const bodyMarkdown =
+    typeof payload.bodyMarkdown === 'string' ? payload.bodyMarkdown.trim() : ''
   // Fatal, and the only genuinely fatal content failure. Everything else on a post can be
   // filled in from a fallback that is honest; a body cannot.
-  if (!bodyMarkdown) {
+  if (!bodyMarkdown)
     throw new GenerationError('The model returned no post body.')
-  }
-  if (bodyMarkdown.length > MAX_BODY_CHARS) {
+
+  if (bodyMarkdown.length > MAX_BODY_CHARS)
     throw new GenerationError(
       `The model returned ${bodyMarkdown.length} characters, past the ${MAX_BODY_CHARS} a post may store.`
     )
-  }
 
   const manualTitle = manualString(spec, 'title')
-  const modelTitle = typeof payload.title === 'string' ? payload.title.trim() : ''
+  const modelTitle =
+    typeof payload.title === 'string' ? payload.title.trim() : ''
   const title = (manualTitle ?? modelTitle).slice(0, 140)
-  if (!title) {
-    throw new GenerationError('The model returned no title, and none was given.')
-  }
+  if (!title)
+    throw new GenerationError(
+      'The model returned no title, and none was given.'
+    )
 
   const { slug, warning: slugWarning } = resolveSlug(spec, payload, title)
   if (slugWarning) warnings.push(slugWarning)
 
   const manualExcerpt = manualString(spec, 'excerpt')
-  const modelExcerpt = typeof payload.excerpt === 'string' ? payload.excerpt.trim() : ''
+  const modelExcerpt =
+    typeof payload.excerpt === 'string' ? payload.excerpt.trim() : ''
   const excerpt = (manualExcerpt ?? modelExcerpt).slice(0, 300)
 
   return {
@@ -447,14 +494,13 @@ function resolveImagePrompts(
   if (placeholders.length === 0) return []
 
   const byKey = new Map<string, string>()
-  if (Array.isArray(payload.imagePrompts)) {
+  if (Array.isArray(payload.imagePrompts))
     for (const entry of payload.imagePrompts) {
       if (!entry || typeof entry !== 'object') continue
       const { key, prompt } = entry as { key?: unknown; prompt?: unknown }
       if (typeof key !== 'string') continue
       byKey.set(key.trim(), normaliseImagePrompt(prompt))
     }
-  }
 
   const missing: string[] = []
   // The schema caps `imagePrompts` at 12 and rejects the whole document past it, so the cap is
@@ -480,16 +526,15 @@ function resolveImagePrompts(
     )
   }
 
-  if (missing.length) {
+  if (missing.length)
     warnings.push(
       `No image prompt came back for ${missing.join(', ')}. Use the regenerate button on that card.`
     )
-  }
-  if (byKey.size > 0) {
+
+  if (byKey.size > 0)
     warnings.push(
       `Dropped ${byKey.size} image prompt${byKey.size === 1 ? '' : 's'} with no placeholder in the body: ${Array.from(byKey.keys()).join(', ')}.`
     )
-  }
 
   return resolved
 }
@@ -520,26 +565,36 @@ function resolveImagePrompts(
  * function safe to call on its own, and they are what a future second caller will rely on. This
  * is an early exit, not the only gate.
  */
-export function validateManualSpec(spec: GenerationSpec, context: GenerationContext): void {
+export function validateManualSpec(
+  spec: GenerationSpec,
+  context: GenerationContext
+): void {
   const slug = manualString(spec, 'slug')
   if (slug) {
-    if (!SLUG_PATTERN.test(slug)) {
+    if (!SLUG_PATTERN.test(slug))
       throw new GenerationError('Slug must match ^[a-z0-9-]{1,80}$.')
-    }
-    if (isReservedSlug(slug)) {
-      throw new GenerationError(`"${slug}" is reserved by a route and cannot be a post slug.`)
-    }
+
+    if (isReservedSlug(slug))
+      throw new GenerationError(
+        `"${slug}" is reserved by a route and cannot be a post slug.`
+      )
   }
 
   const kind = manualString(spec, 'kind')
-  if (kind && !context.kinds.some(entry => entry.slug === kind)) {
-    throw new GenerationError(`"${kind}" is not a kind. It may have been deleted.`)
-  }
+  if (kind && !context.kinds.some(entry => entry.slug === kind))
+    throw new GenerationError(
+      `"${kind}" is not a kind. It may have been deleted.`
+    )
 
   const series = manualString(spec, 'series')
-  if (series && series !== NO_SERIES && !context.series.some(entry => entry.slug === series)) {
-    throw new GenerationError(`"${series}" is not a series. It may have been deleted.`)
-  }
+  if (
+    series &&
+    series !== NO_SERIES &&
+    !context.series.some(entry => entry.slug === series)
+  )
+    throw new GenerationError(
+      `"${series}" is not a series. It may have been deleted.`
+    )
 }
 
 function resolveSlug(
@@ -549,12 +604,14 @@ function resolveSlug(
 ): { slug: string; warning: string | null } {
   const manual = manualString(spec, 'slug')
   if (manual) {
-    if (!SLUG_PATTERN.test(manual)) {
+    if (!SLUG_PATTERN.test(manual))
       throw new GenerationError('Slug must match ^[a-z0-9-]{1,80}$.')
-    }
-    if (isReservedSlug(manual)) {
-      throw new GenerationError(`"${manual}" is reserved by a route and cannot be a post slug.`)
-    }
+
+    if (isReservedSlug(manual))
+      throw new GenerationError(
+        `"${manual}" is reserved by a route and cannot be a post slug.`
+      )
+
     return { slug: manual, warning: null }
   }
 
@@ -563,9 +620,8 @@ function resolveSlug(
   // ends up describing a string that appears nowhere.
   const raw = typeof payload.slug === 'string' ? payload.slug.trim() : ''
   const proposed = raw.toLowerCase()
-  if (SLUG_PATTERN.test(proposed) && !isReservedSlug(proposed)) {
+  if (SLUG_PATTERN.test(proposed) && !isReservedSlug(proposed))
     return { slug: proposed, warning: null }
-  }
 
   // `slugify` guarantees the PATTERN but not the RESERVED list - a post the model titles
   // "Privacy" slugifies to `privacy`, which the schema refuses. Suffixing here rather than
@@ -609,18 +665,22 @@ function resolveKind(
 
   const manual = manualString(spec, 'kind')
   if (manual) {
-    if (!known.has(manual)) {
-      throw new GenerationError(`"${manual}" is not a kind. It may have been deleted.`)
-    }
+    if (!known.has(manual))
+      throw new GenerationError(
+        `"${manual}" is not a kind. It may have been deleted.`
+      )
+
     return manual
   }
 
   const proposed = typeof payload.kind === 'string' ? payload.kind.trim() : ''
   if (known.has(proposed)) return proposed
 
-  if (!fallback) {
-    throw new GenerationError('No post kinds exist. Create one before generating a post.')
-  }
+  if (!fallback)
+    throw new GenerationError(
+      'No post kinds exist. Create one before generating a post.'
+    )
+
   warnings.push(
     proposed
       ? `The model chose the kind "${proposed.slice(0, 80)}", which does not exist. Using "${fallback}".`
@@ -640,24 +700,32 @@ function resolveSeries(
   const manual = manualString(spec, 'series')
   if (manual === NO_SERIES) return null
   if (manual) {
-    if (!known.has(manual)) {
-      throw new GenerationError(`"${manual}" is not a series. It may have been deleted.`)
-    }
+    if (!known.has(manual))
+      throw new GenerationError(
+        `"${manual}" is not a series. It may have been deleted.`
+      )
+
     return manual
   }
 
-  const proposed = typeof payload.series === 'string' ? payload.series.trim() : ''
+  const proposed =
+    typeof payload.series === 'string' ? payload.series.trim() : ''
   if (!proposed) return null
   if (known.has(proposed)) return proposed
 
   // Not fatal and not silently coerced to the nearest series. A wrong cluster is worse than
   // none: `/blog` renders series as hubs, so a misfiled post dilutes a cluster the author
   // built deliberately, and "no series" is a state the board already shows plainly.
-  warnings.push(`The model chose the series "${proposed.slice(0, 80)}", which does not exist. Saved without a series.`)
+  warnings.push(
+    `The model chose the series "${proposed.slice(0, 80)}", which does not exist. Saved without a series.`
+  )
   return null
 }
 
-function resolveLanguage(spec: GenerationSpec, payload: Record<string, unknown>): 'vi' | 'en' {
+function resolveLanguage(
+  spec: GenerationSpec,
+  payload: Record<string, unknown>
+): 'vi' | 'en' {
   const manual = manualString(spec, 'language')
   if (manual === 'vi' || manual === 'en') return manual
   return payload.language === 'vi' ? 'vi' : 'en'
@@ -705,14 +773,13 @@ function resolveTags(
     if (out.length === 8) break
   }
 
-  if (rejected.length) {
+  if (rejected.length)
     // Bounded: `rejected` is uncapped and every entry is model-controlled, so a reply with 500
     // junk tags would otherwise build one enormous warning string and render it as a single
     // list item. Naming the first few is all the author needs to see the shape of the problem.
     warnings.push(
       `Dropped ${rejected.length} unusable tag${rejected.length === 1 ? '' : 's'}: ${summariseList(rejected)}.`
     )
-  }
 
   return out
 }
@@ -729,7 +796,9 @@ function resolveRelated(
   const raw =
     manual ??
     (Array.isArray(payload.relatedSlugs)
-      ? payload.relatedSlugs.filter((slug): slug is string => typeof slug === 'string')
+      ? payload.relatedSlugs.filter(
+          (slug): slug is string => typeof slug === 'string'
+        )
       : [])
 
   const out: string[] = []
@@ -745,14 +814,13 @@ function resolveRelated(
     if (out.length === 5) break
   }
 
-  if (invented.length) {
+  if (invented.length)
     // Worth naming rather than dropping quietly: an invented related slug renders as a link
     // to a 404 on a published post, and it is the failure mode a model is most prone to here
     // because a plausible slug is trivial to write and impossible to distinguish by eye.
     warnings.push(
       `Dropped ${invented.length} related post${invented.length === 1 ? '' : 's'} that do not exist: ${summariseList(invented)}.`
     )
-  }
 
   return out
 }

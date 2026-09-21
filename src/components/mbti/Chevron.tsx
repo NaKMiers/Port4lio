@@ -1,4 +1,5 @@
-const cx = (...parts: (string | undefined | false)[]) => parts.filter(Boolean).join(' ')
+const cx = (...parts: (string | undefined | false)[]) =>
+  parts.filter(Boolean).join(' ')
 
 /**
  * Directional chevron for links and buttons.
@@ -21,15 +22,15 @@ export default function Chevron({
 }) {
   return (
     <svg
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
       strokeWidth={1.75}
-      strokeLinecap='round'
-      strokeLinejoin='round'
+      strokeLinecap="round"
+      strokeLinejoin="round"
       className={cx('h-4 w-4 shrink-0', className)}
       aria-hidden
-      focusable='false'
+      focusable="false"
     >
       <path d={direction === 'right' ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} />
     </svg>

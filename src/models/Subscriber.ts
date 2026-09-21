@@ -63,7 +63,11 @@ import { compileModel } from '@/lib/mongoose-model'
  * deliberately not symmetric with.
  */
 
-export const SUBSCRIBER_STATUSES = ['pending', 'confirmed', 'unsubscribed'] as const
+export const SUBSCRIBER_STATUSES = [
+  'pending',
+  'confirmed',
+  'unsubscribed',
+] as const
 export type SubscriberStatus = (typeof SUBSCRIBER_STATUSES)[number]
 
 export type SubscriberDocument = {
@@ -88,7 +92,12 @@ export type SubscriberDocument = {
 const subscriberSchema = new Schema<SubscriberDocument>(
   {
     email: { type: String, required: true },
-    status: { type: String, enum: SUBSCRIBER_STATUSES, required: true, default: 'pending' },
+    status: {
+      type: String,
+      enum: SUBSCRIBER_STATUSES,
+      required: true,
+      default: 'pending',
+    },
     token: { type: String, required: true },
     confirmedAt: { type: Date, default: null },
     unsubscribedAt: { type: Date, default: null },
@@ -109,12 +118,11 @@ subscriberSchema.index({ email: 1 }, { unique: true })
 subscriberSchema.index({ token: 1 }, { unique: true })
 
 subscriberSchema.on('index', (error: unknown) => {
-  if (error) {
+  if (error)
     console.error(
       '[Subscriber] index build FAILED - unsubscribes are not sticking and duplicates are possible',
       error
     )
-  }
 })
 
 export const SubscriberModel: mongoose.Model<SubscriberDocument> = compileModel(

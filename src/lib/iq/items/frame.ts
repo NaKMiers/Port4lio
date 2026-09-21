@@ -29,7 +29,12 @@ export const GAP = 12
  * sit in a bordered tap target supplied by the client, and a second border inside it reads
  * as part of the puzzle.
  */
-export function boxOf(children: string, x: number, y: number, boxed: boolean): string {
+export function boxOf(
+  children: string,
+  x: number,
+  y: number,
+  boxed: boolean
+): string {
   const frame = boxed
     ? `<rect x="0.75" y="0.75" width="${CELL - 1.5}" height="${CELL - 1.5}" fill="none" stroke="${INK}" stroke-width="1" opacity="0.28"/>`
     : ''
@@ -61,6 +66,8 @@ export function svgDocument(
   body: string,
   label?: string
 ): string {
-  const a11y = label ? ` role="img" aria-label="${label}"` : ' role="presentation"'
+  const a11y = label
+    ? ` role="img" aria-label="${label}"`
+    : ' role="presentation"'
   return `<svg viewBox="0 0 ${width} ${height}" width="100%"${a11y} xmlns="http://www.w3.org/2000/svg">${body}</svg>`
 }

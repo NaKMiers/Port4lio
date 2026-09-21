@@ -1,7 +1,16 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose from 'mongoose'
 import { NextRequest } from 'next/server'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 
 import { KindModel } from '@/models/Kind'
 import { PostModel } from '@/models/Post'
@@ -34,7 +43,8 @@ import { SeriesModel } from '@/models/Series'
 let reply: Record<string, unknown>
 
 vi.mock('@/lib/blog/llm', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
+  const actual =
+    await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
   return {
     ...actual,
     chatCompletion: vi.fn(async () => ({
@@ -53,8 +63,13 @@ vi.mock('@/lib/blog/revalidate', () => ({ revalidatePublishedPost: vi.fn() }))
 // Shiki costs a ~5.5s bootstrap per process and renders HTML this file never asserts on. The
 // pipeline has its own tests; paying for it here would dominate the runtime of every case.
 vi.mock('@/lib/blog/markdown', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/blog/markdown')>('@/lib/blog/markdown')
-  return { ...actual, renderMarkdown: vi.fn(async (markdown: string) => `<p>${markdown}</p>`) }
+  const actual = await vi.importActual<typeof import('@/lib/blog/markdown')>(
+    '@/lib/blog/markdown'
+  )
+  return {
+    ...actual,
+    renderMarkdown: vi.fn(async (markdown: string) => `<p>${markdown}</p>`),
+  }
 })
 
 let memory: MongoMemoryServer
@@ -92,7 +107,11 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.clearAllMocks()
-  await Promise.all([PostModel.deleteMany({}), KindModel.deleteMany({}), SeriesModel.deleteMany({})])
+  await Promise.all([
+    PostModel.deleteMany({}),
+    KindModel.deleteMany({}),
+    SeriesModel.deleteMany({}),
+  ])
 })
 
 function call(body: Record<string, unknown>) {
@@ -154,7 +173,11 @@ describe('slug allocation', () => {
   it('suffixes a model-chosen slug that is already taken', async () => {
     // The model did not choose this name in any meaningful sense, so failing a paid generation
     // over the collision would be absurd. It gets `-2`.
-    await PostModel.create({ slug: 'five-things-i-measured', title: 'Taken', kind: 'article' })
+    await PostModel.create({
+      slug: 'five-things-i-measured',
+      title: 'Taken',
+      kind: 'article',
+    })
 
     const response = await call({ spec: AUTO })
     const body = (await response.json()) as { slug?: string }
@@ -166,7 +189,11 @@ describe('slug allocation', () => {
   it('refuses an AUTHOR-chosen slug that is taken, rather than silently moving it', async () => {
     // The opposite case and deliberately not symmetric: they asked for that URL. Handing them
     // `-2` would be a different post at a different address than the one they requested.
-    await PostModel.create({ slug: 'my-choice', title: 'Taken', kind: 'article' })
+    await PostModel.create({
+      slug: 'my-choice',
+      title: 'Taken',
+      kind: 'article',
+    })
 
     const response = await call({ spec: manual('slug', 'my-choice') })
 
@@ -187,7 +214,9 @@ describe('slug allocation', () => {
       status: 'deleted',
     })
 
-    const body = (await (await call({ spec: AUTO })).json()) as { slug?: string }
+    const body = (await (await call({ spec: AUTO })).json()) as {
+      slug?: string
+    }
 
     expect(body.slug).toBe('five-things-i-measured-2')
   })
@@ -216,7 +245,11 @@ describe('validating what the author pinned, before the model is called', () => 
     await SeriesModel.create({ slug: 'real-series', title: 'Real', order: 0 })
 
     const response = await call({
-      spec: { ...manual('slug', 'a-fine-slug'), ...manual('kind', 'article'), ...manual('series', 'real-series') },
+      spec: {
+        ...manual('slug', 'a-fine-slug'),
+        ...manual('kind', 'article'),
+        ...manual('series', 'real-series'),
+      },
     })
 
     expect(response.status).toBe(201)
@@ -315,11 +348,15 @@ describe('rewriting an existing post', () => {
     // failure as blanking it, so the URL is quoted back.
     const a = 'https://res.cloudinary.com/demo/image/upload/v1/a.png'
     const b = 'https://res.cloudinary.com/demo/image/upload/v1/b.png'
-    const post = await existing({ bodyMarkdown: `![one](${a})\n\n![two](${b})` })
+    const post = await existing({
+      bodyMarkdown: `![one](${a})\n\n![two](${b})`,
+    })
     reply.slug = 'an-old-post'
     reply.bodyMarkdown = '## New\n\n![image](image1)'
 
-    const body = (await (await call({ spec: AUTO, postId: String(post._id) })).json()) as {
+    const body = (await (
+      await call({ spec: AUTO, postId: String(post._id) })
+    ).json()) as {
       warnings: string[]
     }
 
@@ -336,10 +373,16 @@ describe('rewriting an existing post', () => {
   })
 
   it('refuses to change the slug of a published post', async () => {
-    const post = await existing({ status: 'published', publishedAt: new Date() })
+    const post = await existing({
+      status: 'published',
+      publishedAt: new Date(),
+    })
     reply.slug = 'a-brand-new-slug'
 
-    const response = await call({ spec: manual('slug', 'a-brand-new-slug'), postId: String(post._id) })
+    const response = await call({
+      spec: manual('slug', 'a-brand-new-slug'),
+      postId: String(post._id),
+    })
 
     expect(response.status).toBe(409)
     expect((await PostModel.findById(post._id))?.slug).toBe('an-old-post')
@@ -350,11 +393,16 @@ describe('rewriting an existing post', () => {
     const post = await existing()
     reply.slug = 'an-old-post'
 
-    expect((await call({ spec: AUTO, postId: String(post._id) })).status).toBe(200)
+    expect((await call({ spec: AUTO, postId: String(post._id) })).status).toBe(
+      200
+    )
   })
 
   it('404s an unknown postId', async () => {
-    const response = await call({ spec: AUTO, postId: '000000000000000000000000' })
+    const response = await call({
+      spec: AUTO,
+      postId: '000000000000000000000000',
+    })
 
     expect(response.status).toBe(404)
   })
@@ -365,7 +413,10 @@ describe('rewriting an existing post', () => {
       `resolveRelated` would accept it - it IS a published slug. The live page then rendered a
       "related" link back to the page the reader was already on.
     */
-    const post = await existing({ status: 'published', publishedAt: new Date() })
+    const post = await existing({
+      status: 'published',
+      publishedAt: new Date(),
+    })
     reply.slug = 'an-old-post'
     reply.relatedSlugs = ['an-old-post']
 
@@ -384,7 +435,7 @@ describe('related posts the author pinned by hand', () => {
       statement about a live post. Regeneration hit this hardest: the preset pins the post's
       own related list, so every rewrite stripped its oldest links.
     */
-    for (let n = 0; n < 45; n += 1) {
+    for (let n = 0; n < 45; n += 1)
       await PostModel.create({
         slug: `filler-${n}`,
         title: `Filler ${n}`,
@@ -392,18 +443,22 @@ describe('related posts the author pinned by hand', () => {
         status: 'published',
         publishedAt: new Date(2026, 0, n + 1),
       })
-    }
+
     // `filler-0` is the oldest, so it is outside the 40 newest.
     const response = await call({ spec: manual('relatedSlugs', ['filler-0']) })
     const body = (await response.json()) as { id: string; warnings: string[] }
 
-    expect((await PostModel.findById(body.id))?.relatedSlugs).toEqual(['filler-0'])
+    expect((await PostModel.findById(body.id))?.relatedSlugs).toEqual([
+      'filler-0',
+    ])
     expect(body.warnings.join(' ')).not.toMatch(/do not exist/)
   })
 
   it('still drops a pinned slug that really is not a published post', async () => {
     // The control for the case above - the check was loosened, not removed.
-    const body = (await (await call({ spec: manual('relatedSlugs', ['no-such-post']) })).json()) as {
+    const body = (await (
+      await call({ spec: manual('relatedSlugs', ['no-such-post']) })
+    ).json()) as {
       id: string
       warnings: string[]
     }
@@ -422,10 +477,17 @@ describe('image placeholders', () => {
     */
     const keys = Array.from({ length: 15 }, (_, n) => `image${n + 1}`)
     reply.bodyMarkdown = `## Heading\n\n${keys.map(key => `![image](${key})`).join('\n\n')}`
-    reply.imagePrompts = keys.map(key => ({ key, prompt: `A picture for ${key}.` }))
+    reply.imagePrompts = keys.map(key => ({
+      key,
+      prompt: `A picture for ${key}.`,
+    }))
 
     const response = await call({ spec: AUTO })
-    const body = (await response.json()) as { id: string; imageCount: number; warnings: string[] }
+    const body = (await response.json()) as {
+      id: string
+      imageCount: number
+      warnings: string[]
+    }
 
     expect(response.status).toBe(201)
     expect(body.imageCount).toBe(12)
@@ -436,7 +498,11 @@ describe('image placeholders', () => {
 
 describe('what happens when the model does not cooperate', () => {
   it('maps an unparseable reply to 422, not 500 - the request was fine, the answer was not', async () => {
-    chatCompletion.mockResolvedValueOnce({ text: 'I cannot do that.', model: 'x', usage: undefined })
+    chatCompletion.mockResolvedValueOnce({
+      text: 'I cannot do that.',
+      model: 'x',
+      usage: undefined,
+    })
 
     const response = await call({ spec: AUTO })
 
@@ -455,15 +521,19 @@ describe('what happens when the model does not cooperate', () => {
   })
 
   it('re-emits an upstream 429 as a 429, so the client can back off', async () => {
-    const { LlmError } = await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
+    const { LlmError } =
+      await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
     chatCompletion.mockRejectedValueOnce(new LlmError('Rate limited.', 429))
 
     expect((await call({ spec: AUTO })).status).toBe(429)
   })
 
   it('maps any other LLM failure to 502 rather than blaming our own database', async () => {
-    const { LlmError } = await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
-    chatCompletion.mockRejectedValueOnce(new LlmError('Could not reach the model endpoint.', null))
+    const { LlmError } =
+      await vi.importActual<typeof import('@/lib/blog/llm')>('@/lib/blog/llm')
+    chatCompletion.mockRejectedValueOnce(
+      new LlmError('Could not reach the model endpoint.', null)
+    )
 
     expect((await call({ spec: AUTO })).status).toBe(502)
   })
@@ -492,7 +562,9 @@ describe('the preconditions', () => {
   it('reports unknown spec keys as warnings rather than failing', async () => {
     // The dialog and the route share one registry, so an unknown key means a stale client.
     // Dropping it loudly is better than a 400 that makes the whole dialog unusable.
-    const body = (await (await call({ spec: manual('notAField', 'x') })).json()) as {
+    const body = (await (
+      await call({ spec: manual('notAField', 'x') })
+    ).json()) as {
       warnings: string[]
     }
 

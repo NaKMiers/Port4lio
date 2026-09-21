@@ -169,7 +169,12 @@ const postSchema = new Schema<PostDocument>(
     // `select: false` on both bodies: the index page, the sitemap, RSS and
     // generateStaticParams all list many posts and none of them needs either field. A
     // default-excluded heavy field cannot be pulled into a list query by accident.
-    bodyMarkdown: { type: String, default: '', maxlength: 200_000, select: false },
+    bodyMarkdown: {
+      type: String,
+      default: '',
+      maxlength: 200_000,
+      select: false,
+    },
     bodyHtml: { type: String, default: '', maxlength: 400_000, select: false },
     renderedWith: { type: String, default: '' },
     coverImage: { type: String, default: null },
@@ -216,7 +221,8 @@ const postSchema = new Schema<PostDocument>(
         // entry costs a row in this array and nothing on screen. This is the LAST line of
         // defence, not the first: every writer caps itself at `MAX_IMAGE_PROMPTS` first,
         // because failing here throws away a whole paid generation. See the constant.
-        validator: (value: { key: string }[]) => value.length <= MAX_IMAGE_PROMPTS,
+        validator: (value: { key: string }[]) =>
+          value.length <= MAX_IMAGE_PROMPTS,
         message: `imagePrompts is capped at ${MAX_IMAGE_PROMPTS} entries`,
       },
     },
@@ -237,7 +243,12 @@ const postSchema = new Schema<PostDocument>(
         message: 'relatedSlugs is capped at 5',
       },
     },
-    status: { type: String, enum: POST_STATUSES, required: true, default: 'draft' },
+    status: {
+      type: String,
+      enum: POST_STATUSES,
+      required: true,
+      default: 'draft',
+    },
     publishedAt: { type: Date, default: null },
     contentUpdatedAt: { type: Date, default: Date.now },
   },
@@ -289,9 +300,14 @@ postSchema.index(
  * soft-delete reasoning above stops holding.
  */
 postSchema.on('index', (error: unknown) => {
-  if (error) {
-    console.error('[Post] index build FAILED - slug uniqueness is not being enforced', error)
-  }
+  if (error)
+    console.error(
+      '[Post] index build FAILED - slug uniqueness is not being enforced',
+      error
+    )
 })
 
-export const PostModel: mongoose.Model<PostDocument> = compileModel('Post', postSchema)
+export const PostModel: mongoose.Model<PostDocument> = compileModel(
+  'Post',
+  postSchema
+)

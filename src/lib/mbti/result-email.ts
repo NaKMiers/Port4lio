@@ -17,17 +17,19 @@ import type { PaymentDocument } from '@/models/Payment'
  * Throws on any failure. The caller catches it and reports `delivery-failed`; throwing
  * here rather than swallowing is what makes a silent non-delivery impossible.
  */
-export async function deliverResultEmail(payment: PaymentDocument): Promise<void> {
+export async function deliverResultEmail(
+  payment: PaymentDocument
+): Promise<void> {
   const attempt = (await AttemptModel.findById(
     payment.attemptToken
   ).lean()) as AttemptDocument | null
 
-  if (!attempt) {
-    throw new Error(`Attempt ${payment.attemptToken} not found`)
-  }
-  if (!isMbtiType(attempt.type)) {
-    throw new Error(`Attempt ${payment.attemptToken} has an unknown type "${attempt.type}"`)
-  }
+  if (!attempt) throw new Error(`Attempt ${payment.attemptToken} not found`)
+
+  if (!isMbtiType(attempt.type))
+    throw new Error(
+      `Attempt ${payment.attemptToken} has an unknown type "${attempt.type}"`
+    )
 
   // The locale the buyer was reading when they paid. Falls back rather than throwing: a
   // result in the wrong language still beats no email at all.

@@ -1,5 +1,9 @@
 import { pick, shuffle } from '@/lib/iq/items/random'
-import { ALL_SHAPE_KINDS, type Shading, type ShapeKind } from '@/lib/iq/items/primitives'
+import {
+  ALL_SHAPE_KINDS,
+  type Shading,
+  type ShapeKind,
+} from '@/lib/iq/items/primitives'
 import {
   cellKey,
   MAX_TALLY,
@@ -10,8 +14,19 @@ import {
   type Cell,
   type CornerAnchor,
 } from '@/lib/iq/items/v2/cell'
-import { canFill, type RuleCapabilities, type RungProfile } from '@/lib/iq/items/v2/ladder'
-import { coordsOf, emptyGrid, holeCoords, positionCount, type CellGrid, type LayoutId } from '@/lib/iq/items/v2/layout'
+import {
+  canFill,
+  type RuleCapabilities,
+  type RungProfile,
+} from '@/lib/iq/items/v2/ladder'
+import {
+  coordsOf,
+  emptyGrid,
+  holeCoords,
+  positionCount,
+  type CellGrid,
+  type LayoutId,
+} from '@/lib/iq/items/v2/layout'
 import {
   applyTrack,
   CYCLIC,
@@ -192,10 +207,14 @@ function randomBody(random: () => number, sizeStep: number) {
  */
 function baseCell(random: () => number, slots: Target[]): Cell {
   const cell: Cell = {}
-  for (const slot of slots) {
+  for (const slot of slots)
     switch (slot) {
       case 'frame':
-        cell.frame = { class: 'frame', ...randomBody(random, 12), shading: 'outline' }
+        cell.frame = {
+          class: 'frame',
+          ...randomBody(random, 12),
+          shading: 'outline',
+        }
         break
       case 'inner':
         cell.inner = {
@@ -207,7 +226,12 @@ function baseCell(random: () => number, slots: Target[]): Cell {
       case 'mark':
         cell.mark = {
           class: 'mark',
-          anchor: pick(random, ['ne', 'se', 'sw', 'nw'] as const) as CornerAnchor,
+          anchor: pick(random, [
+            'ne',
+            'se',
+            'sw',
+            'nw',
+          ] as const) as CornerAnchor,
           ...randomBody(random, 1),
         }
         break
@@ -218,7 +242,7 @@ function baseCell(random: () => number, slots: Target[]): Cell {
           anchor: 's',
         }
     }
-  }
+
   return cell
 }
 
@@ -237,23 +261,34 @@ function baseCell(random: () => number, slots: Target[]): Cell {
  * witnessing check catches a flattened track either way - but a base drawn at the extreme
  * flattens often enough to waste most of a family's attempts.
  */
-function normaliseBase(cell: Cell, tracks: Track[], random: () => number): Cell {
+function normaliseBase(
+  cell: Cell,
+  tracks: Track[],
+  random: () => number
+): Cell {
   let next = cell
   for (const track of tracks) {
     if (track.dim === 'sides') {
       const element = next[track.target]
       if (element && element.class !== 'tally') {
         // Middle of the ladder, so a step in either direction has room.
-        const kind = SIDE_LADDER_KINDS[1 + Math.floor(random() * 3)] as ShapeKind
+        const kind = SIDE_LADDER_KINDS[
+          1 + Math.floor(random() * 3)
+        ] as ShapeKind
         next = { ...next, [track.target]: { ...element, kind } } as Cell
       }
     }
 
     if (track.dim === 'anchor') {
       const element = next[track.target]
-      if (element && element.class === 'inner') {
-        next = { ...next, inner: { ...element, anchor: pick(random, PERIMETER_ANCHORS) as Anchor } }
-      }
+      if (element && element.class === 'inner')
+        next = {
+          ...next,
+          inner: {
+            ...element,
+            anchor: pick(random, PERIMETER_ANCHORS) as Anchor,
+          },
+        }
     }
 
     if (track.dim === 'size') {
@@ -272,8 +307,13 @@ function normaliseBase(cell: Cell, tracks: Track[], random: () => number): Cell 
          * step 9. Leaving three steps of headroom below that is what makes the band 2..5 here
          * instead of 4..8.
          */
-        const band = next.mark ? 2 + Math.floor(random() * 4) : 4 + Math.floor(random() * 5)
-        next = { ...next, [track.target]: { ...element, sizeStep: band } } as Cell
+        const band = next.mark
+          ? 2 + Math.floor(random() * 4)
+          : 4 + Math.floor(random() * 5)
+        next = {
+          ...next,
+          [track.target]: { ...element, sizeStep: band },
+        } as Cell
       }
     }
   }
@@ -355,9 +395,8 @@ function buildTracked(
    * it, because the options are genuinely distinct pictures. A co-active ordinal dimension
    * makes the palindrome reading self-contradictory, which is what restores a single answer.
    */
-  if (layout.confirmations < 2 && !tracks.some(track => ORDINAL.has(track.dim))) {
+  if (layout.confirmations < 2 && !tracks.some(track => ORDINAL.has(track.dim)))
     return null
-  }
 
   const base = normaliseBase(baseCell(random, slots), tracks, random)
   const cells = emptyGrid(layout)
@@ -376,16 +415,24 @@ function buildTracked(
    * item with nothing to notice. Failing here just re-rolls the base on the next attempt,
    * which is cheaper and more complete than trying to enumerate the safe bases up front.
    */
-  for (const track of tracks) {
+  for (const track of tracks)
     if (!trackIsWitnessed(track, layout, cells)) return null
-  }
 
   const hole = holeCoords(layout)
   const answer = cellAt(base, tracks, hole.row, hole.col)
   if (!noHiddenLayers(answer)) return null
   if (cells.some(cell => cell && !noHiddenLayers(cell))) return null
 
-  const distractors = buildDistractors(base, tracks, layout.id, hole, answer, slots, drivable, cells)
+  const distractors = buildDistractors(
+    base,
+    tracks,
+    layout.id,
+    hole,
+    answer,
+    slots,
+    drivable,
+    cells
+  )
   if (!distractors) return null
 
   const driven = new Set(tracks.map(track => track.target))
@@ -450,7 +497,10 @@ function buildDistractors(
   tracks.slice(1).forEach((track, index) => {
     const frozen = [...tracks]
     frozen[index + 1] = { ...track, step: 0 }
-    candidates.push({ cell: cellAt(base, frozen, hole.row, hole.col), error: 'secondary-frozen' })
+    candidates.push({
+      cell: cellAt(base, frozen, hole.row, hole.col),
+      error: 'secondary-frozen',
+    })
   })
 
   if (layoutId !== '1x3-sequence') {
@@ -461,7 +511,10 @@ function buildDistractors(
     candidates.push({
       cell: cellAt(
         base,
-        tracks.map(track => ({ ...track, axis: track.axis === 'col' ? 'row' : 'col' }) as Track),
+        tracks.map(
+          track =>
+            ({ ...track, axis: track.axis === 'col' ? 'row' : 'col' }) as Track
+        ),
         hole.row,
         hole.col
       ),
@@ -483,7 +536,13 @@ function buildDistractors(
     if (tracks.some(track => track.dim === dim)) continue
     const target = drivable.find(slot => slot !== 'tally')
     if (!target) continue
-    const swapped: Track = { dim, target, axis: primary.axis, step: primary.step, phase: primary.phase }
+    const swapped: Track = {
+      dim,
+      target,
+      axis: primary.axis,
+      step: primary.step,
+      phase: primary.phase,
+    }
     candidates.push({
       cell: cellAt(base, [...tracks, swapped], hole.row, hole.col),
       error: 'dimension-swap',
@@ -519,9 +578,8 @@ function buildDistractors(
   }
 
   // Wider off-by-N, still a statable error rather than noise.
-  for (const shift of [2, -2, 3, -3]) {
+  for (const shift of [2, -2, 3, -3])
     candidates.push({ cell: withPrimaryShift(shift), error: 'off-by-one-step' })
-  }
 
   /**
    * The grid's own cells, echoed back.
@@ -537,11 +595,12 @@ function buildDistractors(
    */
   const echoes = grid
     .map((cell, index) => ({ cell, index }))
-    .filter((entry): entry is { cell: Cell; index: number } => entry.cell != null)
+    .filter(
+      (entry): entry is { cell: Cell; index: number } => entry.cell != null
+    )
     .sort((a, b) => b.index - a.index)
-  for (const { cell } of echoes) {
+  for (const { cell } of echoes)
     candidates.push({ cell, error: 'operand-echo' })
-  }
 
   const chosen: Distractor[] = []
   const modelCount = new Map<ErrorModel, number>()
@@ -550,7 +609,8 @@ function buildDistractors(
     if (chosen.length === 5) break
     if (!noHiddenLayers(candidate.cell)) continue
     if (!perceptuallyDistinct(candidate.cell, answer)) continue
-    if (chosen.some(other => !perceptuallyDistinct(candidate.cell, other.cell))) continue
+    if (chosen.some(other => !perceptuallyDistinct(candidate.cell, other.cell)))
+      continue
     // No model more than twice: five near-identical off-by-ones would measure arithmetic
     // precision rather than whether the rule was found.
     if ((modelCount.get(candidate.error) ?? 0) >= 2) continue
@@ -568,7 +628,11 @@ function buildDistractors(
   return chosen
 }
 
-const ALL_LAYOUTS: readonly LayoutId[] = ['3x3-matrix', '1x3-sequence', '2x2-matrix']
+const ALL_LAYOUTS: readonly LayoutId[] = [
+  '3x3-matrix',
+  '1x3-sequence',
+  '2x2-matrix',
+]
 const MATRICES: readonly LayoutId[] = ['3x3-matrix', '2x2-matrix']
 
 // ---------------------------------------------------------------------------------------
@@ -580,21 +644,29 @@ const LATTICE_SLOTS = LATTICE * LATTICE
 type Operator = 'and' | 'or' | 'xor'
 const OPERATORS: readonly Operator[] = ['and', 'or', 'xor']
 
-function applyOperator(op: Operator, a: readonly number[], b: readonly number[]): number[] {
+function applyOperator(
+  op: Operator,
+  a: readonly number[],
+  b: readonly number[]
+): number[] {
   const setA = new Set(a)
   const setB = new Set(b)
   const out: number[] = []
   for (let i = 0; i < LATTICE_SLOTS; i += 1) {
     const inA = setA.has(i)
     const inB = setB.has(i)
-    const on = op === 'and' ? inA && inB : op === 'or' ? inA || inB : inA !== inB
+    const on =
+      op === 'and' ? inA && inB : op === 'or' ? inA || inB : inA !== inB
     if (on) out.push(i)
   }
   return out
 }
 
 function fieldCell(filled: readonly number[], extras: Cell): Cell {
-  return { ...extras, field: { class: 'field', size: LATTICE, filled: [...filled] } }
+  return {
+    ...extras,
+    field: { class: 'field', size: LATTICE, filled: [...filled] },
+  }
 }
 
 /**
@@ -653,7 +725,11 @@ const setLogic: RuleSpec = {
     const extras: Cell = {}
     const decoySlots: Target[] = []
     if (composition >= 1) {
-      extras.frame = { class: 'frame', ...randomBody(random, 13), shading: 'outline' }
+      extras.frame = {
+        class: 'frame',
+        ...randomBody(random, 13),
+        shading: 'outline',
+      }
       decoySlots.push('frame')
     }
     if (composition >= 2) {
@@ -673,13 +749,12 @@ const setLogic: RuleSpec = {
     })
 
     const cells = emptyGrid(layout)
-    for (let row = 0; row < 3; row += 1) {
+    for (let row = 0; row < 3; row += 1)
       for (let col = 0; col < 3; col += 1) {
         const index = row * 3 + col
         if (index === layout.holeIndex) continue
         cells[index] = fieldCell(rows[row]?.[col] as number[], extras)
       }
-    }
 
     const a = rows[2]?.[0] as number[]
     const b = rows[2]?.[1] as number[]
@@ -688,7 +763,8 @@ const setLogic: RuleSpec = {
 
     // An empty or completely full answer is a different kind of thing from the other options,
     // so it can be picked without reasoning.
-    if (answerFilled.length === 0 || answerFilled.length === LATTICE_SLOTS) return null
+    if (answerFilled.length === 0 || answerFilled.length === LATTICE_SLOTS)
+      return null
 
     const flipOne = (base: readonly number[], salt: number): number[] => {
       const set = new Set(base)
@@ -706,12 +782,21 @@ const setLogic: RuleSpec = {
         error: 'dimension-swap' as ErrorModel,
       })),
       // Right operator, one slot wrong.
-      { cell: fieldCell(flipOne(answerFilled, 1), extras), error: 'off-by-one-step' },
-      { cell: fieldCell(flipOne(answerFilled, 2), extras), error: 'off-by-one-step' },
+      {
+        cell: fieldCell(flipOne(answerFilled, 1), extras),
+        error: 'off-by-one-step',
+      },
+      {
+        cell: fieldCell(flipOne(answerFilled, 2), extras),
+        error: 'off-by-one-step',
+      },
       // The operands handed back - the "it looks like these" instinct.
       { cell: fieldCell(a, extras), error: 'operand-echo' },
       { cell: fieldCell(b, extras), error: 'operand-echo' },
-      { cell: fieldCell(flipOne(answerFilled, 4), extras), error: 'not-advanced' },
+      {
+        cell: fieldCell(flipOne(answerFilled, 4), extras),
+        error: 'not-advanced',
+      },
     ]
 
     const chosen: Distractor[] = []
@@ -720,7 +805,10 @@ const setLogic: RuleSpec = {
       if (chosen.length === 5) break
       if (!noHiddenLayers(candidate.cell)) continue
       if (!perceptuallyDistinct(candidate.cell, answer)) continue
-      if (chosen.some(other => !perceptuallyDistinct(candidate.cell, other.cell))) continue
+      if (
+        chosen.some(other => !perceptuallyDistinct(candidate.cell, other.cell))
+      )
+        continue
       if ((seen.get(candidate.error) ?? 0) >= 2) continue
       seen.set(candidate.error, (seen.get(candidate.error) ?? 0) + 1)
       chosen.push(candidate)
@@ -755,7 +843,8 @@ function tracked(
   return {
     name,
     capabilities,
-    build: (random, profile) => buildTracked(random, profile, primary, secondaries),
+    build: (random, profile) =>
+      buildTracked(random, profile, primary, secondaries),
   }
 }
 
@@ -825,12 +914,17 @@ export const RULES: readonly RuleSpec[] = [
     layouts: MATRICES,
     composition: { min: 0, max: 3 },
   }),
-  tracked('side-progression', 'sides', ['shading', 'size', 'rotation', 'count', 'anchor'], {
-    rungs: { min: 1, max: 26 },
-    maxDimensions: 3,
-    layouts: ALL_LAYOUTS,
-    composition: { min: 0, max: 3 },
-  }),
+  tracked(
+    'side-progression',
+    'sides',
+    ['shading', 'size', 'rotation', 'count', 'anchor'],
+    {
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ALL_LAYOUTS,
+      composition: { min: 0, max: 3 },
+    }
+  ),
   tracked('rotation', 'rotation', ['shading', 'size', 'count', 'anchor'], {
     rungs: { min: 1, max: 26 },
     maxDimensions: 3,
@@ -864,14 +958,19 @@ export const RULES: readonly RuleSpec[] = [
     composition: { min: 1, max: 3 },
   }),
   setLogic,
-  tracked('count-progression', 'count', ['shading', 'size', 'rotation', 'anchor'], {
-    // Composition 1 at minimum, so a shape-bearing slot exists for the secondary dimensions
-    // to run on - a tally alone has nothing but its own count.
-    rungs: { min: 1, max: 26 },
-    maxDimensions: 3,
-    layouts: ALL_LAYOUTS,
-    composition: { min: 1, max: 3 },
-  }),
+  tracked(
+    'count-progression',
+    'count',
+    ['shading', 'size', 'rotation', 'anchor'],
+    {
+      // Composition 1 at minimum, so a shape-bearing slot exists for the secondary dimensions
+      // to run on - a tally alone has nothing but its own count.
+      rungs: { min: 1, max: 26 },
+      maxDimensions: 3,
+      layouts: ALL_LAYOUTS,
+      composition: { min: 1, max: 3 },
+    }
+  ),
 ]
 
 export const RULES_BY_NAME: Record<string, RuleSpec> = Object.fromEntries(

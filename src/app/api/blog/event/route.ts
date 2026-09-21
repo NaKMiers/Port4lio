@@ -3,7 +3,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { jsonError } from '@/lib/api-response'
 import { recordPostEvent } from '@/lib/blog/post-events'
 import { connectDatabase } from '@/lib/mongodb'
-import { BLOG_EVENT_LIMIT, checkRateLimit, clientIpFrom } from '@/lib/rate-limit'
+import {
+  BLOG_EVENT_LIMIT,
+  checkRateLimit,
+  clientIpFrom,
+} from '@/lib/rate-limit'
 import { readJsonBody } from '@/lib/read-json-body'
 import { SLUG_PATTERN } from '@/lib/blog/constants'
 
@@ -77,38 +81,44 @@ export async function POST(request: NextRequest) {
     await connectDatabase()
   } catch (error) {
     // 204, not 503. A reader's browser can do nothing with either, and the page is fine.
-    console.error('[api/blog/event] database unreachable - event dropped', error)
+    console.error(
+      '[api/blog/event] database unreachable - event dropped',
+      error
+    )
     return new NextResponse(null, { status: 204 })
   }
 
   const limit = await checkRateLimit(clientIpFrom(request), BLOG_EVENT_LIMIT)
-  if (!limit.ok) {
+  if (!limit.ok)
     return NextResponse.json(
       { error: 'Too many events from this connection.' },
-      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+      {
+        status: 429,
+        headers: { 'Retry-After': String(limit.retryAfterSeconds) },
+      }
     )
-  }
 
-  const parsed = await readJsonBody<{ kind?: unknown; slug?: unknown; sessionId?: unknown; token?: unknown }>(
-    request,
-    { maxBytes: EVENT_MAX_BODY_BYTES }
-  )
+  const parsed = await readJsonBody<{
+    kind?: unknown
+    slug?: unknown
+    sessionId?: unknown
+    token?: unknown
+  }>(request, { maxBytes: EVENT_MAX_BODY_BYTES })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
   const { kind, slug, sessionId, token } = parsed.body ?? {}
 
-  if (typeof kind !== 'string' || !KINDS.has(kind)) {
+  if (typeof kind !== 'string' || !KINDS.has(kind))
     return jsonError('Unknown event kind.', 400)
-  }
-  if (typeof slug !== 'string' || !SLUG_PATTERN.test(slug)) {
+
+  if (typeof slug !== 'string' || !SLUG_PATTERN.test(slug))
     return jsonError('Invalid slug.', 400)
-  }
-  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) {
+
+  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId))
     return jsonError('Invalid session id.', 400)
-  }
-  if (kind !== 'view' && (typeof token !== 'string' || !SESSION_ID.test(token))) {
+
+  if (kind !== 'view' && (typeof token !== 'string' || !SESSION_ID.test(token)))
     return jsonError('Invalid share token.', 400)
-  }
 
   /**
    * The subject is what makes the `_id` idempotent, and it differs per kind.
@@ -126,7 +136,11 @@ export async function POST(request: NextRequest) {
         ? String(token)
         : `${String(token)}:${sessionId}`
 
-  await recordPostEvent({ kind: kind as 'view' | 'share' | 'attribute', slug, subject })
+  await recordPostEvent({
+    kind: kind as 'view' | 'share' | 'attribute',
+    slug,
+    subject,
+  })
 
   return new NextResponse(null, { status: 204 })
 }

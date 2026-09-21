@@ -74,7 +74,7 @@ async function renderLayout(
   lang: string
 ) {
   const element = await layout({
-    children: <main id='page-content'>questionnaire</main>,
+    children: <main id="page-content">questionnaire</main>,
     params: Promise.resolve({ lang }),
   })
   return renderToStaticMarkup(element as React.ReactElement)
@@ -87,7 +87,7 @@ describe('the questionnaires live in the (plain) group', () => {
   // Cheap, and the only assertions in this file that survive a directory rename. Both
   // directions are asserted: present under (plain) AND absent under (pitch), because a copy
   // left behind in the wrong group is a build failure nobody would attribute to this rule.
-  for (const product of ['mbti', 'iq'] as const) {
+  for (const product of ['mbti', 'iq'] as const)
     it(`${product}/test is under (plain), not (pitch)`, () => {
       expect(
         existsSync(path.join(APP, product, '(plain)/test/page.tsx')),
@@ -99,12 +99,14 @@ describe('the questionnaires live in the (plain) group', () => {
         `a ${product}/test directory appeared in the (pitch) group`
       ).toBe(false)
     })
-  }
 
   it('the path these assertions resolve against is real', () => {
     // Guards the guard. `existsSync` on a wrong root returns false for everything, which
     // would turn the "absent from (pitch)" half above into a test that always passes.
-    expect(existsSync(path.join(APP, 'layout.tsx')), `APP does not resolve: ${APP}`).toBe(true)
+    expect(
+      existsSync(path.join(APP, 'layout.tsx')),
+      `APP does not resolve: ${APP}`
+    ).toBe(true)
   })
 })
 
@@ -153,7 +155,11 @@ describe('availability block placement', () => {
     // Each group layout re-validates `lang` instead of trusting the parent. If that check
     // were dropped, `/garbage/mbti/test` would render the product under a nonsense
     // language - and `isLocale` is also what narrows the type for the shell below it.
-    await expect(renderLayout(MbtiPlainLayout, 'garbage')).rejects.toThrow('notFound() called')
-    await expect(renderLayout(IqPitchLayout, 'garbage')).rejects.toThrow('notFound() called')
+    await expect(renderLayout(MbtiPlainLayout, 'garbage')).rejects.toThrow(
+      'notFound() called'
+    )
+    await expect(renderLayout(IqPitchLayout, 'garbage')).rejects.toThrow(
+      'notFound() called'
+    )
   })
 })

@@ -23,6 +23,7 @@ export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export function normaliseEmail(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   const email = raw.trim().toLowerCase()
-  if (!email || email.length > MAX_EMAIL_LENGTH || !EMAIL_PATTERN.test(email)) return null
+  if (!email || email.length > MAX_EMAIL_LENGTH || !EMAIL_PATTERN.test(email))
+    return null
   return email
 }

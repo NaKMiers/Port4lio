@@ -46,11 +46,14 @@ const PROPS = {
   activeProduct: 'mbti',
 }
 
-const CHILDREN = <main id='page-content'>content</main>
+const CHILDREN = <main id="page-content">content</main>
 
 function render(extra: { footerSlot?: React.ReactNode } = {}) {
   return renderToStaticMarkup(
-    <TestChrome {...PROPS} {...extra}>
+    <TestChrome
+      {...PROPS}
+      {...extra}
+    >
       {CHILDREN}
     </TestChrome>
   )
@@ -75,7 +78,7 @@ describe('TestChrome footerSlot', () => {
   })
 
   it('inserts exactly the slot content, in exactly one place, and alters nothing else', () => {
-    const slot = <aside id='slot-probe'>PITCH</aside>
+    const slot = <aside id="slot-probe">PITCH</aside>
     const slotHtml = renderToStaticMarkup(slot)
 
     const without = render()

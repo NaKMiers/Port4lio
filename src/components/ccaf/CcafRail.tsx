@@ -58,7 +58,10 @@ function headroom(weight: number, level: number): number {
  */
 function ReadinessStrip({ confidence }: { confidence: readonly number[] }) {
   return (
-    <div className='flex h-2.5 gap-[3px]' role='presentation'>
+    <div
+      className="flex h-2.5 gap-[3px]"
+      role="presentation"
+    >
       {DOMAINS.map((domain, i) => {
         const level = confidence[i] ?? 0
         return (
@@ -66,7 +69,7 @@ function ReadinessStrip({ confidence }: { confidence: readonly number[] }) {
             key={domain.key}
             // Each block rounded on its own, with a real gap between: run them together
             // and the unfilled tail of one domain reads as the start of the next.
-            className='relative overflow-hidden rounded-full bg-pp-line'
+            className="relative overflow-hidden rounded-full bg-pp-line"
             style={{ flexGrow: domain.weight }}
           >
             <span
@@ -111,17 +114,17 @@ function DomainRow({
       Math.max(...DOMAINS.map((d, i) => headroom(d.weight, allLevels[i] ?? 0)))
 
   return (
-    <div className='border-t border-pp-line py-2.5 first:border-t-0 first:pt-0'>
-      <div className='flex items-baseline justify-between gap-2'>
-        <span className='flex min-w-0 items-baseline gap-1.5'>
+    <div className="border-t border-pp-line py-2.5 first:border-t-0 first:pt-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="flex min-w-0 items-baseline gap-1.5">
           <span
             className={cx(
               'h-1.5 w-1.5 shrink-0 translate-y-[-1px] rounded-full',
               domainAccentClass(domain.key)
             )}
-            aria-hidden='true'
+            aria-hidden="true"
           />
-          <span className='truncate text-[13px] font-semibold text-pp-text'>
+          <span className="truncate text-[13px] font-semibold text-pp-text">
             D{domain.key} · {domain.short}
           </span>
         </span>
@@ -142,9 +145,9 @@ function DomainRow({
           ) : null}
         </span>
       </div>
-      <div className='mt-1 flex items-center gap-3'>
+      <div className="mt-1 flex items-center gap-3">
         <input
-          type='range'
+          type="range"
           min={0}
           max={MAX_CONFIDENCE}
           step={1}
@@ -225,22 +228,25 @@ function MockForm({
   }
 
   return (
-    <form onSubmit={submit} className='space-y-2.5'>
-      <div className='grid grid-cols-2 gap-2'>
-        <label className='space-y-1'>
+    <form
+      onSubmit={submit}
+      className="space-y-2.5"
+    >
+      <div className="grid grid-cols-2 gap-2">
+        <label className="space-y-1">
           <span className={fieldLabelCls}>{t(UI.mockDate, locale)}</span>
           <input
-            type='date'
+            type="date"
             value={date}
             disabled={!editable}
             onChange={event => setDate(event.target.value)}
             className={fieldCls}
           />
         </label>
-        <label className='space-y-1'>
+        <label className="space-y-1">
           <span className={fieldLabelCls}>{t(UI.mockLabel, locale)}</span>
           <input
-            type='text'
+            type="text"
             value={label}
             maxLength={24}
             placeholder={t(UI.mockLabelPlaceholder, locale)}
@@ -250,31 +256,34 @@ function MockForm({
           />
         </label>
       </div>
-      <label className='block space-y-1'>
+      <label className="block space-y-1">
         <span className={fieldLabelCls}>{t(UI.mockCorrect, locale)}</span>
         <input
-          type='number'
+          type="number"
           min={0}
           max={MOCK_QUESTION_COUNT}
           value={correct}
-          placeholder='48'
+          placeholder="48"
           disabled={!editable}
           onChange={event => setCorrect(event.target.value)}
           className={fieldCls}
         />
       </label>
-      <div className='grid grid-cols-5 gap-1.5'>
+      <div className="grid grid-cols-5 gap-1.5">
         {DOMAINS.map((domain, i) => (
-          <label key={domain.key} className='space-y-1'>
+          <label
+            key={domain.key}
+            className="space-y-1"
+          >
             <span className={cx(fieldLabelCls, 'tracking-normal')}>
               D{domain.key} %
             </span>
             <input
-              type='number'
+              type="number"
               min={0}
               max={100}
               value={percents[i] ?? ''}
-              placeholder='-'
+              placeholder="-"
               disabled={!editable}
               onChange={event =>
                 setPercents(current =>
@@ -290,14 +299,14 @@ function MockForm({
       </div>
       {error ? (
         <p
-          role='alert'
-          className='rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900'
+          role="alert"
+          className="rounded-lg border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs text-red-900"
         >
           {error}
         </p>
       ) : null}
       <button
-        type='submit'
+        type="submit"
         disabled={!editable}
         className={cx(primaryBtnCls, 'w-full')}
       >
@@ -349,7 +358,7 @@ function MockCard({
 
   return (
     <div
-      className='rounded-xl border border-pp-line bg-pp-bg/50 px-3 py-2.5'
+      className="rounded-xl border border-pp-line bg-pp-bg/50 px-3 py-2.5"
       onKeyDown={event => {
         if (!confirming || event.key !== 'Escape') return
         // Stopped so a future dialog or drawer around this rail does not also close on the
@@ -358,8 +367,8 @@ function MockCard({
         setConfirming(false)
       }}
     >
-      <div className='flex flex-wrap items-baseline gap-x-2 gap-y-1'>
-        <span className='font-display text-lg font-semibold tabular-nums text-pp-text'>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="font-display text-lg font-semibold tabular-nums text-pp-text">
           {mock.correct}
           <span className={mutedMonoCls}>/{MOCK_QUESTION_COUNT}</span>
         </span>
@@ -368,7 +377,7 @@ function MockCard({
         >
           <span
             className={cx('h-1.5 w-1.5 rounded-full', BAND_DOT[band])}
-            aria-hidden='true'
+            aria-hidden="true"
           />
           {percent}%
         </span>
@@ -377,7 +386,7 @@ function MockCard({
         </span>
         {editable ? (
           <button
-            type='button'
+            type="button"
             onClick={() => setConfirming(current => !current)}
             aria-expanded={confirming}
             aria-controls={confirmId}
@@ -391,12 +400,15 @@ function MockCard({
                 : 'text-pp-muted hover:bg-pp-line hover:text-pp-text'
             )}
           >
-            <X className='h-3.5 w-3.5' aria-hidden='true' />
+            <X
+              className="h-3.5 w-3.5"
+              aria-hidden="true"
+            />
           </button>
         ) : null}
       </div>
 
-      <div className='mt-1.5 flex flex-wrap gap-1'>
+      <div className="mt-1.5 flex flex-wrap gap-1">
         {mock.domainPercents.map((value, i) => {
           const domain = DOMAINS[i]
           if (!domain || value === null) return null
@@ -419,25 +431,25 @@ function MockCard({
       {confirming ? (
         <div
           id={confirmId}
-          role='group'
+          role="group"
           aria-label={t(UI.mockDeleteConfirm, locale)}
-          className='mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-red-200/80 bg-red-50/90 px-2.5 py-2'
+          className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-red-200/80 bg-red-50/90 px-2.5 py-2"
         >
-          <span className='mr-auto text-xs font-semibold text-red-900'>
+          <span className="mr-auto text-xs font-semibold text-red-900">
             {t(UI.mockDeleteConfirm, locale)}
           </span>
           <button
             ref={confirmRef}
-            type='button'
+            type="button"
             onClick={() => onRemove(mock.id)}
-            className='inline-flex min-h-[30px] items-center rounded-full bg-red-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+            className="inline-flex min-h-[30px] items-center rounded-full bg-red-600 px-3 text-[11px] font-semibold text-white transition-colors hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
           >
             {t(UI.mockDelete, locale)}
           </button>
           <button
-            type='button'
+            type="button"
             onClick={() => setConfirming(false)}
-            className='inline-flex min-h-[30px] items-center rounded-full border border-pp-line bg-pp-panel-strong px-3 text-[11px] font-semibold text-pp-text transition-colors hover:border-pp-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue'
+            className="inline-flex min-h-[30px] items-center rounded-full border border-pp-line bg-pp-panel-strong px-3 text-[11px] font-semibold text-pp-text transition-colors hover:border-pp-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue"
           >
             {t(UI.mockDeleteCancel, locale)}
           </button>
@@ -467,8 +479,11 @@ export default function CcafRail({
 
   return (
     <>
-      <EditorialPanel variant='strong' className='p-5'>
-        <h3 className='font-display text-base font-semibold tracking-tight text-pp-text'>
+      <EditorialPanel
+        variant="strong"
+        className="p-5"
+      >
+        <h3 className="font-display text-base font-semibold tracking-tight text-pp-text">
           {t(UI.readinessTitle, locale)}
         </h3>
 
@@ -477,25 +492,25 @@ export default function CcafRail({
           far end of five rows: the filled segments literally add up to this number, and
           separating them made it look like an unrelated verdict.
         */}
-        <div className='mt-3 rounded-xl border border-pp-line bg-pp-bg/50 px-3.5 py-3'>
-          <div className='flex items-baseline justify-between gap-3'>
-            <span className='font-display text-[2rem] font-semibold leading-none tabular-nums text-pp-text'>
+        <div className="mt-3 rounded-xl border border-pp-line bg-pp-bg/50 px-3.5 py-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-display text-[2rem] font-semibold tabular-nums leading-none text-pp-text">
               {readiness === null ? '-' : `${readiness}%`}
             </span>
-            <span className='text-right text-[11px] leading-tight text-pp-muted'>
+            <span className="text-right text-[11px] leading-tight text-pp-muted">
               {t(UI.readinessTotal, locale)}
             </span>
           </div>
-          <div className='mt-2.5'>
+          <div className="mt-2.5">
             <ReadinessStrip confidence={state.confidence} />
           </div>
         </div>
 
-        <p className='mt-3 text-xs leading-relaxed text-pp-muted'>
+        <p className="mt-3 text-xs leading-relaxed text-pp-muted">
           <RichText>{t(UI.readinessHelp, locale)}</RichText>
         </p>
 
-        <div className='mt-3'>
+        <div className="mt-3">
           {DOMAINS.map((domain, i) => (
             <DomainRow
               key={domain.key}
@@ -510,21 +525,28 @@ export default function CcafRail({
         </div>
       </EditorialPanel>
 
-      <EditorialPanel variant='strong' className='p-5'>
-        <h3 className='font-display text-base font-semibold tracking-tight text-pp-text'>
+      <EditorialPanel
+        variant="strong"
+        className="p-5"
+      >
+        <h3 className="font-display text-base font-semibold tracking-tight text-pp-text">
           {t(UI.mocksTitle, locale)}
         </h3>
-        <p className='mt-1 text-xs leading-relaxed text-pp-muted'>
+        <p className="mt-1 text-xs leading-relaxed text-pp-muted">
           <RichText>{t(UI.mocksHelp, locale)}</RichText>
         </p>
 
-        <div className='mt-3'>
-          <MockForm locale={locale} onAdd={onAddMock} editable={editable} />
+        <div className="mt-3">
+          <MockForm
+            locale={locale}
+            onAdd={onAddMock}
+            editable={editable}
+          />
         </div>
 
-        <div className='mt-4 space-y-2'>
+        <div className="mt-4 space-y-2">
           {mocks.length === 0 ? (
-            <p className='rounded-lg border border-dashed border-pp-line px-3 py-4 text-center text-xs text-pp-muted'>
+            <p className="rounded-lg border border-dashed border-pp-line px-3 py-4 text-center text-xs text-pp-muted">
               {t(UI.mockEmpty, locale)}
             </p>
           ) : (
