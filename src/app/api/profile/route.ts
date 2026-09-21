@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
  * instead - the asymmetry is deliberate, hence the name.
  */
 function toOwnerProfile(doc: Record<string, unknown>) {
-  const { _id, createdAt, updatedAt, ...profile } = doc
+  const { _id, createdAt: _createdAt, updatedAt: _updatedAt, ...profile } = doc
   return profile
 }
 

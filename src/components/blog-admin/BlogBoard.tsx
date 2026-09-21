@@ -8,9 +8,13 @@ import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
 import GenerateBlogDialog from '@/components/blog-admin/GenerateBlogDialog'
 import PostRowActions from '@/components/blog-admin/PostRowActions'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
+import SelectField, {
+  type SelectOption,
+} from '@/components/settings/SelectField'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoading from '@/components/settings/SettingLoading'
 import {
+  ghostBtnCls,
   inputCls,
   primaryBtnCls,
   secondaryBtnCls,
@@ -62,6 +66,7 @@ type BoardPost = {
   title: string
   kind: string
   series: string | null
+  language: 'vi' | 'en'
   isPillar: boolean
   coverImage: string | null
   status: 'draft' | 'published' | 'archived' | 'deleted'
@@ -132,6 +137,18 @@ export default function BlogBoard() {
   } | null>(null)
   const [generating, setGenerating] = useState(false)
 
+  /**
+   * Kind and series filters, keyed by slug - `'all'` is not a real slug, so it can never
+   * collide with one. Fetched rather than derived from `posts`: a kind or series with zero
+   * posts right now (just created, or every post using it was archived) still belongs in the
+   * dropdown, the same reasoning `BlogEditor`'s own Kind/Series fields follow.
+   */
+  const [kindOptions, setKindOptions] = useState<SelectOption[]>([])
+  const [seriesOptions, setSeriesOptions] = useState<SelectOption[]>([])
+  const [kindFilter, setKindFilter] = useState('all')
+  const [seriesFilter, setSeriesFilter] = useState('all')
+  const [languageFilter, setLanguageFilter] = useState('all')
+
   const load = useCallback(async () => {
     setError(null)
     try {
@@ -150,8 +167,47 @@ export default function BlogBoard() {
     }
   }, [])
 
+  const loadKinds = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/blog/kinds', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        kinds?: { slug: string; label: string }[]
+      }
+      setKindOptions(
+        (data.kinds ?? []).map(item => ({
+          value: item.slug,
+          label: item.label,
+        }))
+      )
+    } catch {
+      // Silent, same as the board's own load: a failed taxonomy fetch must not stop the list
+      // of posts from rendering, it just leaves the filter's dropdown short.
+    }
+  }, [])
+
+  const loadSeries = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/blog/series', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        series?: { slug: string; title: string }[]
+      }
+      setSeriesOptions(
+        (data.series ?? []).map(item => ({
+          value: item.slug,
+          label: item.title,
+        }))
+      )
+    } catch {
+      // Silent, same as loadKinds.
+    }
+  }, [])
+
   const bootstrap = useEffectEvent(() => {
     void load()
+    void loadKinds()
+    void loadSeries()
   })
 
   // Deferred to a macrotask so the fetch's setState does not run inside the effect body,
@@ -287,6 +343,37 @@ export default function BlogBoard() {
       .at(-1) ?? null
   const quietDays = daysSince(lastPublished)
 
+  const kindFilterOptions: SelectOption[] = [
+    { value: 'all', label: 'All kinds' },
+    ...kindOptions,
+  ]
+  const seriesFilterOptions: SelectOption[] = [
+    { value: 'all', label: 'All series' },
+    { value: 'none', label: 'No series' },
+    ...seriesOptions,
+  ]
+  const languageFilterOptions: SelectOption[] = [
+    { value: 'all', label: 'All languages' },
+    { value: 'en', label: 'English' },
+    { value: 'vi', label: 'Vietnamese' },
+  ]
+  const filtersActive =
+    kindFilter !== 'all' || seriesFilter !== 'all' || languageFilter !== 'all'
+
+  const filteredPosts = (posts ?? []).filter(post => {
+    if (kindFilter !== 'all' && post.kind !== kindFilter) return false
+    if (
+      seriesFilter !== 'all' &&
+      (seriesFilter === 'none'
+        ? post.series !== null
+        : post.series !== seriesFilter)
+    )
+      return false
+    if (languageFilter !== 'all' && post.language !== languageFilter)
+      return false
+    return true
+  })
+
   return (
     <OwnerAuthGate onAuthed={() => void load()}>
       <div className="mx-auto w-full max-w-editorial px-gutter py-10">
@@ -362,8 +449,71 @@ export default function BlogBoard() {
           />
         </div>
 
+        {/*
+          Filters narrow which rows render below - they never touch `posts` itself, so the
+          "days since the last publish" figure above and the create-draft flow stay computed
+          over every post regardless of what is currently filtered out.
+        */}
+        <div className="mt-6 flex flex-wrap items-end gap-3">
+          <div className="min-w-[10rem] flex-1">
+            <label
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
+              htmlFor="filter-kind"
+            >
+              Kind
+            </label>
+            <SelectField
+              id="filter-kind"
+              value={kindFilter}
+              options={kindFilterOptions}
+              onChange={setKindFilter}
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1">
+            <label
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
+              htmlFor="filter-series"
+            >
+              Series
+            </label>
+            <SelectField
+              id="filter-series"
+              value={seriesFilter}
+              options={seriesFilterOptions}
+              onChange={setSeriesFilter}
+            />
+          </div>
+          <div className="min-w-[10rem] flex-1">
+            <label
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
+              htmlFor="filter-language"
+            >
+              Language
+            </label>
+            <SelectField
+              id="filter-language"
+              value={languageFilter}
+              options={languageFilterOptions}
+              onChange={setLanguageFilter}
+            />
+          </div>
+          {filtersActive ? (
+            <button
+              type="button"
+              className={ghostBtnCls}
+              onClick={() => {
+                setKindFilter('all')
+                setSeriesFilter('all')
+                setLanguageFilter('all')
+              }}
+            >
+              Clear filters
+            </button>
+          ) : null}
+        </div>
+
         <ul className="mt-8 space-y-2">
-          {(posts ?? []).map(post => (
+          {filteredPosts.map(post => (
             <li
               key={post._id}
               className={[
@@ -587,6 +737,12 @@ export default function BlogBoard() {
           <p className="mt-8 text-sm text-pp-muted">
             No posts yet. The first three should be mined from source comments
             you have already written - see <code>docs/blog/authoring.md</code>.
+          </p>
+        ) : null}
+
+        {posts !== null && posts.length > 0 && filteredPosts.length === 0 ? (
+          <p className="mt-8 text-sm text-pp-muted">
+            No posts match these filters.
           </p>
         ) : null}
       </div>

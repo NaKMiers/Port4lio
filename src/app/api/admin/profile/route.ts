@@ -23,10 +23,12 @@ export async function GET(request: NextRequest) {
     const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID).lean()
     if (!doc) return NextResponse.json({ profile: null })
 
-    const { _id, createdAt, updatedAt, ...profile } = doc as Record<
-      string,
-      unknown
-    >
+    const {
+      _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      ...profile
+    } = doc as Record<string, unknown>
     return NextResponse.json({ profile })
   } catch (error) {
     const message =
