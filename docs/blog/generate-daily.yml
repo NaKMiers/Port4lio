@@ -1,0 +1,84 @@
+# The daily blog cron, as a GitHub Actions workflow.
+#
+# This is the ALTERNATIVE to `vercel.json`'s `crons` entry, not a companion to it - running
+# both means two posts a day requested and one of them refused by the limiter every morning,
+# which is a 429 in the logs that means nothing is wrong. Pick one and delete the other.
+#
+# Use this one when the deployment is NOT on Vercel, and for that reason alone.
+#
+# It does not buy extra wall clock on a Vercel deployment, which is the reason it looks like it
+# exists. `maxDuration` caps the FUNCTION, not the caller, so a Vercel-hosted route is cut off
+# at its plan's ceiling (300s on Pro) whoever rang the doorbell - a patient GitHub runner just
+# waits longer for the same truncated answer. Somewhere with no per-request ceiling is where
+# this workflow earns the extra images.
+#
+# Copy to `.github/workflows/generate-daily.yml` in this repo.
+#
+# Secrets to create first:
+#   BLOG_CRON_URL     https://anhkhoa.info/api/cron/blog
+#   BLOG_CRON_SECRET  the same value as CRON_SECRET in the deployment's environment
+
+name: generate-daily
+
+on:
+  schedule:
+    # 22:22 UTC = 05:22 ICT. Off the hour on purpose - :00 is a scheduling stampede - and
+    # deliberately nowhere near 00:00 UTC, which is where the daily rate-limit window resets.
+    # A run straddling that boundary is the one case where the fixed window would allow two.
+    - cron: '22 22 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: generate-daily
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    # Well above the route's own ceiling (300s on Vercel Pro, and this is the workflow for
+    # hosts with no such cap), so a slow run is decided by the route rather than killed by the
+    # runner. The route saves the post before it draws a single image, so even a hard kill here
+    # leaves an archived post with its prompts - but a kill produces no log line, and the log
+    # line is the only record of what happened.
+    timeout-minutes: 20
+
+    steps:
+      - name: Ask for today's post
+        env:
+          CRON_URL: ${{ secrets.BLOG_CRON_URL }}
+          CRON_SECRET: ${{ secrets.BLOG_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          # No --retry. Every other curl in this repo retries and it would be wrong here: the
+          # route's guard refuses a second call for the rest of the day, so a retry after a
+          # timeout does not get the post written again - it gets a 429 that looks like a
+          # failure and masks the real one. One attempt, and the answer is whatever it says.
+          status=$(curl --silent --show-error \
+                        --max-time 900 \
+                        -X POST \
+                        -H "Authorization: Bearer ${CRON_SECRET}" \
+                        -H 'Accept: application/json' \
+                        -o response.json -w '%{http_code}' \
+                        "${CRON_URL}")
+
+          cat response.json
+          echo
+
+          if [ "${status}" = '429' ]; then
+            echo '::notice::Already generated in this window - nothing to do.'
+            exit 0
+          fi
+
+          if [ "${status}" != '201' ]; then
+            echo "::error::The blog cron answered ${status}"
+            exit 1
+          fi
+
+          # A post that came out short of an image is not a failed run - it is on the board,
+          # archived, with the prompts needed to finish it. Surfaced as a notice so it is
+          # visible in the run list without turning the workflow red every time an image
+          # provider has a bad morning.
+          if [ "$(jq -r '.published' response.json)" != 'true' ]; then
+            echo "::notice::Saved as archived - $(jq -r '.blockers | join("; ")' response.json)"
+          fi

@@ -1,5 +1,6 @@
 'use client'
 
+import { Archive, Eye, Pencil, RotateCcw, Send, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 
@@ -7,6 +8,9 @@ import ConfirmDialog from '@/components/blog-admin/ConfirmDialog'
 import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
 import GenerateBlogDialog from '@/components/blog-admin/GenerateBlogDialog'
 import PostRowActions from '@/components/blog-admin/PostRowActions'
+import TaxonomyDialog, {
+  type TaxonomyResource,
+} from '@/components/blog-admin/TaxonomyDialog'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import SelectField, {
   type SelectOption,
@@ -148,6 +152,10 @@ export default function BlogBoard() {
   const [kindFilter, setKindFilter] = useState('all')
   const [seriesFilter, setSeriesFilter] = useState('all')
   const [languageFilter, setLanguageFilter] = useState('all')
+  /** Which taxonomy dialog is open, if any. One slot: they are modal, so never both. */
+  const [taxonomyDialog, setTaxonomyDialog] = useState<TaxonomyResource | null>(
+    null
+  )
 
   const load = useCallback(async () => {
     setError(null)
@@ -343,19 +351,44 @@ export default function BlogBoard() {
       .at(-1) ?? null
   const quietDays = daysSince(lastPublished)
 
+  /**
+   * Counts are always against every post, never the other active filters - a facet count
+   * that shifted under the other two selects would make "Article (3)" mean a different 3
+   * depending on what Series and Language happen to be set to, which is a worse dropdown
+   * than one with no counts at all.
+   */
+  const allPosts = posts ?? []
+  const countWhere = (predicate: (post: BoardPost) => boolean) =>
+    allPosts.filter(predicate).length
+
   const kindFilterOptions: SelectOption[] = [
-    { value: 'all', label: 'All kinds' },
-    ...kindOptions,
+    { value: 'all', label: `All kinds (${allPosts.length})` },
+    ...kindOptions.map(option => ({
+      ...option,
+      label: `${option.label} (${countWhere(post => post.kind === option.value)})`,
+    })),
   ]
   const seriesFilterOptions: SelectOption[] = [
-    { value: 'all', label: 'All series' },
-    { value: 'none', label: 'No series' },
-    ...seriesOptions,
+    { value: 'all', label: `All series (${allPosts.length})` },
+    {
+      value: 'none',
+      label: `No series (${countWhere(post => post.series === null)})`,
+    },
+    ...seriesOptions.map(option => ({
+      ...option,
+      label: `${option.label} (${countWhere(post => post.series === option.value)})`,
+    })),
   ]
   const languageFilterOptions: SelectOption[] = [
-    { value: 'all', label: 'All languages' },
-    { value: 'en', label: 'English' },
-    { value: 'vi', label: 'Vietnamese' },
+    { value: 'all', label: `All languages (${allPosts.length})` },
+    {
+      value: 'en',
+      label: `English (${countWhere(post => post.language === 'en')})`,
+    },
+    {
+      value: 'vi',
+      label: `Vietnamese (${countWhere(post => post.language === 'vi')})`,
+    },
   ]
   const filtersActive =
     kindFilter !== 'all' || seriesFilter !== 'all' || languageFilter !== 'all'
@@ -456,12 +489,21 @@ export default function BlogBoard() {
         */}
         <div className="mt-6 flex flex-wrap items-end gap-3">
           <div className="min-w-[10rem] flex-1">
-            <label
-              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
-              htmlFor="filter-kind"
-            >
-              Kind
-            </label>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <label
+                className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
+                htmlFor="filter-kind"
+              >
+                Kind
+              </label>
+              <button
+                type="button"
+                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
+                onClick={() => setTaxonomyDialog('kinds')}
+              >
+                Manage
+              </button>
+            </div>
             <SelectField
               id="filter-kind"
               value={kindFilter}
@@ -470,12 +512,21 @@ export default function BlogBoard() {
             />
           </div>
           <div className="min-w-[10rem] flex-1">
-            <label
-              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
-              htmlFor="filter-series"
-            >
-              Series
-            </label>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <label
+                className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
+                htmlFor="filter-series"
+              >
+                Series
+              </label>
+              <button
+                type="button"
+                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
+                onClick={() => setTaxonomyDialog('series')}
+              >
+                Manage
+              </button>
+            </div>
             <SelectField
               id="filter-series"
               value={seriesFilter}
@@ -512,7 +563,15 @@ export default function BlogBoard() {
           ) : null}
         </div>
 
-        <ul className="mt-8 space-y-2">
+        {posts !== null ? (
+          <p className="mt-8 text-xs text-pp-muted">
+            {filtersActive
+              ? `${filteredPosts.length} of ${allPosts.length} post${allPosts.length === 1 ? '' : 's'}`
+              : `${allPosts.length} post${allPosts.length === 1 ? '' : 's'}`}
+          </p>
+        ) : null}
+
+        <ul className="mt-2 space-y-2">
           {filteredPosts.map(post => (
             <li
               key={post._id}
@@ -533,7 +592,16 @@ export default function BlogBoard() {
                   for `pp-*` colours and fixes it with `ppColor()`; plain `white` does not go
                   through that helper, so the only defence is staying on the scale.
                 */
-                'flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line bg-white/85 px-4 py-3 shadow-[0_18px_36px_rgba(46,35,28,0.06)] backdrop-blur-md transition',
+                /*
+                  `relative focus-within:z-20`: this row's `backdrop-blur-md` opens its own
+                  stacking context, so `PostRowActions`' `z-30` menu is only ever compared
+                  against its siblings inside THIS row - it cannot outrank the next `<li>`,
+                  which paints after it in DOM order regardless of the menu's own z-index.
+                  Raising the row's stacking level while a descendant holds focus (the menu
+                  trigger, or a focused menu item) is what actually lifts the open menu above
+                  the row below it.
+                */
+                'relative flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line bg-white/85 px-4 py-3 shadow-[0_18px_36px_rgba(46,35,28,0.06)] backdrop-blur-md transition focus-within:z-20',
                 'hover:border-pp-blue/30 hover:bg-white/95',
                 post.status === 'deleted' ? 'opacity-50' : '',
               ]
@@ -617,6 +685,8 @@ export default function BlogBoard() {
                             key: 'view',
                             label: 'View',
                             href: `/blog/${post.slug}`,
+                            tone: 'blue' as const,
+                            icon: Eye,
                           },
                         ]
                       : []),
@@ -624,6 +694,8 @@ export default function BlogBoard() {
                       key: 'edit',
                       label: 'Edit',
                       href: `/admin/blog/${post._id}`,
+                      tone: 'violet' as const,
+                      icon: Pencil,
                     },
                     ...(post.status === 'published'
                       ? [
@@ -631,6 +703,8 @@ export default function BlogBoard() {
                             key: 'archive',
                             label: 'Archive',
                             disabled: busy,
+                            tone: 'amber' as const,
+                            icon: Archive,
                             onSelect: () =>
                               void mutate(
                                 post._id,
@@ -644,6 +718,8 @@ export default function BlogBoard() {
                             key: 'publish',
                             label: 'Publish',
                             disabled: busy,
+                            tone: 'green' as const,
+                            icon: Send,
                             onSelect: () =>
                               post.unresolvedImages > 0
                                 ? setPendingPublish({
@@ -663,6 +739,8 @@ export default function BlogBoard() {
                       label: 'Delete',
                       disabled: busy,
                       separated: true,
+                      tone: 'rose' as const,
+                      icon: Trash2,
                       onSelect: () =>
                         setPendingDelete({
                           id: post._id,
@@ -681,6 +759,8 @@ export default function BlogBoard() {
                         key: 'restore',
                         label: 'Restore',
                         disabled: busy,
+                        tone: 'green' as const,
+                        icon: RotateCcw,
                         /*
                           Restore NEVER republishes. `archived` when the post was public before
                           it was deleted, `draft` when it never was.
@@ -717,6 +797,8 @@ export default function BlogBoard() {
                         label: 'Delete forever',
                         disabled: busy,
                         separated: true,
+                        tone: 'rose' as const,
+                        icon: Trash2,
                         onSelect: () =>
                           setPendingPurge({
                             id: post._id,
@@ -761,6 +843,21 @@ export default function BlogBoard() {
           onGenerated={() => void load()}
         />
       ) : null}
+
+      {/* Same dialog BlogEditor's own Kind/Series "Manage" buttons open - one taxonomy, one
+          component, editable from wherever it is displayed. */}
+      <TaxonomyDialog
+        resource="kinds"
+        open={taxonomyDialog === 'kinds'}
+        onClose={() => setTaxonomyDialog(null)}
+        onChanged={() => void loadKinds()}
+      />
+      <TaxonomyDialog
+        resource="series"
+        open={taxonomyDialog === 'series'}
+        onClose={() => setTaxonomyDialog(null)}
+        onChanged={() => void loadSeries()}
+      />
 
       {/*
         One dialog, two stages, keyed off `contactMessages`. The second stage is only ever

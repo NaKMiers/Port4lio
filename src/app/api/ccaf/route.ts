@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest) {
         $set: { ...state, updatedAt: now },
         $setOnInsert: { _id: CCAF_PROGRESS_DOCUMENT_ID, createdAt: now },
       },
-      { upsert: true, new: true, lean: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
     )
   } catch (error) {
     console.error('[ccaf] failed to save progress', error)

@@ -11,10 +11,12 @@ import { secondaryBtnCls } from '@/components/settings/settings-utils'
  * about `/api/admin/profile` specifically rather than about loading in general. Give it props
  * when a second caller exists, not before.
  *
- * `ProfileFetchStatus` suppresses the global error toast on `/settings` so it cannot sit
- * on top of the owner login card, which leaves this page responsible for surfacing its
- * own fetch failures. Without it a 500 from `/api/admin/profile` looked identical to a
- * slow one: a spinner, forever.
+ * There is no global toast behind this. `ProfileFetchStatus` used to render one from
+ * `AdminChrome` and had to special-case this pathname away, so it could not sit on top of
+ * the owner login card; now the fetching provider lives on `admin/settings/layout.tsx` and
+ * that component is not in the admin tree at all. Either way this page is the only thing
+ * surfacing its own fetch failures, and without it a 500 from `/api/admin/profile` looks
+ * identical to a slow one: a spinner, forever.
  */
 export default function SettingLoadError({
   message,

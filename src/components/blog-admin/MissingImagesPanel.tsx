@@ -3,10 +3,13 @@
 import { Check, ImageUp, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
+import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
 import ImagePromptField, {
   iconBtnCls,
 } from '@/components/blog-admin/ImagePromptField'
+import SelectField from '@/components/settings/SelectField'
 import { inputCls } from '@/components/settings/settings-utils'
+import { IMAGE_MODEL_SELECT_OPTIONS } from '@/lib/blog/generation-fields'
 import type { ImagePlaceholder } from '@/lib/blog/image-placeholders'
 
 /**
@@ -48,10 +51,16 @@ export default function MissingImagesPanel({
   promptFor,
   busyKey,
   uploadingKey,
+  generatingKey,
+  imageModel,
+  imageGenError,
+  imageGenErrorSource,
   onPromptChange,
   onRegenerate,
   onResolve,
   onUpload,
+  onImageModelChange,
+  onGenerateImage,
 }: {
   placeholders: ImagePlaceholder[]
   /** The stored prompt for a key, or '' when the model did not return one. */
@@ -60,10 +69,24 @@ export default function MissingImagesPanel({
   busyKey: string | null
   /** Which key has an upload in flight, if any. */
   uploadingKey: string | null
+  /** Which key has an image generation call in flight, if any. */
+  generatingKey: string | null
+  /** The model chosen for Generate - one selection, shared by every card and the cover. */
+  imageModel: string
+  /**
+   * The last generation failure, if any - shared with the cover's own model row for the same
+   * reason `imageModel` is: one generation call is ever in flight at a time, cover or
+   * placeholder. `imageGenErrorSource` is which one it belongs to (a placeholder key, or
+   * `'cover'`), so it renders under exactly the row that produced it and not every card.
+   */
+  imageGenError: string | null
+  imageGenErrorSource: string | null
   onPromptChange: (key: string, value: string) => void
   onRegenerate: (key: string) => void
   onResolve: (key: string, url: string) => void
   onUpload: (key: string, file: File) => void
+  onImageModelChange: (value: string) => void
+  onGenerateImage: (key: string) => void
 }) {
   if (placeholders.length === 0) return null
 
@@ -80,10 +103,15 @@ export default function MissingImagesPanel({
           prompt={promptFor(placeholder.key)}
           busy={busyKey === placeholder.key}
           uploading={uploadingKey === placeholder.key}
+          generating={generatingKey === placeholder.key}
+          imageModel={imageModel}
+          error={imageGenErrorSource === placeholder.key ? imageGenError : null}
           onPromptChange={value => onPromptChange(placeholder.key, value)}
           onRegenerate={() => onRegenerate(placeholder.key)}
           onResolve={url => onResolve(placeholder.key, url)}
           onUpload={file => onUpload(placeholder.key, file)}
+          onImageModelChange={onImageModelChange}
+          onGenerateImage={() => onGenerateImage(placeholder.key)}
         />
       ))}
     </div>
@@ -95,19 +123,29 @@ function PlaceholderCard({
   prompt,
   busy,
   uploading,
+  generating,
+  imageModel,
+  error,
   onPromptChange,
   onRegenerate,
   onResolve,
   onUpload,
+  onImageModelChange,
+  onGenerateImage,
 }: {
   placeholder: ImagePlaceholder
   prompt: string
   busy: boolean
   uploading: boolean
+  generating: boolean
+  imageModel: string
+  error: string | null
   onPromptChange: (value: string) => void
   onRegenerate: () => void
   onResolve: (url: string) => void
   onUpload: (file: File) => void
+  onImageModelChange: (value: string) => void
+  onGenerateImage: () => void
 }) {
   const [url, setUrl] = useState('')
   const ready = isHttpUrl(url)
@@ -206,6 +244,34 @@ function PlaceholderCard({
           />
         </label>
       </div>
+
+      {/*
+        At the bottom of the card, below the URL row rather than beside the prompt's own
+        copy/rewrite icons above - same placement `BlogEditor`'s cover section uses. Self-
+        applying like the upload button next to it: a generated image has no partial state
+        either, so there is nothing for a separate "use this" press to commit.
+      */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <SelectField
+          id={`image-model-${placeholder.key}`}
+          ariaLabel="Image generation model"
+          value={imageModel}
+          options={IMAGE_MODEL_SELECT_OPTIONS}
+          onChange={onImageModelChange}
+          className="min-w-[14rem] flex-1"
+        />
+        <GenerateBlogButton
+          label={generating ? 'Generating...' : 'Generate image'}
+          onClick={onGenerateImage}
+          disabled={!imageModel || generating}
+        />
+      </div>
+      {error ? (
+        // `span`, not `p` - see the matching comment in `BlogEditor`'s cover section for why.
+        <span className="mt-2 block text-xs font-medium text-pp-ink-rose">
+          {error}
+        </span>
+      ) : null}
     </div>
   )
 }

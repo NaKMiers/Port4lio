@@ -98,7 +98,7 @@ export async function fulfilMbtiPayment(
         ...(transactionDateTime ? { transactionDateTime } : {}),
       },
     },
-    { new: true, lean: true }
+    { returnDocument: 'after', lean: true }
   )) as PaymentDocument | null
 
   if (!claimed) return { outcome: 'already-processed', payment: existing }
@@ -123,7 +123,7 @@ export async function fulfilMbtiPayment(
     const unlocked = await AttemptModel.findByIdAndUpdate(
       claimed.attemptToken,
       { $set: { paid: true } },
-      { new: true, lean: true }
+      { returnDocument: 'after', lean: true }
     )
 
     if (!unlocked)

@@ -137,7 +137,20 @@ const postSchema = new Schema<PostDocument>(
         message: props => `"${props.value}" is a reserved slug`,
       },
     },
-    language: { type: String, enum: ['vi', 'en'], default: 'en' },
+    /*
+      Vietnamese by default, which is a change and only applies to documents created after it.
+
+      The default is what "Create draft" produces, and the generator's own default moved to `vi`
+      at the same time (`LANGUAGE_OPTIONS`, and `resolveLanguage`'s fallback) - leaving this at
+      `en` would mean the two creation paths disagreed about the blog's language, with the
+      hand-made drafts being the ones that came out wrong.
+
+      Existing documents are untouched: a mongoose default is applied at document creation, not
+      at read, so every post already in the collection keeps the language it was stored with.
+      There is no migration to run and no backfill wanted - an English post is still an English
+      post and `<article lang>` should keep saying so.
+    */
+    language: { type: String, enum: ['vi', 'en'], default: 'vi' },
     title: { type: String, required: true, maxlength: 140 },
     excerpt: { type: String, default: '', maxlength: 300 },
     /*

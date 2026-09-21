@@ -68,6 +68,21 @@ export async function GET() {
         The tags are the same values the page renders and the JSON-LD declares as `keywords`,
         so there is one source for all three.
       */
+      /*
+        `<dc:language>` per item, and the channel's own `<language>` below is deliberately left
+        alone rather than derived.
+
+        RSS 2.0 has no per-item language element, so the channel one is the only thing the
+        format itself offers - and it is now the wrong shape for this feed. `Post.language`
+        defaults to `vi` and the daily cron writes Vietnamese, so a single channel-level value
+        has to be wrong for some of the items whichever way it is set. Dublin Core is the
+        standard answer to exactly that, the `dc:` namespace is already declared on `<rss>` for
+        `dc:creator`, and an aggregator that does not understand the element ignores it.
+
+        Deriving the channel value from `posts[0]` was the alternative and is worse: it would
+        make the feed's declared language flip every time a post in the other language went out,
+        which is a property of the newest item masquerading as a property of the blog.
+      */
       const categories = post.tags
         .map(tag => `      <category>${escapeXml(tag)}</category>`)
         .join('\n')
@@ -77,6 +92,7 @@ export async function GET() {
       <link>${escapeXml(url)}</link>
       <guid isPermaLink="true">${escapeXml(url)}</guid>
       <dc:creator>${escapeXml(AUTHOR)}</dc:creator>
+      <dc:language>${escapeXml(post.language)}</dc:language>
       ${post.publishedAt ? `<pubDate>${post.publishedAt.toUTCString()}</pubDate>` : ''}
       ${post.excerpt ? `<description>${escapeXml(post.excerpt)}</description>` : ''}
 ${categories}

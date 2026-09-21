@@ -114,7 +114,7 @@ export async function fulfilIqPayment(
         ...(reference ? { reference } : {}),
       },
     },
-    { new: true, lean: true }
+    { returnDocument: 'after', lean: true }
   )) as IqPaymentDocument | null
 
   // Lost the race. Whoever won is completing it, so this is success from here.
@@ -164,7 +164,7 @@ export async function fulfilIqPayment(
           certificateIssuedAt: new Date(),
         },
       },
-      { new: true, lean: true }
+      { returnDocument: 'after', lean: true }
     )
 
     if (!unlocked)

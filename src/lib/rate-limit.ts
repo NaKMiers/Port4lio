@@ -81,7 +81,7 @@ export async function checkRateLimit(
     const doc = await RateLimitModel.findByIdAndUpdate(
       `${route}:${ip}:${windowStart}`,
       { $inc: { count: 1 }, $setOnInsert: { expireAt: windowEndsAt } },
-      { upsert: true, new: true, lean: true }
+      { upsert: true, returnDocument: 'after', lean: true }
     )
 
     return { ok: (doc?.count ?? 1) <= limit, retryAfterSeconds }
@@ -288,6 +288,60 @@ export const BLOG_IMAGE_PROMPT_LIMIT: RateLimitOptions = {
   route: 'blog-image-prompt',
   limit: 40,
   windowSeconds: 10 * 60,
+}
+
+/**
+ * Generating an image. Its own bucket, and priced like `BLOG_GENERATE_LIMIT` rather than
+ * `BLOG_IMAGE_PROMPT_LIMIT` - a prompt rewrite is a sentence from the router, this is an image
+ * from a model call that costs and takes roughly what writing the post itself does.
+ *
+ * ## Why thirty and not the ten it used to be
+ *
+ * The number was chosen when every image was one deliberate button press in the editor, where
+ * ten in ten minutes is generous. `GenerateBlogDialog`'s "make every image, then publish"
+ * switch made that assumption false: one press is now up to five calls in sequence - a cover
+ * plus four body placeholders on a long post - so the old ceiling let TWO posts through a
+ * window and then failed the third one halfway, leaving a half-illustrated post and a warning
+ * list. A limit that a feature's normal use hits is a limit that only ever fires on the
+ * honest user.
+ *
+ * Thirty is six full posts per window, which is well past any real session, and the worst case
+ * it permits is about $2 of Gemini 3.1 Flash or $4 of 3 Pro behind an owner-only gate. The
+ * limiter here is a runaway-loop guard, not a budget - the budget is the switch, which is off
+ * by default and prices itself on its own label.
+ */
+export const BLOG_GENERATE_IMAGE_LIMIT: RateLimitOptions = {
+  route: 'blog-generate-image',
+  limit: 30,
+  windowSeconds: 10 * 60,
+}
+
+/**
+ * The daily blog cron, and this is where "1 blog/day" is actually enforced.
+ *
+ * NOT the schedule. Vercel's own cron docs are explicit that delivery is best effort and that
+ * "cron delivery can also occasionally invoke the same scheduled run more than once" - they
+ * recommend a lock for exactly this, and this is that lock. (They do NOT retry a failed
+ * invocation, which was the wrong reason an earlier version of this comment gave. The right
+ * one is duplicate delivery, plus the second case Vercel names: a job that runs longer than
+ * its own interval can have a second instance started while the first is still going.)
+ *
+ * The limiter catches that where a "has a post been created today?" query cannot, because it
+ * increments BEFORE the work starts rather than after it finishes. A duplicate delivery sixty
+ * seconds in is refused by a counter that is already at 1, with the first post still unsaved.
+ *
+ * A MISSED run is the other half of best-effort delivery and needs nothing: a day with no post
+ * is a day with no post, and tomorrow's run is unaffected.
+ *
+ * `windowSeconds` is a whole day and the window is fixed and aligned to the epoch, so buckets
+ * begin at 00:00 UTC. The documented fixed-window property - up to 2x across a boundary - can
+ * only fire here for a run scheduled within minutes of UTC midnight, which is the one time of
+ * day not to schedule it. See the workflow in `docs/blog/generate-daily.yml`.
+ */
+export const BLOG_CRON_LIMIT: RateLimitOptions = {
+  route: 'blog-cron',
+  limit: 10,
+  windowSeconds: 24 * 60 * 60,
 }
 
 export const CONTACT_LIMIT: RateLimitOptions = {

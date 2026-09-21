@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
         waived,
       },
     },
-    { new: true, lean: true }
+    { returnDocument: 'after', lean: true }
   )
 
   if (!claimed) {

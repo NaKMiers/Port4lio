@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 
 import AvailabilityBlock from '@/components/blog/AvailabilityBlock'
 import BlogIndexHeader from '@/components/blog/BlogIndexHeader'
@@ -26,11 +25,15 @@ import { listSeries } from '@/lib/blog/series-data'
  *
  * ## No language filter, and no bilingual index (D7)
  *
- * The blog is English-only. The Vietnamese version of a post is written as a *native* Viblo
- * post - a different piece of writing for a different audience - not a translation of this
- * URL. So there is no language switch here, no `hreflang`, and no mixed-language list to
- * partition. `Post.language` still exists and defaults to `'en'`; it drives `<article lang>`
- * and `og:locale` for the rare post that is not.
+ * One post is one URL in one language. The Vietnamese version of an English post is written
+ * as a *native* Viblo post - a different piece of writing for a different audience - not a
+ * translation of this URL. So there is no language switch here, no `hreflang`, and no
+ * per-language partition of the list: the index is whatever was written, in whatever it was
+ * written in, newest first.
+ *
+ * `Post.language` defaults to `'vi'` (it was `'en'` until the generator's own default moved -
+ * see the field's comment in `models/Post.ts`), and it drives `<article lang>` and
+ * `og:locale` per post rather than anything on this page.
  *
  * ## Why this queries once and groups in memory
  *

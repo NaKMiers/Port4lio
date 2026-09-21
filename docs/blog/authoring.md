@@ -99,6 +99,155 @@ naming the alternatives you rejected is what shows judgement.
 - ✅ "revalidateTag didn't invalidate anything"
 - ❌ "Some thoughts on Next.js caching"
 
+The second half of the rule, from `what-good-looks-like.md`: the title is a **label for a
+discussion, not ad copy**. On Hacker News a promotional title gets rewritten by a moderator or
+flagged, and around a fifth of front-page stories are penalised for something in that family.
+Specific and true is what satisfies both halves. No "the ultimate guide", no colon-and-subtitle.
+
+---
+
+## The four things that decide whether a post is read
+
+From `docs/blog/what-good-looks-like.md`, which is the research this section compresses. The
+seven-step template above is a skeleton; these are what make it worth reading. All four are in
+the generator's brief (`src/lib/blog/brief.ts`), and the first three are **measured** on the way
+back out (`src/lib/blog/prose-audit.ts`) rather than merely asked for.
+
+1. **Throughline.** The one claim the whole post hangs from, decided before the first sentence
+   and stated in the opening. Not the topic - the claim. "The documented way to revalidate a
+   dynamic route does nothing", not "a post about caching". The source calls deciding this 80%
+   of the work, and a post without one is a survey.
+2. **Hook.** The first two or three sentences produce something concrete: a scene, a number, a
+   claim, the question the reader already has. Never a definition, never setup. On a long post,
+   say early where it is going - a reader who can see the shape of the journey will take it.
+3. **Evidence.** At least one thing in the post that no other page could tell the reader. This
+   is the whole reason it exists, and it is also the only defence against AI Overviews: a page
+   a model can synthesise without you is a page it will not cite. **Never invent a number.**
+4. **The close.** Stop on the point. What you would do differently, or what is unresolved.
+
+## What the generator refuses to produce
+
+The brief bans three silhouettes by name, because the thing that makes a post read as generated
+is not its vocabulary - it is its outline:
+
+- **N parallel sections with parallel headings.** "Lỗi thứ nhất / Lỗi thứ hai / Lỗi thứ ba",
+  "Mistake one / two / three". The most recognisable shape of machine-written prose, and it
+  survives every other improvement. Sections are meant to be of unequal weight.
+- **A closing section that restates the post.** Any heading under which nothing new happens.
+- **The same sentence pattern opening three or more sections.**
+
+All three are checked after generation and reported as warnings in the editor, along with em
+dashes, banned phrases, and any date, duration, percentage or measurement in the body that is
+not in the evidence you supplied. **Specifics inside code samples are checked too** - a
+`TIMEOUT = 30` with a comment sourcing it to a vendor SLA is a fabricated measurement wearing a
+citation.
+
+## The formats beyond the seven-step template
+
+The seven-step template is for `measured-in-production`. Nine shapes exist in
+`STRUCTURE_TEMPLATES`, and **auto never leaves the choice to the model** - it derives one from
+the style, then the series, then falls back to the zipline. The three added from the research:
+
+| Structure       | Use it for                                   | The step that carries it                            |
+| --------------- | -------------------------------------------- | --------------------------------------------------- |
+| `zipline`       | one big topic, taken all the way down        | throughline first, then each section one rung down  |
+| `in-medias-res` | a personal or career post that should travel | one arc, one revelation, then stop                  |
+| `pillar-hub`    | the hub post of a cluster                    | it is the map, not the territory - link the cluster |
+
+`isPillar` overrides all of it: a hub post always gets the hub shape.
+
+A **pillar** is 2,500-4,000 words and covers the whole topic, linking down to 5-12 cluster posts
+that link back up. The research number behind the shape: 86% of AI citations come from sites
+with five or more interconnected pages on a topic, and two-way internal links raise citation
+probability by about 2.7x. `relatedSlugs` is where the down-links live; the up-links have to be
+added on the cluster posts by hand.
+
+## Making every image, then publishing
+
+The Generate dialog has one switch that is not a property of the post: **Make every image, then
+publish**, under "After the model finishes". It is **off by default**, and off is the old
+behaviour exactly - a post saved as `archived`, with its image prompts written and no pictures,
+for you to make in the editor and publish by hand.
+
+Turned on, the dialog keeps working after the post is saved. It draws the cover first, then each
+`![image](imageN)` in body order, one call at a time against the Gemini image model chosen just
+below the switch. Every URL is folded in and saved in a single PATCH - one save, not one per
+image, because each save re-runs the whole body through Shiki.
+
+**It publishes only a post that is finished.** The bar is four things, and each is visible damage
+on a live page rather than a matter of taste: a title, a body, a cover image, and no placeholder
+left over. Anything missing and the post stays archived with the reason on the result card. This
+is the same refusal the board already makes - it raises a confirm before you publish a post with
+placeholders in it, because a placeholder renders as a broken-image icon - so the automatic path
+declines where the manual path asks. `publishBlockers` in `src/lib/blog/auto-illustrate.ts` is
+the whole rule, and an excerpt is deliberately not on the list.
+
+Two things worth knowing before pressing it:
+
+- **The images are drawn from your browser**, not from the server. Closing the tab stops the run.
+  Nothing is lost when it does - the post is already saved, with whatever pictures had arrived -
+  but the rest have to be made in the editor.
+- **It costs a model call per image**, priced on the dropdown. Up to five on a long post, so
+  roughly $0.34 at Flash rates and $0.67 at Pro. `BLOG_GENERATE_IMAGE_LIMIT` allows thirty images
+  per ten minutes, which is about six full posts.
+
+## The daily cron
+
+`POST /api/cron/blog` writes one post a day on its own. It is the same generator the dialog
+uses - the whole of `runGeneration`, not a copy - with three things decided for it.
+
+**The brief is sampled.** `src/lib/blog/cron-spec.ts` draws one of a dozen **angles**: a
+coherent bundle of style, structure, hook, tone, length and code density that together describe
+a post somebody would choose to write. Rolling each field independently would maximise variance
+and produce confusion - `personal-essay` with `codeExamples: heavy` and `structure: reference`
+is three instructions pulling three ways. Tone, audience, point of view and creativity jitter on
+top, but only where the angle did not already have an opinion.
+
+Notes are weighted four times heavier than any single article angle, because this doc commits to
+8 notes per 2 articles and a daily job is the thing most able to honour that ratio and most
+likely to drift off it. **No angle can produce a pillar.** A series holds exactly one, the
+database enforces it, and spending that slot on a dice roll is unrecoverable.
+
+Repetition is the real risk, and the model's only view of this blog is `relatedCandidates` -
+which is _published_ posts. Every cron post is archived until you read it, so day two cannot see
+day one. The route therefore reads the last 25 titles at **any** status and passes them as an
+instruction: "these exist, write about something none of them covers".
+
+**Images are on, and failure is survivable.** The post is saved as `archived` _before_ the first
+image is drawn. Then the cover and every placeholder are drawn one at a time, each one saved as
+it lands. An image that fails is skipped - its prompt stays on the post, the run keeps going, and
+what arrives on the board is a post with one card left to press.
+
+**It publishes only a whole post.** Same `publishBlockers` bar as the dialog's switch: a title, a
+body, a cover, and no placeholder left over. Anything missing and it stays archived with the
+reasons in the response. So an image provider having a bad morning costs a day's publish, never a
+broken picture on a live page.
+
+### Running it
+
+`CRON_SECRET` must be set or the route 404s every caller - it never runs open. Send it as
+`Authorization: Bearer <secret>`, which is what Vercel Cron does with that variable already.
+Schedule it with **either** `vercel.json`'s `crons` entry **or**
+`docs/blog/generate-daily.yml`, never both: two requests a day means one of them is refused
+every morning and the 429 in the logs means nothing is wrong.
+
+"1 blog/day" is enforced by the route, not by the schedule. `BLOG_CRON_LIMIT` is one per UTC
+day, and it increments _before_ the work starts - which is what catches the failure a
+"has a post been created today?" query cannot: this route can run for minutes, so a scheduler
+whose own timeout is shorter records a failure and retries while the first post is still being
+written.
+
+## Language
+
+**Vietnamese is the default for anything new.** `Post.language` defaults to `vi`, the generator
+defaults to `vi`, and a Vietnamese post is written natively rather than translated - technical
+nouns stay in English (`cache`, `deploy`, `build`), the register is `bạn`/`mình`, and the
+`Đầu tiên... Thứ hai... Cuối cùng` paragraph habit is the Vietnamese equivalent of an em dash.
+The full list is `VIETNAMESE_STYLE` in `src/lib/blog/generate.ts`.
+
+Existing English posts are untouched and stay English. Choosing English on a post is one switch
+in the dialog.
+
 ---
 
 ## The LLM policy

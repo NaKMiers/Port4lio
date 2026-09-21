@@ -40,16 +40,15 @@ import {
   MAX_RAIL_WIDTH,
   MIN_RAIL_WIDTH,
 } from '@/components/settings/useRailWidth'
-import { presetSpecFromPost } from '@/lib/blog/generation-fields'
+import {
+  IMAGE_MODEL_SELECT_OPTIONS,
+  presetSpecFromPost,
+} from '@/lib/blog/generation-fields'
 import {
   countBodyImages,
   findImagePlaceholders,
   replacePlaceholder,
 } from '@/lib/blog/image-placeholders'
-import {
-  buildSyndicationBundle,
-  type SyndicationTarget,
-} from '@/lib/blog/syndication'
 
 /**
  * The split-pane editor.
@@ -61,7 +60,8 @@ import {
  *   │  Section  Classification                │  POST /api/admin/    │
  *   │  Section  Cover image                   │       blog/preview   │
  *   │  Section  Markdown  (the textarea)      │  sticky, resizable   │
- *   │  manual save only - Save now / dock     │  refreshed with it   │
+ *   │  Save now / dock - text waits, images   │  refreshed with it   │
+ *   │  and status commit on click             │                      │
  *   └─────────────────────────────────────────┴──────────────────────┘
  *                                             ^ RailResizeHandle
  * ```
@@ -113,14 +113,21 @@ import {
  * So the preview posts to `/api/admin/blog/preview` - the sixth gated handler - and renders
  * exactly the HTML the save path would produce, from the same function.
  *
- * ## Save is manual; the preview is not
+ * ## Save is manual for text; the preview is not; images are not
  *
  * These two used to share one debounce, back when there was an autosave to share it with.
- * Save is manual now - every PATCH happens because the author clicked Save, never because they
- * paused typing - but the preview kept its own 1.2s-debounced timer, firing on every edit to
- * `bodyMarkdown` regardless of whether anything is ever saved. A split-pane editor whose right
- * pane goes stale until a deliberate click is a worse product than the save behaviour is worth;
- * "what you see is what publishes" has to be true while typing, not just after Save.
+ * Save is manual for TEXT now - no PATCH happens because the author paused typing - but the
+ * preview kept its own 1.2s-debounced timer, firing on every edit to `bodyMarkdown` regardless
+ * of whether anything is ever saved. A split-pane editor whose right pane goes stale until a
+ * deliberate click is a worse product than the save behaviour is worth; "what you see is what
+ * publishes" has to be true while typing, not just after Save.
+ *
+ * Three controls commit on click rather than staging for later, and each has its own header
+ * saying why: `applyStatus` (Publish and Archive - a button labelled with a verb has to do the
+ * verb), `regenerateImagePrompt` (the route reads the STORED body, so it pre-flushes), and
+ * `commitImage` (an uploaded or generated image is an asset that already exists and costs
+ * money to make again - losing it is not the same as losing a retypable paragraph). Everything
+ * else goes through `patch` and waits for the button.
  *
  * `flush` still re-fetches the preview once after a successful save, which is close to
  * redundant now - the debounced timer has usually already caught up - but cheap, and it is the
@@ -156,6 +163,17 @@ type EditorPost = {
   status: 'draft' | 'published' | 'archived' | 'deleted'
   publishedAt: string | null
 }
+
+/**
+ * What `patch` and `commitImage` accept.
+ *
+ * The function form is for callers that compute the new value FROM the old one after an await -
+ * `commitPlaceholder` rewrites a placeholder out of a body the author has gone on typing into,
+ * and the object form built from a stale closure would drop every keystroke typed during the
+ * upload. See `patch`'s own header.
+ */
+type PostPatch =
+  Partial<EditorPost> | ((current: EditorPost) => Partial<EditorPost>)
 
 /**
  * How long the markdown pane waits after a keystroke before re-rendering the preview.
@@ -230,14 +248,39 @@ export default function BlogEditor({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
+  /** Bumped by `commitImage` to mean "save what is on screen now"; see the effect it drives. */
+  const [commitRequests, setCommitRequests] = useState(0)
   const [uploading, setUploading] = useState(false)
+  /** The chosen model for "Generate image". Empty until picked - Generate stays disabled until then. */
+  const [imageModel, setImageModel] = useState('')
+  /**
+   * A generation failure (`GOOGLE_API_KEY is not set`, a model rejecting the prompt, ...),
+   * kept apart from `error`. `error` renders in the page-top banner, which is the right place
+   * for "the post failed to load" or "the save failed" - but a generation failure is scoped to
+   * the model picker the author is looking at, not the whole page, and the top banner put it
+   * a full scroll away from the button that caused it.
+   *
+   * `imageGenErrorSource` says which picker: `'cover'` or a placeholder's key. Without it, a
+   * cover-image failure would render under every placeholder card too (and vice versa) - the
+   * state is shared because only one generation call is ever in flight, but the error still
+   * belongs to a single row on screen.
+   */
+  const [imageGenError, setImageGenError] = useState<string | null>(null)
+  const [imageGenErrorSource, setImageGenErrorSource] = useState<string | null>(
+    null
+  )
+  /** Whether a cover-image generation call is in flight. */
+  const [generatingImage, setGeneratingImage] = useState(false)
+  /** Which placeholder has an image generation call in flight. Separate from `generatingImage`, which is the cover's. */
+  const [generatingImageKey, setGeneratingImageKey] = useState<string | null>(
+    null
+  )
   /** Which image prompt has a rewrite in flight: a placeholder key, or `cover`. */
   const [promptBusy, setPromptBusy] = useState<string | null>(null)
   /** Which placeholder has a file upload in flight. Separate from `uploading`, which is the cover's. */
   const [imageUploading, setImageUploading] = useState<string | null>(null)
   /** Whether the regeneration dialog is up. The dialog is mounted only while this is true. */
   const [regenerating, setRegenerating] = useState(false)
-  const [copied, setCopied] = useState<SyndicationTarget | null>(null)
   /**
    * Whether an edit has been made that the server has not acknowledged yet.
    *
@@ -495,16 +538,23 @@ export default function BlogEditor({ id }: { id: string }) {
   )
 
   /**
-   * Update the in-memory post. Nothing is written to the server until Save is clicked - but a
-   * change to the body still schedules a debounced preview render, because the preview is not
-   * "what was saved", it is "what is on screen right now".
+   * Update the in-memory post. Nothing is written to the server by this - a change to the body
+   * only schedules a debounced preview render, because the preview is not "what was saved", it
+   * is "what is on screen right now". The three controls that DO write on the spot
+   * (`applyStatus`, `regenerateImagePrompt`, `commitImage`) each say why in their own header.
+   *
+   * `changes` may be a function of the current post, for the callers that compute the new value
+   * FROM the old one after an await - `commitPlaceholder` rewrites a placeholder out of a body
+   * the author has gone on typing into. Passing the object form from a stale closure there would
+   * drop every keystroke typed during the upload.
    */
-  function patch(changes: Partial<EditorPost>) {
+  function patch(changes: PostPatch) {
     setPost(current => {
       if (!current) return current
-      const next = { ...current, ...changes }
+      const applied = typeof changes === 'function' ? changes(current) : changes
+      const next = { ...current, ...applied }
 
-      if (changes.bodyMarkdown !== undefined) {
+      if (applied.bodyMarkdown !== undefined) {
         if (previewTimer.current) clearTimeout(previewTimer.current)
         previewTimer.current = setTimeout(
           () => void refreshPreview(next.bodyMarkdown, next.slug),
@@ -569,6 +619,80 @@ export default function BlogEditor({ id }: { id: string }) {
     [post, flush]
   )
 
+  /**
+   * Put an image into the post and write it to the server in the same action.
+   *
+   * ## Why this does not wait for Save, when the rest of the editor does
+   *
+   * Save is manual here and stays manual for text: an author who types a paragraph and closes
+   * the tab loses a paragraph they can type again. An image is not that. By the time this runs
+   * the asset already EXISTS - an upload is sitting in Cloudinary, a generation has already
+   * cost a model call - and the only record of where it lives is a URL in React state. Close
+   * the tab and the file is still up there, orphaned and unreachable, and the picture has to be
+   * paid for a second time. That is not a retypable loss, so it does not get retypable
+   * treatment.
+   *
+   * It is worse for a body placeholder than for the cover. `replacePlaceholder` rewrites
+   * `![alt](imageN)` out of the markdown, and the card in `MissingImagesPanel` is derived from
+   * the body - so the card vanishes the instant the URL lands. The screen stops showing any
+   * sign that something is pending at exactly the moment the author stops thinking about Save.
+   *
+   * Pasting a URL by hand is deliberately NOT routed here; see `resolvePlaceholder`.
+   *
+   * ## Why it signals rather than calling `flush` itself
+   *
+   * `flush` takes the post to write, and the obvious shape - `const next = { ...post, ...changes }`
+   * then `flush(next)`, which is what `applyStatus` does - is wrong for these four callers in a
+   * way it is not wrong for a button click. Every one of them awaits something slow first (a
+   * Cloudinary upload, a model drawing a picture), and the author keeps typing throughout. By
+   * the time the URL arrives, `post` in the closure is the snapshot from before the upload
+   * started, so writing it would silently wipe every keystroke typed during the wait. Two
+   * uploads finishing together would do worse: the second would write a post that never had the
+   * first one's image.
+   *
+   * So this goes through `patch`, whose update is functional and therefore merges, and then
+   * bumps a counter that an effect below turns into one `flush` of whatever the committed state
+   * actually is. Two concurrent uploads produce two saves of a post containing both, instead of
+   * one save that loses one of them.
+   */
+  function commitImage(changes: PostPatch) {
+    patch(changes)
+    setCommitRequests(count => count + 1)
+  }
+
+  /** `resolvePlaceholder`, committed - the generate and upload paths, not the paste one. */
+  function commitPlaceholder(key: string, url: string) {
+    commitImage(current => ({
+      bodyMarkdown: replacePlaceholder(current.bodyMarkdown, key, url),
+    }))
+  }
+
+  /**
+   * Saves whatever is on screen when `commitRequests` moves.
+   *
+   * An effect rather than a call inside `commitImage` because that is what makes it race-free:
+   * the effect runs after React has committed the `patch`, so `post` here is the merged result,
+   * not the pre-patch value the caller was holding. `useEffectEvent` keeps `post` and `flush`
+   * out of the dependency array, so the save fires on the signal and never on a keystroke.
+   *
+   * A failure leaves `dirty` set with the reason in the banner, and the URL is still on screen -
+   * so the Save button is the retry. Nothing is rolled back, unlike `applyStatus`, which rolls
+   * back because the server can legitimately REFUSE a transition. There is no refusable image
+   * URL: a failed save here means the request did not land, not that the picture was rejected.
+   */
+  const commitLatest = useEffectEvent(() => {
+    if (post) void flush(post)
+  })
+
+  // Deferred to a macrotask, same as the bootstrap and the initial preview above and for the
+  // same reason: `flush` opens with `setSaving(true)`, and a setState in an effect body
+  // cascades a second render before paint.
+  useEffect(() => {
+    if (commitRequests === 0) return
+    const timer = window.setTimeout(() => commitLatest(), 0)
+    return () => window.clearTimeout(timer)
+  }, [commitRequests])
+
   const renderInitialPreview = useEffectEvent((current: EditorPost) => {
     void refreshPreview(current.bodyMarkdown, current.slug)
   })
@@ -580,33 +704,6 @@ export default function BlogEditor({ id }: { id: string }) {
     const timer = window.setTimeout(() => renderInitialPreview(post), 0)
     return () => window.clearTimeout(timer)
   }, [post, preview])
-
-  /**
-   * Copy a channel-ready bundle to the clipboard.
-   *
-   * Built from the CURRENT editor state rather than from what was last saved, so the author
-   * can copy without saving first - the bundle is for pasting elsewhere and never touches the
-   * stored document.
-   */
-  async function copyBundle(target: SyndicationTarget) {
-    if (!post) return
-    const canonical = `${window.location.origin}/blog/${post.slug}`
-    const bundle = buildSyndicationBundle({
-      target,
-      title: post.title,
-      bodyMarkdown: post.bodyMarkdown,
-      canonical,
-      tags: post.tags,
-    })
-
-    try {
-      await navigator.clipboard.writeText(bundle)
-      setCopied(target)
-      window.setTimeout(() => setCopied(null), 2000)
-    } catch {
-      setError('Could not reach the clipboard. Copy the markdown pane instead.')
-    }
-  }
 
   /**
    * Ask the server to write a new prompt, for the cover or for one placeholder.
@@ -684,7 +781,14 @@ export default function BlogEditor({ id }: { id: string }) {
   }
 
   /**
-   * Put a real URL where a placeholder was.
+   * Put a hand-pasted URL where a placeholder was. Local until Save, like any other edit.
+   *
+   * This is the paste field in `MissingImagesPanel`, and it is the one image path that does
+   * NOT go through `commitImage`. Pasting creates nothing: the asset was already somewhere
+   * before it was pasted, so a lost paste costs a paste, not a Cloudinary orphan and not
+   * another model call. And the field it comes from is a text input, where the next keystroke
+   * is as likely to be a correction as a commit - saving on every accepted paste would write
+   * a wrong URL to the server as eagerly as a right one.
    *
    * The prompt is deliberately LEFT in `imagePrompts` afterwards rather than pruned. The card
    * disappears either way - it is derived from the body - but the body is a textarea, so the
@@ -693,8 +797,9 @@ export default function BlogEditor({ id }: { id: string }) {
    * model call to refill. Orphans are capped at twelve by the schema and swept at generation.
    */
   function resolvePlaceholder(key: string, url: string) {
-    if (!post) return
-    patch({ bodyMarkdown: replacePlaceholder(post.bodyMarkdown, key, url) })
+    patch(current => ({
+      bodyMarkdown: replacePlaceholder(current.bodyMarkdown, key, url),
+    }))
   }
 
   async function uploadPlaceholderImage(key: string, file: File) {
@@ -702,7 +807,7 @@ export default function BlogEditor({ id }: { id: string }) {
     setError(null)
     try {
       const url = await uploadAssetToCloudinary(file, 'post')
-      resolvePlaceholder(key, url)
+      commitPlaceholder(key, url)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Upload failed')
     } finally {
@@ -717,11 +822,89 @@ export default function BlogEditor({ id }: { id: string }) {
       // `post` kind: the only upload kind with a MIME allowlist, because what it produces
       // lands in markdown and the pipeline trusts that host unconditionally.
       const url = await uploadAssetToCloudinary(file, 'post')
-      patch({ coverImage: url })
+      commitImage({ coverImage: url })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Upload failed')
     } finally {
       setUploading(false)
+    }
+  }
+
+  /**
+   * Draw the cover from the prompt above it, then treat the result exactly like an upload:
+   * straight through `commitImage`, which writes it to the server without waiting for Save.
+   *
+   * The prompt travels in the request body rather than being re-read from the database - see
+   * the route's own header for why that differs from `regenerateImagePrompt`, which flushes
+   * first because it reads the post's saved BODY to write a new prompt. This one only reads a
+   * prompt that already exists on screen, so there is nothing to flush.
+   */
+  async function generateCoverImage() {
+    if (!post || !imageModel) return
+
+    setGeneratingImage(true)
+    setImageGenError(null)
+    setImageGenErrorSource(null)
+    try {
+      const res = await fetch(`/api/admin/blog/${id}/generate-image`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: imageModel,
+          prompt: post.coverImagePrompt,
+        }),
+      })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (!res.ok || !data.url)
+        throw new Error(data.error ?? 'Could not generate an image')
+
+      commitImage({ coverImage: data.url })
+    } catch (cause) {
+      setImageGenError(
+        cause instanceof Error ? cause.message : 'Could not generate an image'
+      )
+      setImageGenErrorSource('cover')
+    } finally {
+      setGeneratingImage(false)
+    }
+  }
+
+  /**
+   * Draw a body placeholder's image, then resolve it exactly like an upload: `commitPlaceholder`
+   * rewrites `![image](imageN)` to the real URL and saves, and the card disappears with it - see
+   * `resolvePlaceholder`'s own header for why the prompt is left in `imagePrompts` regardless.
+   *
+   * Reads the prompt from `post.imagePrompts` rather than accepting one as an argument, same
+   * reasoning as `generateCoverImage`: it is what is on screen right now, unsaved edits
+   * included, and the caller (`MissingImagesPanel`) already identifies the card by key alone.
+   */
+  async function generatePlaceholderImage(key: string) {
+    if (!post || !imageModel) return
+
+    const prompt =
+      post.imagePrompts.find(entry => entry.key === key)?.prompt ?? ''
+
+    setGeneratingImageKey(key)
+    setImageGenError(null)
+    setImageGenErrorSource(null)
+    try {
+      const res = await fetch(`/api/admin/blog/${id}/generate-image`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: imageModel, prompt }),
+      })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (!res.ok || !data.url)
+        throw new Error(data.error ?? 'Could not generate an image')
+
+      commitPlaceholder(key, data.url)
+    } catch (cause) {
+      setImageGenError(
+        cause instanceof Error ? cause.message : 'Could not generate an image'
+      )
+      setImageGenErrorSource(key)
+    } finally {
+      setGeneratingImageKey(null)
     }
   }
 
@@ -1066,6 +1249,42 @@ export default function BlogEditor({ id }: { id: string }) {
                       onChange={value => patch({ coverImagePrompt: value })}
                       onRegenerate={() => void regenerateImagePrompt(null)}
                     />
+
+                    {/*
+                      Left-aligned, directly under the prompt's own copy/rewrite row - unlike
+                      those two, which sit right-aligned above. The model has no default on
+                      purpose (`IMAGE_MODEL_SELECT_OPTIONS` opens on the empty "Choose a
+                      model..." row), so Generate stays disabled until one is actually picked.
+                    */}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <SelectField
+                        id="cover-image-model"
+                        ariaLabel="Image generation model"
+                        value={imageModel}
+                        options={IMAGE_MODEL_SELECT_OPTIONS}
+                        onChange={setImageModel}
+                        className="min-w-[14rem] flex-1"
+                      />
+                      <GenerateBlogButton
+                        label={
+                          generatingImage ? 'Generating...' : 'Generate image'
+                        }
+                        onClick={() => void generateCoverImage()}
+                        disabled={!imageModel || generatingImage}
+                      />
+                    </div>
+                    {imageGenError && imageGenErrorSource === 'cover' ? (
+                      /*
+                        `span`, not `p`: `.portfolio-public-root p { color: var(--pp-muted) }`
+                        in globals.css is a (0,1,1) selector, which beats the (0,1,0) utility
+                        class below on source order - a `<p>` here renders muted grey no matter
+                        what text colour utility it carries. See `.blog-prose p`'s own comment
+                        in globals.css for the same landmine hit and fixed once already.
+                      */
+                      <span className="mt-2 block text-xs font-medium text-pp-ink-rose">
+                        {imageGenError}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -1263,38 +1482,20 @@ export default function BlogEditor({ id }: { id: string }) {
                   }
                   busyKey={promptBusy === 'cover' ? null : promptBusy}
                   uploadingKey={imageUploading}
+                  generatingKey={generatingImageKey}
+                  imageModel={imageModel}
+                  imageGenError={imageGenError}
+                  imageGenErrorSource={imageGenErrorSource}
                   onPromptChange={setImagePrompt}
                   onRegenerate={key => void regenerateImagePrompt(key)}
                   onResolve={resolvePlaceholder}
                   onUpload={(key, file) =>
                     void uploadPlaceholderImage(key, file)
                   }
+                  onImageModelChange={setImageModel}
+                  onGenerateImage={key => void generatePlaceholderImage(key)}
                 />
               </Section>
-
-              <div className="bg-white/72 flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line px-4 py-3">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
-                  Cross-post
-                </span>
-                {/*
-                  Both bundles carry the availability footer in the TARGET's language. Without
-                  it the one P0 conversion criterion exists only on /blog/<slug>, which is the
-                  page almost nobody reads - the audience is on these two channels, which is
-                  the whole reason for cross-posting at all.
-                */}
-                <button
-                  className={ghostBtnCls}
-                  onClick={() => void copyBundle('devto')}
-                >
-                  {copied === 'devto' ? 'Copied' : 'DEV.to (EN)'}
-                </button>
-                <button
-                  className={ghostBtnCls}
-                  onClick={() => void copyBundle('viblo')}
-                >
-                  {copied === 'viblo' ? 'Copied' : 'Viblo (VI)'}
-                </button>
-              </div>
             </div>
 
             <div className="relative lg:pl-2">

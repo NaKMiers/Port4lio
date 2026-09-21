@@ -1,6 +1,7 @@
 'use client'
 
 import { MoreHorizontal } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
@@ -14,10 +15,10 @@ import {
  * narrow one.
  *
  * ```
- *   >= md    [ View ][ Edit ][ Archive ][ Delete ]
+ *   >= md    [ icon ][ icon ][ icon ][ icon ]   - icon only, label moved to aria-label/title
  *
- *   <  md    [ ⋯ Actions ]
- *              └─ opens a menu carrying exactly the same set
+ *   <  md    [ ... ]
+ *              -> opens a menu carrying the same set, icon AND label this time
  * ```
  *
  * ## Why the actions are data rather than JSX
@@ -50,6 +51,9 @@ import {
  * at the start of the gesture, which is when the intent to leave is already expressed.
  */
 
+/** Maps straight onto the `pp-ink-*` tokens, which are the ones tuned for text contrast. */
+export type RowActionTone = 'blue' | 'violet' | 'green' | 'amber' | 'rose'
+
 export type RowAction = {
   key: string
   label: string
@@ -60,6 +64,29 @@ export type RowAction = {
   disabled?: boolean
   /** Rendered apart from the rest in the menu - used by Delete. */
   separated?: boolean
+  /** Colours the action's label so View/Edit/Archive/Publish/Delete read apart at a glance. */
+  tone?: RowActionTone
+  /**
+   * The wide-screen row has no room for five labelled buttons, so it shows this icon alone
+   * (with `label` moved to `aria-label`/`title`). The narrow menu has room and shows both -
+   * an icon-only menu would make a screen reader announce nothing and a sighted user guess.
+   */
+  icon: LucideIcon
+}
+
+/*
+ * `!text-pp-ink-*`: both call sites append this after `ghostBtnCls`/the menu item's base
+ * classes, which already carry `text-pp-muted` at equal specificity - plain string order in
+ * `className` does not decide which utility wins, Tailwind's generated stylesheet order does,
+ * and that order is not something this component controls. `!important` is what actually
+ * guarantees the tone wins.
+ */
+const toneTextCls: Record<RowActionTone, string> = {
+  blue: '!text-pp-ink-blue',
+  violet: '!text-pp-ink-violet',
+  green: '!text-pp-ink-green',
+  amber: '!text-pp-ink-amber',
+  rose: '!text-pp-ink-rose',
 }
 
 export default function PostRowActions({
@@ -98,27 +125,35 @@ export default function PostRowActions({
 
   return (
     <>
-      {/* Wide screens: unchanged behaviour, the five buttons in a row. */}
+      {/* Wide screens: icon-only, five in a row - the label moves to aria-label/title. */}
       <span className="hidden flex-wrap gap-1 md:flex">
         {actions.map(action =>
           action.href ? (
             <Link
               key={action.key}
-              className={ghostBtnCls}
+              className={`${ghostBtnCls} ${action.tone ? toneTextCls[action.tone] : ''}`}
               href={action.href}
-              title={action.title}
+              aria-label={action.label}
+              title={action.title ?? action.label}
             >
-              {action.label}
+              <action.icon
+                aria-hidden
+                size={14}
+              />
             </Link>
           ) : (
             <button
               key={action.key}
-              className={ghostBtnCls}
+              className={`${ghostBtnCls} ${action.tone ? toneTextCls[action.tone] : ''}`}
               disabled={action.disabled}
               onClick={action.onSelect}
-              title={action.title}
+              aria-label={action.label}
+              title={action.title ?? action.label}
             >
-              {action.label}
+              <action.icon
+                aria-hidden
+                size={14}
+              />
             </button>
           )
         )}
@@ -135,14 +170,13 @@ export default function PostRowActions({
           aria-haspopup="menu"
           aria-expanded={open}
           aria-label={label}
-          className={`${secondaryBtnCls} gap-1.5`}
+          className={secondaryBtnCls}
           onClick={() => setOpen(value => !value)}
         >
           <MoreHorizontal
             aria-hidden
-            size={14}
+            size={16}
           />
-          Actions
         </button>
 
         {open ? (
@@ -152,8 +186,7 @@ export default function PostRowActions({
             className="absolute right-0 z-30 mt-2 min-w-[11rem] overflow-hidden rounded-[1.1rem] border border-pp-line bg-[rgba(255,253,250,0.98)] p-1.5 shadow-[0_24px_48px_rgba(46,35,28,0.18)] backdrop-blur-xl"
           >
             {actions.map(action => {
-              const itemCls =
-                'block w-full rounded-[0.85rem] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted no-underline transition hover:bg-white hover:text-pp-text disabled:cursor-not-allowed disabled:opacity-50'
+              const itemCls = `flex w-full items-center gap-2 rounded-[0.85rem] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.14em] ${action.tone ? toneTextCls[action.tone] : 'text-pp-muted'} no-underline transition hover:bg-white hover:text-pp-text disabled:cursor-not-allowed disabled:opacity-50`
 
               return (
                 <div key={action.key}>
@@ -171,6 +204,10 @@ export default function PostRowActions({
                       title={action.title}
                       onClick={() => setOpen(false)}
                     >
+                      <action.icon
+                        aria-hidden
+                        size={14}
+                      />
                       {action.label}
                     </Link>
                   ) : (
@@ -185,6 +222,10 @@ export default function PostRowActions({
                         action.onSelect?.()
                       }}
                     >
+                      <action.icon
+                        aria-hidden
+                        size={14}
+                      />
                       {action.label}
                     </button>
                   )}

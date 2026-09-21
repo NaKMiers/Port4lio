@@ -272,7 +272,10 @@ describe('field constraints', () => {
 
     expect(post.status).toBe('draft')
     expect(post.publishedAt).toBeNull()
-    expect(post.language).toBe('en')
+    // Vietnamese, matching the generator's own default. The two creation paths - this one, via
+    // "Create draft", and `POST /api/admin/blog/generate` - have to agree, or hand-made drafts
+    // are the ones that come out in the wrong language.
+    expect(post.language).toBe('vi')
   })
 
   it('excludes both bodies from a plain query', async () => {

@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { labelCls } from '@/components/settings/settings-utils'
 
 /**
- * A text-to-image prompt, two lines tall, with copy and rewrite on the same row as its label.
+ * A text-to-image prompt, three lines tall, with copy and rewrite on the same row as its label.
  *
  * ```
  *   IMAGE PROMPT                              [copy] [rewrite]
@@ -124,7 +124,7 @@ export default function ImagePromptField({
 
       <textarea
         id={id}
-        rows={2}
+        rows={3}
         value={prompt}
         disabled={busy}
         onChange={event => onChange(event.target.value)}

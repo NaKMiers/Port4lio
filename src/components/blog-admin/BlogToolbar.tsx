@@ -157,8 +157,14 @@ export default function BlogToolbar({
           </div>
 
           <div className="flex flex-wrap gap-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
+            {/*
+              "Text" rather than nothing, because this chip is a promise about when a PATCH
+              happens and it stopped being true of the whole editor: images commit the moment
+              they are uploaded or generated, and Publish/Archive commit on click. See
+              `commitImage` in `BlogEditor` for why an image is not treated like a paragraph.
+            */}
             <span className="bg-white/76 rounded-full border border-pp-line px-3 py-1.5">
-              Manual save only
+              Manual save for text
             </span>
             <span className="bg-white/76 rounded-full border border-pp-line px-3 py-1.5">
               Preview rendered server-side
@@ -191,7 +197,14 @@ export default function BlogToolbar({
             title={
               uploading ? 'Waiting for the image upload to finish' : 'Save now'
             }
-            className={secondaryBtnCls}
+            /*
+              `secondaryBtnCls` carries no `disabled:` styling - unlike `BlogSaveDock`'s copy of
+              this same button, which uses `primaryBtnCls` and already dims correctly. Without
+              this, a disabled Save now (the common case: nothing typed since the last save)
+              renders pixel-identical to an enabled one, so clicking it looks like the button is
+              simply broken rather than like there is nothing to save.
+            */
+            className={`${secondaryBtnCls} disabled:cursor-not-allowed disabled:opacity-50`}
           >
             {saving ? 'Saving...' : 'Save now'}
           </button>

@@ -6,7 +6,7 @@
     "node": ">=22 <23"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "fuser -k 3000/tcp 2>/dev/null; grep -oP '(?<=\"pid\":)[0-9]+' .next/dev/lock 2>/dev/null | xargs -r kill -9 2>/dev/null; next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

@@ -5,7 +5,21 @@ import {
   TAG_PATTERN,
 } from '@/lib/blog/constants'
 import {
-  CODE_LANGUAGE_OPTIONS,
+  HOOK_DIRECTIVES,
+  markdownContract,
+  outputSchema,
+  SENTENCE_RULES,
+  STRUCTURE_TEMPLATES,
+  structureFor,
+  STYLE_DIRECTIVES,
+  tellsFor,
+  THE_EVIDENCE_LAW,
+  THE_METHOD,
+  THE_SHAPE,
+  WORD_TARGETS,
+  type BriefLanguage,
+} from '@/lib/blog/brief'
+import {
   manualBoolean,
   manualList,
   manualString,
@@ -22,6 +36,7 @@ import {
   IMAGE_PROMPT_RULES,
   normaliseImagePrompt,
 } from '@/lib/blog/image-prompt'
+import { auditProse } from '@/lib/blog/prose-audit'
 
 /**
  * The brief that goes to the model, and the gate everything it says back has to pass.
@@ -111,93 +126,39 @@ export function summariseList(values: string[], limit = 6): string {
     : head.join(', ')
 }
 
-const WORD_TARGETS: Record<string, string> = {
-  note: '150 to 500 words',
-  short: '500 to 800 words',
-  standard: '800 to 1200 words',
-  long: '1500 to 2500 words',
-}
-
 /**
- * The house style, and it is almost entirely a list of things not to do.
+ * The brief, assembled. All of the CONTENT lives in `brief.ts`; this function only chooses.
  *
- * Every line here exists because it is a default the model has and this blog does not. The
- * "no em dash" rule is the load-bearing one: an em dash between clauses is the single most
- * recognisable tell of generated prose in 2026, and `docs/blog/authoring.md` says outright
- * that reading as generated is the one way this blog fails at its only job. The repo's own
- * prose uses a spaced hyphen throughout - including this sentence - so the rule also keeps a
- * generated post indistinguishable in shape from a written one.
- */
-const HOUSE_STYLE = [
-  'Never use an em dash or an en dash. Use a spaced hyphen ("like - this") or rewrite the sentence.',
-  'No arrow glyphs in prose. Write the word.',
-  'No "delve", "leverage" as a verb, "in today\'s fast-paced", "it is worth noting", "in conclusion", "unlock", "robust", "seamless", "game-changer".',
-  'No three-item lists of adjectives. No sentence that opens "But here is the thing".',
-  'Do not open with a definition or with background the reader already has. Open on the specific thing that happened.',
-  'Claims carry evidence: a number, an error message, a command, or a named alternative that was rejected. A paragraph with none of those is a paragraph to cut.',
-  'Short paragraphs. Two to four sentences. Vary sentence length - a run of same-length sentences is the other tell.',
-  'Do not summarise the post at the end. Stop when the point is made.',
-]
-
-/**
- * Rules about the markdown itself, all of which come from the rendering pipeline downstream.
+ * ## What changed, and why it is a rewrite rather than an edit
  *
- * These are not preferences. `## ` and not `# ` because `page.tsx` renders `post.title` in
- * the page's only `h1` and a second one is a real accessibility defect; no images because
- * `rehypeRestrictImageHosts` drops every `src` that is not this site's Cloudinary account, so
- * an invented image URL renders as a broken node; fenced languages restricted because
- * `downgradeUnknownFences` silently strips highlighting from a grammar Shiki does not carry.
- */
-function markdownRules(codeLanguage: string | undefined): string[] {
-  return [
-    'Markdown only. No front matter, no HTML tags - raw HTML is dropped by the renderer, not escaped.',
-    "Start at `## `. The title is rendered above the body as the page's only h1, so the body must not contain one.",
-    /*
-      This used to be a flat "no images", which was right when there was nowhere for one to
-      come from: `rehypeRestrictImageHosts` refuses every `src` that is not this site's own
-      Cloudinary account. It does that by deleting the ATTRIBUTE and keeping the node, so an
-      invented URL publishes as `<img alt="...">` - a broken-image icon on a live post, which
-      is worse than no picture and exactly what the placeholder form replaces: `image1` is
-      refused by the same rule, but the editor knows what it means and offers an upload slot
-      for it.
-    */
-    'Never write a real image URL. You do not know one, and an invented one is refused by the renderer and published as a broken image.',
-    codeLanguage
-      ? `Fenced code blocks must be tagged \`${codeLanguage}\`.`
-      : // Built from the option list rather than typed out, so adding a language to the dropdown
-        // cannot leave auto mode offering the old set. `blog-generation-fields.test.ts` already
-        // ties that list to `SHIKI_LANGUAGES`; this makes the prompt inherit the same guarantee.
-        `Tag every fenced code block with one of: ${CODE_LANGUAGE_OPTIONS.map(option => option.value).join(', ')}. An untagged or unknown fence loses its highlighting.`,
-    'Links are welcome but must be real. Do not invent a URL to a doc page you are not sure exists.',
-  ]
-}
-
-/** How many placeholders auto mode allows. Two is "where a picture helps", not a gallery. */
-const AUTO_IMAGE_CEILING = 2
-
-/**
- * What to tell the model about pictures, given the `imageCount` field.
+ * The previous version of this function was audited against a real generation. Two of its
+ * rules reached the output, four could not because they sat behind fields that default to auto
+ * and nobody switches twenty-six fields off auto before clicking generate, and one - the
+ * instruction to name what should be measured when no material was supplied - had become a
+ * formula repeated at the end of every section.
  *
- * Auto is a CEILING and explicitly permits zero. The alternative - always asking for one -
- * would put a decorative image on every note, and a note is 150 words: the picture would be
- * larger than the post and would have to be made before the post could ship. A model told
- * "up to two, none if none helps" leaves plenty of posts with none, which is the right
- * distribution for a blog whose articles are about measurements.
+ * The three structural fixes, all of them in the AUTO branches rather than in the wording:
+ *
+ * 1. `structureFor` always resolves to a named template. The old auto branch said "you choose,
+ *    matched to the style", and the model's choice is always the same one.
+ * 2. The title rule no longer depends on `kind`, because the model also picks `kind` - so the
+ *    rule was conditioned on a value its own subject controlled.
+ * 3. The evidence directive tells the model what NOT to write when it has no material, and
+ *    routes the uncertainty into a JSON field instead of into the prose.
  */
-function imageDirective(count: number | null): string[] {
-  if (count === 0)
-    return ['- Images: none. Do not write any image placeholder.']
+function briefSections(spec: GenerationSpec) {
+  const style = manualString(spec, 'style')
+  const manualSeries = manualString(spec, 'series')
+  const isPillar = manualBoolean(spec, 'isPillar') ?? false
 
-  const exact = count !== null
-  const keys = placeholderKeys(exact ? count : AUTO_IMAGE_CEILING)
+  const structure = structureFor({
+    manual: manualString(spec, 'structure'),
+    style,
+    series: manualSeries === NO_SERIES ? undefined : manualSeries,
+    isPillar,
+  })
 
-  return [
-    exact
-      ? `- Images: exactly ${count}, using ${keys.map(key => `\`${key}\``).join(' and ')}${count > 1 ? ', in that order' : ''}.`
-      : `- Images: up to ${AUTO_IMAGE_CEILING}, numbered from \`image1\`. None at all is a fine answer - only place one where a picture earns its space.`,
-    `  Write each as \`${placeholderMarkdown('image1')}\` on its own line, in the body, where the picture belongs.`,
-    '  Then give a matching entry in `imagePrompts` for every placeholder you used, and only those.',
-  ]
+  return { style, manualSeries, isPillar, structure }
 }
 
 /** `- Label: <what the model should do>` for one field, manual or auto. */
@@ -209,10 +170,40 @@ function directive(
   return manual ? `- ${label}: ${manual}` : `- ${label}: ${auto}`
 }
 
+/** The language the post is written in, which is Vietnamese unless the author said otherwise. */
+function promptLanguage(spec: GenerationSpec): BriefLanguage {
+  return manualString(spec, 'language') === 'en' ? 'en' : 'vi'
+}
+
+/**
+ * The structure, written out in full.
+ *
+ * Every shape `structureFor` DERIVES has a template. Four of the values an author (or the cron
+ * sampler) can pin by hand do not, and pass through as a bare `- Structure: <value>` line:
+ * `numbered-list`, `problem-solution`, `chronological` and `freeform`.
+ *
+ * That is deliberate for each of them, and the reasons differ. `numbered-list` IS the banned
+ * silhouette, so describing it would be writing out the shape `THE_SHAPE` forbids. `freeform`
+ * means "no template" by definition. `problem-solution` and `chronological` name their own
+ * order in their own words, which is the one case where a name is not an invitation to
+ * improvise. None of the four is reachable from auto - `structureFor` never returns them - so
+ * the "a structure the model approximates" failure that `brief.ts` describes needs an author
+ * to have chosen the shape on purpose first.
+ */
+function structureDirective(structure: string): string {
+  const template = STRUCTURE_TEMPLATES[structure]
+  if (!template) return `- Structure: ${structure}`
+  return [`- Structure: ${template[0]}`, ...template.slice(1)].join('\n')
+}
+
 export function buildGenerationPrompt(
   spec: GenerationSpec,
   context: GenerationContext
 ): { system: string; user: string } {
+  const language = promptLanguage(spec)
+  const codeLanguage = manualString(spec, 'codeLanguage')
+  const { style, manualSeries, structure } = briefSections(spec)
+
   const kindList = context.kinds
     .map(kind => `${kind.slug} (${kind.label})`)
     .join(', ')
@@ -222,47 +213,42 @@ export function buildGenerationPrompt(
 
   const length = manualString(spec, 'length')
   const wordTarget = WORD_TARGETS[length ?? ''] ?? null
-  const codeLanguage = manualString(spec, 'codeLanguage')
   const genres = manualList(spec, 'genres')
-  const structure = manualString(spec, 'structure')
-  const titleRule = manualBoolean(spec, 'titleRule')
-  const manualSeries = manualString(spec, 'series')
+  const evidence = manualString(spec, 'evidence')
 
   const system = [
-    "You write one blog post for a working software engineer's personal site and return it as a single JSON object.",
+    "You are drafting one post for a working software engineer's personal site. The author reads what you produce, edits it, and publishes it under their own name.",
     '',
-    'The blog exists to make a senior engineer reading it believe the author thinks well. Prose that reads as machine-written fails at that, so the style rules below are requirements rather than preferences.',
+    "There is exactly one way this fails: the post reads as something a model produced. Not because generated prose is bad, but because the site's whole claim is that this person thinks well and measures things, and a post that reads as generated retracts that claim on arrival. Everything below is in service of that one requirement.",
     '',
-    '# House style',
-    ...HOUSE_STYLE.map(rule => `- ${rule}`),
+    '# The method - do this before writing a sentence',
+    ...THE_METHOD.map((rule, index) => `${index + 1}. ${rule}`),
     '',
-    '# Markdown rules',
-    ...markdownRules(codeLanguage).map(rule => `- ${rule}`),
+    '# The evidence law - the rule that is not about style',
+    ...THE_EVIDENCE_LAW.map(rule => `- ${rule}`),
+    '',
+    '# The shape',
+    ...THE_SHAPE.map(rule => `- ${rule}`),
+    '',
+    '# The sentences',
+    ...SENTENCE_RULES.map(rule => `- ${rule}`),
+    // One language's tells, never both. They do not correspond: sending the English list with a
+    // Vietnamese post spends the model's attention on words it was never going to write and
+    // leaves the ones it does overuse unmentioned.
+    ...tellsFor(language).map(rule => `- ${rule}`),
+    '',
+    '# The markdown contract',
+    ...markdownContract(codeLanguage).map(rule => `- ${rule}`),
     '',
     '# Image prompts',
     'You cannot produce images, so you produce the brief for them: a placeholder in the body and a prompt for a text-to-image model. Every prompt follows these rules.',
     ...IMAGE_PROMPT_RULES.map(rule => `- ${rule}`),
     '',
     '# Output',
-    'Return ONE JSON object and nothing else. No prose before it, no prose after it, no code fence.',
-    '',
-    '```json',
-    '{',
-    '  "title": "under 140 characters",',
-    '  "slug": "lowercase-hyphenated, max 80 chars, matches ^[a-z0-9-]{1,80}$",',
-    '  "excerpt": "one or two sentences, under 300 characters, no trailing ellipsis",',
-    `  "kind": "one of: ${context.kinds.map(kind => kind.slug).join(' | ') || 'article'}",`,
-    `  "series": ${context.series.length ? `"one of: ${context.series.map(entry => entry.slug).join(' | ')}" or null` : 'null'},`,
-    '  "language": "en" or "vi",',
-    '  "tags": ["three-to-six", "lowercase-hyphenated", "max-8"],',
-    '  "relatedSlugs": ["slugs-from-the-list-below-only, at most 5, [] if none fit"],',
-    '  "coverImagePrompt": "a text-to-image prompt for the cover, under the rules above",',
-    '  "imagePrompts": [{"key": "image1", "prompt": "a text-to-image prompt for that placeholder"}],',
-    '  "bodyMarkdown": "the whole post, starting at a ## heading"',
-    '}',
-    '```',
-    '',
-    'Every string must be valid JSON - escape newlines in `bodyMarkdown` as \\n. Do not truncate the body to fit; write to the length asked for.',
+    ...outputSchema({
+      kinds: context.kinds.map(kind => kind.slug),
+      series: context.series.map(entry => entry.slug),
+    }),
   ].join('\n')
 
   const user = [
@@ -270,28 +256,31 @@ export function buildGenerationPrompt(
     '',
     'Fields marked "you choose" are yours to decide, and your choice goes in the JSON. Every other field is a constraint.',
     '',
-    '## Subject',
+    '## The post',
     directive(
       'Topic',
       manualString(spec, 'topic'),
-      'you choose, from the series and genres below. Prefer something concrete and measured over a survey of a subject.'
-    ),
-    directive('Blog name', manualString(spec, 'title'), 'you choose'),
-    directive(
-      'Slug',
-      manualString(spec, 'slug'),
-      'you choose, derived from the title'
+      'you choose, from the series and genres below. Prefer one concrete thing that happened over a survey of a subject.'
     ),
     directive(
-      'Excerpt',
-      manualString(spec, 'excerpt'),
-      'you choose, written after the body'
+      'Claim',
+      manualString(spec, 'throughline'),
+      'you choose one, and it must be arguable rather than a description of the subject. Put it in `throughline` and state it in the opening.'
     ),
-    directive(
-      'Tags',
-      manualString(spec, 'tags'),
-      'you choose, three to six, lowercase and hyphenated'
-    ),
+    /*
+      The auto branch is a prohibition, and the wording of it is the fix for a specific observed
+      failure. An author with numbers pastes them here. An author without them used to get a
+      model that invented some - first as claims, then, once claims were banned, inside code
+      samples where the ban was not looking - and that padded every section with "what you
+      should measure here is...". So: no material means no specifics, said plainly, plus an
+      explicit ban on the compensating behaviour.
+    */
+    evidence
+      ? `- Evidence, and the ONLY specifics this post may contain:\n${evidence
+          .split('\n')
+          .map(line => `  ${line}`)
+          .join('\n')}`
+      : '- Evidence: NONE supplied. This post may contain no dates, no durations, no percentages, no measurements and no error text - not in the prose and not in code samples. Write the argument without them. Do not tell the reader what they should measure instead.',
     '',
     '## Placement',
     `- Kinds that exist: ${kindList || 'article'}`,
@@ -310,7 +299,11 @@ export function buildGenerationPrompt(
         : manualSeries,
       'you choose one, or null if the topic fits none of them. Do not force a fit.'
     ),
-    directive('Language', manualString(spec, 'language'), 'en'),
+    directive(
+      'Language',
+      manualString(spec, 'language'),
+      'vi. Write the whole post in Vietnamese and return "vi".'
+    ),
     context.relatedCandidates.length
       ? [
           '- Published posts you may reference in `relatedSlugs` (use the slug exactly, or return []):',
@@ -326,7 +319,7 @@ export function buildGenerationPrompt(
     '## Craft',
     directive(
       'Style',
-      manualString(spec, 'style'),
+      STYLE_DIRECTIVES[style ?? ''] ?? style,
       'you choose, matched to the topic'
     ),
     directive('Tone', manualString(spec, 'tone'), 'plain and direct'),
@@ -339,30 +332,35 @@ export function buildGenerationPrompt(
       manualString(spec, 'pointOfView'),
       'first person'
     ),
-    structure === 'seven-step'
-      ? [
-          '- Structure: the seven-step template, in this order, as `##` sections with your own headings:',
-          '  1. Context - what was being built, in two sentences',
-          '  2. What I measured - the thing actually run',
-          '  3. What I expected - the documented or obvious answer',
-          '  4. What happened - the number, the output, the error',
-          '  5. Root cause - why',
-          '  6. What I rejected - the fixes not taken, and why. Do not skip this one; it is the section that shows judgement.',
-          '  7. What I would tell you - the one-line takeaway',
-        ].join('\n')
-      : directive('Structure', structure, 'you choose, matched to the style'),
+    // Never "you choose". See `structureFor`.
+    structureDirective(structure),
+    directive(
+      'Opening',
+      HOOK_DIRECTIVES[manualString(spec, 'hook') ?? ''],
+      'you choose, matched to the structure above. Never a definition and never a paragraph of setup.'
+    ),
     `- Length: ${wordTarget ?? 'you choose - a note is 150 to 500 words, an article is 800 to 2000'}`,
     directive(
       'Code examples',
       manualString(spec, 'codeExamples'),
       'as many as the topic needs'
     ),
-    ...imageDirective(resolveImageCount(spec)),
-    titleRule === true
-      ? '- The title MUST contain a number or a named failure. "Five things Next.js 16 did that its docs did not say" or "revalidateTag did not invalidate anything", never "Some thoughts on caching".'
-      : titleRule === false
-        ? '- The title does not need to carry a number.'
-        : '- If this is an article, the title must contain a number or a named failure. A note may have a plain title.',
+    ...imageDirective(resolveImageCount(spec), length),
+    /*
+      Unconditional, and that is the fix.
+
+      It used to read "if this is an article, the title must carry a number or a named failure",
+      which cannot work: the model picks `kind` in the same reply, so the rule was conditioned on
+      a value its own subject controlled, and a post that wanted a plain title simply came back
+      as a note. `false` still turns it off - that is an author saying so, which is different.
+    */
+    manualBoolean(spec, 'titleRule') === false
+      ? '- The title does not need to carry a number or a named failure.'
+      : '- The title MUST name something specific: a number the brief gave you, or a named failure. "revalidateTag did not invalidate anything" or "Five things Next.js 16 did that its docs did not say", never "Some thoughts on caching". If you have no number, name the failure.',
+    '- The title is a label for a discussion, not ad copy. No "you will not believe", no "the ultimate guide", no colon-and-subtitle construction. Specific and true beats clickable.',
+    manualBoolean(spec, 'quotableLine') === true
+      ? '- Somewhere in the post, write one sentence a reader would quote about themselves - the line they would screenshot because it describes them. One. It must be true and earned by what came before it, not bolted on at the end.'
+      : '- Do not write a motivational or quotable line. Let the evidence be the thing worth repeating.',
     directive(
       'Closing',
       manualString(spec, 'callToAction') === 'none'
@@ -383,6 +381,155 @@ export function buildGenerationPrompt(
   ].join('\n')
 
   return { system, user }
+}
+
+/**
+ * How many pictures a post of a given length wants, and the ONE table both halves read.
+ *
+ * ```
+ *   words         images   roughly one per 400 words
+ *   ───────────   ──────   ─────────────────────────────────────────────
+ *   under 300         0    a micro-note; the picture would outweigh the post
+ *   300 - 699         1    note
+ *   700 - 1199        2    short / standard
+ *   1200 - 2199       3    long
+ *   2200 and up       4    pillar
+ * ```
+ *
+ * ## Why a table and not a range
+ *
+ * Because a range with a cheap end is not a range. Auto used to say "place one, or two if the
+ * post genuinely has two things worth showing", which sounds like a judgement call and is not:
+ * one is cheaper than two and the model returned one, every time. The version before that said
+ * "up to two, none is a fine answer" and returned none, every time. Twice now the answer has
+ * been whichever end of the offer cost least, so the offer is gone.
+ *
+ * This is the same rule `structureFor` follows and for the same reason: auto derives, it does
+ * not delegate. A number the code computed is a constraint; a number the model picked off a
+ * spectrum is a floor it will stand on.
+ *
+ * ## Why four is the ceiling
+ *
+ * `IMAGE_COUNT_OPTIONS` stops at four and this must not exceed it, or auto would ask for a
+ * count the dialog cannot express and `presetSpecFromPost` cannot preset when regenerating.
+ * Past four the post is a gallery with captions, and every placeholder is another picture the
+ * author has to make before publishing - the generator cannot draw, so what a placeholder buys
+ * is a prompt and an upload slot.
+ */
+export function expectedImageCount(words: number): number {
+  if (words < 300) return 0
+  if (words < 700) return 1
+  if (words < 1200) return 2
+  if (words < 2200) return 3
+  return 4
+}
+
+/** The word target each `length` option commits to, as the midpoint this table keys off. */
+const LENGTH_MIDPOINT: Record<string, number> = {
+  note: 325,
+  short: 650,
+  standard: 1000,
+  long: 2000,
+  pillar: 3250,
+}
+
+/**
+ * What to tell the model about pictures.
+ *
+ * Three branches, and the middle one is the fix. A pinned count passes through. A pinned
+ * LENGTH resolves to an exact number through the table above, because at that point the code
+ * knows how long the post will be and there is nothing left to judge. Only when both are auto
+ * does the model get a rule instead of a number - and even then it is a rate with worked
+ * anchors, not a range to choose from.
+ */
+function imageDirective(
+  count: number | null,
+  length: string | undefined
+): string[] {
+  if (count === 0)
+    return ['- Images: none. Do not write any image placeholder.']
+
+  // A derived zero is the micro-note case and says the same thing, so it short-circuits here
+  // rather than falling through to a directive asking for `image1` and then for zero of them.
+
+  if (count !== null)
+    return [
+      `- Images: exactly ${count}, using ${placeholderKeys(count)
+        .map(key => `\`${key}\``)
+        .join(', ')}${count > 1 ? ', in that order' : ''}.`,
+      ...imagePlacementRules(),
+    ]
+
+  const midpoint = LENGTH_MIDPOINT[length ?? '']
+  if (midpoint !== undefined) {
+    const derived = expectedImageCount(midpoint)
+    if (derived === 0)
+      return ['- Images: none. The post is too short to carry one.']
+    return [
+      `- Images: ${derived}, using ${placeholderKeys(derived)
+        .map(key => `\`${key}\``)
+        .join(
+          ', '
+        )}${derived > 1 ? ', in that order' : ''}. This is the count for the length above, not a maximum to work down from.`,
+      ...imagePlacementRules(),
+    ]
+  }
+
+  return [
+    '- Images: one for roughly every 400 words you write, numbered from `image1`. A 600 word post carries 1, a 1000 word post carries 2, a 1500 word post carries 3, anything past 2200 words carries 4. Four is the maximum, and a post under 300 words carries none.',
+    '  That is the count, not a ceiling to work down from. A full-length post with a single picture in it has not met this.',
+    ...imagePlacementRules(),
+  ]
+}
+
+/**
+ * Where a placeholder goes, which is the half that decides whether the picture is worth making.
+ *
+ * "Where the picture belongs" was doing too much work on its own. The research this blog's
+ * format comes from is specific that a visual has to carry information rather than decorate -
+ * a crude diagram of the thing being explained beats a polished photograph of a laptop - and a
+ * model told only "place an image" reaches for the laptop.
+ *
+ * The spacing rule is here rather than in the count because it is what stops a raised count
+ * from being met badly: four placeholders stacked in the first third is not four illustrated
+ * sections, it is a gallery with an essay after it.
+ */
+function imagePlacementRules(): string[] {
+  return [
+    `  Write each as \`${placeholderMarkdown('image1')}\` on its own line, in the body, at the point it is needed.`,
+    '  Spread them. Each one belongs in a different section, next to the thing it shows. Never two in a row and never all of them before the halfway point.',
+    '  Put each where it does work: the diagram of the thing being explained, the shape of the data, the before and the after. Never a decorative photograph at the top, and never an image standing in for a paragraph you did not write.',
+    '  Then give a matching entry in `imagePrompts` for every placeholder you used, and only those.',
+  ]
+}
+
+/**
+ * The post came back with fewer pictures than its length calls for.
+ *
+ * Reads `expectedImageCount` against the body that actually arrived, so the check and the brief
+ * cannot disagree about what was asked for - the failure mode of a gate that measures something
+ * other than what the prompt requested is a warning the author cannot act on.
+ *
+ * Silent whenever the author pinned a count: `0` is then a decision, and any other number is
+ * already reported key by key through `resolveImagePrompts`, more precisely than this could.
+ */
+function imageExpectationWarning(
+  spec: GenerationSpec,
+  bodyMarkdown: string
+): string | null {
+  if (resolveImageCount(spec) !== null) return null
+
+  const words = bodyMarkdown.trim().split(/\s+/).filter(Boolean).length
+  const expected = expectedImageCount(words)
+  const actual = findImagePlaceholders(bodyMarkdown).length
+  if (actual >= expected) return null
+
+  return `This post is ${words} words, which calls for ${expected} image${expected === 1 ? '' : 's'}, and it came back with ${actual}. Add ${expected - actual} more \`![image](imageN)\` placeholder${expected - actual === 1 ? '' : 's'} where a diagram would do work, or regenerate with a count pinned.`
+}
+
+/** The resolved structure for a spec, which `parseGeneratedDraft` needs for the audit. */
+export function resolvedStructure(spec: GenerationSpec): string {
+  return briefSections(spec).structure
 }
 
 /**
@@ -447,6 +594,53 @@ export function parseGeneratedDraft(
     typeof payload.excerpt === 'string' ? payload.excerpt.trim() : ''
   const excerpt = (manualExcerpt ?? modelExcerpt).slice(0, 300)
 
+  const language = resolveLanguage(spec, payload)
+
+  /*
+    The model's own declaration of what it could not stand behind.
+
+    This replaces a prose instruction that had become a formula - "the thing to measure here
+    is...", once per section - by moving the same admission into a field nobody reads as part
+    of the post. It is a task list for the author rather than a confession in the text, and it
+    is the only place in this function where the model is taken at its word on purpose: a
+    model saying "I made this up" is not a claim that needs verifying.
+  */
+  if (Array.isArray(payload.unsupported)) {
+    const unsupported = payload.unsupported
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map(entry => entry.trim())
+      .filter(Boolean)
+
+    if (unsupported.length)
+      warnings.push(
+        `The model flagged ${unsupported.length} claim${unsupported.length === 1 ? '' : 's'} it could not support: ${summariseList(unsupported)}. Cut each one or replace it with something you measured.`
+      )
+  }
+
+  // Not stored, and the point is that producing it forces the decision. A reply with no
+  // throughline is a reply that skipped the first step of the method, and what comes back
+  // when that happens is a survey of the subject rather than an argument about it.
+  const throughline =
+    typeof payload.throughline === 'string' ? payload.throughline.trim() : ''
+  if (!throughline && !manualString(spec, 'throughline'))
+    warnings.push(
+      'The model returned no throughline, which means it never committed to a claim. Read the opening: a post with no arguable sentence in it is a survey, and that is the shape this blog is trying not to produce.'
+    )
+
+  const imageWarning = imageExpectationWarning(spec, bodyMarkdown)
+  if (imageWarning) warnings.push(imageWarning)
+
+  // The prose gate. Everything above validates what the post IS; this measures how it READS,
+  // against the same brief that asked for it. See `prose-audit.ts` for why it is not a second
+  // model call.
+  for (const finding of auditProse({
+    bodyMarkdown,
+    language,
+    evidence: manualString(spec, 'evidence') ?? '',
+    structure: resolvedStructure(spec),
+  }))
+    warnings.push(finding.message)
+
   return {
     draft: {
       title,
@@ -460,7 +654,7 @@ export function parseGeneratedDraft(
       // `true` turns a good post into an E11000 at save. The route drops it too if the
       // series already has a hub.
       isPillar: manualBoolean(spec, 'isPillar') ?? false,
-      language: resolveLanguage(spec, payload),
+      language,
       tags: resolveTags(spec, payload, warnings),
       relatedSlugs: resolveRelated(spec, payload, context, warnings),
       coverImagePrompt: normaliseImagePrompt(payload.coverImagePrompt),
@@ -722,13 +916,23 @@ function resolveSeries(
   return null
 }
 
+/**
+ * The post's language, and on auto the fallback is Vietnamese.
+ *
+ * The reply is still believed when it says `en`: a brief whose topic is an English-language
+ * conference talk can reasonably come back in English, and overriding that would store `vi` on
+ * a post that is visibly not, which `<article lang>` then lies about to a screen reader. What
+ * changed is which way an ABSENT or unrecognised value falls. It used to be English, which was
+ * right when the blog was English-first; it is now Vietnamese, so a model that omits the field
+ * entirely does not silently produce the one language the author did not ask for.
+ */
 function resolveLanguage(
   spec: GenerationSpec,
   payload: Record<string, unknown>
 ): 'vi' | 'en' {
   const manual = manualString(spec, 'language')
   if (manual === 'vi' || manual === 'en') return manual
-  return payload.language === 'vi' ? 'vi' : 'en'
+  return payload.language === 'en' ? 'en' : 'vi'
 }
 
 /**

@@ -1,16 +1,15 @@
 import type { Metadata } from 'next'
 
 import AdminChrome from '@/components/admin/AdminChrome'
-import AppProvider from '@/context/AppContext'
 
 /**
  * Every owner surface on the site, and nothing else.
  *
  * ```
- *   (admin)/layout.tsx          this file: profile bootstrap + chrome, force-dynamic
+ *   (admin)/layout.tsx          this file: chrome + noindex + force-dynamic, no data
  *     └── admin/
  *           ├── page.tsx        /admin           the hub every other board hangs off
- *           ├── settings/       /admin/settings
+ *           ├── settings/       /admin/settings  the one page that reads the profile
  *           ├── publish/        /admin/publish
  *           ├── metrics/        /admin/metrics
  *           ├── blog/           /admin/blog, /admin/blog/<id>
@@ -42,6 +41,22 @@ import AppProvider from '@/context/AppContext'
  *
  * `robots: noindex` stays, because that IS shared and is true of every page below.
  * `robots.ts` blocks the fetch; this keeps anything that fetched anyway out of the index.
+ *
+ * ## Why there is no `AppProvider` here, despite this being "the admin bootstrap"
+ *
+ * It used to wrap this whole group with `bootstrapOnMount endpoint='/api/admin/profile'`,
+ * and the cost was paid on every owner surface: `AdminChrome` rendered `ProfileFetchStatus`,
+ * so `/admin`, `/admin/blog`, `/admin/blog/<id>`, `/admin/publish`, `/admin/metrics` and the
+ * three CCA-F pages each sat behind a `fixed inset-0 z-[200]` "Loading portfolio..." overlay
+ * while a full profile document - resume included, the largest document this app has - was
+ * fetched and then used by none of them. The blog board's own three fetches raced under an
+ * opaque backdrop.
+ *
+ * `/admin/settings` is the only owner page that reads the profile (`useApp()` appears in
+ * exactly one page in this tree), so the provider lives in `admin/settings/layout.tsx` and
+ * nothing else in the group pays for it. A second page that needs the profile should wrap
+ * itself the same way rather than hoisting the provider back up here; hoisting is what made
+ * the fetch invisible in the first place.
  */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -54,12 +69,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <AppProvider
-      bootstrapOnMount
-      endpoint="/api/admin/profile"
-    >
-      <AdminChrome>{children}</AdminChrome>
-    </AppProvider>
-  )
+  return <AdminChrome>{children}</AdminChrome>
 }

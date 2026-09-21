@@ -88,6 +88,24 @@ export const GROUP_INTROS: Record<FieldGroup, string> = {
   engine: 'Which model writes it, and how far it may wander from the brief.',
 }
 
+/**
+ * The formats, and the last four come from `docs/blog/what-good-looks-like.md`.
+ *
+ * The first seven are this blog's own shapes. The four added below are the ones the research
+ * found actually working on other people's sites, each kept because it does something the
+ * existing seven cannot:
+ *
+ * - `personal-essay` is the shape of a post that travels. The research finding is that people
+ *   share what says something about who they are, and none of the engineering formats has
+ *   anywhere to put that.
+ * - `deep-dive` is the Wait But Why shape: one topic taken all the way down. It is the only
+ *   format here that justifies the pillar length tier.
+ * - `build-log` is the income-report mechanism with the money taken out: specific numbers
+ *   about your own work, published on a schedule. Original data is the most-cited content
+ *   type by AI engines, and this is the format that produces it on purpose.
+ * - `digest` is the Ben's Bites shape. It is the one format that is allowed to be mostly
+ *   other people's news, so it carries its own risk - see the directive in `generate.ts`.
+ */
 export const STYLE_OPTIONS = [
   {
     value: 'measured-teardown',
@@ -104,6 +122,22 @@ export const STYLE_OPTIONS = [
   {
     value: 'reference',
     label: 'Reference - the thing you look up twice a year',
+  },
+  {
+    value: 'personal-essay',
+    label: 'Personal essay - one scene, one arc, one revelation',
+  },
+  {
+    value: 'deep-dive',
+    label: 'Deep dive - one big topic, taken all the way down',
+  },
+  {
+    value: 'build-log',
+    label: 'Build log - what I shipped this month, with the numbers',
+  },
+  {
+    value: 'digest',
+    label: 'Digest - what happened, curated, in a fixed shape',
   },
 ] as const
 
@@ -157,10 +191,53 @@ export const STRUCTURE_OPTIONS = [
     value: 'seven-step',
     label: 'The seven-step template (docs/blog/authoring.md)',
   },
+  /*
+    The next three come from `docs/blog/what-good-looks-like.md` and are spelled out in
+    `buildGenerationPrompt` for the same reason the seven-step one is: a structure named but
+    not described is a structure the model approximates from its own priors, which is how the
+    one step that matters goes missing.
+  */
+  {
+    value: 'zipline',
+    label: 'Zipline - throughline first, then the ladder down',
+  },
+  {
+    value: 'in-medias-res',
+    label: 'In the middle of it - open in the action, land one revelation',
+  },
+  {
+    value: 'pillar-hub',
+    label: 'Pillar hub - the table of contents for a whole topic',
+  },
   { value: 'problem-solution', label: 'Problem, then solution' },
   { value: 'chronological', label: 'Chronological' },
   { value: 'numbered-list', label: 'Numbered list' },
   { value: 'freeform', label: 'Freeform' },
+] as const
+
+/**
+ * How the first two or three sentences work, which is the only part every reader reads.
+ *
+ * The research finding behind the field: a post that has not produced something - a scene, a
+ * number, a claim - inside the first ten seconds has lost the reader, and the default a model
+ * reaches for is the opposite of all five of these. It opens by describing the subject.
+ * `HOUSE_STYLE` already bans that; this says what to do instead.
+ */
+export const HOOK_OPTIONS = [
+  {
+    value: 'scene',
+    label: 'A scene - the moment it broke, or a line said out loud',
+  },
+  { value: 'number', label: 'The number - lead with the measurement' },
+  { value: 'claim', label: 'The claim - state the conclusion in sentence one' },
+  {
+    value: 'question',
+    label: 'The question - the one the reader already has',
+  },
+  {
+    value: 'reframe',
+    label: 'The reframe - "it is not what you think it is"',
+  },
 ] as const
 
 /**
@@ -169,12 +246,23 @@ export const STRUCTURE_OPTIONS = [
  * `note` is 150-500 and `article` is 800-2000 there. The four values below bracket both, so
  * a length can be chosen independently of `kind` - which matters, because the model is
  * otherwise very willing to write 1400 words and call it a note.
+ *
+ * `pillar` is the fifth and it is not just "longer". The cited number is 2,500-5,000 words for
+ * a hub page, and the reason to have a tier for it rather than telling authors to pick "long"
+ * and ask for more is that a pillar is a different document: it covers a whole topic and links
+ * down to the cluster, where a long article covers one thing at length. The ceiling is 4,000
+ * rather than 5,000 because the body column is capped and a model asked for 5,000 words
+ * routinely returns 3,000 anyway.
  */
 export const LENGTH_OPTIONS = [
   { value: 'note', label: 'Note - 150 to 500 words' },
   { value: 'short', label: 'Short - 500 to 800 words' },
   { value: 'standard', label: 'Standard - 800 to 1200 words' },
   { value: 'long', label: 'Long - 1500 to 2500 words' },
+  {
+    value: 'pillar',
+    label: 'Pillar - 2500 to 4000 words, covers a whole topic',
+  },
 ] as const
 
 export const CODE_OPTIONS = [
@@ -216,6 +304,11 @@ export const CODE_LANGUAGE_OPTIONS = [
  *
  * Capped at four. Past that the post is a gallery with captions, and every extra placeholder
  * is another thing the author has to go and make before the post can be published at all.
+ *
+ * "None - text only" stays first and stays a real choice, but it is no longer what auto drifts
+ * to. See `expectedImageCount`: auto now DERIVES a count from the post's length instead of
+ * offering a range. It offered one twice - "up to two, none is fine", then "one, or two if the
+ * post has two things worth showing" - and both times the model returned the cheap end.
  */
 export const IMAGE_COUNT_OPTIONS = [
   { value: '0', label: 'None - text only' },
@@ -240,9 +333,23 @@ export const CTA_OPTIONS = [
   { value: 'hire-me', label: 'Available for work' },
 ] as const
 
+/**
+ * Vietnamese first, and first here means the default rather than the order.
+ *
+ * `emptyValueFor` opens a select on `options[0]`, so this tuple's head is what a field switched
+ * to manual starts on - but the load-bearing half of the change is in `generate.ts`, where the
+ * AUTO directive now says `vi` and `resolveLanguage` falls back to `vi`. Both had to move:
+ * flipping only this one would leave every post generated with the switch untouched - which is
+ * all of them, since auto is the default on every field - still coming out in English.
+ *
+ * The house style splits on this value too. `HOUSE_STYLE` is a list of English tells, and a
+ * Vietnamese post has an entirely different set of them, so `VIETNAMESE_STYLE` is what gets
+ * sent instead. A Vietnamese post written under English style rules reads as a translation,
+ * which is the specific failure `docs/blog/authoring.md` names for the Viblo cross-post.
+ */
 export const LANGUAGE_OPTIONS = [
-  { value: 'en', label: 'English' },
   { value: 'vi', label: 'Tieng Viet' },
+  { value: 'en', label: 'English' },
 ] as const
 
 /**
@@ -289,6 +396,58 @@ export const MODEL_OPTIONS = [
 
 export const DEFAULT_MODEL = 'ag/claude-sonnet-4-6'
 
+/**
+ * Image-generation models - one list, shared by the cover's Generate button and every
+ * placeholder card in "Images to make". Google's own model ids, not router aliases -
+ * `chatCompletion`'s router has no image model (see the comment on `Post.coverImagePrompt`),
+ * so `lib/blog/image-gen.ts` calls Google's Generative Language API directly, the same host
+ * `llm.ts` already falls back to for text. Verified present on this project's `GOOGLE_API_KEY`
+ * via `GET /v1beta/models` - both return `image/jpeg` bytes from the same `generateContent`
+ * shape the text fallback uses, just with an `inlineData` part instead of a `text` one.
+ *
+ * ## The price on each label
+ *
+ * `image-gen.ts` never sets an output resolution, so these are priced at whatever Google
+ * defaults to - which is the 1K tier, not a guess: a live call against both models returned
+ * `usageMetadata.candidatesTokensDetails` of exactly 1120 image tokens, and Google's own pricing
+ * page documents 1120 tokens as *is* the 1K (1024x1024px) output. Standard (non-batch) rate,
+ * since this route makes one real-time `generateContent` call, never the batch API:
+ * $0.034/image for 3.1 Flash Lite, $0.067/image for 3.1 Flash, $0.134/image for 3 Pro ("$0.134
+ * per 1K/2K image" - same price through the 2K tier). https://ai.google.dev/gemini-api/docs/pricing,
+ * checked 2026-09-21.
+ */
+/*
+  Cheapest first, deliberately: `IMAGE_MODEL_OPTIONS[0]` is the default both `cron/blog/route.ts`
+  (`CRON_IMAGE_MODEL`) and `GenerateBlogDialog` read for every automated/default-path image
+  generation, so whichever option sits at index 0 IS the default model, budget-wise, across the
+  app. The editor's own dropdown has no such default - it opens on "Choose a model..." - so this
+  order only decides the automated defaults, not what an author sees pre-selected there.
+*/
+export const IMAGE_MODEL_OPTIONS = [
+  {
+    value: 'gemini-3.1-flash-lite-image',
+    label: 'Gemini 3.1 Flash Lite Image - cheapest, fastest - $0.034/image',
+  },
+  {
+    value: 'gemini-3.1-flash-image',
+    label: 'Gemini 3.1 Flash Image - fast - $0.067/image',
+  },
+  {
+    value: 'gemini-3-pro-image',
+    label: 'Gemini 3 Pro Image - slower, higher quality - $0.134/image',
+  },
+] as const
+
+/**
+ * `IMAGE_MODEL_OPTIONS` plus a leading empty option, so every Generate select renders "Choose
+ * a model..." rather than silently pre-selecting the first one. Every Generate button stays
+ * disabled until the author actually picks a model - defaulting here would pick it for them.
+ */
+export const IMAGE_MODEL_SELECT_OPTIONS = [
+  { value: '', label: 'Choose a model...' },
+  ...IMAGE_MODEL_OPTIONS,
+]
+
 /** The sentinel a `series` select uses for "no series". `null` cannot be an `<option>` value. */
 export const NO_SERIES = '__none__'
 
@@ -310,17 +469,21 @@ export type GenerationFieldKey =
   | 'language'
   | 'relatedSlugs'
   | 'topic'
+  | 'throughline'
+  | 'evidence'
   | 'style'
   | 'tone'
   | 'genres'
   | 'audience'
   | 'pointOfView'
   | 'structure'
+  | 'hook'
   | 'length'
   | 'codeExamples'
   | 'codeLanguage'
   | 'imageCount'
   | 'titleRule'
+  | 'quotableLine'
   | 'callToAction'
   | 'seoKeywords'
   | 'instruction'
@@ -397,7 +560,7 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'taxonomy',
     control: 'select',
     options: LANGUAGE_OPTIONS,
-    autoNote: 'English.',
+    autoNote: 'Tieng Viet, written natively rather than translated.',
   },
   {
     key: 'relatedSlugs',
@@ -418,6 +581,40 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     autoNote:
       'The model picks a subject from the series and genres. This is the field worth filling in.',
     maxLength: 2000,
+  },
+  /*
+    `throughline` and `evidence` are the two fields the research says decide whether a post is
+    worth publishing at all, and they are deliberately adjacent to `topic` rather than filed
+    under style.
+
+    A topic is what the post is about. A throughline is what it ARGUES - one sentence the whole
+    post hangs from, which the source calls "80% of the work" and which a model will skip
+    entirely unless asked, producing a competent survey of a subject with no spine. Evidence is
+    the half that cannot be generated: a number you measured, an error you saw, a result you
+    got. Left on auto the model writes around the gap, and what comes out is exactly the
+    synthesisable page that 2026 search no longer sends anybody to.
+  */
+  {
+    key: 'throughline',
+    label: 'Throughline',
+    group: 'craft',
+    control: 'text',
+    placeholder:
+      'The documented way to revalidate a dynamic route does nothing.',
+    autoNote:
+      'The model writes one and states it in the opening. A post with no throughline is a survey.',
+    maxLength: 300,
+  },
+  {
+    key: 'evidence',
+    label: 'Evidence you actually have',
+    group: 'craft',
+    control: 'textarea',
+    placeholder:
+      'The numbers, the error text, the before and after. Anything only you could report.',
+    autoNote:
+      'None supplied. The post is then written with NO dates, durations, percentages or measurements anywhere, including inside code samples. That is the honest version of a post with no material behind it.',
+    maxLength: 4000,
   },
   {
     key: 'style',
@@ -466,7 +663,20 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     group: 'craft',
     control: 'select',
     options: STRUCTURE_OPTIONS,
-    autoNote: 'Matched to the style.',
+    // Auto is a DERIVATION, not a delegation. `structureFor` in `brief.ts` resolves it from the
+    // style, then the series, then falls back to the zipline - and never hands the choice to
+    // the model, whose answer is always the same parallel-sections shape the brief bans.
+    autoNote:
+      'Derived from the style, or the series, or the zipline. Never left to the model.',
+  },
+  {
+    key: 'hook',
+    label: 'Opening',
+    group: 'craft',
+    control: 'select',
+    options: HOOK_OPTIONS,
+    autoNote:
+      'Matched to the style, and never a definition or a paragraph of setup - the rule the house style already carries.',
   },
   {
     key: 'length',
@@ -499,15 +709,37 @@ export const GENERATION_FIELDS: readonly GenerationField[] = [
     control: 'select',
     options: IMAGE_COUNT_OPTIONS,
     autoNote:
-      'One or two where a picture actually helps, none if the post does not need any.',
+      'Derived from the length: roughly one per 400 words. A note gets 1, a standard post 2, a long post 3, a pillar 4. Never a range the model picks the cheap end of.',
   },
   {
     key: 'titleRule',
     label: 'Title must carry a number or a named failure',
     group: 'craft',
     control: 'boolean',
+    // Auto is ON, unconditionally. It used to be "on for an article, off for a note", which
+    // could not work: the model picks `kind` in the same reply, so the rule was conditioned on a
+    // value its own subject controlled and any post could opt out by calling itself a note.
     autoNote:
-      'On for an article, off for a note - the rule in docs/blog/authoring.md.',
+      'On. The title has to name a number or a named failure - and turning it off here is an author deciding that, not the model deciding it.',
+  },
+  {
+    key: 'quotableLine',
+    label: 'Carry one line a reader would quote about themselves',
+    group: 'craft',
+    control: 'boolean',
+    /*
+      Off by default, and the default is the interesting part.
+
+      The research is unambiguous that this is the sharing mechanism - people pass on what says
+      something about who they are, not what informs them - so the tempting move is to turn it
+      on everywhere. It is off because the failure mode is worse than the miss: a model told to
+      produce a quotable line on a post about `revalidatePath` produces a motivational sentence
+      bolted to a measurement, and one of those on a technical post costs more credibility than
+      the share was ever going to be worth. It belongs on the essays and the career posts, where
+      an author turns it on deliberately.
+    */
+    autoNote:
+      'Off. It is the sharing mechanism, and a motivational line welded onto a measurement post costs more than the share is worth.',
   },
   {
     key: 'callToAction',

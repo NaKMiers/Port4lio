@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
           createdAt: now,
         },
       },
-      { upsert: true, new: true, lean: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
     )
 
     if (!updatedDoc) return jsonError('Failed to load updated profile', 500)

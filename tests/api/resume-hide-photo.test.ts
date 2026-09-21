@@ -51,7 +51,7 @@ describe('resume.hidePhoto', () => {
         $set: { ...sent, updatedAt: now },
         $setOnInsert: { _id: PROFILE_DOCUMENT_ID, createdAt: now },
       },
-      { upsert: true, new: true, lean: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
     )
 
     // What loadPublicResume reads for /cv.
@@ -84,7 +84,7 @@ describe('resume.hidePhoto', () => {
           updatedAt: now,
         },
       },
-      { upsert: true, new: true, lean: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
     )
 
     const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
@@ -130,7 +130,7 @@ describe('compileModel', () => {
     await Model.findOneAndUpdate(
       { _id: 'p' },
       { $set: { box: { a: 'x', b: true } } },
-      { upsert: true, new: true, lean: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
     )
 
     const raw = await mongoose.connection
