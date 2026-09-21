@@ -35,5 +35,6 @@ const publishStateSchema = new Schema(
   }
 )
 
-export const PublishStateModel: any =
-  mongoose.models.PublishState ?? mongoose.model('PublishState', publishStateSchema)
+export const PublishStateModel =
+  mongoose.models.PublishState ??
+  mongoose.model('PublishState', publishStateSchema)

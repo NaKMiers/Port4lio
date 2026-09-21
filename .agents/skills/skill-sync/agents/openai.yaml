@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Skill Sync'
+  short_description: 'Reconcile Codex .agents and Claude .claude skill wrappers'
+  default_prompt: "Use $skill-sync to sync the project's Codex and Claude skill configuration."

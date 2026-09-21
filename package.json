@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint",
     "clean": "rm -rf .next node_modules package-lock.json bun.lock",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -17,7 +17,11 @@
     "test:unit": "vitest run tests/unit",
     "test:e2e": "playwright test",
     "test:e2e:local": "MONGODB_URI=mongodb://127.0.0.1:27017/port4lio_e2e E2E_ALLOW_DB=port4lio_e2e playwright test",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "test:watch": "vitest"
   },
   "config": {
     "mongodbMemoryServer": {
@@ -29,6 +33,7 @@
     "@react-email/render": "^2.1.0",
     "@shikijs/rehype": "^4.4.3",
     "cloudinary": "^2.9.0",
+    "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "hast-util-sanitize": "^5.0.2",
     "lucide-react": "^0.546.0",
@@ -46,6 +51,7 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "shiki": "^4.4.3",
+    "tailwind-merge": "^3.7.0",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0"
   },
@@ -62,6 +68,8 @@
     "eslint-config-next": "16.2.6",
     "mongodb-memory-server": "^11.2.0",
     "postcss": "^8",
+    "prettier": "^3.9.8",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "server-only": "^0.0.1",
     "tailwindcss": "^3.3.0",
     "typescript": "^5",

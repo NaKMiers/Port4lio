@@ -21,6 +21,7 @@
     "classChild",
     "containerClassName",
     "contentClassName",
-    "optionClassName"
+    "optionClassName",
+    "triggerClassName"
   ]
 }

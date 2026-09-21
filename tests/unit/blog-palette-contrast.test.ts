@@ -29,12 +29,16 @@ import { describe, expect, it } from 'vitest'
  * test demanding both pass would be arguing for a palette with no bright colours in it.
  */
 
-const CSS = readFileSync(path.resolve(__dirname, '../../src/styles/globals.css'), 'utf8')
+const CSS = readFileSync(
+  path.resolve(__dirname, '../../src/styles/globals.css'),
+  'utf8'
+)
 
 /** Pull a hex custom property out of the real stylesheet, so the test cannot drift from it. */
 function token(name: string): string {
   const match = CSS.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))
-  if (!match) throw new Error(`--${name} is not declared as a hex value in globals.css`)
+  if (!match)
+    throw new Error(`--${name} is not declared as a hex value in globals.css`)
   return match[1]
 }
 
@@ -55,7 +59,13 @@ function contrast(a: string, b: string): number {
 const BG = token('pp-bg')
 
 describe('the ink palette carries text on the blog background', () => {
-  const INKS = ['pp-ink-blue', 'pp-ink-violet', 'pp-ink-green', 'pp-ink-rose', 'pp-ink-amber']
+  const INKS = [
+    'pp-ink-blue',
+    'pp-ink-violet',
+    'pp-ink-green',
+    'pp-ink-rose',
+    'pp-ink-amber',
+  ]
 
   it.each(INKS)('%s clears AA for body text (4.5:1)', name => {
     expect(contrast(token(name), BG)).toBeGreaterThanOrEqual(4.5)
@@ -71,9 +81,8 @@ describe('the ink palette carries text on the blog background', () => {
     const body = contrast(token('pp-text'), BG)
     expect(body).toBeGreaterThan(14)
 
-    for (const name of INKS) {
+    for (const name of INKS)
       expect(contrast(token(name), BG)).toBeLessThan(body)
-    }
   })
 })
 
@@ -115,8 +124,13 @@ describe('body copy is left alone', () => {
 
       This also has to stay BELOW that rule in the file: both selectors are (0,2,0), so the win
       is on source order.
+
+      Matched as a pattern rather than an exact one-line string: Prettier owns this file's
+      whitespace now, and a rule it decides to expand across three lines is the same rule.
+      The two things worth asserting - the declaration exists, and it comes second - are
+      both independent of how the braces are laid out.
     */
-    expect(CSS).toContain('.blog-prose p { color: var(--pp-text); }')
+    expect(CSS).toMatch(/\.blog-prose p \{\s*color:\s*var\(--pp-text\);?\s*\}/)
     expect(CSS.indexOf('.blog-prose p {')).toBeGreaterThan(
       CSS.indexOf('.portfolio-public-root p {')
     )

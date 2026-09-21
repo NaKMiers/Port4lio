@@ -123,7 +123,10 @@ const resumeTextBlockSchema = new Schema(
   { _id: false }
 )
 
-const resumeSkillRowSchema = new Schema({ items: { type: [String], default: [] } }, { _id: false })
+const resumeSkillRowSchema = new Schema(
+  { items: { type: [String], default: [] } },
+  { _id: false }
+)
 
 const resumeSkillBlockSchema = new Schema(
   {
@@ -200,7 +203,10 @@ const resumeSchema = new Schema(
     summary: { type: resumeTextBlockSchema, default: undefined },
     education: { type: resumeTextBlockSchema, default: undefined },
     skillBlocks: { type: [resumeSkillBlockSchema], default: [] },
-    certifications: { type: resumeCertificationBlockSchema, default: undefined },
+    certifications: {
+      type: resumeCertificationBlockSchema,
+      default: undefined,
+    },
     projectSections: { type: [resumeProjectSectionSchema], default: [] },
     pageBreak: { type: resumePageBreakSchema, default: undefined },
   },
@@ -249,4 +255,4 @@ const profileSchema = new Schema(
 // `compileModel`, not the usual `mongoose.models.X ?? ...`: this schema gains fields while
 // a dev server is running, and the cached-model version of that guard drops them from every
 // write without erroring. See `src/lib/mongoose-model.ts`.
-export const ProfileModel: any = compileModel('Profile', profileSchema)
+export const ProfileModel = compileModel('Profile', profileSchema)
