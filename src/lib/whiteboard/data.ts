@@ -273,10 +273,9 @@ async function linksAndNeighbours(
   }).lean()
 
   const otherIds = new Set<string>()
-  for (const link of touching) 
+  for (const link of touching)
     for (const end of [String(link.from), String(link.to)])
       if (!scopeIds.has(end)) otherIds.add(end)
-  
 
   const neighbours = otherIds.size
     ? (

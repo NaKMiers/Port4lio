@@ -3,6 +3,7 @@ import {
   FileText,
   GraduationCap,
   SlidersHorizontal,
+  Waypoints,
 } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
@@ -21,7 +22,8 @@ export const metadata: Metadata = {
  *     ├── Portfolio    /admin/settings   the one-page editor + preview rail
  *     ├── Blog         /admin/blog       drafts, publish, the quiet-days signal
  *     ├── Metrics      /admin/metrics    MBTI + IQ attempt counts
- *     └── Certificates /admin/certificates  earned + in progress (CCA-F tracker inside)
+ *     ├── Certificates /admin/certificates  earned + in progress (CCA-F tracker inside)
+ *     └── Whiteboard   /admin/whiteboard the private context canvas agents read via MCP
  * ```
  *
  * ## Why this exists at all
@@ -97,6 +99,14 @@ const BOARDS: readonly Board[] = [
       { href: '/admin/certificates/ccaf', label: 'CCA-F' },
       { href: '/admin/certificates/ccaf/vocab', label: 'Vocab' },
     ],
+  },
+  {
+    href: '/admin/whiteboard',
+    title: 'Whiteboard',
+    blurb:
+      'Dreams, goals, failures and drafts as linked cards. Export them to a chat, or let Claude Code read them over MCP.',
+    Icon: Waypoints,
+    tint: 'border-pp-green/30 bg-pp-green/10 text-pp-green',
   },
 ]
 
