@@ -67,8 +67,10 @@ export default async function globalSetup() {
    * the same cluster is fine and a production database on localhost is not. Set
    * `E2E_ALLOW_DB=<name>` to state out loud which database is disposable.
    */
+  // `?` optional: an Atlas URI carries query options, the local one in `test:e2e:local`
+  // (`mongodb://127.0.0.1:27017/port4lio_e2e`) does not, and used to read as "no name".
   const dbName =
-    (process.env.MONGODB_URI ?? '').match(/\/([^/?]+)\?/)?.[1] ?? ''
+    (process.env.MONGODB_URI ?? '').match(/\/([^/?]+)(?:\?|$)/)?.[1] ?? ''
   const allowed = process.env.E2E_ALLOW_DB
 
   if (!dbName)

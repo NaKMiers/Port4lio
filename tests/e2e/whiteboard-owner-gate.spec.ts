@@ -121,3 +121,12 @@ test('POST /api/whiteboard/mcp is 401 without a token', async ({ request }) => {
     })
   )
 })
+
+test('the whiteboard page itself shows nothing anonymously', async ({
+  page,
+}) => {
+  await page.goto('/admin/whiteboard')
+  // OwnerAuthGate renders the login card instead of the canvas; the API is the real control.
+  await expect(page.locator('body')).not.toContainText('Export to AI')
+  await expect(page.getByTestId('wb-save-pill')).toHaveCount(0)
+})
