@@ -346,7 +346,16 @@ export function useBoard() {
     (
       id: string,
       patch: Partial<ClientItem>,
-      { delay, group }: { delay?: number; group?: string } = {}
+      {
+        delay,
+        group,
+        keepChildrenPrivate,
+      }: {
+        delay?: number
+        group?: string
+        /** D24: un-hide a frame but write its children hidden first. */
+        keepChildrenPrivate?: boolean
+      } = {}
     ) => {
       const current = dataRef.current.items[id]
       if (!current) return
@@ -360,12 +369,24 @@ export function useBoard() {
 
       if (next.ink)
         next.ink = { ...next.ink, bbox: deriveInkBBox(next.ink.points) }
-      commit(prev => ({
-        ...prev,
-        items: { ...prev.items, [id]: { ...current, ...next } },
-      }))
+      commit(prev => {
+        const items = { ...prev.items, [id]: { ...current, ...next } }
+        // Mirror the server (children first, then the frame) so no badge lies meanwhile.
+        if (keepChildrenPrivate)
+          for (const child of Object.values(prev.items))
+            if (child.parentId === id)
+              items[child._id] = { ...child, includeInAi: false }
+        return { ...prev, items }
+      })
       clearError(id)
-      queue.patchItem(id, patchBody(next), { delay, group })
+      queue.patchItem(
+        id,
+        {
+          ...patchBody(next),
+          ...(keepChildrenPrivate ? { keepChildrenPrivate: true } : {}),
+        },
+        { delay, group }
+      )
     },
     [clearError, commit, queue]
   )
@@ -582,13 +603,16 @@ export function useBoard() {
     [clearError, commit, queue]
   )
 
+  /** Points are local to `origin`, the stroke's top-left, so its box is its bbox. */
   const addInk = useCallback(
-    (points: InkPoint[], origin: { x: number; y: number }) =>
-      createItem('ink', origin, {
-        ink: { points, bbox: deriveInkBBox(points) },
-        width: 1,
-        height: 1,
-      }),
+    (points: InkPoint[], origin: { x: number; y: number }) => {
+      const bbox = deriveInkBBox(points)
+      return createItem('ink', origin, {
+        ink: { points, bbox },
+        width: Math.max(1, Math.round(bbox.maxX - bbox.minX)),
+        height: Math.max(1, Math.round(bbox.maxY - bbox.minY)),
+      })
+    },
     [createItem]
   )
 

@@ -403,3 +403,29 @@ describe('backup and restore routes', () => {
     expect(res.status).toBe(413)
   })
 })
+
+describe('bulk "Include in AI: on" (DR11)', () => {
+  it('fanned out over a hidden frame child, the child stays hidden (rule 1)', async () => {
+    const hidden = await createCard({ form: 'frame', includeInAi: false })
+    const child = await createCard({
+      parentId: hidden._id,
+      includeInAi: false,
+      title: 'Inside',
+    })
+    const free = await createCard({ includeInAi: false, title: 'Outside' })
+
+    // The inspector skips the child, but even a client that sent it cannot expose it.
+    for (const id of [child._id, free._id])
+      expect(
+        (await call('item', 'PATCH', { id, body: { includeInAi: true } }))
+          .status
+      ).toBe(200)
+
+    const res = await call('context', 'POST', {
+      body: { scope: { kind: 'all' } },
+    })
+    const { markdown } = await res.json()
+    expect(markdown).toContain('Outside')
+    expect(markdown).not.toContain('Inside')
+  })
+})

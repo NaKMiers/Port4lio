@@ -6,9 +6,12 @@ import type { Meaning } from '@/lib/whiteboard/limits'
 
 export function MeaningChip({
   meaning,
+  count,
   className,
 }: {
   meaning: Meaning | null
+  /** The multi-select summary shows "GOAL 2" (DR11). */
+  count?: number
   className?: string
 }) {
   const style = meaningStyle(meaning)
@@ -28,6 +31,7 @@ export function MeaningChip({
         />
       ) : null}
       {style.label}
+      {count !== undefined ? <span className="ml-0.5">{count}</span> : null}
     </span>
   )
 }

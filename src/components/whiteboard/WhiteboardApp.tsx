@@ -2,9 +2,13 @@
 
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import { Pencil } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import { AgentsButton } from '@/components/whiteboard/AgentsPopover'
+import { BackupMenu, RestoreDialog } from '@/components/whiteboard/Backup'
+import ExportSheet from '@/components/whiteboard/ExportSheet'
+import InkLayer from '@/components/whiteboard/InkLayer'
 import {
   BoardLoadFailed,
   EmptyBoard,
@@ -31,6 +35,7 @@ import { useReducedMotion, useTier } from '@/components/whiteboard/useTier'
 import ZoomControls from '@/components/whiteboard/ZoomControls'
 import { cn } from '@/lib/utils'
 import type { Form, Shape } from '@/lib/whiteboard/limits'
+import type { ClientItem } from '@/lib/whiteboard/types'
 
 /**
  * `/admin/whiteboard` - the canvas app, client-only (React Flow measures the DOM).
@@ -116,6 +121,13 @@ function WhiteboardShell() {
   const [helpOpen, setHelpOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [pulse, setPulse] = useState(0)
+  const [exportScope, setExportScope] = useState<'all' | 'selection'>('all')
+  const [restoreFile, setRestoreFile] = useState<File | null>(null)
+  const [unhide, setUnhide] = useState<{
+    frame: ClientItem
+    readable: number
+  } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const readOnly = load.phase !== 'ready'
   const empty = load.phase === 'ready' && Object.keys(data.items).length === 0
@@ -169,6 +181,17 @@ function WhiteboardShell() {
     },
     [create, flow]
   )
+
+  const openExport = useCallback(
+    (scope: 'all' | 'selection') => {
+      if (readOnly || empty) return
+      setExportScope(scope)
+      setSurface('export')
+    },
+    [empty, readOnly]
+  )
+
+  const pickRestoreFile = useCallback(() => fileInputRef.current?.click(), [])
 
   // MARK: Delete (R3-7, R3-19)
 
@@ -280,10 +303,11 @@ function WhiteboardShell() {
           return
         case 'export':
           event.preventDefault()
-          if (!empty && !readOnly) setSurface('export')
+          openExport(selection.nodes.length > 1 ? 'selection' : 'all')
           return
         case 'escape': {
-          if (pendingDelete || helpOpen) return // their own handlers close them
+          // Dialogs close themselves (their own capture-phase Esc handlers).
+          if (pendingDelete || helpOpen || unhide || restoreFile) return
           const layer = escapeTarget({
             tool,
             surfaceOpen: surface !== null,
@@ -303,13 +327,16 @@ function WhiteboardShell() {
     empty,
     helpOpen,
     nudge,
+    openExport,
     pendingDelete,
     readOnly,
     requestDelete,
+    restoreFile,
     selection,
     setTool,
     surface,
     tool,
+    unhide,
   ])
 
   // MARK: Context for nodes
@@ -341,6 +368,9 @@ function WhiteboardShell() {
       board={board}
       selection={selection}
       onDelete={requestDelete}
+      onSelect={selectOnly}
+      onExportSelection={() => openExport('selection')}
+      onUnhideFrame={(frame, readable) => setUnhide({ frame, readable })}
     />
   )
   const hasSelection = selection.nodes.length + selection.edges.length > 0
@@ -365,11 +395,27 @@ function WhiteboardShell() {
           }
           hiddenCount={board.hiddenCount}
           onHiddenClick={showHidden}
-          backup={null}
-          agents={null}
+          backup={
+            <BackupMenu
+              open={surface === 'backup'}
+              onToggle={open => setSurface(open ? 'backup' : null)}
+              onRestore={pickRestoreFile}
+              beforeDownload={() => board.queue.flush()}
+              compact={tier !== 'lg'}
+            />
+          }
+          agents={
+            <AgentsButton
+              open={surface === 'agents'}
+              onToggle={open => setSurface(open ? 'agents' : null)}
+              compact={tier !== 'lg'}
+            />
+          }
           exportDisabled={readOnly || empty}
           exportOpen={surface === 'export'}
-          onExport={() => setSurface(surface === 'export' ? null : 'export')}
+          onExport={() =>
+            surface === 'export' ? setSurface(null) : openExport('all')
+          }
           compact={tier === 'sm'}
         />
 
@@ -395,6 +441,12 @@ function WhiteboardShell() {
             <ZoomControls />
           </Canvas>
 
+          {tool === 'pen' && !readOnly ? (
+            <InkLayer
+              onStroke={(points, origin) => actions.addInk(points, origin)}
+            />
+          ) : null}
+
           {drawingAllowed ? (
             <ToolRail
               tool={tool}
@@ -416,7 +468,7 @@ function WhiteboardShell() {
             <EmptyBoard
               onText={() => createAtCentre('text')}
               onFrame={() => createAtCentre('frame')}
-              onRestore={() => setSurface('backup')}
+              onRestore={pickRestoreFile}
             />
           ) : null}
           {load.phase === 'error' ? (
@@ -455,7 +507,71 @@ function WhiteboardShell() {
             {inspector}
           </div>
         ) : null}
+
+        {surface === 'export' ? (
+          <ExportSheet
+            key={exportScope}
+            board={board}
+            selectionIds={selection.nodes}
+            initialScope={exportScope}
+            onClose={() => setSurface(null)}
+          />
+        ) : null}
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        aria-hidden
+        tabIndex={-1}
+        onChange={event => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) setRestoreFile(file)
+        }}
+      />
+      {restoreFile ? (
+        <RestoreDialog
+          file={restoreFile}
+          pendingSaves={board.status.pending}
+          onClose={() => setRestoreFile(null)}
+          onRestored={board.retryLoad}
+        />
+      ) : null}
+      <ConfirmDialog
+        open={unhide !== null}
+        title={`Make "${unhide?.frame.title || 'Untitled frame'}" readable?`}
+        message={
+          <p>
+            {unhide?.readable} item{unhide?.readable === 1 ? '' : 's'} inside
+            become{unhide?.readable === 1 ? 's' : ''} agent-readable.
+          </p>
+        }
+        destructive={false}
+        secondaryLabel="Keep items private"
+        onSecondary={() => {
+          if (unhide)
+            actions.updateItem(
+              unhide.frame._id,
+              { includeInAi: true },
+              { delay: 0, keepChildrenPrivate: true }
+            )
+          setUnhide(null)
+        }}
+        confirmLabel="Make all readable"
+        onConfirm={() => {
+          if (unhide)
+            actions.updateItem(
+              unhide.frame._id,
+              { includeInAi: true },
+              { delay: 0 }
+            )
+          setUnhide(null)
+        }}
+        onCancel={() => setUnhide(null)}
+      />
 
       <ConfirmDialog
         open={pendingDelete !== null}

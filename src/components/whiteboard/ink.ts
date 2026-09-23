@@ -32,22 +32,33 @@ function perpendicular(p: InkPoint, a: InkPoint, b: InkPoint) {
   return Math.abs(dy * p[0] - dx * p[1] + b[0] * a[1] - b[1] * a[0]) / length
 }
 
+/**
+ * Ramer-Douglas-Peucker, iterative. The recursive form overflows the stack on a long
+ * zigzag scribble (every point is a keeper, so the recursion is as deep as the stroke).
+ */
 function rdp(points: InkPoint[], epsilon: number): InkPoint[] {
   if (points.length < 3) return points
-  let maxDistance = 0
-  let index = 0
-  const last = points.length - 1
-  for (let i = 1; i < last; i++) {
-    const d = perpendicular(points[i], points[0], points[last])
-    if (d > maxDistance) {
-      maxDistance = d
-      index = i
+  const keep = new Uint8Array(points.length)
+  keep[0] = 1
+  keep[points.length - 1] = 1
+  const stack: [number, number][] = [[0, points.length - 1]]
+  while (stack.length) {
+    const [start, end] = stack.pop()!
+    let maxDistance = 0
+    let index = -1
+    for (let i = start + 1; i < end; i++) {
+      const d = perpendicular(points[i], points[start], points[end])
+      if (d > maxDistance) {
+        maxDistance = d
+        index = i
+      }
+    }
+    if (index !== -1 && maxDistance > epsilon) {
+      keep[index] = 1
+      stack.push([start, index], [index, end])
     }
   }
-  if (maxDistance <= epsilon) return [points[0], points[last]]
-  const left = rdp(points.slice(0, index + 1), epsilon)
-  const right = rdp(points.slice(index), epsilon)
-  return [...left.slice(0, -1), ...right]
+  return points.filter((_, i) => keep[i])
 }
 
 export function simplifyStroke(

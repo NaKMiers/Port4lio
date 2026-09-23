@@ -255,7 +255,7 @@ describe('agent auth (both routes)', () => {
       {},
       { $set: { revokedAt: new Date() } }
     )
-    for (const [name, send] of routes()) 
+    for (const [name, send] of routes())
       for (const token of [
         undefined,
         'not-a-token',
@@ -266,7 +266,6 @@ describe('agent auth (both routes)', () => {
         expect(res.status, `${name} ${token}`).toBe(401)
         expect(res.headers.get('cache-control')).toBe('no-store, private')
       }
-    
   })
 
   it('a token in the query string is ignored', async () => {

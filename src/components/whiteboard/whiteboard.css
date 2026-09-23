@@ -104,3 +104,14 @@
 .wb-flow .react-flow__edgelabel-renderer {
   z-index: 5;
 }
+
+@keyframes wb-sheet-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
