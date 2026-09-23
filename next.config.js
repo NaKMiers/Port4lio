@@ -5,6 +5,18 @@ const nextConfig = {
   /** Chunk 0 / Chunk 10: real HTTP 308s for legacy permalinks (App Router `permanentRedirect` alone may not emit redirect responses). */
   async redirects() {
     return [
+      // The CCA-F tracker moved under the certificates overview; keeps old bookmarks working.
+      // The English twin is gone; send it to the Vietnamese roadmap rather than a 404.
+      {
+        source: '/admin/ccaf/en',
+        destination: '/admin/certificates/ccaf',
+        permanent: true,
+      },
+      {
+        source: '/admin/ccaf/:path*',
+        destination: '/admin/certificates/ccaf/:path*',
+        permanent: true,
+      },
       { source: '/about', destination: '/?section=about', permanent: true },
       {
         source: '/services',

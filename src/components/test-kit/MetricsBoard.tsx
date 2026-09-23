@@ -74,19 +74,13 @@ export default function MetricsBoard() {
         <h1 className="font-display text-2xl font-semibold text-pp-text">
           Funnel
         </h1>
-        {/* The other two owner surfaces, so all three reach each other from any of them. */}
+        {/* The other owner surface, so the two reach each other from either. */}
         <nav className="flex flex-wrap items-center gap-2.5">
           <Link
             className={secondaryBtnCls}
             href="/admin/settings"
           >
             Edit profile
-          </Link>
-          <Link
-            className={secondaryBtnCls}
-            href="/admin/publish"
-          >
-            Publish
           </Link>
         </nav>
       </div>

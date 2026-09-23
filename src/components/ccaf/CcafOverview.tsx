@@ -1,4 +1,3 @@
-import CcafLocaleSwitcher from '@/components/ccaf/CcafLocaleSwitcher'
 import type { SaveStatus } from '@/components/ccaf/CcafTracker'
 import RichText from '@/components/ccaf/RichText'
 import {
@@ -114,27 +113,22 @@ export default function CcafOverview({
       className="scroll-mt-24 border-b border-pp-line pb-8 pt-8 md:scroll-mt-28 md:pb-12 md:pt-10"
     >
       <div className="space-y-6 md:space-y-8">
-        <div className="flex items-start justify-between gap-4">
-          <header className="max-w-3xl space-y-3">
-            <p className={eyebrowCls}>{t(UI.eyebrow, locale)}</p>
-            <h1
-              id="ccaf-overview-heading"
-              className="text-pretty font-display text-[clamp(2rem,4.6vw,3.1rem)] font-semibold leading-[1.08] tracking-tight text-pp-text"
-            >
-              {t(UI.pageTitle, locale)}
-            </h1>
-            <p className="text-pretty text-base leading-[1.75] text-pp-muted md:text-[1.0625rem]">
-              {t(UI.ledeBefore, locale)}
-              <strong className="font-semibold text-pp-text">
-                ≥ {TARGET_SCALED_SCORE}/1000
-              </strong>
-              {t(UI.ledeAfter, locale)}
-            </p>
-          </header>
-          <div className="shrink-0 pt-1">
-            <CcafLocaleSwitcher current={locale} />
-          </div>
-        </div>
+        <header className="max-w-3xl space-y-3">
+          <p className={eyebrowCls}>{t(UI.eyebrow, locale)}</p>
+          <h1
+            id="ccaf-overview-heading"
+            className="text-pretty font-display text-[clamp(2rem,4.6vw,3.1rem)] font-semibold leading-[1.08] tracking-tight text-pp-text"
+          >
+            {t(UI.pageTitle, locale)}
+          </h1>
+          <p className="text-pretty text-base leading-[1.75] text-pp-muted md:text-[1.0625rem]">
+            {t(UI.ledeBefore, locale)}
+            <strong className="font-semibold text-pp-text">
+              ≥ {TARGET_SCALED_SCORE}/1000
+            </strong>
+            {t(UI.ledeAfter, locale)}
+          </p>
+        </header>
 
         <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
           <Tile

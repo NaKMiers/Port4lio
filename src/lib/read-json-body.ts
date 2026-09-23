@@ -85,6 +85,3 @@ export const CONTACT_MAX_BODY_BYTES = 32 * 1024
 
 /** `{ code, days }` - six digits and a small integer. Anything near this is not that. */
 export const VERIFY_CODE_MAX_BODY_BYTES = 1024
-
-/** `{ target, version, result, detail }`, where `detail` is truncated to 500 characters. */
-export const PUBLISH_ACK_MAX_BODY_BYTES = 4 * 1024

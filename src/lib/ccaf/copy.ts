@@ -1,19 +1,21 @@
 import type { Locale } from '@/lib/i18n'
 
 /**
- * Every user-facing string on `/admin/ccaf`, in both languages.
+ * Every user-facing string on `/admin/certificates/ccaf`, in both languages.
+ *
+ * The page now renders Vietnamese only (the English route was removed); the `en` halves
+ * stay so each entry remains a complete `Localized`. Drop them together with the `locale`
+ * prop if the page goes monolingual for good.
  *
  * ## Why this page is bilingual when the rest of `(me)` is not
  *
  * `lib/i18n.ts` says the portfolio stays English because its audience is English-reading
  * recruiters. This page has two audiences that do not overlap: the plan is worked through
  * in Vietnamese by the person sitting the exam, and read in English by anyone he shows it
- * to. Translating it was cheaper than picking one of them.
+ * to. (That was the reason for the English twin; it has since been dropped.)
  *
- * `Locale`, `LOCALES` and `LOCALE_LABELS` are reused from `lib/i18n` rather than redeclared
- * - a second `'vi' | 'en'` union that could drift from the first is worth nobody's time -
- * but `swapLocale` is not, because these URLs are `/admin/ccaf` and `/admin/ccaf/en` rather
- * than the `/[lang]/product` shape that function assumes. See the route comment for why.
+ * `Locale` is reused from `lib/i18n` rather than redeclared - a second `'vi' | 'en'` union
+ * that could drift from the first is worth nobody's time.
  *
  * ## Why both languages ship to the browser
  *
@@ -143,6 +145,14 @@ export const UI = {
   statusBehind: { vi: 'Còn dở', en: 'Behind' },
   doneWhenLabel: { vi: 'Xong khi:', en: 'Done when:' },
   markComplete: { vi: 'Đánh dấu hoàn thành', en: 'Mark complete' },
+  viewGroup: { vi: 'Cách hiển thị', en: 'View' },
+  viewByWeek: { vi: 'Theo tuần', en: 'By week' },
+  viewList: { vi: 'Danh sách', en: 'List' },
+  hideDone: { vi: 'Ẩn việc đã xong', en: 'Hide done' },
+  listAllDone: {
+    vi: 'Xong hết rồi. Bỏ chọn "Ẩn việc đã xong" để xem lại.',
+    en: 'Everything is done. Untick "Hide done" to see it again.',
+  },
 
   // --- rail: readiness ------------------------------------------------------
   readinessTitle: { vi: 'Độ sẵn sàng theo domain', en: 'Readiness by domain' },
@@ -223,5 +233,4 @@ export const UI = {
   resourcesKicker: { vi: 'Tài nguyên', en: 'Resources' },
   resourcesTitle: { vi: 'Mở nhanh', en: 'One click away' },
   newTab: { vi: 'mở tab mới', en: 'opens in a new tab' },
-  languageGroup: { vi: 'Ngôn ngữ', en: 'Language' },
 } satisfies Record<string, Localized>

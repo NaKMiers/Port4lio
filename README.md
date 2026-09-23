@@ -156,7 +156,7 @@ Create a `.env.local` file in the root directory:
 MONGODB_URI=mongodb+srv://...
 PROFILE_DOCUMENT_ID=your-profile-id
 
-# Owner gate for /settings and /publish. HMAC key for both the auth cookie and the
+# Owner gate for /admin. HMAC key for both the auth cookie and the
 # login-code hash, so treat it like a password, not a label.
 AUTH_SECRET=long-random-string
 
@@ -169,9 +169,6 @@ MAIL_TO=recipient@email.com
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
-
-# Bearer token for the /api/publish/* endpoints
-PUBLISH_TOKEN=long-random-string
 
 # Public site origin, used in canonical URLs, JSON-LD and email footers
 NEXT_PUBLIC_SITE_URL=https://your-domain.com

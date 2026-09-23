@@ -4,7 +4,7 @@ import { t, UI } from '@/lib/ccaf/copy'
 import type { Locale } from '@/lib/i18n'
 
 /**
- * Metadata for both language variants of `/admin/ccaf`, built from one place.
+ * Metadata for `/admin/certificates/ccaf`.
  *
  * ## Why there is so little of it
  *
@@ -13,11 +13,6 @@ import type { Locale } from '@/lib/i18n'
  * Twitter card. Every one of those exists to help something find or render a link to the
  * page. It is owner-only now, so they have nothing left to do - and `robots: noindex` next
  * to an OpenGraph card is a page arguing with itself about whether it wants to be found.
- *
- * The two URLs are `/admin/ccaf` and `/admin/ccaf/en` rather than `/admin/vi/ccaf` and
- * `/admin/en/ccaf`. The `/[lang]/product` shape was never adopted here: it was inherited from
- * the page's public life and outlived the reason for it. D6's move under `/admin` re-prefixed
- * both without touching that, because re-localising an owner-only route still buys nothing.
  *
  * `noindex` is belt to `robots.ts`'s braces: a `Disallow` stops the fetch, `noindex` keeps
  * anything that fetched anyway out of the index. `robots.ts` explains why both are wanted.

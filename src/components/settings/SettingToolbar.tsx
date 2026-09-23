@@ -113,12 +113,6 @@ export default function SettingToolbar({
           >
             Metrics
           </Link>
-          <Link
-            className={secondaryBtnCls}
-            href="/admin/publish"
-          >
-            Publish
-          </Link>
           <button
             ref={saveButtonRef}
             type="button"

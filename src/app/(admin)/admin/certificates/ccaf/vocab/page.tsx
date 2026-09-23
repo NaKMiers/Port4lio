@@ -4,12 +4,13 @@ import CcafGate from '@/components/ccaf/CcafGate'
 import VocabTracker from '@/components/ccaf/VocabTracker'
 
 /**
- * `/admin/ccaf/vocab` - the exam glossary, separate from `/admin/ccaf`'s roadmap.
+ * `/admin/certificates/ccaf/vocab` - the exam glossary, separate from the roadmap one level
+ * up.
  *
  * Same gating as every other owner board (`CcafGate`), but no server-loaded state: the
  * deck is hardcoded in `lib/ccaf/vocab-data.ts` and mastery lives in the browser's
  * `localStorage`, so there is nothing here for the server to withhold from a stranger -
- * the gate alone is enough, unlike `/admin/ccaf` which also has to hide a server render.
+ * the gate alone is enough, unlike the roadmap, which also has to hide a server render.
  *
  * ## Why this one is not `max-w-editorial`
  *

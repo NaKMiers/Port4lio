@@ -38,7 +38,7 @@ import AdminHomeLink from './AdminHomeLink'
  * It was, and it is the reason every owner surface opened behind a full-screen
  * "Loading portfolio..." overlay. The component is only ever `loading` when an `AppProvider`
  * above it is bootstrapping, and that provider used to sit on `(admin)/layout.tsx` - so
- * `/admin`, `/admin/blog`, `/admin/publish`, `/admin/metrics` and the CCA-F pages each
+ * `/admin`, `/admin/blog`, `/admin/metrics` and the CCA-F pages each
  * blocked on a `/api/admin/profile` round trip for data none of them render. The provider
  * now sits on `admin/settings/layout.tsx`, which is below this chrome, and `/admin/settings`
  * shows its own `SettingLoading` inline - so there is no admin surface left for this

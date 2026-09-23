@@ -16,8 +16,8 @@ import { useApp } from '@/context/AppContext'
  * profile - not on chrome shared by pages that never read it.
  *
  * It used to sit in `AdminChrome` while the provider sat on `(admin)/layout.tsx`, which gave
- * "Loading portfolio..." to `/admin`, `/admin/blog`, `/admin/publish`, `/admin/metrics` and
- * the CCA-F pages - seven boards blocking on a profile document none of them render. That is
+ * "Loading portfolio..." to `/admin`, `/admin/blog`, `/admin/metrics` and
+ * the CCA-F pages - six boards blocking on a profile document none of them render. That is
  * also why this file used to open with `if (pathname === '/admin/settings') return null`:
  * the one admin page that DID need the profile already draws `SettingLoading` inline, so the
  * shared overlay had to be carved back out again for it. Both the mount and the carve-out

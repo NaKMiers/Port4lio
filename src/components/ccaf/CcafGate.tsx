@@ -8,7 +8,7 @@ import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 /**
  * `OwnerAuthGate` for a page whose contents are server-rendered.
  *
- * `/settings`, `/publish` and `/metrics` fetch their data from an admin API after the gate
+ * `/settings` and `/metrics` fetch their data from an admin API after the gate
  * opens, so the gate on its own is enough for them. This page renders the plan on the
  * server, so it splits the job in two: the page withholds the state from a request with no
  * owner cookie, and the gate asks for one. That leaves a seam - verifying a code changes

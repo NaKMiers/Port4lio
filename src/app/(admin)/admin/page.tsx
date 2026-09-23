@@ -2,7 +2,6 @@ import {
   BarChart3,
   FileText,
   GraduationCap,
-  Send,
   SlidersHorizontal,
 } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -21,9 +20,8 @@ export const metadata: Metadata = {
  *   /admin
  *     ├── Portfolio    /admin/settings   the one-page editor + preview rail
  *     ├── Blog         /admin/blog       drafts, publish, the quiet-days signal
- *     ├── Publish      /admin/publish    the syndication artifacts
  *     ├── Metrics      /admin/metrics    MBTI + IQ attempt counts
- *     └── CCA-F        /admin/ccaf       the certification tracker (vi | en)
+ *     └── Certificates /admin/certificates  earned + in progress (CCA-F tracker inside)
  * ```
  *
  * ## Why this exists at all
@@ -81,14 +79,6 @@ const BOARDS: readonly Board[] = [
     tint: 'border-pp-blue/30 bg-pp-blue/10 text-pp-blue',
   },
   {
-    href: '/admin/publish',
-    title: 'Publish',
-    blurb:
-      'The syndication artifacts: the GitHub README, the LinkedIn about, the Upwork profile, and what is paste-only.',
-    Icon: Send,
-    tint: 'border-pp-green/30 bg-pp-green/10 text-pp-green',
-  },
-  {
     href: '/admin/metrics',
     title: 'Metrics',
     blurb:
@@ -97,15 +87,15 @@ const BOARDS: readonly Board[] = [
     tint: 'border-pp-violet/30 bg-pp-violet/10 text-pp-violet',
   },
   {
-    href: '/admin/ccaf',
-    title: 'CCA-F',
+    href: '/admin/certificates',
+    title: 'Certificates',
     blurb:
-      'The certification tracker: roadmap, readiness and the reference deck.',
+      'Every certificate in one place: what is earned, and the trackers for what is still being studied for.',
     Icon: GraduationCap,
     tint: 'border-pp-pink/30 bg-pp-pink/10 text-pp-pink',
     secondary: [
-      { href: '/admin/ccaf/en', label: 'English' },
-      { href: '/admin/ccaf/vocab', label: 'Vocab' },
+      { href: '/admin/certificates/ccaf', label: 'CCA-F' },
+      { href: '/admin/certificates/ccaf/vocab', label: 'Vocab' },
     ],
   },
 ]

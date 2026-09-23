@@ -219,7 +219,7 @@ export default function BlogBoard() {
   })
 
   // Deferred to a macrotask so the fetch's setState does not run inside the effect body,
-  // matching PublishBoard and AppProvider. The lint rule this satisfies is not a formality:
+  // matching AppProvider. The lint rule this satisfies is not a formality:
   // a setState in an effect body cascades a second render before paint.
   useEffect(() => {
     const timer = window.setTimeout(() => bootstrap(), 0)

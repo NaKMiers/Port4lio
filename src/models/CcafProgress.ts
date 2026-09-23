@@ -40,7 +40,7 @@ import mongoose, { Schema } from 'mongoose'
  * has to work out which rows are exempt.
  */
 
-/** Singleton `_id`. Same idiom as `Profile` and `PublishState`. */
+/** Singleton `_id`. Same idiom as `Profile`. */
 export const CCAF_PROGRESS_DOCUMENT_ID = 'ccaf-progress'
 
 export type CcafMockRecord = {

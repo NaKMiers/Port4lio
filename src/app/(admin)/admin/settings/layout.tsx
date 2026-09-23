@@ -23,7 +23,7 @@ import AppProvider from '@/context/AppContext'
  * `resume`. Mounted on the group layout it ran on every owner surface, and since
  * `AdminChrome` rendered `ProfileFetchStatus`, every one of them opened behind a
  * `fixed inset-0 z-[200]` "Loading portfolio..." overlay: `/admin`, `/admin/blog`,
- * `/admin/publish`, `/admin/metrics`, the three CCA-F pages. None of them read the profile.
+ * `/admin/metrics`, the three CCA-F pages. None of them read the profile.
  * `useApp()` appears in exactly one page in this tree, and it is the one below this file.
  *
  * So the provider sits on the narrowest segment that needs it. The admin endpoint rather

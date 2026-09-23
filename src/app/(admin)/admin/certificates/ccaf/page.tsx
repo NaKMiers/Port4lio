@@ -6,12 +6,13 @@ import { buildCcafMetadata } from '@/lib/ccaf/page-meta'
 import { loadOwnerCcafState } from '@/lib/ccaf/progress-data'
 
 /**
- * `/admin/ccaf` - the CCA-F study plan in Vietnamese, and how far through it I am.
+ * `/admin/certificates/ccaf` - the CCA-F study plan in Vietnamese, and how far through it
+ * I am. Linked from the `/admin/certificates` overview, one folder up.
  *
- * An owner-only surface, same shape as `/settings`, `/publish` and `/metrics`: the admin
+ * An owner-only surface, same shape as `/settings` and `/metrics`: the admin
  * layout's chrome, `OwnerAuthGate` over the UI, `robots: noindex`, and no sitemap entry.
- * The English twin is `./en/page.tsx`; the two differ by one prop, so anything that would
- * have to be written twice belongs in `lib/ccaf/page-meta.ts` or in the tracker, not here.
+ * There used to be an English twin at `/admin/ccaf/en`; it was dropped, so this route is
+ * Vietnamese-only. The tracker still takes a `locale` prop, which is always `'vi'` here.
  *
  * ## Why the state load is gated and not just the gate
  *

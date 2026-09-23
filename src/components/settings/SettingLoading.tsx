@@ -7,9 +7,8 @@ import React from 'react'
  *
  * The copy used to be hardcoded to "Loading profile..." / "Preparing your editorial settings
  * view.", which was accurate when the settings editor was the only board. It stopped being
- * accurate the moment it was not: `PublishBoard.tsx` already renders this component, so
- * `/admin/publish` has been telling the owner it is loading a profile while it loads publish
- * state, and `/admin/metrics` does the same. The blog board would have been the third.
+ * accurate the moment it was not: `/admin/metrics` renders this component too, and was telling
+ * the owner it was loading a profile while it loaded the funnel.
  *
  * Defaults, rather than making the props required: every existing call site is correct as
  * written or is the settings editor itself, so requiring them would be a mechanical edit to

@@ -7,8 +7,6 @@ export type TabItem = {
   label: string
   /** Small count shown after the label, e.g. number of sections in the group. */
   count?: number
-  /** Renders an attention dot on the pill - used by /publish for out-of-date targets. */
-  flagged?: boolean
 }
 
 const baseCls =
@@ -59,12 +57,6 @@ export default function TabNav({
               >
                 {tab.count}
               </span>
-            ) : null}
-            {tab.flagged ? (
-              <span
-                aria-hidden="true"
-                className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-pp-orange shadow-[0_0_0_2px_rgba(255,255,255,0.9)]"
-              />
             ) : null}
           </button>
         )

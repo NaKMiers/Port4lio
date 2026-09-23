@@ -10,10 +10,9 @@ import AdminChrome from '@/components/admin/AdminChrome'
  *     └── admin/
  *           ├── page.tsx        /admin           the hub every other board hangs off
  *           ├── settings/       /admin/settings  the one page that reads the profile
- *           ├── publish/        /admin/publish
  *           ├── metrics/        /admin/metrics
  *           ├── blog/           /admin/blog, /admin/blog/<id>
- *           └── ccaf/           /admin/ccaf, /admin/ccaf/en
+ *           └── certificates/ /admin/certificates, /admin/certificates/ccaf(/vocab)
  * ```
  *
  * ## Why the pages sit under `admin/` and not directly in the group
@@ -34,7 +33,7 @@ import AdminChrome from '@/components/admin/AdminChrome'
  * ## `title` is not set here, deliberately
  *
  * It used to be `'Settings'`, which was true when settings was the only page and became a
- * lie the moment it was not: `/admin/publish` and `/admin/metrics` both rendered a tab
+ * lie the moment it was not: `/admin/metrics` rendered a tab
  * reading "Settings", and the blog board would have inherited it too. There is no sensible
  * shared title for four unrelated boards, so each page states its own and this layout
  * declines to guess.
@@ -46,7 +45,7 @@ import AdminChrome from '@/components/admin/AdminChrome'
  *
  * It used to wrap this whole group with `bootstrapOnMount endpoint='/api/admin/profile'`,
  * and the cost was paid on every owner surface: `AdminChrome` rendered `ProfileFetchStatus`,
- * so `/admin`, `/admin/blog`, `/admin/blog/<id>`, `/admin/publish`, `/admin/metrics` and the
+ * so `/admin`, `/admin/blog`, `/admin/blog/<id>`, `/admin/metrics` and the
  * three CCA-F pages each sat behind a `fixed inset-0 z-[200]` "Loading portfolio..." overlay
  * while a full profile document - resume included, the largest document this app has - was
  * fetched and then used by none of them. The blog board's own three fetches raced under an

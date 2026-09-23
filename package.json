@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "clean": "rm -rf .next node_modules package-lock.json bun.lock",
+    "clean": "rm -rf .next node_modules package-lock.json bun.lock pnpm.lock && bun install",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:api": "vitest run tests/api",

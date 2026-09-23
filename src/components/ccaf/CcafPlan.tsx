@@ -1,5 +1,5 @@
-import { ChevronRight } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { CalendarDays, ChevronRight, ListChecks } from 'lucide-react'
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 
 import RichText from '@/components/ccaf/RichText'
 import {
@@ -68,6 +68,241 @@ function toIsoDate(date: Date): string {
 }
 
 type DayStatus = 'done' | 'today' | 'late' | 'ahead'
+
+/**
+ * Week tabs or one flat checklist, remembered per browser.
+ *
+ * `localStorage` rather than Mongo for the same reason open state is not persisted: it is a
+ * reading preference, not progress. Read through `useSyncExternalStore` so the server and
+ * the hydrating pass both render the week view, and the stored choice lands one commit
+ * later without a `setState`-in-effect.
+ */
+type PlanView = 'week' | 'list'
+
+const VIEW_STORAGE_KEY = 'ccaf-plan-view'
+const viewListeners = new Set<() => void>()
+
+function readView(): PlanView {
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'list'
+      ? 'list'
+      : 'week'
+  } catch {
+    return 'week'
+  }
+}
+
+// This visit's choice. Set before the storage write so it wins whether or not the write
+// succeeds - private mode and blocked storage throw, and the toggle must still work.
+let memoryView: PlanView | null = null
+
+function writeView(view: PlanView) {
+  memoryView = view
+  try {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, view)
+  } catch {
+    // Storage unavailable; `memoryView` carries the choice for this visit.
+  }
+  viewListeners.forEach(listener => listener())
+}
+
+function subscribeView(listener: () => void) {
+  viewListeners.add(listener)
+  return () => {
+    viewListeners.delete(listener)
+  }
+}
+
+function usePlanView(): [PlanView, (view: PlanView) => void] {
+  const view = useSyncExternalStore(
+    subscribeView,
+    () => memoryView ?? readView(),
+    () => 'week' as const
+  )
+  return [view, writeView]
+}
+
+function ViewToggle({
+  view,
+  locale,
+  onChange,
+}: {
+  view: PlanView
+  locale: Locale
+  onChange: (view: PlanView) => void
+}) {
+  const options = [
+    { value: 'week', label: t(UI.viewByWeek, locale), Icon: CalendarDays },
+    { value: 'list', label: t(UI.viewList, locale), Icon: ListChecks },
+  ] as const
+
+  return (
+    <div
+      role="group"
+      aria-label={t(UI.viewGroup, locale)}
+      className="inline-flex items-center gap-0.5 rounded-full border border-pp-line bg-pp-panel-strong p-0.5 shadow-[0_8px_18px_rgba(46,35,28,0.05)]"
+    >
+      {options.map(({ value, label, Icon }) => {
+        const active = value === view
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChange(value)}
+            aria-pressed={active}
+            className={cx(
+              'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue',
+              active
+                ? 'bg-pp-text text-[var(--pp-bg)] shadow-[0_6px_14px_rgba(31,28,26,0.18)]'
+                : 'text-pp-muted hover:bg-pp-bg hover:text-pp-text'
+            )}
+          >
+            <Icon
+              className="h-3.5 w-3.5"
+              aria-hidden="true"
+            />
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Every task in the plan as one list of checkboxes - no tabs, no disclosures.
+ *
+ * For ticking things off quickly, or seeing what is left across the whole plan at once.
+ * The steps stay in the week view; here the whole row is the checkbox's label.
+ */
+function ChecklistView({
+  state,
+  locale,
+  doneIds,
+  editable,
+  onToggleTask,
+}: {
+  state: CcafState
+  locale: Locale
+  doneIds: Set<string>
+  editable: boolean
+  onToggleTask: (taskId: string) => void
+}) {
+  const [hideDone, setHideDone] = useState(false)
+
+  // Day numbers run across the whole plan, as in the week view's day cards.
+  const allRows = WEEKS.flatMap(week => week.days.map(day => ({ week, day })))
+    .map(({ week, day }, i) => ({
+      week,
+      day,
+      index: i + 1,
+      date: day.floating ? state.examDate : (day.date ?? ''),
+    }))
+    .flatMap(({ week, day, index, date }) =>
+      day.tasks.map(task => ({ week, task, day, index, date }))
+    )
+  const total = allRows.length
+  const done = allRows.filter(row => doneIds.has(row.task.id)).length
+  const percent = total ? Math.round((done / total) * 100) : 0
+
+  const visible = hideDone
+    ? allRows.filter(row => !doneIds.has(row.task.id))
+    : allRows
+  const weeks = WEEKS.map(week => ({
+    week,
+    rows: visible.filter(row => row.week.id === week.id),
+  })).filter(group => group.rows.length > 0)
+
+  return (
+    <EditorialPanel
+      variant="strong"
+      className="p-4 sm:p-5"
+    >
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-pp-line pb-3">
+        <span className="font-display text-2xl font-semibold tabular-nums text-pp-text">
+          {percent}%
+        </span>
+        <span className={cx(mutedMonoCls, 'tabular-nums')}>
+          {done}/{total} {t(UI.tasksSuffix, locale)}
+        </span>
+        <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-pp-muted">
+          <input
+            type="checkbox"
+            checked={hideDone}
+            onChange={() => setHideDone(value => !value)}
+            className="h-4 w-4 accent-pp-blue"
+          />
+          {t(UI.hideDone, locale)}
+        </label>
+      </div>
+
+      {weeks.length === 0 ? (
+        <p className="py-6 text-center text-sm text-pp-muted">
+          {t(UI.listAllDone, locale)}
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {weeks.map(({ week, rows }) => (
+            <section key={week.id}>
+              <h3 className={cx(eyebrowCls, 'mb-1 px-2')}>
+                {t(week.label, locale)} · {t(week.phase, locale)}
+              </h3>
+              <ul className="space-y-0.5">
+                {rows.map(({ task, day, index, date }) => {
+                  const checked = doneIds.has(task.id)
+                  const parsed = parseIsoDate(date)
+                  return (
+                    <li key={task.id}>
+                      <label
+                        className={cx(
+                          'grid grid-cols-[1.125rem_minmax(0,1fr)_auto] items-start gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-pp-bg/50',
+                          editable ? 'cursor-pointer' : 'cursor-not-allowed'
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!editable}
+                          onChange={() => onToggleTask(task.id)}
+                          // Titles can hold links, whose text would otherwise leak into
+                          // the checkbox's accessible name via the wrapping label.
+                          aria-label={`${t(UI.markComplete, locale)}: ${t(task.title, locale).replace(/<[^>]+>/g, '')}`}
+                          className="mt-1 h-[18px] w-[18px] shrink-0 accent-pp-blue disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        <span
+                          className={cx(
+                            'min-w-0 text-sm leading-relaxed',
+                            checked
+                              ? 'text-pp-muted line-through decoration-pp-line'
+                              : 'text-pp-text'
+                          )}
+                        >
+                          <RichText>{t(task.title, locale)}</RichText>
+                        </span>
+                        <span
+                          className={cx(
+                            mutedMonoCls,
+                            'mt-0.5 whitespace-nowrap tabular-nums'
+                          )}
+                        >
+                          {day.floating
+                            ? `${t(UI.examDayLabel, locale)} ★`
+                            : `${t(UI.dayLabel, locale)} ${String(index).padStart(2, '0')}`}
+                          {parsed ? ` · ${formatDayMonth(date)}` : ''}
+                        </span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+    </EditorialPanel>
+  )
+}
 
 function TaskRow({
   task,
@@ -323,6 +558,7 @@ export default function CcafPlan({
 
   const doneIds = useMemo(() => new Set(state.doneTaskIds), [state.doneTaskIds])
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  const [view, setView] = usePlanView()
 
   /**
    * Which week opens first: the one containing today, else the first unfinished one, else
@@ -383,145 +619,174 @@ export default function CcafPlan({
       className="scroll-mt-24 border-b border-pp-line pt-8 md:scroll-mt-28 md:pt-12"
     >
       <div className="space-y-6">
-        <header className="max-w-3xl space-y-2">
-          <p className={eyebrowCls}>{t(UI.planEyebrow, locale)}</p>
-          <h2
-            id="ccaf-plan-heading"
-            className="text-pretty font-display text-[clamp(1.65rem,3.6vw,2.35rem)] font-semibold leading-tight tracking-tight text-pp-text"
-          >
-            {t(UI.planHeading, locale)}
-          </h2>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div className="max-w-3xl space-y-2">
+            <p className={eyebrowCls}>{t(UI.planEyebrow, locale)}</p>
+            <h2
+              id="ccaf-plan-heading"
+              className="text-pretty font-display text-[clamp(1.65rem,3.6vw,2.35rem)] font-semibold leading-tight tracking-tight text-pp-text"
+            >
+              {t(UI.planHeading, locale)}
+            </h2>
+          </div>
+          {/* `ml-auto` keeps it on the right even when it wraps below the heading. */}
+          <div className="ml-auto">
+            <ViewToggle
+              view={view}
+              locale={locale}
+              onChange={setView}
+            />
+          </div>
         </header>
 
-        <nav
-          aria-label={t(UI.weeksNavLabel, locale)}
-          className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
-        >
-          {WEEKS.map(candidate => {
-            const stats = weekProgress(candidate.id, state.doneTaskIds)
-            const active = candidate.id === week.id
-            return (
-              <button
-                key={candidate.id}
-                type="button"
-                onClick={() => setActiveWeekId(candidate.id)}
-                aria-current={active ? 'true' : undefined}
-                className={cx(
-                  'rounded-panel border px-4 py-3 text-left motion-safe:transition-[transform,border-color,background-color,box-shadow] motion-safe:duration-200',
-                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue',
-                  active
-                    ? 'border-pp-blue bg-pp-panel-strong shadow-[0_14px_32px_rgba(51,152,255,0.2)] ring-1 ring-pp-blue/35 motion-safe:-translate-y-0.5'
-                    : 'border-pp-line bg-pp-panel hover:border-pp-muted/40'
-                )}
-              >
-                <span className="flex items-baseline justify-between gap-2">
-                  <span
-                    className={cx(
-                      'font-display text-sm font-semibold',
-                      active ? 'text-pp-blue' : 'text-pp-text'
-                    )}
-                  >
-                    {t(candidate.label, locale)}
-                  </span>
-                  <span className={mutedMonoCls}>{candidate.range}</span>
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-pp-muted">
-                  {t(candidate.phase, locale)} · {stats.done}/{stats.total}
-                </span>
-                <span className="mt-2 block h-1 overflow-hidden rounded-full bg-pp-line">
-                  <span
-                    className={cx(
-                      'block h-full rounded-full transition-[width] duration-300',
-                      stats.percent === 100
-                        ? 'bg-pp-green'
-                        : active
-                          ? 'bg-pp-blue'
-                          : 'bg-pp-text'
-                    )}
-                    style={{ width: `${stats.percent}%` }}
-                  />
-                </span>
-              </button>
-            )
-          })}
-        </nav>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
-          <div className="min-w-0 space-y-4">
-            <EditorialPanel
-              variant="strong"
-              className="border-l-4 border-l-pp-blue p-5"
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <h3 className="font-display text-xl font-semibold tracking-tight text-pp-text">
-                    {t(week.label, locale)} · {t(week.phase, locale)}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-pp-muted">
-                    {t(week.desc, locale)}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-[11.5rem] sm:flex-col sm:items-end">
-                  <span className="font-display text-2xl font-semibold tabular-nums text-pp-text">
-                    {weekStats.percent}%
-                  </span>
-                  <span className={cx(mutedMonoCls, 'whitespace-nowrap')}>
-                    {weekStats.done}/{weekStats.total}{' '}
-                    {t(UI.tasksSuffix, locale)} · ≈
-                    {formatHours(weekHours, locale)} {t(UI.hoursSuffix, locale)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenIds(current => {
-                        const next = new Set(current)
-                        if (allOpen) weekTaskIds.forEach(id => next.delete(id))
-                        else weekTaskIds.forEach(id => next.add(id))
-                        return next
-                      })
-                    }
-                    className={cx(
-                      secondaryBtnCls,
-                      'min-h-[34px] px-3 py-1 text-xs'
-                    )}
-                  >
-                    {allOpen
-                      ? t(UI.collapseAll, locale)
-                      : t(UI.expandAll, locale)}
-                  </button>
-                </div>
-              </div>
-            </EditorialPanel>
-
-            {week.days.map((day, i) => {
-              const date = day.floating ? state.examDate : (day.date ?? '')
-              return (
-                <DayCard
-                  key={day.id}
-                  day={day}
-                  locale={locale}
-                  index={dayOffset + i + 1}
-                  date={date}
-                  status={dayStatus(date, day.tasks)}
-                  doneIds={doneIds}
-                  editable={editable}
-                  openIds={openIds}
-                  onToggleOpen={taskId =>
-                    setOpenIds(current => {
-                      const next = new Set(current)
-                      if (next.has(taskId)) next.delete(taskId)
-                      else next.add(taskId)
-                      return next
-                    })
-                  }
-                  onToggleTask={onToggleTask}
-                />
-              )
-            })}
+        {view === 'list' ? (
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
+            <div className="min-w-0">
+              <ChecklistView
+                state={state}
+                locale={locale}
+                doneIds={doneIds}
+                editable={editable}
+                onToggleTask={onToggleTask}
+              />
+            </div>
+            <div className="space-y-4 lg:sticky lg:top-6">{rail}</div>
           </div>
+        ) : (
+          <>
+            <nav
+              aria-label={t(UI.weeksNavLabel, locale)}
+              className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+            >
+              {WEEKS.map(candidate => {
+                const stats = weekProgress(candidate.id, state.doneTaskIds)
+                const active = candidate.id === week.id
+                return (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    onClick={() => setActiveWeekId(candidate.id)}
+                    aria-current={active ? 'true' : undefined}
+                    className={cx(
+                      'rounded-panel border px-4 py-3 text-left motion-safe:transition-[transform,border-color,background-color,box-shadow] motion-safe:duration-200',
+                      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue',
+                      active
+                        ? 'border-pp-blue bg-pp-panel-strong shadow-[0_14px_32px_rgba(51,152,255,0.2)] ring-1 ring-pp-blue/35 motion-safe:-translate-y-0.5'
+                        : 'border-pp-line bg-pp-panel hover:border-pp-muted/40'
+                    )}
+                  >
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span
+                        className={cx(
+                          'font-display text-sm font-semibold',
+                          active ? 'text-pp-blue' : 'text-pp-text'
+                        )}
+                      >
+                        {t(candidate.label, locale)}
+                      </span>
+                      <span className={mutedMonoCls}>{candidate.range}</span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-pp-muted">
+                      {t(candidate.phase, locale)} · {stats.done}/{stats.total}
+                    </span>
+                    <span className="mt-2 block h-1 overflow-hidden rounded-full bg-pp-line">
+                      <span
+                        className={cx(
+                          'block h-full rounded-full transition-[width] duration-300',
+                          stats.percent === 100
+                            ? 'bg-pp-green'
+                            : active
+                              ? 'bg-pp-blue'
+                              : 'bg-pp-text'
+                        )}
+                        style={{ width: `${stats.percent}%` }}
+                      />
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
 
-          <div className="space-y-4 lg:sticky lg:top-6">{rail}</div>
-        </div>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
+              <div className="min-w-0 space-y-4">
+                <EditorialPanel
+                  variant="strong"
+                  className="border-l-4 border-l-pp-blue p-5"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <h3 className="font-display text-xl font-semibold tracking-tight text-pp-text">
+                        {t(week.label, locale)} · {t(week.phase, locale)}
+                      </h3>
+                      <p className="text-sm leading-relaxed text-pp-muted">
+                        {t(week.desc, locale)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 sm:w-[11.5rem] sm:flex-col sm:items-end">
+                      <span className="font-display text-2xl font-semibold tabular-nums text-pp-text">
+                        {weekStats.percent}%
+                      </span>
+                      <span className={cx(mutedMonoCls, 'whitespace-nowrap')}>
+                        {weekStats.done}/{weekStats.total}{' '}
+                        {t(UI.tasksSuffix, locale)} · ≈
+                        {formatHours(weekHours, locale)}{' '}
+                        {t(UI.hoursSuffix, locale)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenIds(current => {
+                            const next = new Set(current)
+                            if (allOpen)
+                              weekTaskIds.forEach(id => next.delete(id))
+                            else weekTaskIds.forEach(id => next.add(id))
+                            return next
+                          })
+                        }
+                        className={cx(
+                          secondaryBtnCls,
+                          'min-h-[34px] px-3 py-1 text-xs'
+                        )}
+                      >
+                        {allOpen
+                          ? t(UI.collapseAll, locale)
+                          : t(UI.expandAll, locale)}
+                      </button>
+                    </div>
+                  </div>
+                </EditorialPanel>
+
+                {week.days.map((day, i) => {
+                  const date = day.floating ? state.examDate : (day.date ?? '')
+                  return (
+                    <DayCard
+                      key={day.id}
+                      day={day}
+                      locale={locale}
+                      index={dayOffset + i + 1}
+                      date={date}
+                      status={dayStatus(date, day.tasks)}
+                      doneIds={doneIds}
+                      editable={editable}
+                      openIds={openIds}
+                      onToggleOpen={taskId =>
+                        setOpenIds(current => {
+                          const next = new Set(current)
+                          if (next.has(taskId)) next.delete(taskId)
+                          else next.add(taskId)
+                          return next
+                        })
+                      }
+                      onToggleTask={onToggleTask}
+                    />
+                  )
+                })}
+              </div>
+
+              <div className="space-y-4 lg:sticky lg:top-6">{rail}</div>
+            </div>
+          </>
+        )}
       </div>
     </SectionFrame>
   )

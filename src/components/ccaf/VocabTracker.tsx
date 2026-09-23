@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
+  Map as MapIcon,
   Shuffle,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -137,7 +138,8 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * `/admin/ccaf/vocab` - study the exam glossary as flip cards, or browse it as a grid.
+ * `/admin/certificates/ccaf/vocab` - study the exam glossary as flip cards, or browse it as
+ * a grid.
  *
  * The deck lives in `lib/ccaf/vocab-data.ts` as plain hardcoded data, not a document: the
  * content only grows when a new exam attempt surfaces new terms, which is a code change
@@ -282,19 +284,31 @@ export default function VocabTracker() {
                 Từ vựng
               </h1>
             </div>
-            {/* Stands in for the `AdminHomeLink` pill this board hides, so the frame can
-                own the full viewport without the page losing its only way out. */}
-            <Link
-              href="/admin"
-              aria-label="All boards"
-              title="All boards"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-pp-line bg-pp-panel-strong text-pp-muted no-underline transition hover:text-pp-text"
-            >
-              <LayoutGrid
-                aria-hidden
-                size={14}
-              />
-            </Link>
+            {/* Stand in for the `AdminHomeLink` pills this board hides, so the frame can
+                own the full viewport without the page losing its ways out. */}
+            <div className="flex shrink-0 items-center gap-1.5">
+              {[
+                { href: '/admin', label: 'All boards', Icon: LayoutGrid },
+                {
+                  href: '/admin/certificates/ccaf',
+                  label: 'CCA-F roadmap',
+                  Icon: MapIcon,
+                },
+              ].map(({ href, label, Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-label={label}
+                  title={label}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-pp-line bg-pp-panel-strong text-pp-muted no-underline transition hover:text-pp-text"
+                >
+                  <Icon
+                    aria-hidden
+                    size={14}
+                  />
+                </Link>
+              ))}
+            </div>
           </div>
 
           <div>

@@ -132,7 +132,7 @@ fairly independent products, split by route group:
 | `(me)`     | `/`                                      | The portfolio. English only, rendered from one Mongo profile document |
 | `(blog)`   | `/blog`, `/blog/<slug>`, `/blog/rss.xml` | The blog. Own chrome, own CSP                                         |
 | `(choice)` | `/[lang]/mbti/*`, `/[lang]/iq/*`         | Bilingual (vi/en) paid test products                                  |
-| `(admin)`  | `/admin/*`                               | Owner-only surfaces: blog editor, settings, publish, metrics, CCA-F   |
+| `(admin)`  | `/admin/*`                               | Owner-only surfaces: blog editor, settings, metrics, CCA-F            |
 
 `src/proxy.ts` (Next 16's renamed middleware) 307s bare `/mbti` and `/iq` to a
 locale-prefixed URL. Its `matcher` is a deliberate allowlist of static literals;
@@ -145,9 +145,8 @@ Route handlers and pages stay thin. The real logic lives in `src/lib/<domain>/`,
 which is where to look first:
 
 - `src/lib/blog/` - markdown pipeline, post/kind/series data access, SEO, events, revalidation
-- `src/lib/publish/` - renders the profile into per-platform artifacts (LinkedIn, Upwork, ...)
 - `src/lib/iq/`, `src/lib/mbti/` - item banks, scoring, pricing, result emails
-- `src/lib/ccaf/` - a private study tracker under `/admin/ccaf`
+- `src/lib/ccaf/` - a private study tracker under `/admin/certificates/ccaf`; `/admin/certificates` is the overview of all certificates
 - `src/lib/test-kit/` - shared shell for the two test products (nav, payment copy, effort rules)
 - `src/models/` - Mongoose schemas
 

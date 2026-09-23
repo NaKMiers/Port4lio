@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, LayoutGrid } from 'lucide-react'
+import { Award, BookOpen, LayoutGrid } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -19,37 +19,54 @@ const pillCls =
  * Renders nothing on `/admin` itself - a "back to the hub" pill on the hub is a link to the
  * page you are reading.
  *
- * Nothing on `/admin/ccaf/vocab` either, for a different reason: that board is a framed app
- * sized to the viewport with equal margins on all four sides, and a pill floating above the
- * frame both eats the height it wants and breaks the symmetry. It carries the same link as
- * an icon inside its own rail instead, so hiding this one costs no navigation.
+ * Nothing on `/admin/certificates/ccaf/vocab` either, for a different reason: that board is
+ * a framed app sized to the viewport with equal margins on all four sides, and a pill
+ * floating above the frame both eats the height it wants and breaks the symmetry. Its rail
+ * carries its own hub and roadmap icons instead.
  *
- * The CCA-F roadmap gets a second pill straight to that vocab deck: it is a sibling board
- * one click away, and going by way of the hub for something used mid-study session is
- * friction the roadmap page can spare. Everywhere else stays a single pill.
+ * Pages under `/admin/certificates/` add a Certificates pill beside the hub one, so the
+ * overview is one click back. The CCA-F roadmap also gets a pill on the right straight to
+ * the vocab deck: a sibling board used mid-study session, where going by way of the hub is
+ * friction the page can spare.
  */
 export default function AdminHomeLink() {
   const pathname = usePathname()
-  if (pathname === '/admin' || pathname === '/admin/ccaf/vocab') return null
+  if (pathname === '/admin' || pathname === '/admin/certificates/ccaf/vocab')
+    return null
 
-  const isCcafRoadmap =
-    pathname === '/admin/ccaf' || pathname === '/admin/ccaf/en'
+  const isCcafRoadmap = pathname === '/admin/certificates/ccaf'
+  // Pages below the certificates overview get a way back up to it, not just to the hub.
+  const underCertificates = pathname.startsWith('/admin/certificates/')
 
   return (
     <div className="relative mx-auto flex w-full max-w-editorial items-center justify-between gap-3 px-gutter pt-8">
-      <Link
-        href="/admin"
-        className={pillCls}
-      >
-        <LayoutGrid
-          aria-hidden
-          size={13}
-        />
-        All boards
-      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href="/admin"
+          className={pillCls}
+        >
+          <LayoutGrid
+            aria-hidden
+            size={13}
+          />
+          All boards
+        </Link>
+        {underCertificates ? (
+          <Link
+            href="/admin/certificates"
+            className={pillCls}
+          >
+            <Award
+              aria-hidden
+              size={13}
+            />
+            Certificates
+          </Link>
+        ) : null}
+      </div>
       {isCcafRoadmap ? (
         <Link
-          href="/admin/ccaf/vocab"
+          href="/admin/certificates/ccaf/vocab"
           className={pillCls}
         >
           <BookOpen

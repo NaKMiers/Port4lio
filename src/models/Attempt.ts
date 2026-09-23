@@ -16,7 +16,7 @@ import type { Axis } from '@/lib/mbti/types'
  * ```
  *
  * `_id` IS the capability token. That follows the string-id convention already used by
- * `Profile` and `PublishState`, and it means the unique index and the lookup
+ * `Profile`, and it means the unique index and the lookup
  * (`findById(token)`) come free, with no second field that can drift out of sync.
  *
  * There is no user reference because there are no users. Holding the URL is the whole

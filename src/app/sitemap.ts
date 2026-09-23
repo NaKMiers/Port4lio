@@ -216,8 +216,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.7,
     },
-    // Deliberately absent, in the style of the MBTI and IQ notes below: `/admin/ccaf` and
-    // `/admin/ccaf/en`. They were listed here while the study plan was a public page. It is an
+    // Deliberately absent, in the style of the MBTI and IQ notes below: the CCA-F tracker. It
+    // was listed here while the study plan was a public page. It is an
     // owner-only surface now, and since D6 every owner surface lives under `/admin` - none
     // of which has ever been listed here.
     ...mbti,

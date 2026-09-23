@@ -6,7 +6,7 @@ import { verifyAuthToken } from '@/lib/auth'
  * Set `REQUIRE_ADMIN=false` to work on the editor locally without a round trip through
  * Gmail. Production ignores the flag on purpose: this one boolean is the only thing
  * standing between the open internet and every owner surface - `/admin/settings`,
- * `/admin/publish`, `/admin/blog`, the profile-write APIs and the six blog handlers behind
+ * `/admin/blog`, the profile-write APIs and the six blog handlers behind
  * `requireOwner` - so a stale or fat-fingered env var on the live site must not be able to
  * unlock them. Turning the gate off there has to be a code change, not a config change.
  */

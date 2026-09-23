@@ -58,7 +58,8 @@ export async function GET(request: NextRequest) {
  * ## Why the gate is here and not only on the page
  *
  * The rule this repo states plainly in `api/admin/metrics`: a client-side gate hides a
- * page, a server-side gate protects data. `OwnerAuthGate` on `/admin/ccaf` is the first kind.
+ * page, a server-side gate protects data. `OwnerAuthGate` on
+ * `/admin/certificates/ccaf` is the first kind.
  * This check is the second, and it is the one that matters.
  */
 export async function PUT(request: NextRequest) {
@@ -115,7 +116,7 @@ export async function PUT(request: NextRequest) {
     return jsonError('Could not save progress', 500)
   }
 
-  // No `revalidatePath` here any more. Both pages render under the admin layout's
+  // No `revalidatePath` here any more. The CCA-F pages render under the admin layout's
   // `force-dynamic` - a per-request cookie check cannot share a cached render - so there is
   // no window left to bust, and calling it would only look like there was.
 

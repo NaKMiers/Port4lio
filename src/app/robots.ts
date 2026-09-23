@@ -27,14 +27,14 @@ import { resolveSiteOrigin } from '@/lib/seo'
  * paths above, one section later, which is what a list of individually-remembered routes
  * costs when nobody revisits it.
  *
- * `/settings`, `/publish`, `/metrics` and `/ccaf` now live under `/admin` (D6), so
- * `/admin` + `/admin/` covers all four, the CCA-F English twin at `/admin/ccaf/en`, and the
- * blog board that has not been written yet. The next owner surface is disallowed the moment
+ * Every owner surface now lives under `/admin` (D6), so `/admin` + `/admin/` covers all of
+ * them. The next owner surface is disallowed the moment
  * it is created rather than the moment somebody notices.
  *
- * No redirects from the old paths. They were `noindex` and disallowed, so nothing external
- * links to them and no crawler holds them; the only reader was a bookmark the owner can
- * re-make.
+ * No redirects from the pre-D6 paths. They were `noindex` and disallowed, so nothing
+ * external links to them and no crawler holds them; the only reader was a bookmark the owner
+ * can re-make. (`/admin/ccaf` is the one exception: it redirects to its new home under
+ * `/admin/certificates`, see `next.config.js`.)
  *
  * Kept as explicit per-product entries rather than collapsing to `/*&#47;iq/`: the IQ
  * landing, `/iq/method` and `/iq/privacy` are all in the sitemap and MUST stay crawlable,

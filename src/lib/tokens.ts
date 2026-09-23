@@ -14,7 +14,7 @@ import { base64url } from '@/lib/base64url'
  * is 128 bits, the same order as a UUIDv4, and encodes to 22 URL-safe characters.
  *
  * Tokens are stored as the Mongo `_id` (see `models/Attempt.ts`), following the string-id
- * convention already used by `Profile` and `PublishState`. That gives a unique index for
+ * convention already used by `Profile`. That gives a unique index for
  * free and makes `findById(token)` the whole lookup, with no second field to keep in sync.
  */
 

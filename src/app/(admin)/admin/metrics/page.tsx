@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 }
 
 /**
- * The funnel dashboard. Same shape as `/publish` and `/settings`: `OwnerAuthGate` hides
+ * The funnel dashboard. Same shape as `/settings`: `OwnerAuthGate` hides
  * the UI, and `/api/admin/metrics` is what actually refuses a request without the owner
  * cookie. The gate here is convenience; the gate there is the control.
  */

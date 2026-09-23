@@ -119,7 +119,7 @@ ${bodyHtml}
 </html>`
 }
 
-/** The owner login code for `/settings` and `/publish`. */
+/** The owner login code for the `/admin` pages. */
 export function renderOtpEmail({
   code,
   ttlMinutes,
