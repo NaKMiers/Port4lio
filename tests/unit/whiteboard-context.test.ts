@@ -510,6 +510,41 @@ describe('MCP budgets (D18)', () => {
     expect(text.length).toBeLessThanOrEqual(MCP_BUDGET_CHARS)
     expect(text).toMatch(/\(\d+ more links\)$/)
   })
+
+  // The biggest card limits.ts allows: a 20,000-char body plus 100 rows of 500 chars.
+  const bigTodo = item(94, {
+    form: 'todo',
+    title: 'Everything',
+    body: 'b'.repeat(20_000),
+    todos: Array.from({ length: 100 }, (_, i) => ({
+      id: `r${i}`,
+      text: 'r'.repeat(500),
+      done: false,
+    })),
+  })
+
+  it('keeps get_item within budget for a card with a full body and 100 long rows', () => {
+    const text = renderItemDetail(bigTodo, {
+      frames: [],
+      neighbours: [],
+      links: [],
+    })
+    expect(text.length).toBeLessThanOrEqual(MCP_BUDGET_CHARS)
+    expect(text).toContain('b'.repeat(20_000))
+    expect(text).toMatch(/\(\d+ more rows\)$/)
+  })
+
+  it('clips to-do rows in a search entry like a body, with a get_item pointer', () => {
+    const text = renderSearchResults([bigTodo], {
+      frames: [],
+      neighbours: [],
+      links: [],
+    })
+    // Still returned (not dropped as "(1 more)"), and small.
+    expect(text).toContain('#### Everything')
+    expect(text).toContain(`more rows - get_item ${bigTodo.id})`)
+    expect(text.length).toBeLessThan(4 * SEARCH_BODY_CLIP)
+  })
 })
 
 it('the whole fictional board renders with every item', () => {

@@ -315,3 +315,92 @@ test('(6) the Agents panel flips to Connected after the first MCP call (DR5)', a
     { timeout: 15_000 }
   )
 })
+
+test('(7) a card deleted and brought back by a restore can be edited again', async ({
+  page,
+  request,
+}, testInfo) => {
+  const card = objectId()
+  await request.post(`${API}/items`, {
+    data: { _id: card, form: 'text', title: 'Round trip', x: 0, y: 0 },
+  })
+  await openBoard(page)
+
+  await page.getByRole('button', { name: 'Backup', exact: true }).click()
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('menuitem', { name: 'Download backup (JSON)' }).click(),
+  ])
+  const backupPath = testInfo.outputPath('backup.json')
+  await download.saveAs(backupPath)
+
+  await page.getByText('Round trip').click()
+  await page.keyboard.press('Delete')
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Delete permanently' })
+    .click()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+
+  await page.getByRole('button', { name: 'Backup', exact: true }).click()
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('menuitem', { name: 'Restore from backup' }).click(),
+  ])
+  await chooser.setFiles(backupPath)
+  const restore = page.getByRole('alertdialog')
+  await restore.getByRole('button', { name: 'Restore' }).click()
+  await expect(restore).toContainText('documents written')
+  await restore.getByRole('button', { name: 'Close' }).click()
+
+  // Same session, same id: this edit used to be dropped without a word.
+  await page.getByText('Round trip').click()
+  const title = page.getByRole('textbox', { name: 'Title' })
+  await title.fill('Round trip, edited')
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  await expect
+    .poll(async () => {
+      const lines = await boardLines(request)
+      return lines.find(l => l.t === 'item' && l.item._id === card)?.item.title
+    })
+    .toBe('Round trip, edited')
+})
+
+test('(8) keyboard: Tab selects a card, Esc in a field keeps it, a dialog blocks the canvas', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(`${API}/items`, {
+    data: { _id: card, form: 'text', title: 'Keyboard card', x: 0, y: 0 },
+  })
+  await openBoard(page)
+
+  // Tab onto the card: it becomes the selection (DR9), so the inspector shows it.
+  const node = page.locator(`.react-flow__node[data-id="${card}"]`)
+  for (let i = 0; i < 60; i++) {
+    if (await node.evaluate(el => el === document.activeElement)) break
+    await page.keyboard.press('Tab')
+  }
+  await expect(node).toBeFocused()
+  const title = page.getByRole('textbox', { name: 'Title' })
+  await expect(title).toHaveValue('Keyboard card')
+
+  // Esc in the title leaves the field; the card stays selected.
+  await title.click()
+  await page.keyboard.press('Escape')
+  await expect(title).not.toBeFocused()
+  await expect(title).toHaveValue('Keyboard card')
+
+  // With the delete confirm open, arrows must not move the card behind it.
+  await node.focus()
+  await page.keyboard.press('Delete')
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toBeVisible()
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight')
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await page.waitForTimeout(1_200) // past the nudge debounce
+  const lines = await boardLines(request)
+  expect(lines.find(l => l.t === 'item' && l.item._id === card)?.item.x).toBe(0)
+})

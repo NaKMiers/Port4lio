@@ -22,9 +22,10 @@ import {
 import Inspector from '@/components/whiteboard/Inspector'
 import SavePill from '@/components/whiteboard/SavePill'
 import ShortcutsHelp from '@/components/whiteboard/ShortcutsHelp'
+import { deletePlan } from '@/components/whiteboard/delete-plan'
 import {
+  canvasNodeId,
   escapeTarget,
-  isTypingTarget,
   shortcutFor,
   type Tool,
 } from '@/components/whiteboard/shortcuts'
@@ -56,8 +57,9 @@ import type { ClientItem } from '@/lib/whiteboard/types'
  * focus is in a field - a "t" typed into a title must be a letter. Esc peels one layer at a
  * time (tool, then an open surface, then the selection). Delete on a selection that holds
  * any item opens the confirm with counts; a selection of links only is deleted at once
- * (R3-7). Enter on a focused card edits it; the arrows nudge the selection 10px (Shift 50px)
- * through the debounced PATCH.
+ * (R3-7). Tab onto a card selects it, Enter edits it, and the arrows nudge the selection
+ * 10px (Shift 50px) through the debounced PATCH. Nothing reaches the canvas while a dialog
+ * is open.
  */
 
 const CREATE_FORM: Partial<Record<Tool, { form: Form; shape?: Shape }>> = {
@@ -197,26 +199,13 @@ function WhiteboardShell() {
 
   const requestDelete = useCallback(() => {
     if (readOnly) return
-    const itemIds = selection.nodes.filter(id => data.items[id])
-    if (itemIds.length === 0) {
-      if (selection.edges.length) actions.deleteLinks(selection.edges)
-      return
+    const plan = deletePlan(selection, data)
+    if (plan?.kind === 'links') actions.deleteLinks(plan.ids)
+    if (plan?.kind === 'confirm') {
+      const { items, links, frameChildren, hiddenFrame } = plan
+      setPendingDelete({ items, links, frameChildren, hiddenFrame })
     }
-    const set = new Set(itemIds)
-    const links = Object.values(data.links).filter(
-      link =>
-        set.has(link.from) ||
-        set.has(link.to) ||
-        selection.edges.includes(link._id)
-    ).length
-    const frames = itemIds.filter(id => data.items[id].form === 'frame')
-    const frameChildren = Object.values(data.items).filter(
-      item =>
-        item.parentId && frames.includes(item.parentId) && !set.has(item._id)
-    ).length
-    const hiddenFrame = frames.some(id => !data.items[id].includeInAi)
-    setPendingDelete({ items: itemIds, links, frameChildren, hiddenFrame })
-  }, [actions, data.items, data.links, readOnly, selection])
+  }, [actions, data, readOnly, selection])
 
   const confirmDelete = useCallback(() => {
     if (!pendingDelete) return
@@ -249,45 +238,23 @@ function WhiteboardShell() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null
-
-      if (
-        event.key === 'Enter' &&
-        !isTypingTarget(target) &&
-        target?.classList?.contains('react-flow__node') &&
-        !readOnly
-      ) {
-        const id = target.getAttribute('data-id')
-        if (id) {
-          event.preventDefault()
-          setEditingId(id)
-        }
-        return
-      }
-
-      if (
-        event.key.startsWith('Arrow') &&
-        !isTypingTarget(target) &&
-        !readOnly &&
-        selection.nodes.length
-      ) {
-        event.preventDefault()
-        const step = event.shiftKey ? 50 : 10
-        const [dx, dy] =
-          event.key === 'ArrowLeft'
-            ? [-step, 0]
-            : event.key === 'ArrowRight'
-              ? [step, 0]
-              : event.key === 'ArrowUp'
-                ? [0, -step]
-                : [0, step]
-        nudge(dx, dy)
-        return
-      }
-
-      const action = shortcutFor(event)
+      // A dialog owns the keyboard while it is open, Esc included (its own handler).
+      const action = shortcutFor(event, {
+        modalOpen: Boolean(pendingDelete || helpOpen || unhide || restoreFile),
+      })
       if (!action) return
       switch (action.type) {
+        case 'edit':
+          if (readOnly) return
+          event.preventDefault()
+          selectOnly([action.id])
+          setEditingId(action.id)
+          return
+        case 'nudge':
+          if (readOnly || !selection.nodes.length) return
+          event.preventDefault()
+          nudge(action.dx, action.dy)
+          return
         case 'tool':
           if (readOnly) return
           event.preventDefault()
@@ -305,9 +272,10 @@ function WhiteboardShell() {
           event.preventDefault()
           openExport(selection.nodes.length > 1 ? 'selection' : 'all')
           return
+        case 'leaveField':
+          ;(event.target as HTMLElement | null)?.blur?.()
+          return
         case 'escape': {
-          // Dialogs close themselves (their own capture-phase Esc handlers).
-          if (pendingDelete || helpOpen || unhide || restoreFile) return
           const layer = escapeTarget({
             tool,
             surfaceOpen: surface !== null,
@@ -320,8 +288,21 @@ function WhiteboardShell() {
         }
       }
     }
+    // Tab onto a card selects it, so the inspector, Delete and the arrow keys follow the
+    // keyboard focus. Only for keyboard focus (:focus-visible): a click selects on its own.
+    const onFocusIn = (event: FocusEvent) => {
+      const id = canvasNodeId(event.target)
+      const el = event.target as HTMLElement
+      if (!id || readOnly || !el.matches?.(':focus-visible')) return
+      if (selection.nodes.length === 1 && selection.nodes[0] === id) return
+      selectOnly([id])
+    }
+    window.addEventListener('focusin', onFocusIn)
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('focusin', onFocusIn)
+    }
   }, [
     clearSelection,
     empty,
@@ -332,6 +313,7 @@ function WhiteboardShell() {
     readOnly,
     requestDelete,
     restoreFile,
+    selectOnly,
     selection,
     setTool,
     surface,
@@ -358,9 +340,25 @@ function WhiteboardShell() {
     [actions, editingEdgeId, editingId, readOnly, selectOnly, tool]
   )
 
+  // The pulse class is on only for the length of the animation (900ms, whiteboard.css).
+  // It used to stay on forever: a second click could not replay it, and cards hidden later,
+  // or panned back into view (remounted), pulsed on their own.
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (pulseTimer.current) clearTimeout(pulseTimer.current)
+    },
+    []
+  )
   const showHidden = () => {
     if (reducedMotion) return
-    setPulse(Date.now())
+    if (pulseTimer.current) clearTimeout(pulseTimer.current)
+    // Off for one frame first, so a click during a pulse restarts the animation.
+    setPulse(0)
+    requestAnimationFrame(() => {
+      setPulse(Date.now())
+      pulseTimer.current = setTimeout(() => setPulse(0), 1_000)
+    })
   }
 
   const inspector = (
@@ -371,6 +369,7 @@ function WhiteboardShell() {
       onSelect={selectOnly}
       onExportSelection={() => openExport('selection')}
       onUnhideFrame={(frame, readable) => setUnhide({ frame, readable })}
+      readOnly={readOnly}
     />
   )
   const hasSelection = selection.nodes.length + selection.edges.length > 0
@@ -384,6 +383,11 @@ function WhiteboardShell() {
         )}
       >
         <TopBar
+          unsaved={
+            board.status.failing > 0 ||
+            (!board.status.online && board.status.pending > 0) ||
+            Object.keys(board.errors).length > 0
+          }
           className="col-span-full"
           pill={
             <SavePill
@@ -423,6 +427,24 @@ function WhiteboardShell() {
           aria-label="Canvas"
           className="relative col-start-1 row-start-2 min-h-0 min-w-0"
         >
+          {/* Before the canvas in the DOM so Tab reaches the tools first (DR9). */}
+          {drawingAllowed ? (
+            <ToolRail
+              tool={tool}
+              onTool={setTool}
+              disabled={readOnly}
+              large={tier !== 'lg'}
+            />
+          ) : (
+            <p className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-full border border-pp-line bg-white/90 px-3 py-2 text-[12px] text-pp-muted">
+              <Pencil
+                aria-hidden
+                size={13}
+              />
+              Drawing needs a larger screen
+            </p>
+          )}
+
           <Canvas
             board={board}
             tool={tool}
@@ -446,23 +468,6 @@ function WhiteboardShell() {
               onStroke={(points, origin) => actions.addInk(points, origin)}
             />
           ) : null}
-
-          {drawingAllowed ? (
-            <ToolRail
-              tool={tool}
-              onTool={setTool}
-              disabled={readOnly}
-              large={tier !== 'lg'}
-            />
-          ) : (
-            <p className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-full border border-pp-line bg-white/90 px-3 py-2 text-[12px] text-pp-muted">
-              <Pencil
-                aria-hidden
-                size={13}
-              />
-              Drawing needs a larger screen
-            </p>
-          )}
 
           {empty ? (
             <EmptyBoard

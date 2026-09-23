@@ -421,7 +421,7 @@ function entryParts(
   item: ContextItem,
   ctx: EntryContext,
   options: EntryOptions = {}
-): { lines: string[]; links: string[] } {
+): { lines: string[]; rows: string[]; links: string[] } {
   const lines = [
     `#### ${displayTitle(item)}`,
     metaLine(item, ctx.framesById, options.showFrame),
@@ -438,9 +438,23 @@ function entryParts(
     if (clipped) lines.push(`(clipped - get_item ${item.id})`)
   }
 
-  if (item.form === 'todo')
-    for (const row of item.todos)
-      lines.push(`- [${row.done ? 'x' : ' '}] ${escapeInline(row.text)}`)
+  // To-do rows are body-sized too (100 rows of 500 chars), so the D18 clip covers them: a
+  // search entry keeps rows up to `clipBody` chars and points at get_item for the rest.
+  const rows: string[] = []
+  if (item.form === 'todo') {
+    let used = 0
+    for (const [index, row] of item.todos.entries()) {
+      const line = `- [${row.done ? 'x' : ' '}] ${escapeInline(row.text)}`
+      if (options.clipBody && used + line.length > options.clipBody) {
+        rows.push(
+          `(${item.todos.length - index} more rows - get_item ${item.id})`
+        )
+        break
+      }
+      rows.push(line)
+      used += line.length + 1
+    }
+  }
 
   if (item.form === 'ink')
     lines.push(inkLabel(item, ctx.inkPeers, ctx.framesById))
@@ -457,7 +471,7 @@ function entryParts(
     }
   }
 
-  return { lines, links }
+  return { lines, rows, links }
 }
 
 function renderEntry(
@@ -465,8 +479,9 @@ function renderEntry(
   ctx: EntryContext,
   options: EntryOptions = {}
 ): string {
-  const { lines, links } = entryParts(item, ctx, options)
-  return [...lines, ...links].join('\n')
+  const { lines, rows, links } = entryParts(item, ctx, options)
+  // Ink items have no rows, so the ink label (last in `lines`) never lands after them.
+  return [...lines, ...rows, ...links].join('\n')
 }
 
 function byRecency(a: ContextItem, b: ContextItem) {
@@ -787,17 +802,23 @@ export function renderItemDetail(
   { budget = MCP_BUDGET_CHARS }: { budget?: number } = {}
 ): string {
   const ctx = buildEntryContext({ ...input, items: [item] }, () => 'in')
-  // Links are the only unbounded part (bodies are capped at 20,000 by limits.ts).
-  const { lines, links } = entryParts(item, ctx, { showFrame: true })
+  // The body is capped at 20,000 by limits.ts and always fits. To-do rows (up to 100 of 500
+  // chars) and links are not, so both are added only while the answer stays in budget.
+  const { lines, rows, links } = entryParts(item, ctx, { showFrame: true })
 
   let out = lines.join('\n')
-  for (const [index, l] of links.entries()) {
-    const tail = `\n(${links.length - index} more links)`
-    if (out.length + l.length + 1 + tail.length > budget) {
-      out += tail
-      break
+  const append = (entries: string[], noun: string) => {
+    for (const [index, entry] of entries.entries()) {
+      const tail = `\n(${entries.length - index} more ${noun})`
+      if (out.length + entry.length + 1 + tail.length > budget) {
+        out += tail
+        return false
+      }
+      out += `\n${entry}`
     }
-    out += `\n${l}`
+    return true
   }
+  if (append(rows, 'rows')) append(links, 'links')
+  else if (links.length) out += `\n(${links.length} more links)`
   return out
 }

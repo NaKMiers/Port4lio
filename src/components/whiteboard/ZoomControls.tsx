@@ -14,7 +14,7 @@ function ZoomControls({ className }: { className?: string }) {
   const reduced = useReducedMotion()
   const duration = reduced ? 0 : 200
   const btn =
-    'grid h-8 min-w-8 place-items-center rounded-lg px-1 font-display text-[11px] font-semibold text-pp-muted hover:bg-pp-text/5 hover:text-pp-text'
+    'grid h-11 min-w-11 place-items-center lg:h-8 lg:min-w-8 rounded-lg px-1 font-display text-[11px] font-semibold text-pp-muted hover:bg-pp-text/5 hover:text-pp-text'
 
   return (
     <div

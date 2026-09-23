@@ -51,10 +51,19 @@ export function HiddenBadge({ className }: { className?: string }) {
   )
 }
 
-export function ErrorBadge({ message }: { message: string }) {
+export function ErrorBadge({
+  message,
+  className,
+}: {
+  message: string
+  className?: string
+}) {
   return (
     <span
-      className="absolute -right-2.5 -top-2.5 grid h-5 w-5 place-items-center rounded-full bg-pp-ink-rose text-white shadow"
+      className={cn(
+        'absolute -right-2.5 -top-2.5 grid h-5 w-5 place-items-center rounded-full bg-pp-ink-rose text-white shadow',
+        className
+      )}
       title={message}
     >
       <TriangleAlert

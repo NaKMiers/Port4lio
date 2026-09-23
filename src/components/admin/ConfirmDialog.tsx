@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useId, useRef, type ReactNode } from 'react'
 
+import { useDialogFocus } from '@/components/admin/useDialogFocus'
 import {
   ghostBtnCls,
   secondaryBtnCls,
@@ -32,7 +33,8 @@ import { cn } from '@/lib/utils'
  * It moved here from `blog-admin/` when the whiteboard needed it, and gained what a modal
  * owes a keyboard user on the way: focus moves into the dialog when it opens, Tab and
  * Shift+Tab stay inside it, Escape cancels, and focus goes back to whatever opened it when
- * it closes.
+ * it closes. The mechanics are `useDialogFocus`, including the busy case where every button
+ * is disabled and the dialog itself holds focus.
  */
 export default function ConfirmDialog({
   open,
@@ -62,52 +64,9 @@ export default function ConfirmDialog({
 }) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const titleId = useId()
-  // Callers pass inline handlers; reading them through a ref keeps the focus effect tied to
-  // open/close only, instead of re-running (and re-grabbing focus) on every parent render.
-  const latest = useRef({ busy, onCancel })
-  useEffect(() => {
-    latest.current = { busy, onCancel }
+  useDialogFocus(dialogRef, open, () => {
+    if (!busy) onCancel()
   })
-
-  useEffect(() => {
-    if (!open) return
-    const opener = document.activeElement as HTMLElement | null
-    const dialog = dialogRef.current
-    const focusables = () =>
-      Array.from(
-        dialog?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        ) ?? []
-      )
-    // The last button is the confirm; start on Cancel so Enter is never destructive by accident.
-    focusables()[0]?.focus()
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        if (!latest.current.busy) latest.current.onCancel()
-        return
-      }
-      if (event.key !== 'Tab') return
-      const list = focusables()
-      if (list.length === 0) return
-      const first = list[0]
-      const last = list[list.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown, true)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown, true)
-      opener?.focus?.()
-    }
-  }, [open])
 
   if (!open) return null
 
@@ -118,8 +77,10 @@ export default function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-busy={busy || undefined}
+        tabIndex={-1}
         className={cn(
-          'w-full max-w-sm rounded-[1.9rem] border border-pp-line bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(255,250,246,0.8))] p-5 shadow-panel backdrop-blur-md',
+          'w-full max-w-sm rounded-[1.9rem] border border-pp-line bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(255,250,246,0.8))] p-5 shadow-panel outline-none backdrop-blur-md',
           className
         )}
       >

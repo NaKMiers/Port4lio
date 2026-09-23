@@ -21,9 +21,9 @@ export const metadata: Metadata = {
  *   /admin
  *     ├── Portfolio    /admin/settings   the one-page editor + preview rail
  *     ├── Blog         /admin/blog       drafts, publish, the quiet-days signal
- *     ├── Metrics      /admin/metrics    MBTI + IQ attempt counts
+ *     ├── Whiteboard   /admin/whiteboard the private context canvas agents read via MCP
  *     ├── Certificates /admin/certificates  earned + in progress (CCA-F tracker inside)
- *     └── Whiteboard   /admin/whiteboard the private context canvas agents read via MCP
+ *     └── Metrics      /admin/metrics    MBTI + IQ attempt counts
  * ```
  *
  * ## Why this exists at all
@@ -81,12 +81,12 @@ const BOARDS: readonly Board[] = [
     tint: 'border-pp-blue/30 bg-pp-blue/10 text-pp-blue',
   },
   {
-    href: '/admin/metrics',
-    title: 'Metrics',
+    href: '/admin/whiteboard',
+    title: 'Whiteboard',
     blurb:
-      'MBTI and IQ attempts, completion, and where people stop. The traffic the availability block is aimed at.',
-    Icon: BarChart3,
-    tint: 'border-pp-violet/30 bg-pp-violet/10 text-pp-violet',
+      'Dreams, goals, failures and drafts as linked cards. Export them to a chat, or let Claude Code read them over MCP.',
+    Icon: Waypoints,
+    tint: 'border-pp-green/30 bg-pp-green/10 text-pp-green',
   },
   {
     href: '/admin/certificates',
@@ -101,12 +101,12 @@ const BOARDS: readonly Board[] = [
     ],
   },
   {
-    href: '/admin/whiteboard',
-    title: 'Whiteboard',
+    href: '/admin/metrics',
+    title: 'Metrics',
     blurb:
-      'Dreams, goals, failures and drafts as linked cards. Export them to a chat, or let Claude Code read them over MCP.',
-    Icon: Waypoints,
-    tint: 'border-pp-green/30 bg-pp-green/10 text-pp-green',
+      'MBTI and IQ attempts, completion, and where people stop. The traffic the availability block is aimed at.',
+    Icon: BarChart3,
+    tint: 'border-pp-violet/30 bg-pp-violet/10 text-pp-violet',
   },
 ]
 

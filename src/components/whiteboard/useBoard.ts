@@ -5,11 +5,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { readBoardStream } from '@/components/whiteboard/board-loader'
 import {
   absoluteOrigin,
+  movePatch,
   resolveMembership,
   type Placeable,
 } from '@/components/whiteboard/frame-geometry'
 import { newObjectId } from '@/components/whiteboard/object-id'
-import type { LinkBody, SaveOp } from '@/components/whiteboard/save-queue'
+import type {
+  LinkBody,
+  SaveOp,
+  UnparentedChild,
+} from '@/components/whiteboard/save-queue'
 import { useSaveQueue } from '@/components/whiteboard/useSaveQueue'
 import {
   STATUS_MEANINGS,
@@ -118,6 +123,37 @@ export function isEffectivelyHidden(
   return !frame || !frame.includeInAi
 }
 
+/** Groups a multi-delete in the queue, and picks "deleted" for its summary. */
+const DELETE_GROUP = 'delete-'
+
+/**
+ * Take a frame's children out of it in `next`: absolute x/y, and hidden if the frame was
+ * (rule 8). Returns them in the shape `queue.unparent` wants.
+ */
+function unparentLocally(
+  frame: ClientItem,
+  items: Record<string, ClientItem>,
+  next: Record<string, ClientItem>,
+  skip: ReadonlySet<string> = new Set()
+): UnparentedChild[] {
+  const hidden = !frame.includeInAi
+  const children: UnparentedChild[] = []
+  for (const child of Object.values(items)) {
+    if (child.parentId !== frame._id || skip.has(child._id)) continue
+    const x = child.x + frame.x
+    const y = child.y + frame.y
+    next[child._id] = {
+      ...child,
+      parentId: null,
+      x,
+      y,
+      ...(hidden ? { includeInAi: false } : {}),
+    }
+    children.push({ id: child._id, x, y, hidden })
+  }
+  return children
+}
+
 function framesOf(items: Record<string, ClientItem>): Placeable[] {
   return Object.values(items)
     .filter(item => item.form === 'frame')
@@ -144,6 +180,10 @@ export function useBoard() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const serverItems = useRef(new Map<string, ClientItem>())
   const serverLinks = useRef(new Map<string, ClientLink>())
+  /** A frame's children as they were before a local un-parent, for a refused delete. */
+  const serverChildren = useRef(
+    new Map<string, Pick<ClientItem, 'parentId' | 'x' | 'y' | 'includeInAi'>>()
+  )
   const [notice, setNotice] = useState<string | null>(null)
 
   const { queue, status, setStatus } = useSaveQueue({
@@ -202,14 +242,25 @@ export function useBoard() {
         if (op.type === 'deleteLink') serverLinks.current.delete(op.id)
       },
       onRejected: (op, id, error) => {
-        // R3-19: a delete that the server refused puts the card back, marked.
+        // R3-19: a delete that the server refused puts the card back, marked - with the
+        // links it took off the canvas, and its children back inside it if it is a frame
+        // (the server changed nothing).
         if (op.type === 'deleteItem') {
           const snapshot = serverItems.current.get(op.id)
           if (snapshot)
-            commit(prev => ({
-              ...prev,
-              items: { ...prev.items, [op.id]: snapshot },
-            }))
+            commit(prev => {
+              const items = { ...prev.items, [op.id]: snapshot }
+              for (const child of Object.values(prev.items)) {
+                const before = serverChildren.current.get(child._id)
+                if (before?.parentId === op.id && child.parentId === null)
+                  items[child._id] = { ...child, ...before }
+              }
+              const links = { ...prev.links }
+              for (const link of serverLinks.current.values())
+                if (link.from === op.id || link.to === op.id)
+                  links[link._id] = link
+              return { items, links }
+            })
         }
         if (op.type === 'deleteLink') {
           const snapshot = serverLinks.current.get(op.id)
@@ -221,14 +272,21 @@ export function useBoard() {
         }
         setErrors(prev => ({ ...prev, [id]: error }))
       },
-      onGroupSettled: (_groupId, result) => {
+      onGroupSettled: (groupId, result) => {
+        const deleting = groupId.startsWith(DELETE_GROUP)
         const total =
           result.ok.length + result.failed.length + result.skipped.length
-        const parts = [`${result.ok.length} of ${total} updated`]
+        const parts = [
+          `${result.ok.length} of ${total} ${deleting ? 'deleted' : 'updated'}`,
+        ]
         if (result.failed.length)
-          parts.push(`${result.failed.length} not saved`)
+          parts.push(
+            `${result.failed.length} ${deleting ? 'not deleted' : 'not saved'}`
+          )
         if (result.skipped.length)
-          parts.push(`${result.skipped.length} skipped (inside a hidden frame)`)
+          parts.push(
+            `${result.skipped.length} skipped (a hidden frame or inside one)`
+          )
         setNotice(parts.join(' - '))
       },
     })
@@ -262,6 +320,8 @@ export function useBoard() {
         })
         serverItems.current = new Map(Object.entries(items))
         serverLinks.current = new Map(Object.entries(links))
+        // A card deleted earlier this session and brought back by a restore is live again.
+        queue.revive([...Object.keys(items), ...Object.keys(links)])
         queue.markPersisted(Object.keys(items))
         setLoad({ phase: 'ready' })
       } catch (error) {
@@ -424,6 +484,7 @@ export function useBoard() {
         y: number
         parentId: string | null
         changed: boolean
+        leftHidden: boolean
       }[] = []
       const nextItems = { ...items }
 
@@ -458,6 +519,7 @@ export function useBoard() {
           y: membership.y,
           parentId: membership.parentId,
           changed: membership.changed,
+          leftHidden,
         })
       }
       commit(prev => ({ ...prev, items: nextItems }))
@@ -475,7 +537,7 @@ export function useBoard() {
       for (const u of fresh)
         queue.patchItem(
           u.id,
-          { x: u.x, y: u.y, ...(u.changed ? { parentId: u.parentId } : {}) },
+          movePatch(u, u.leftHidden),
           debounce ? {} : { delay: 0 }
         )
     },
@@ -487,23 +549,25 @@ export function useBoard() {
       const { items, links } = dataRef.current
       const doomed = new Set(ids.filter(id => items[id]))
       const nextItems = { ...items }
+      const orphans = new Map<string, UnparentedChild[]>()
       for (const id of doomed) {
         const item = items[id]
-        if (item.form === 'frame')
+        if (item.form === 'frame') {
           // Mirror the server's safe order locally: children stay, converted to absolute,
           // and a hidden frame's children stay hidden (rule 8).
-          for (const child of Object.values(items))
-            if (child.parentId === id && !doomed.has(child._id)) {
-              const updated = {
-                ...child,
-                parentId: null,
-                x: child.x + item.x,
-                y: child.y + item.y,
-                ...(item.includeInAi ? {} : { includeInAi: false }),
-              }
-              nextItems[child._id] = updated
-              serverItems.current.set(child._id, updated)
-            }
+          const children = unparentLocally(item, items, nextItems, doomed)
+          for (const child of children) {
+            const { parentId, x, y, includeInAi } = items[child.id]
+            serverChildren.current.set(child.id, {
+              parentId,
+              x,
+              y,
+              includeInAi,
+            })
+            serverItems.current.set(child.id, nextItems[child.id])
+          }
+          orphans.set(id, children)
+        }
         delete nextItems[id]
       }
       const nextLinks = { ...links }
@@ -511,11 +575,18 @@ export function useBoard() {
         if (doomed.has(link.from) || doomed.has(link.to))
           delete nextLinks[link._id]
       commit(() => ({ items: nextItems, links: nextLinks }))
-      // R3-19: one DELETE per item, each through that item's own queue.
+      // The children's own queued writes still name the frame; rewrite them first.
+      for (const [frameId, children] of orphans)
+        queue.unparent(frameId, children)
+      // R3-19: one DELETE per item, each through that item's own queue, with a per-item
+      // summary ("4 of 5 deleted - 1 not deleted") when there is more than one.
+      const group = doomed.size > 1 ? `${DELETE_GROUP}${Date.now()}` : undefined
+      if (group) queue.openGroup(group)
       for (const id of doomed) {
         clearError(id)
-        queue.deleteItem(id)
+        queue.deleteItem(id, { group })
       }
+      if (group) queue.closeGroup(group)
     },
     [clearError, commit, queue]
   )
@@ -581,6 +652,15 @@ export function useBoard() {
   /** DR4: "Discard" on a card the server rejected. Reverts it, or removes it if it never saved. */
   const discard = useCallback(
     (id: string) => {
+      // A frame that never saved goes away entirely; its children stay, un-parented, and
+      // their writes stop waiting on it.
+      const frame = dataRef.current.items[id]
+      if (frame?.form === 'frame' && !serverItems.current.has(id)) {
+        const items = { ...dataRef.current.items }
+        const children = unparentLocally(frame, dataRef.current.items, items)
+        commit(prev => ({ ...prev, items }))
+        queue.unparent(id, children)
+      }
       const droppedLinks = queue.discard(id)
       commit(prev => {
         const items = { ...prev.items }

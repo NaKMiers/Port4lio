@@ -115,3 +115,15 @@
     opacity: 1;
   }
 }
+
+/* Below lg the export sheet is a bottom sheet (DR8), so it rises instead. */
+@keyframes wb-sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}

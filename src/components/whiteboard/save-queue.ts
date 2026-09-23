@@ -1,4 +1,4 @@
-import type { BulkPositionUpdate } from '@/lib/whiteboard/limits'
+import { LIMITS, type BulkPositionUpdate } from '@/lib/whiteboard/limits'
 
 /**
  * The canvas save queue, with no React and no fetch in it (both are injected).
@@ -13,13 +13,24 @@ import type { BulkPositionUpdate } from '@/lib/whiteboard/limits'
  *              ▼
  *   send ──▶ 2xx ─────────▶ saved: mark persisted, report the server doc (R3-1 merge)
  *          ├ 0 / 5xx ────▶ retry with backoff 1s, 2s, 4s ... 30s    (pill: N not saved)
- *          └ 4xx ────────▶ permanent: reported, never retried
+ *          │ 401/408/429    (also a timed-out fetch, which is a 0)
+ *          └ other 4xx ──▶ permanent: reported, never retried
  *                           · create rejected: stays at the head, blocked, until the next
  *                             edit fixes it or `discard` drops it and what depends on it
+ *                           · PATCH rejected: its fields ride along with the next edit of
+ *                             that item, so they are re-sent, not forgotten
  *                           · bulk rejected naming one entry: that entry is reported, the
  *                             rest are re-queued without it (R3-15)
  *                           · 404 on PATCH: discarded; 404 on DELETE: already gone (R3-6)
  * ```
+ *
+ * ## Why 401, 408 and 429 are retried although they are 4xx
+ *
+ * "4xx is permanent" (the design doc) is about the server refusing the CONTENT - a title over
+ * 200 characters stays over 200 characters however often it is sent. These three refuse the
+ * MOMENT: an expired owner session (sign in again in another tab and the same request
+ * succeeds), a timeout, a rate limit. Treating an expired session as permanent used to drop
+ * every edit made after it, with the next edit clearing the error so nothing even warned.
  *
  * ## Why ids come from the client
  *
@@ -36,6 +47,10 @@ import type { BulkPositionUpdate } from '@/lib/whiteboard/limits'
  * for it again, and an in-flight create that fails after the delete is not retried. The
  * server keeps no tombstone, so this client rule is the whole guarantee that a deleted card
  * does not come back.
+ *
+ * The one way back is the server itself listing the id again - a board load after "Restore
+ * from backup" (`revive`). Without that, every edit to a restored card was dropped in
+ * silence for the rest of the session, which is exactly the recovery path D20 exists for.
  *
  * ## Why a bulk move holds every key at once
  *
@@ -116,6 +131,17 @@ interface Job {
 
 export const PATCH_DEBOUNCE_MS = 600
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000]
+/** 4xx answers about the moment, not the content - see the header. */
+const RETRYABLE_4XX = new Set([401, 408, 429])
+
+/** A child of a frame that is going away: where it ends up, canvas-absolute. */
+export interface UnparentedChild {
+  id: string
+  x: number
+  y: number
+  /** The frame was hidden, so the child is written hidden (rule 8). */
+  hidden: boolean
+}
 
 const itemKey = (id: string) => `item:${id}`
 const linkKey = (id: string) => `link:${id}`
@@ -125,7 +151,11 @@ export class SaveQueue {
   private seq = 0
   private persisted = new Set<string>()
   private deleted = new Set<string>()
+  /** Fields of a 4xx PATCH, kept until the next edit of the item re-sends them. */
+  private rejectedPatches = new Map<string, Record<string, unknown>>()
   private online = true
+  /** The board page is gone: send what can go now, but set no more timers (no retries). */
+  private stopped = false
   private timer: unknown = null
   private groups = new Map<
     string,
@@ -158,6 +188,21 @@ export class SaveQueue {
   markPersisted(ids: Iterable<string>) {
     for (const id of ids) this.persisted.add(id)
     this.pump()
+  }
+
+  /**
+   * The server just listed these ids (a board load after a restore), so a session delete no
+   * longer applies to them. An id that still has a job queued keeps the rule: its DELETE has
+   * not run yet, and reviving it would let an edit race that delete.
+   */
+  revive(ids: Iterable<string>) {
+    for (const id of ids) {
+      if (!this.deleted.has(id)) continue
+      const keys = [itemKey(id), linkKey(id)]
+      if (this.jobs.some(job => job.keys.some(key => keys.includes(key))))
+        continue
+      this.deleted.delete(id)
+    }
   }
 
   isPersisted(id: string) {
@@ -196,6 +241,13 @@ export class SaveQueue {
     }: { delay?: number; group?: string } = {}
   ) {
     if (this.deleted.has(id)) return
+    const carried = this.rejectedPatches.get(id)
+    if (carried) {
+      // The rejected fields go out again with this edit: either it fixes them, or the server
+      // rejects them again and the card is marked again. Never silently forgotten.
+      this.rejectedPatches.delete(id)
+      patch = { ...carried, ...patch }
+    }
     const deps =
       typeof patch.parentId === 'string' ? [patch.parentId] : ([] as string[])
     // Fixing a rejected create is just editing it: the merged body goes out again.
@@ -223,7 +275,9 @@ export class SaveQueue {
         this.pump()
         return
       }
-      if (tail.op.type === 'createItem') {
+      // Only into a create that never left. One that was sent and is waiting to retry may
+      // already be on the server, where `$setOnInsert` would ignore the merged fields.
+      if (tail.op.type === 'createItem' && !tail.sent) {
         tail.op = { ...tail.op, body: { ...tail.op.body, ...patch } }
         for (const dep of deps) tail.deps.add(dep)
         if (group) this.joinGroup(tail, group, id)
@@ -244,6 +298,7 @@ export class SaveQueue {
   deleteItem(id: string, { group }: { group?: string } = {}) {
     if (this.deleted.has(id)) return
     this.deleted.add(id)
+    this.rejectedPatches.delete(id)
 
     const key = itemKey(id)
     let createNeverSent = false
@@ -255,7 +310,8 @@ export class SaveQueue {
           continue
         }
         if (job.op.type === 'createItem' && !job.sent) createNeverSent = true
-        this.drop(job, 'skipped')
+        // In a bulk edit, an item deleted before its write went out is "not saved".
+        this.drop(job, 'failed')
         continue
       }
       // Queued link writes that touch this item: the server deletes those links with it.
@@ -272,11 +328,81 @@ export class SaveQueue {
       j => j.inFlight && j.op.type === 'createItem' && j.op.id === id
     )
     if (createNeverSent && !inFlightCreate && !this.persisted.has(id)) {
+      // Nothing to undo on the server: in a multi-delete this one is simply done.
+      this.groups.get(group ?? '')?.result.ok.push(id)
       this.emitStatus()
       return
     }
     const job = this.push({ type: 'deleteItem', id }, [key], [], 0, true)
     if (job && group) this.joinGroup(job, group, id)
+  }
+
+  /**
+   * A frame is going away (deleted, or a never-saved frame discarded), and these children
+   * stay on the canvas at absolute positions. Their queued writes still say `parentId:
+   * <frame>` with relative x/y, and wait on the frame's create. Rewritten here:
+   *
+   * ```
+   *   queued create / patch / bulk entry of a child  ──▶ parentId null, absolute x/y,
+   *                                                       includeInAi false if hidden,
+   *                                                       no longer waits on the frame
+   *   child write IN FLIGHT with parentId = frame     ──▶ a follow-up patch behind it
+   *                                                       (the frame's DELETE also waits
+   *                                                       for it - see runnable)
+   * ```
+   *
+   * Without this, a child created in a frame that never saved waited forever, and one racing
+   * the frame's DELETE got a 400 that no edit could fix.
+   */
+  unparent(frameId: string, children: UnparentedChild[]) {
+    for (const child of children) {
+      const place = {
+        parentId: null,
+        x: child.x,
+        y: child.y,
+        ...(child.hidden ? { includeInAi: false } : {}),
+      }
+      const key = itemKey(child.id)
+      let followUp = false
+      for (const job of this.jobs) {
+        if (!job.keys.includes(key)) continue
+        const { op } = job
+        if (job.inFlight) {
+          const carries =
+            (op.type === 'createItem' && op.body.parentId === frameId) ||
+            (op.type === 'patchItem' && op.patch.parentId === frameId) ||
+            (op.type === 'bulkMove' &&
+              op.entries.some(e => e.id === child.id && e.parentId === frameId))
+          if (carries) followUp = true
+          continue
+        }
+        job.deps.delete(frameId)
+        if (op.type === 'createItem')
+          job.op = { ...op, body: { ...op.body, ...place } }
+        if (
+          op.type === 'patchItem' &&
+          ('parentId' in op.patch || 'x' in op.patch || 'y' in op.patch)
+        )
+          job.op = { ...op, patch: { ...op.patch, ...place } }
+        if (op.type === 'bulkMove')
+          job.op = {
+            ...op,
+            entries: op.entries.map(entry =>
+              entry.id === child.id
+                ? { id: entry.id, x: child.x, y: child.y, parentId: null }
+                : entry
+            ),
+          }
+      }
+      if (followUp)
+        this.push(
+          { type: 'patchItem', id: child.id, patch: place },
+          [key],
+          [],
+          0
+        )
+    }
+    this.pump()
   }
 
   createLink(body: LinkBody) {
@@ -304,7 +430,7 @@ export class SaveQueue {
         this.pump()
         return
       }
-      if (tail.op.type === 'createLink') {
+      if (tail.op.type === 'createLink' && (!tail.sent || tail.rejected)) {
         tail.op = { ...tail.op, body: { ...tail.op.body, label } }
         tail.rejected = false
         tail.attempts = 0
@@ -338,19 +464,25 @@ export class SaveQueue {
     this.push({ type: 'deleteLink', id }, [key], [], 0, true)
   }
 
-  /** A multi-select drag: one request, holding every entry's queue (R3-15 on failure). */
+  /**
+   * A multi-select drag: one request, holding every entry's queue (R3-15 on failure). Split
+   * at the server's cap (`LIMITS.bulkUpdates`), which rejects a bigger body whole and names
+   * no entry, so a 600-card drag would otherwise never save.
+   */
   bulkMove(entries: BulkPositionUpdate[]) {
     const live = entries.filter(entry => !this.deleted.has(entry.id))
-    if (live.length === 0) return
-    const parents = live
-      .map(entry => entry.parentId)
-      .filter((p): p is string => Boolean(p))
-    this.push(
-      { type: 'bulkMove', entries: live },
-      live.map(entry => itemKey(entry.id)),
-      parents,
-      0
-    )
+    for (let i = 0; i < live.length; i += LIMITS.bulkUpdates) {
+      const chunk = live.slice(i, i + LIMITS.bulkUpdates)
+      const parents = chunk
+        .map(entry => entry.parentId)
+        .filter((p): p is string => Boolean(p))
+      this.push(
+        { type: 'bulkMove', entries: chunk },
+        chunk.map(entry => itemKey(entry.id)),
+        parents,
+        0
+      )
+    }
   }
 
   /**
@@ -378,6 +510,7 @@ export class SaveQueue {
    * ids dropped, so the caller can remove them from the canvas.
    */
   discard(id: string): string[] {
+    this.rejectedPatches.delete(id)
     const droppedLinks: string[] = []
     for (const job of [...this.jobs]) {
       if (job.inFlight) continue
@@ -418,6 +551,22 @@ export class SaveQueue {
     this.pump()
   }
 
+  /**
+   * The board page unmounted. Debounced edits go out now and writes waiting on those still
+   * follow as they land, but no timer is set again, so nothing retries forever in a tab that
+   * has moved on. Leaving with failed writes asks first (TopBar), so this loses nothing
+   * silently. `start` undoes it - React's dev double-mount stops and starts every effect.
+   */
+  stop() {
+    this.stopped = true
+    this.flush()
+  }
+
+  start() {
+    this.stopped = false
+    this.pump()
+  }
+
   status(): QueueStatus {
     const live = this.jobs.filter(job => !job.rejected)
     return {
@@ -430,7 +579,9 @@ export class SaveQueue {
 
   /** Field names with a queued (not yet confirmed) change, for merging a server doc. */
   pendingFields(id: string): Set<string> {
-    const fields = new Set<string>()
+    const fields = new Set<string>(
+      Object.keys(this.rejectedPatches.get(id) ?? {})
+    )
     for (const job of this.jobs) {
       if (job.op.type === 'patchItem' && job.op.id === id)
         for (const key of Object.keys(job.op.patch)) fields.add(key)
@@ -492,6 +643,14 @@ export class SaveQueue {
     if (job.inFlight || job.rejected) return false
     if (now < job.notBefore || now < job.retryAt) return false
     for (const dep of job.deps) if (!this.persisted.has(dep)) return false
+    // A frame's DELETE waits for writes in flight that name it as a parent: landing after
+    // the delete, they would 400 on a parent that no longer exists (`unparent` follows up).
+    const { op } = job
+    if (
+      op.type === 'deleteItem' &&
+      this.jobs.some(j => j !== job && j.inFlight && j.deps.has(op.id))
+    )
+      return false
     return this.isHead(job)
   }
 
@@ -508,7 +667,7 @@ export class SaveQueue {
   private schedule() {
     if (this.timer !== null) this.clearTimer(this.timer)
     this.timer = null
-    if (!this.online) return
+    if (!this.online || this.stopped) return
     const now = this.now()
     let next = Infinity
     for (const job of this.jobs) {
@@ -555,7 +714,10 @@ export class SaveQueue {
 
   private onFailure(job: Job, result: Extract<SendResult, { ok: false }>) {
     const { op } = job
-    const transient = result.status === 0 || result.status >= 500
+    const transient =
+      result.status === 0 ||
+      result.status >= 500 ||
+      RETRYABLE_4XX.has(result.status)
 
     // A create that was overtaken by its own delete is not worth retrying.
     if (transient && op.type === 'createItem' && this.deleted.has(op.id)) {
@@ -580,10 +742,33 @@ export class SaveQueue {
       }
       if (op.type === 'patchItem' || op.type === 'patchLink') {
         this.remove(job)
-        this.settle(job, 'skipped')
+        this.settle(job, 'failed')
         return
       }
     }
+
+    // A create rejected after its own delete was queued: the server does not have it, and
+    // parking it would block that delete forever (it waits behind the create).
+    if (
+      (op.type === 'createItem' || op.type === 'createLink') &&
+      this.deleted.has(op.id)
+    ) {
+      this.remove(job)
+      this.settle(job, 'skipped')
+      return
+    }
+
+    // A refused delete puts the entity back on the canvas (useBoard), so it is live again.
+    if (op.type === 'deleteItem' || op.type === 'deleteLink')
+      this.deleted.delete(op.id)
+
+    // Kept whole, `keepChildrenPrivate` included: re-sending a frame un-hide without it
+    // would make the children readable (D24).
+    if (op.type === 'patchItem')
+      this.rejectedPatches.set(op.id, {
+        ...this.rejectedPatches.get(op.id),
+        ...op.patch,
+      })
 
     if (op.type === 'bulkMove') {
       const named = result.id && op.entries.some(e => e.id === result.id)
@@ -621,7 +806,7 @@ export class SaveQueue {
     job.keys = entries.map(entry => itemKey(entry.id))
   }
 
-  private drop(job: Job, outcome: 'skipped') {
+  private drop(job: Job, outcome: 'skipped' | 'failed') {
     this.remove(job)
     this.settle(job, outcome)
   }

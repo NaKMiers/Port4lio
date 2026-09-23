@@ -12,6 +12,10 @@ import {
   secondaryBtnCls,
   textareaCls,
 } from '@/components/settings/settings-utils'
+import {
+  readableChildren,
+  skipsBulkAiOn,
+} from '@/components/whiteboard/frame-geometry'
 import { MEANING_STYLE } from '@/components/whiteboard/meaning-style'
 import { MeaningChip } from '@/components/whiteboard/nodes/badges'
 import { ShortcutList } from '@/components/whiteboard/ShortcutsHelp'
@@ -58,6 +62,8 @@ export interface InspectorProps {
   onSelect: (ids: string[]) => void
   onExportSelection: () => void
   onUnhideFrame: (frame: ClientItem, readableChildren: number) => void
+  /** The board is still loading (or failed): nothing here may write (DR4). */
+  readOnly?: boolean
   className?: string
 }
 
@@ -82,7 +88,7 @@ const deleteCls =
   'inline-flex items-center gap-2 self-start font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-ink-rose hover:underline'
 
 function Inspector(props: InspectorProps) {
-  const { board, selection, className } = props
+  const { board, selection, readOnly = false, className } = props
   const { data } = board
   const items = selection.nodes.map(id => data.items[id]).filter(Boolean)
 
@@ -111,7 +117,14 @@ function Inspector(props: InspectorProps) {
       aria-label="Inspector"
       className={cn('flex min-h-full flex-col gap-3.5 p-[18px]', className)}
     >
-      {body}
+      {/* A disabled fieldset disables every control inside it at once, custom buttons too,
+          so a selection left over from before a reload can't edit a partial board. */}
+      <fieldset
+        disabled={readOnly}
+        className="contents"
+      >
+        {body}
+      </fieldset>
     </aside>
   )
 }
@@ -152,9 +165,7 @@ function ItemPanel({
 
   const toggleAi = (next: boolean) => {
     if (item.form === 'frame' && next && !item.includeInAi) {
-      const readable = Object.values(data.items).filter(
-        child => child.parentId === id && child.includeInAi
-      ).length
+      const readable = readableChildren(id, Object.values(data.items))
       if (readable > 0) {
         onUnhideFrame(item, readable)
         return
@@ -474,7 +485,8 @@ function TagsField({
               type="button"
               aria-label={`Remove tag ${tag}`}
               onClick={() => onChange(tags.filter(t => t !== tag))}
-              className="hover:text-pp-text"
+              // 44px hit area below lg (DR8) without making the chip itself bigger.
+              className="relative before:absolute before:-inset-4 before:content-[''] hover:text-pp-text lg:before:-inset-1"
             >
               <X size={10} />
             </button>
@@ -592,8 +604,12 @@ function MultiPanel({
           id="wb-bulk-ai"
           checked={allOn}
           onChange={next =>
-            // Rule 1 wins: turning AI on skips (and counts) children of hidden frames.
-            fanOut({ includeInAi: next }, next ? hiddenByFrame : undefined)
+            // Turning AI on skips (and counts) children of hidden frames (rule 1) and
+            // hidden frames themselves, which only un-hide through the D24 confirm.
+            fanOut(
+              { includeInAi: next },
+              next ? item => skipsBulkAiOn(item, data.items) : undefined
+            )
           }
         />
       </div>
@@ -712,14 +728,19 @@ function LinkPanel({ board, selection, onDelete, onSelect }: InspectorProps) {
 export function ErrorNotice({
   message,
   onDiscard,
+  className,
 }: {
   message: string
   onDiscard: () => void
+  className?: string
 }) {
   return (
     <div
       role="alert"
-      className="rounded-2xl border border-pp-ink-rose/30 bg-pp-pink/10 px-3 py-2.5 text-[12.5px] text-pp-ink-rose"
+      className={cn(
+        'rounded-2xl border border-pp-ink-rose/30 bg-pp-pink/10 px-3 py-2.5 text-[12.5px] text-pp-ink-rose',
+        className
+      )}
     >
       <p className="font-semibold">Not saved</p>
       <p className="mt-0.5">{message}</p>

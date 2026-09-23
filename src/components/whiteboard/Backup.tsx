@@ -264,12 +264,14 @@ export function BackupMenu({
   onRestore,
   beforeDownload,
   compact,
+  className,
 }: {
   open: boolean
   onToggle: (open: boolean) => void
   onRestore: () => void
   beforeDownload: () => void
   compact: boolean
+  className?: string
 }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -311,7 +313,7 @@ export function BackupMenu({
   return (
     <div
       ref={rootRef}
-      className="relative"
+      className={cn('relative', className)}
     >
       <button
         type="button"

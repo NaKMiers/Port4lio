@@ -20,6 +20,7 @@ function TopBar({
   exportOpen,
   onExport,
   compact,
+  unsaved,
   className,
 }: {
   pill: ReactNode
@@ -32,6 +33,12 @@ function TopBar({
   onExport: () => void
   /** Below md: icons only for the secondary buttons. */
   compact: boolean
+  /**
+   * Writes that failed, were rejected, or are waiting for the network. Leaving stops the
+   * save queue's retries, so the way back to the hub asks first - the in-app counterpart of
+   * the `beforeunload` warning, which a client-side navigation never fires.
+   */
+  unsaved: boolean
   className?: string
 }) {
   return (
@@ -45,7 +52,16 @@ function TopBar({
         href="/admin"
         aria-label="All boards"
         title="All boards"
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-pp-line bg-white/85 text-pp-muted no-underline hover:text-pp-text"
+        onClick={event => {
+          if (
+            unsaved &&
+            !window.confirm(
+              'Some changes are not saved yet. Leave the board anyway?'
+            )
+          )
+            event.preventDefault()
+        }}
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-pp-line bg-white/85 text-pp-muted no-underline hover:text-pp-text lg:h-9 lg:w-9"
       >
         <LayoutGrid
           aria-hidden

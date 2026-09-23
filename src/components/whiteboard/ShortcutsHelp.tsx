@@ -1,8 +1,9 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 
+import { useDialogFocus } from '@/components/admin/useDialogFocus'
 import { cn } from '@/lib/utils'
 
 export const SHORTCUT_LINES = [
@@ -23,22 +24,28 @@ export function ShortcutList({ className }: { className?: string }) {
   )
 }
 
-/** `?` opens this (DR9). Esc or the close button returns focus to the canvas. */
+/**
+ * `?` opens this (DR9). Focus is held inside while it is open, and Esc or the close button
+ * returns it to whatever opened it (`useDialogFocus`).
+ */
 export default function ShortcutsHelp({
   open,
   onClose,
+  className,
 }: {
   open: boolean
   onClose: () => void
+  className?: string
 }) {
   const ref = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    if (open) ref.current?.focus()
-  }, [open])
+  useDialogFocus(ref, open, onClose)
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-[rgba(24,20,18,0.3)] p-4"
+      className={cn(
+        'fixed inset-0 z-[60] grid place-items-center bg-[rgba(24,20,18,0.3)] p-4',
+        className
+      )}
       onClick={onClose}
     >
       <div
@@ -48,12 +55,6 @@ export default function ShortcutsHelp({
         aria-modal="true"
         aria-label="Keyboard shortcuts"
         onClick={event => event.stopPropagation()}
-        onKeyDown={event => {
-          if (event.key === 'Escape') {
-            event.stopPropagation()
-            onClose()
-          }
-        }}
         className="w-full max-w-sm rounded-[1.4rem] border border-pp-line bg-pp-panel-strong p-5 shadow-panel outline-none"
       >
         <div className="flex items-center justify-between">
@@ -62,7 +63,7 @@ export default function ShortcutsHelp({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="text-pp-muted hover:text-pp-text"
+            className="grid h-11 w-11 place-items-center rounded-full text-pp-muted hover:text-pp-text lg:h-8 lg:w-8"
           >
             <X size={16} />
           </button>

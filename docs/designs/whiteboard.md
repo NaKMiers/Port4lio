@@ -17,7 +17,7 @@ The first AI use is **ask-me-anything about me**: "what did I want in 2025?", "w
 
 ## What Makes This Cool
 
-The picture is how you put things in. The product is what an agent can read back. Every card carries a *meaning* (dream, goal, failure, draft, note), every arrow is a real, labelled link ("because", "blocks", "learned from"), and the same serializer feeds both the copy button and the MCP server. So when Claude Code starts a session and asks "who is the owner and what are they working toward?", it gets the same clean, cited markdown the owner would have pasted by hand, with no pasting.
+The picture is how you put things in. The product is what an agent can read back. Every card carries a _meaning_ (dream, goal, failure, draft, note), every arrow is a real, labelled link ("because", "blocks", "learned from"), and the same serializer feeds both the copy button and the MCP server. So when Claude Code starts a session and asks "who is the owner and what are they working toward?", it gets the same clean, cited markdown the owner would have pasted by hand, with no pasting.
 
 ## Constraints
 
@@ -42,12 +42,13 @@ Agreed in session (2 and 4 were revised by the owner):
 
 Codex (cold read of a session summary):
 
-- **Coolest version:** a "personal context compiler" - every AI answer cites the exact cards, links and frames it used, and AI-proposed ideas appear as *ghost cards* until accepted. Over time it becomes a navigable autobiography: goals linked to failed attempts, changing beliefs, "what did I believe before I learned X?".
+- **Coolest version:** a "personal context compiler" - every AI answer cites the exact cards, links and frames it used, and AI-proposed ideas appear as _ghost cards_ until accepted. Over time it becomes a navigable autobiography: goals linked to failed attempts, changing beliefs, "what did I believe before I learned X?".
 - **Most revealing line:** "this is even quicker than copy-paste." The excitement is not drawing; it is not having to re-explain yourself to Claude/Codex.
 - **Library:** React Flow (`@xyflow/react`, MIT) + `perfect-freehand`. Cards are real React nodes, arrows are real edges, matching per-item documents. Build ink as a custom stroke node; React Flow's own freehand example is Pro-only. Excalidraw gets 50% of the drawing feel for free but its elements are drawing primitives, so typed items, per-item persistence and queryable links would mean fighting its model. Use JSON Canvas as an import/export format, not the schema.
 - **Build order:** models, canvas, export drawer, token, then a read-only MCP (Codex proposed two tools).
 
 Synthesis: agreed on library and build order. Two changes adopted:
+
 - Codex's form list becomes `text | todo | shape | frame | ink` (the item's **form**), and dream/goal/failure is a separate **meaning** field - a to-do list can be a Goal, an ink sketch can be a Dream.
 - The v1 MCP surface is **three tools** (below), not two - `get_overview` is added because "what are my active goals?" should not need a search query. (A full-board `whiteboard://context` resource was planned and then cut in eng review, D15: at up to 1 MB it overflows Claude Code's 25k-token MCP output cap.)
 
@@ -56,17 +57,20 @@ Ghost cards are parked for v2 as the safe shape for agent writes.
 ## Approaches Considered
 
 ### Approach A: Excalidraw blob
+
 Rejected: one scene blob breaks premise 1, no native to-do cards, meaning hidden in `customData`.
 
 ### Approach B: React Flow context graph - CHOSEN
+
 Custom React Flow nodes over per-item Mongo documents, one serializer shared by the export drawer, a markdown route and a read-only MCP endpoint.
 
 ### Approach C: Excalidraw surface with per-element projection
+
 Rejected: two sources of truth (scene vs documents) that can disagree, high sync risk, to-do lists still faked.
 
 ## Recommended Approach
 
-Approach B. Wireframe (approved): `~/.gstack/projects/NaKMiers-Port4lio/designs/whiteboard-20260923/whiteboard-sketch.png` - tool rail left, canvas with frames and typed cards, inspector right, "Export to AI" + MCP status top right.
+Approach B. Wireframe (approved in design review, DR2): `~/.gstack/projects/NaKMiers-Port4lio/designs/whiteboard-20260923/wireframe-board.png`, `wireframe-empty.png`, `wireframe-multi.png` (source `wireframe.html`). The office-hours sketch `whiteboard-sketch.png` this line used to cite was never saved to disk. The full visual spec is in [Design Review](#design-review-plan-design-review-2026-09-23) below.
 
 ### Data flow (eng review)
 
@@ -102,8 +106,8 @@ Approach B. Wireframe (approved): `~/.gstack/projects/NaKMiers-Port4lio/designs/
 
 ### Taxonomy: form vs meaning
 
-- **form** (required) - what the item *is* on the canvas: `text | todo | shape | frame | ink`.
-- **meaning** (optional) - what it *says about you*: `dream | goal | failure | draft | note`. `null` means unclassified. There is no `todo` meaning; a to-do list is a form, and it can carry any meaning (a to-do list that is a Goal).
+- **form** (required) - what the item _is_ on the canvas: `text | todo | shape | frame | ink`.
+- **meaning** (optional) - what it _says about you_: `dream | goal | failure | draft | note`. `null` means unclassified. There is no `todo` meaning; a to-do list is a form, and it can carry any meaning (a to-do list that is a Goal).
 - **status** - only meaningful when meaning is `dream` or `goal`: `active | someday | done | dropped`. Ignored (stored as `null`) otherwise. A todo-form item's rows carry their own `done` flags; the item has no derived status.
 
 ### Data model (`src/models/`, all via `compileModel`)
@@ -118,7 +122,8 @@ WhiteboardItem
   body        string, plain text, <= 20,000 chars, never rendered as HTML
   todos       [{ id, text (single line, <= 500), done }], <= 100 rows   (form = todo)
   shape       'rect' | 'ellipse' | 'diamond'                   (form = shape)
-  ink         { points: [x, y, pressure][] }, <= 2,000 points  (form = ink)
+  ink         { points: [x, y, pressure][], bbox: { minX, minY, maxX, maxY } }, <= 2,000 points  (form = ink)
+              bbox is derived by the SERVER from points on every create/PATCH/restore; a client or file value is ignored (D27)
   parentId    ObjectId of a frame | null
   x, y        RELATIVE to the parent frame's top-left when parentId is set, canvas-absolute otherwise
   width, height, z
@@ -169,12 +174,13 @@ Other indexes: text index on `title`, `body`, `tags`, `todos.text` with **`defau
 7. A link to a missing item is ignored. A `parentId` pointing at a missing item is treated as **hidden**, not visible (fail closed - see Delete).
 8. **Exclusion is written down when it would otherwise be lost.** Hiding a frame doesn't touch the children's flags. But when a child leaves a hidden frame (dragged out, or un-parented because the frame was deleted), the server sets that child's `includeInAi: false` in the same write. A card never becomes agent-readable just by moving. Making it visible again is always a deliberate toggle.
 9. `search_context` never queries the collection directly. It calls `loadAgentVisible({ kind: 'search', ... })`, which puts the visibility conditions (`includeInAi: true`, `parentId` not in the excluded frames and existing) **inside** the same `$text` query, so the index is used and there is still one privacy path.
+10. **Agent reads never load ink points (D27).** `loadAgentVisible` projects out `ink.points` and works from `ink.bbox`. `get_overview` counts use `countDocuments` / an aggregate on the same filter, not a load-then-count. For `search_context`, ink "near" labels are computed over all visible items, loaded bbox-only.
 
 **Default for `includeInAi`: `true`, with an escape hatch and a decision rule.** Autosave persists a card seconds after you create it, so a new card outside a hidden frame is agent-readable immediately. That's acceptable in v1 because agents are read-only and only run when you invoke them, and a card created **inside** a hidden frame inherits the exclusion from its first save. Rule: if the Assignment below has you hesitating over 3 or more of the 15 items, flip the default to `false` before building step 1.
 
 **Un-hiding a frame (D24).** Switching a hidden frame back to visible asks first: "N items inside become agent-readable" [Make all readable] / [Keep items private]. "Keep" writes `includeInAi: false` on the children before the frame flips (one request, children first).
 
-**Showing visibility.** The inspector toggle shows the item's *effective* visibility. For a child of a hidden frame it is disabled, with "Hidden by frame <title>". On the canvas, every effectively hidden item gets a small lucide `EyeOff` badge, so you can see at a glance what agents can't.
+**Showing visibility.** The inspector toggle shows the item's _effective_ visibility. For a child of a hidden frame it is disabled, with "Hidden by frame <title>". On the canvas, every effectively hidden item gets a small lucide `EyeOff` badge, so you can see at a glance what agents can't.
 
 ### Modules (`src/lib/whiteboard/`)
 
@@ -187,7 +193,7 @@ Other indexes: text index on `title`, `body`, `tags`, `todos.text` with **`defau
   - Size: a full export is expected around 100-200 KB at 500 items, capped at 1 MB. Past the cap, items are **picked by priority**, then rendered in the normal grouping: active dreams/goals first, then everything else by `updatedAt` desc, until the budget is spent. A final line then reads `(truncated: N of M items - use search_context)`. Tests check which items survive.
   - Date rule, shared by every path: a from/to range matches `when ?? createdAt`. A `targetFrom/targetTo` range matches `targetBy`. (D22) All dates are calendar days: `when`/`targetBy` are stored as UTC midnight of the picked day. Params are `YYYY-MM-DD` with both ends inclusive. `createdAt` is converted to a day in `Asia/Ho_Chi_Minh` (`WHITEBOARD_TIMEZONE` in `limits.ts`).
 - `data.ts` - Mongo reads/writes, including `loadAgentVisible`, and the delete sequence.
-- `token.ts` - create (32 random bytes, `wbt_` prefix, shown once), sha256, verify (`findOne({ hash, revokedAt: null })`, so an unknown token and a revoked one give the same answer at the same cost), revoke, touch `lastUsedAt`.
+- `token.ts` - create (32 random bytes, `wbt_` prefix, shown once), sha256, verify (`findOne({ hash, revokedAt: null })`, so an unknown token and a revoked one give the same answer at the same cost), revoke, touch `lastUsedAt`. The touch is throttled (D29): a conditional `updateOne` that only writes when `lastUsedAt` is null or older than 5 minutes, scheduled with Next's `after()` so it never delays the answer or fails the request. The token panel shows it as approximate ("used ~5 min ago").
 
 ### Save pipeline (client)
 
@@ -207,7 +213,8 @@ Other indexes: text index on `title`, `body`, `tags`, `todos.text` with **`defau
 ### Routes
 
 UI (cookie, `requireOwner`):
-- `GET    /api/admin/whiteboard` - all items + links for the canvas, **streamed as NDJSON** (D21, Vercel's 4.5 MB limit does not apply to streamed responses).
+
+- `GET    /api/admin/whiteboard` - all items + links for the canvas, **streamed as NDJSON** (D21, Vercel's 4.5 MB limit does not apply to streamed responses). **Order is fixed (D28):** frames, then other items, then links, because React Flow needs a parent node before its children and a link needs both ends. The client adds parsed lines to state in batches (per chunk / animation frame), not one render per line.
 - `POST   /api/admin/whiteboard/items` - idempotent upsert create.
 - `PATCH  /api/admin/whiteboard/items` - bulk position update `{ updates: [{ id, x, y, parentId }] }`, max 500.
 - `PATCH  /api/admin/whiteboard/items/[id]`, `DELETE /api/admin/whiteboard/items/[id]`.
@@ -220,10 +227,11 @@ UI (cookie, `requireOwner`):
 - `DELETE /api/admin/whiteboard/tokens/[id]` - sets `revokedAt` (the record is kept, so the list shows revoked tokens).
 
 Agent (bearer token only; never the cookie; never `hasOwnerAccess`, so `REQUIRE_ADMIN=false` can't open them):
+
 - Order in both handlers: `checkRateLimit` with a new named `WHITEBOARD_AGENT_LIMIT` in `rate-limit.ts` (120 requests per 10 minutes per IP, sized for an agent making several tool calls per question), **then** token verification. So failed guessing is throttled too.
 - `Authorization: Bearer` header only. A token in the query string is ignored.
 - `GET /api/whiteboard/context.md` - the full visible export as `text/markdown`.
-- `POST /api/whiteboard/mcp` - stateless streamable-HTTP MCP, JSON responses, no SSE. `GET` and `DELETE` return 405 (no session, no server-initiated stream). Built on `mcp-handler` 2.0 (D17). Methods the tests must see answered correctly: `initialize`, `notifications/initialized` (202, no body), `ping`, `tools/list`, `tools/call`. Any other message **without an id** (any notification, for example `notifications/cancelled`) gets 202 with no body. Only an unknown *request* (one with an id) gets JSON-RPC `-32601`.
+- `POST /api/whiteboard/mcp` - stateless streamable-HTTP MCP, JSON responses, no SSE. `GET` and `DELETE` return 405 (no session, no server-initiated stream). Built on `mcp-handler` 2.0 (D17). Methods the tests must see answered correctly: `initialize`, `notifications/initialized` (202, no body), `ping`, `tools/list`, `tools/call`. Any other message **without an id** (any notification, for example `notifications/cancelled`) gets 202 with no body. Only an unknown _request_ (one with an id) gets JSON-RPC `-32601`.
   - `get_overview()` - frames (title, id, visible item count), counts by meaning, active dreams/goals (max 20, newest first), the 10 most recently updated visible items.
   - `search_context(query, meanings?, status?, frameId?, from?, to?, targetFrom?, targetTo?, limit?)` - `query` is at most 200 chars and may be empty when filters are given. Dates follow the shared date rule. `frameId` is a frame id; an unknown or hidden frame returns the same empty result. With a query: `$text` and sort by text score, then `updatedAt` desc. With no query: no `$text`, sort by `updatedAt` desc. With no query **and** no filter: a tool error pointing to `get_overview` (D23). Either way the default is 10 results, max 25, each rendered by `context.ts` as one item entry with its links.
   - `get_item(id)` - one item plus its visible linked neighbours, rendered by `context.ts`.
@@ -231,21 +239,23 @@ Agent (bearer token only; never the cookie; never `hasOwnerAccess`, so `REQUIRE_
   - No MCP resource in v1 (D15). The full board is reached through the Export drawer or `context.md`.
 
 **Connecting agents** (instructions shown on the token panel after creation):
+
 ```
 export PORT4LIO_WB_TOKEN=wbt_...          # in your shell profile, not typed inline
 claude mcp add --scope user --transport http me https://<site>/api/whiteboard/mcp \
   --header "Authorization: Bearer $PORT4LIO_WB_TOKEN"
 ```
+
 Use user scope, **never project scope**. Project scope writes `.mcp.json`, which gets committed. The panel says so in plain words. Codex: an `[mcp_servers.me]` entry in `~/.codex/config.toml` for the same URL, reading the token from the env var (exact keys confirmed at build time - Open Questions).
 
 ### Page (`src/app/(admin)/admin/whiteboard/page.tsx`)
 
 - Server page with its own `metadata` (`title: 'Whiteboard'`, `robots: noindex`), rendering inside **`OwnerAuthGate`** like every other board. The canvas is a client component loaded client-only.
-- Layout inside `AdminChrome`: the canvas owns a fixed viewport region below `AdminHomeLink` (`fixed inset-x-0 bottom-0 top-12`, `overflow-hidden`), with page scroll locked while mounted. `AdminBackdrop` stays behind it, and the React Flow background is transparent over `pp-bg` with a dot grid.
-- Tool rail: select, text card, to-do card, rect, ellipse, diamond, frame, arrow, pen, eraser (ink only), each with a keyboard shortcut and lucide icons.
-- Inspector: Meaning and Status via `SelectField`, when + target-by dates, tags, links list (in and out), "Include in AI export" toggle, "Delete permanently" with confirm.
-- Export drawer: scope picker, live server-rendered preview, rough token estimate (chars / 4), Copy button. It shows what the privacy filter dropped ("N selected items are hidden and not included" / "This frame is hidden from AI"), and Copy is disabled on an empty export (D25).
-- Phone width: pan, zoom and inspector editing work, and drawing tools are hidden behind a "Drawing needs a larger screen" note.
+- Layout (DR2, supersedes the `fixed ... top-12` line that was here): a **framed app sized to the viewport**, following `/admin/certificates/ccaf/vocab`. `<main className="w-full p-4 lg:h-[100dvh]">`, one rounded `pp-line` frame, 56px top bar, canvas, 320px inspector. `AdminHomeLink` hides itself on `/admin/whiteboard` (add the path to its early return and its comment), and the top bar's grid icon is the way back to the hub. The old `top-12` offset would have sat under the ~68px pill row. The React Flow background is transparent over `pp-bg` with a dot grid.
+- Tool rail: select (V), text card (T), to-do card (L), rect (R), ellipse (O), diamond (D), frame (F), arrow (A), pen (P), eraser (E, ink only), lucide icons, shortcut letter shown on each button. Behaviour: DR9.
+- Inspector: Title, **Body** (auto-growing textarea, counter, DR10), Meaning and Status via `SelectField`, when + target-by dates, tags, links list (in and out), "Include in AI export" toggle, "Delete permanently" with confirm. Nothing selected: shortcuts. 2+ selected: DR11.
+- Export drawer (a 480px non-modal right sheet over the inspector, DR3): scope picker, live server-rendered preview, rough token estimate (chars / 4), Copy button. It shows what the privacy filter dropped ("N selected items are hidden and not included" / "This frame is hidden from AI"), and Copy is disabled on an empty export (D25).
+- Responsive: three tiers (DR8), see Design Review.
 - Navigation: add one card to `BOARDS` in `src/app/(admin)/admin/page.tsx` with a lucide icon and tint. There is no `AdminChrome` nav change - hub -> board -> hub is the navigation model by design.
 
 ### New dependencies
@@ -256,7 +266,7 @@ Use user scope, **never project scope**. Project scope writes `.mcp.json`, which
 
 - **mcp-handler defaults (D17):** confirm at build time how it answers GET/DELETE and notifications in stateless mode, and wrap the handler where it differs from the approved 405 / 202 behavior.
 - **Codex MCP config keys** for a remote HTTP server with a bearer token from an env var - verify against current Codex docs before writing the panel text.
-- **Undo/redo:** v1 relies on the delete confirm + JSON backup. Is a local undo stack worth adding to v1?
+- ~~Undo/redo~~ - resolved (D30): not in v1, captured in `TODOS.md` with the delete-recreate caveat.
 - **Export beyond 1 MB:** v1 truncates and points at `search_context`. Summarisation is v2.
 
 ## Success Criteria
@@ -279,7 +289,7 @@ Web feature on the existing deployment; the existing deploy pipeline covers it. 
 2. Models `WhiteboardItem`, `WhiteboardLink`, `WhiteboardToken` + `data.ts` (`loadAgentVisible`, validation, delete sequence). `tests/api`: CRUD, idempotent create, validation rejections, bulk PATCH all-or-nothing, delete order + dangling tolerance, frame hide cascading to children, a child dragged out of a hidden frame staying hidden, deleting a hidden frame leaving its children hidden, search scope using the text index with visibility inside the query.
 3. UI routes behind `requireOwner`, plus a hub card.
 4. `/admin/whiteboard` canvas in `OwnerAuthGate`: text + todo cards, frames (join/leave), labelled edges, inspector, save pipeline, delete confirm, backup download.
-5. Shapes and ink (`perfect-freehand`, stroke simplification before save, point cap).
+5. Shapes and ink (`perfect-freehand`, stroke simplification before save, point cap, server-derived `ink.bbox` - D27). The ink node memoizes its SVG path on `points`; `onlyRenderVisibleElements` is on; drag positions save on drag stop, not per move (D28).
 6. Export drawer on `POST /api/admin/whiteboard/context`.
 7. Token panel + `token.ts` + `WHITEBOARD_AGENT_LIMIT`. `tests/api`: create/list (no hash)/revoke.
 8. `GET /api/whiteboard/context.md`, then `POST /api/whiteboard/mcp` (mcp-handler, D17) with three tools. `tests/api`: privacy filter through `context.md`, every tool and the counts; 401 for missing/unknown/revoked tokens; `REQUIRE_ADMIN=false` doesn't bypass the bearer check; GET/DELETE -> 405; Vietnamese search. Then connect Claude Code for real and ask it about yourself.
@@ -291,6 +301,7 @@ v2 candidates: agent writes as ghost cards you accept, in-app chat over the same
 Before any code: open a plain markdown file **outside the repo** today and write 15 real items the way `context.ts` will emit them - 5 dreams or goals, 5 failures, 5 drafts or to-dos. Give each a meaning, a status where it applies, a `when` (and a `targetBy` for goals), and at least one `- <label> -> [[Other title]]` link. Paste it into a fresh Claude chat and ask: "What are my active goals, and which past failures should shape how I pursue them?"
 
 Write down three things:
+
 - which fields the answer actually used - that is what `context.ts` must emit well;
 - which items you hesitated to write because they felt too private - 3 or more flips the `includeInAi` default to `false`;
 - whether the grouping helped or got in the way.
@@ -305,6 +316,7 @@ The file itself stays private. Step 1's unit-test fixture is a **fictional** boa
 - You took the recommendation on structure-heavy questions (drawing scope, approach, layout) but overrode it on organization ("One infinite canvas + types"). You want structure in the data and freedom on the canvas.
 
 <!-- gstack:office-hours:concerns:start -->
+
 ## Reviewer Concerns
 
 Disposition: CONCERNS_RECORDED
@@ -500,6 +512,7 @@ Stop: MAX_ITERATIONS
 **Remedy**
 
 > State that a multi-delete issues one DELETE per item through each item's queue, and that the result is reported per item, with failed ones kept and marked. Or add a bulk delete route that follows the same safe order.
+
 <!-- gstack:office-hours:concerns:end -->
 
 ## Eng Review (/plan-eng-review, 2026-09-23)
@@ -543,44 +556,46 @@ Each item below is the necessary implementation or proof of a behavior D11 alrea
 - **House convention** (AGENTS.md "Comments explain why") - `context.ts`, `data.ts` (the privacy rules), `token.ts` and `useSaveQueue` each open with a doc comment carrying an ASCII flow diagram and the reasoning.
 
 ### S1: MCP server implementation
+
 Finding: Scope 1, P2, confidence 7/10, plan section "Routes > Agent" + "New dependencies", reviewer: Claude (eng review).
 Plan baseline: "`@modelcontextprotocol/sdk` if its web-standard streamable-HTTP transport runs stateless ... Otherwise, the hand-written fallback above (seven methods, no dependency)" - approved in D11 as an open question, not a chosen mechanism.
 Runtime evidence: none in repo (no MCP code, no MCP dependency in package.json). External: mcp-handler 2.0 supports the 2026-07-28 spec statelessly, with a compatibility layer for 2025-era Streamable HTTP clients; the SDK v2 offers a framework-agnostic web-standard adapter (web search, unverified locally).
 Comparison grid:
-| Choice | Current | A | B | C |
-|---|---|---|---|---|
-| S1 MCP mechanism | SDK-or-fallback, undecided | `mcp-handler` 2.0 (wraps SDK v2), bearer check via its auth hook calling `token.ts` | `@modelcontextprotocol/sdk` v2 web-standard adapter used directly | hand-written JSON-RPC, 5 methods, no dependency |
-| Approved behavior (3 tools, POST only, GET/DELETE 405, notifications 202, fail-closed token) | approved D11/D15 | kept | kept | kept |
-| R3-9 per-tool output budget | pending | pending | pending | pending |
-Question D17:
-D17 - Which library runs the MCP endpoint?
-Project/branch/task: main, whiteboard MCP route `POST /api/whiteboard/mcp`.
-ELI10: Claude Code and Codex talk to your board through MCP, a protocol with a handshake, versioning and message rules. We can use Vercel's mcp-handler (a thin Next-friendly wrapper around the official SDK), use the official SDK directly, or hand-write the few messages we need. The protocol changed in 2026 and old and new clients both exist, so version handling matters.
-Stakes if we pick wrong: hand-written code can break silently when Claude Code or Codex update to a newer protocol version, and the owner just sees "MCP server failed".
-Recommendation: A because it handles both the 2026 spec and 2025-era clients statelessly and is built for Next route handlers, so we write only the three tools and the token check.
-Note: options differ in kind, not coverage - no completeness score.
-Pros / cons:
-A) mcp-handler 2.0 (recommended)
-  ✅ Serves 2026-07-28 spec natively plus a 2025-client compatibility layer, stateless by design
-  ✅ Built and documented for Next App Router route handlers, auth hook fits token.ts cleanly
-  ❌ One more dependency (and the SDK beneath it) that must be kept current with protocol changes
-B) Official SDK v2 adapter directly
-  ✅ One dependency fewer than A and maintained by the protocol authors themselves
-  ✅ Same web-standard Request/Response shape, so it still mounts in a route handler
-  ❌ We wire version negotiation and auth plumbing ourselves, more glue code to test and maintain
-C) Hand-written JSON-RPC
-  ✅ Zero dependencies and every line is visible and reviewable in this repo
-  ✅ Tiny surface: initialize, initialized, ping, tools/list, tools/call only
-  ❌ Protocol upgrades become our job; a client update can break agent access with no warning
-Net: a maintained dependency that tracks the protocol, versus owning protocol drift yourself.
-Header: MCP library
-Options:
-A) mcp-handler 2.0 (Recommended)
-Vercel's Next-oriented wrapper over SDK v2. Stateless, 2026 spec + 2025 client compat. We write 3 tools + a token.ts auth hook. (human: ~3h / CC: ~15 min). Risk low; maintenance = dependency updates.
-B) Official SDK v2 directly
-@modelcontextprotocol/sdk web-standard adapter in the route handler; we wire version handling + auth ourselves. (human: ~5h / CC: ~25 min). Risk medium; more glue to maintain.
-C) Hand-written JSON-RPC
-No dependency; implement initialize / notifications / ping / tools/list / tools/call. (human: ~6h / CC: ~30 min). Risk high on protocol changes; we own drift.
+
+| Choice                                                                                                                                                                                                                                                                                                                                                                               | Current                    | A                                                                                   | B                                                                 | C                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------- |
+| S1 MCP mechanism                                                                                                                                                                                                                                                                                                                                                                     | SDK-or-fallback, undecided | `mcp-handler` 2.0 (wraps SDK v2), bearer check via its auth hook calling `token.ts` | `@modelcontextprotocol/sdk` v2 web-standard adapter used directly | hand-written JSON-RPC, 5 methods, no dependency |
+| Approved behavior (3 tools, POST only, GET/DELETE 405, notifications 202, fail-closed token)                                                                                                                                                                                                                                                                                         | approved D11/D15           | kept                                                                                | kept                                                              | kept                                            |
+| R3-9 per-tool output budget                                                                                                                                                                                                                                                                                                                                                          | pending                    | pending                                                                             | pending                                                           | pending                                         |
+| Question D17:                                                                                                                                                                                                                                                                                                                                                                        |
+| D17 - Which library runs the MCP endpoint?                                                                                                                                                                                                                                                                                                                                           |
+| Project/branch/task: main, whiteboard MCP route `POST /api/whiteboard/mcp`.                                                                                                                                                                                                                                                                                                          |
+| ELI10: Claude Code and Codex talk to your board through MCP, a protocol with a handshake, versioning and message rules. We can use Vercel's mcp-handler (a thin Next-friendly wrapper around the official SDK), use the official SDK directly, or hand-write the few messages we need. The protocol changed in 2026 and old and new clients both exist, so version handling matters. |
+| Stakes if we pick wrong: hand-written code can break silently when Claude Code or Codex update to a newer protocol version, and the owner just sees "MCP server failed".                                                                                                                                                                                                             |
+| Recommendation: A because it handles both the 2026 spec and 2025-era clients statelessly and is built for Next route handlers, so we write only the three tools and the token check.                                                                                                                                                                                                 |
+| Note: options differ in kind, not coverage - no completeness score.                                                                                                                                                                                                                                                                                                                  |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                                                                         |
+| A) mcp-handler 2.0 (recommended)                                                                                                                                                                                                                                                                                                                                                     |
+| ✅ Serves 2026-07-28 spec natively plus a 2025-client compatibility layer, stateless by design                                                                                                                                                                                                                                                                                       |
+| ✅ Built and documented for Next App Router route handlers, auth hook fits token.ts cleanly                                                                                                                                                                                                                                                                                          |
+| ❌ One more dependency (and the SDK beneath it) that must be kept current with protocol changes                                                                                                                                                                                                                                                                                      |
+| B) Official SDK v2 adapter directly                                                                                                                                                                                                                                                                                                                                                  |
+| ✅ One dependency fewer than A and maintained by the protocol authors themselves                                                                                                                                                                                                                                                                                                     |
+| ✅ Same web-standard Request/Response shape, so it still mounts in a route handler                                                                                                                                                                                                                                                                                                   |
+| ❌ We wire version negotiation and auth plumbing ourselves, more glue code to test and maintain                                                                                                                                                                                                                                                                                      |
+| C) Hand-written JSON-RPC                                                                                                                                                                                                                                                                                                                                                             |
+| ✅ Zero dependencies and every line is visible and reviewable in this repo                                                                                                                                                                                                                                                                                                           |
+| ✅ Tiny surface: initialize, initialized, ping, tools/list, tools/call only                                                                                                                                                                                                                                                                                                          |
+| ❌ Protocol upgrades become our job; a client update can break agent access with no warning                                                                                                                                                                                                                                                                                          |
+| Net: a maintained dependency that tracks the protocol, versus owning protocol drift yourself.                                                                                                                                                                                                                                                                                        |
+| Header: MCP library                                                                                                                                                                                                                                                                                                                                                                  |
+| Options:                                                                                                                                                                                                                                                                                                                                                                             |
+| A) mcp-handler 2.0 (Recommended)                                                                                                                                                                                                                                                                                                                                                     |
+| Vercel's Next-oriented wrapper over SDK v2. Stateless, 2026 spec + 2025 client compat. We write 3 tools + a token.ts auth hook. (human: ~3h / CC: ~15 min). Risk low; maintenance = dependency updates.                                                                                                                                                                              |
+| B) Official SDK v2 directly                                                                                                                                                                                                                                                                                                                                                          |
+| @modelcontextprotocol/sdk web-standard adapter in the route handler; we wire version handling + auth ourselves. (human: ~5h / CC: ~25 min). Risk medium; more glue to maintain.                                                                                                                                                                                                      |
+| C) Hand-written JSON-RPC                                                                                                                                                                                                                                                                                                                                                             |
+| No dependency; implement initialize / notifications / ping / tools/list / tools/call. (human: ~6h / CC: ~30 min). Risk high on protocol changes; we own drift.                                                                                                                                                                                                                       |
 
 State: approved
 Actual answer: A) mcp-handler 2.0 (Recommended) - D17
@@ -588,46 +603,48 @@ Accepted scope: `POST /api/whiteboard/mcp` is built on `mcp-handler` 2.0 (statel
 History: none
 
 ### R3-9: per-tool MCP response budget
+
 Finding: Section 1 Architecture, P1, confidence 9/10, plan "Routes > Agent > search_context / get_overview / get_item"; Claude Code MCP docs (warning at 10,000 tokens, default max 25,000). Reviewer: spec review R3-9 + Claude (eng review).
 Plan baseline: no per-tool size bound; bodies up to 20,000 chars; search up to 25 full entries.
 Runtime evidence: none (no code yet). External limit quoted from code.claude.com/docs/en/mcp.
 Comparison grid:
-| Choice | Current | A | B | C |
-|---|---|---|---|---|
-| R3-9 per-response budget | none | 8,000 tokens (~32,000 chars, chars/4) | 20,000 tokens (~80,000 chars) | none |
-| search_context bodies | full | clipped to 1,200 chars + `(clipped - get_item <id>)`; stop adding entries at budget with `(N more - narrow the search)` | clipped to 4,000 chars, same stop rule | full |
-| get_overview | titles/meta | titles + meta only, no bodies | titles + meta only | titles/meta, unbounded list |
-| get_item | full | full body (<= 20,000 chars) + neighbour titles/ids only | full body + neighbour titles/ids | full body + neighbours |
-| Test | none | unit test: an over-budget result is clipped and marked | same | none |
-Question D18:
-D18 - How big can one MCP tool answer be?
-Project/branch/task: main, whiteboard MCP tools `search_context` / `get_overview` / `get_item`.
-ELI10: when Claude Code asks your board a question, the answer counts against its context. Claude Code warns above 10k tokens and cuts off at 25k by default. Right now nothing stops a search from returning 25 cards with 20,000-character bodies each, which is hundreds of thousands of tokens. A budget clips long bodies in search results and points at `get_item` for the full text.
-Stakes if we pick wrong: with no budget, "what are my active goals?" can come back truncated or dumped to a file, in exactly the success path we care about.
-Recommendation: A because staying under the 10k warning keeps every answer inline, and `get_item` still returns any full card on demand.
-Note: options differ in kind, not coverage - no completeness score.
-Pros / cons:
-A) 8k-token budget (recommended)
-  ✅ Every tool answer stays under Claude Code's 10k warning, so answers always arrive inline
-  ✅ Clipped bodies carry a get_item pointer, so no card text is actually unreachable
-  ❌ The agent needs an extra get_item call to read a long card in full
-B) 20k-token budget
-  ✅ Fewer follow-up calls because much more text fits into each search answer
-  ✅ Still under the default 25k cap, so nothing is cut off by Claude Code
-  ❌ Triggers the 10k warning often and burns a large slice of the agent's context per call
-C) No budget
-  ✅ Simplest code, with no clipping rules or extra tests to maintain at all
-  ✅ Agents always see full bodies without follow-up calls on a small board
-  ❌ A real board overflows the 25k cap, so answers get truncated or moved to files
-Net: a few more get_item calls in exchange for answers that always fit.
-Header: MCP budget
-Options:
-A) 8k-token budget (Recommended)
-Each tool answer <= ~32,000 chars. search_context bodies clipped at 1,200 chars with a get_item pointer, then stops at budget with "(N more)". get_overview has no bodies. get_item returns the full body + neighbour titles. Unit test for clipping. (human: ~2h / CC: ~10 min). Risk low.
-B) 20k-token budget
-Same rules with 4,000-char clips and an ~80,000-char cap. Under the 25k max but over the 10k warning. (human: ~2h / CC: ~10 min). Risk: context burn per call.
-C) No budget
-Keep full bodies, no clipping. (human: 0 / CC: 0). Risk high: overflow on a real board.
+
+| Choice                                                                                                                                                                                                                                                                                                                                                                                       | Current     | A                                                                                                                       | B                                      | C                           |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------- |
+| R3-9 per-response budget                                                                                                                                                                                                                                                                                                                                                                     | none        | 8,000 tokens (~32,000 chars, chars/4)                                                                                   | 20,000 tokens (~80,000 chars)          | none                        |
+| search_context bodies                                                                                                                                                                                                                                                                                                                                                                        | full        | clipped to 1,200 chars + `(clipped - get_item <id>)`; stop adding entries at budget with `(N more - narrow the search)` | clipped to 4,000 chars, same stop rule | full                        |
+| get_overview                                                                                                                                                                                                                                                                                                                                                                                 | titles/meta | titles + meta only, no bodies                                                                                           | titles + meta only                     | titles/meta, unbounded list |
+| get_item                                                                                                                                                                                                                                                                                                                                                                                     | full        | full body (<= 20,000 chars) + neighbour titles/ids only                                                                 | full body + neighbour titles/ids       | full body + neighbours      |
+| Test                                                                                                                                                                                                                                                                                                                                                                                         | none        | unit test: an over-budget result is clipped and marked                                                                  | same                                   | none                        |
+| Question D18:                                                                                                                                                                                                                                                                                                                                                                                |
+| D18 - How big can one MCP tool answer be?                                                                                                                                                                                                                                                                                                                                                    |
+| Project/branch/task: main, whiteboard MCP tools `search_context` / `get_overview` / `get_item`.                                                                                                                                                                                                                                                                                              |
+| ELI10: when Claude Code asks your board a question, the answer counts against its context. Claude Code warns above 10k tokens and cuts off at 25k by default. Right now nothing stops a search from returning 25 cards with 20,000-character bodies each, which is hundreds of thousands of tokens. A budget clips long bodies in search results and points at `get_item` for the full text. |
+| Stakes if we pick wrong: with no budget, "what are my active goals?" can come back truncated or dumped to a file, in exactly the success path we care about.                                                                                                                                                                                                                                 |
+| Recommendation: A because staying under the 10k warning keeps every answer inline, and `get_item` still returns any full card on demand.                                                                                                                                                                                                                                                     |
+| Note: options differ in kind, not coverage - no completeness score.                                                                                                                                                                                                                                                                                                                          |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                                                                                 |
+| A) 8k-token budget (recommended)                                                                                                                                                                                                                                                                                                                                                             |
+| ✅ Every tool answer stays under Claude Code's 10k warning, so answers always arrive inline                                                                                                                                                                                                                                                                                                  |
+| ✅ Clipped bodies carry a get_item pointer, so no card text is actually unreachable                                                                                                                                                                                                                                                                                                          |
+| ❌ The agent needs an extra get_item call to read a long card in full                                                                                                                                                                                                                                                                                                                        |
+| B) 20k-token budget                                                                                                                                                                                                                                                                                                                                                                          |
+| ✅ Fewer follow-up calls because much more text fits into each search answer                                                                                                                                                                                                                                                                                                                 |
+| ✅ Still under the default 25k cap, so nothing is cut off by Claude Code                                                                                                                                                                                                                                                                                                                     |
+| ❌ Triggers the 10k warning often and burns a large slice of the agent's context per call                                                                                                                                                                                                                                                                                                    |
+| C) No budget                                                                                                                                                                                                                                                                                                                                                                                 |
+| ✅ Simplest code, with no clipping rules or extra tests to maintain at all                                                                                                                                                                                                                                                                                                                   |
+| ✅ Agents always see full bodies without follow-up calls on a small board                                                                                                                                                                                                                                                                                                                    |
+| ❌ A real board overflows the 25k cap, so answers get truncated or moved to files                                                                                                                                                                                                                                                                                                            |
+| Net: a few more get_item calls in exchange for answers that always fit.                                                                                                                                                                                                                                                                                                                      |
+| Header: MCP budget                                                                                                                                                                                                                                                                                                                                                                           |
+| Options:                                                                                                                                                                                                                                                                                                                                                                                     |
+| A) 8k-token budget (Recommended)                                                                                                                                                                                                                                                                                                                                                             |
+| Each tool answer <= ~32,000 chars. search_context bodies clipped at 1,200 chars with a get_item pointer, then stops at budget with "(N more)". get_overview has no bodies. get_item returns the full body + neighbour titles. Unit test for clipping. (human: ~2h / CC: ~10 min). Risk low.                                                                                                  |
+| B) 20k-token budget                                                                                                                                                                                                                                                                                                                                                                          |
+| Same rules with 4,000-char clips and an ~80,000-char cap. Under the 25k max but over the 10k warning. (human: ~2h / CC: ~10 min). Risk: context burn per call.                                                                                                                                                                                                                               |
+| C) No budget                                                                                                                                                                                                                                                                                                                                                                                 |
+| Keep full bodies, no clipping. (human: 0 / CC: 0). Risk high: overflow on a real board.                                                                                                                                                                                                                                                                                                      |
 
 State: approved
 Actual answer: A) 8k-token budget (Recommended) - D18
@@ -635,37 +652,39 @@ Accepted scope: every MCP tool answer is <= ~32,000 chars (8,000 tokens at chars
 History: none
 
 ### R3-5: editing a link's label
+
 Finding: Section 1 Architecture, P2, confidence 8/10, plan "Routes > UI": only `POST /links` and `DELETE /links/[id]`; plan "Data model > WhiteboardLink": unique `{ from, to, label }`. Reviewer: spec review R3-5.
 Plan baseline: no way to change a label after the link exists.
 Runtime evidence: none (no code yet).
 Comparison grid:
-| Choice | Current | A | B |
-|---|---|---|---|
-| R3-5 label editing | not possible | `PATCH /api/admin/whiteboard/links/[id]` `{ label }`: single line, <= 80 chars, duplicate `{from,to,label}` on another id -> 400; sent through the save queue; inline edit on the edge (double-click) and in the inspector | label chosen at create only; changing it = delete + recreate the edge (client does both) |
-| Tests | none | tests/api: label edit, duplicate rejection, 404 on missing link | tests/api: create/delete only |
-Question D19:
-D19 - Can you rename an arrow's label after drawing it?
-Project/branch/task: main, whiteboard links API (`/api/admin/whiteboard/links`).
-ELI10: arrows carry meaning ("because", "blocks", "learned from"), and in React Flow you usually draw the arrow first and type the label after, then fix typos later. The plan can create and delete links but not edit them. We can add a small edit route, or make "rename" secretly delete the arrow and draw a new one.
-Stakes if we pick wrong: without an edit path, every label typo costs a delete + recreate, which changes the link's id, and any agent that cited the old id sees a dead reference.
-Recommendation: A because a label edit is the most common arrow action and a stable id keeps agent citations valid.
-Completeness: A=10/10, B=6/10
-Pros / cons:
-A) Add a label edit route (recommended)
-  ✅ Double-click an arrow and retype, the way every whiteboard tool already behaves
-  ✅ Link ids stay stable, so ids an agent cited earlier still resolve
-  ❌ One more route with its own validation and duplicate handling to test
-B) Delete and recreate on rename
-  ✅ No new route. The existing create and delete paths do all the work
-  ✅ Fewer server tests, since nothing new is added to the API surface
-  ❌ Every rename changes the link id and costs two writes that can half-fail
-Net: one small route in exchange for stable ids and normal editing.
-Header: Link labels
-Options:
-A) Add PATCH /links/[id] (Recommended)
-{ label } edit through the save queue: single line, <= 80 chars, duplicate -> 400, missing -> 404. Inline double-click edit + inspector field. tests/api for edit, duplicate, 404. (human: ~2h / CC: ~10 min). Risk low.
-B) Delete + recreate
-Label fixed at create. Renaming deletes the edge and creates a new one with a new id. (human: ~1h / CC: ~5 min). Risk: id churn, two-write partial failure.
+
+| Choice                                                                                                                                                                                                                                                                                                                      | Current      | A                                                                                                                                                                                                                          | B                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| R3-5 label editing                                                                                                                                                                                                                                                                                                          | not possible | `PATCH /api/admin/whiteboard/links/[id]` `{ label }`: single line, <= 80 chars, duplicate `{from,to,label}` on another id -> 400; sent through the save queue; inline edit on the edge (double-click) and in the inspector | label chosen at create only; changing it = delete + recreate the edge (client does both) |
+| Tests                                                                                                                                                                                                                                                                                                                       | none         | tests/api: label edit, duplicate rejection, 404 on missing link                                                                                                                                                            | tests/api: create/delete only                                                            |
+| Question D19:                                                                                                                                                                                                                                                                                                               |
+| D19 - Can you rename an arrow's label after drawing it?                                                                                                                                                                                                                                                                     |
+| Project/branch/task: main, whiteboard links API (`/api/admin/whiteboard/links`).                                                                                                                                                                                                                                            |
+| ELI10: arrows carry meaning ("because", "blocks", "learned from"), and in React Flow you usually draw the arrow first and type the label after, then fix typos later. The plan can create and delete links but not edit them. We can add a small edit route, or make "rename" secretly delete the arrow and draw a new one. |
+| Stakes if we pick wrong: without an edit path, every label typo costs a delete + recreate, which changes the link's id, and any agent that cited the old id sees a dead reference.                                                                                                                                          |
+| Recommendation: A because a label edit is the most common arrow action and a stable id keeps agent citations valid.                                                                                                                                                                                                         |
+| Completeness: A=10/10, B=6/10                                                                                                                                                                                                                                                                                               |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                |
+| A) Add a label edit route (recommended)                                                                                                                                                                                                                                                                                     |
+| ✅ Double-click an arrow and retype, the way every whiteboard tool already behaves                                                                                                                                                                                                                                          |
+| ✅ Link ids stay stable, so ids an agent cited earlier still resolve                                                                                                                                                                                                                                                        |
+| ❌ One more route with its own validation and duplicate handling to test                                                                                                                                                                                                                                                    |
+| B) Delete and recreate on rename                                                                                                                                                                                                                                                                                            |
+| ✅ No new route. The existing create and delete paths do all the work                                                                                                                                                                                                                                                       |
+| ✅ Fewer server tests, since nothing new is added to the API surface                                                                                                                                                                                                                                                        |
+| ❌ Every rename changes the link id and costs two writes that can half-fail                                                                                                                                                                                                                                                 |
+| Net: one small route in exchange for stable ids and normal editing.                                                                                                                                                                                                                                                         |
+| Header: Link labels                                                                                                                                                                                                                                                                                                         |
+| Options:                                                                                                                                                                                                                                                                                                                    |
+| A) Add PATCH /links/[id] (Recommended)                                                                                                                                                                                                                                                                                      |
+| { label } edit through the save queue: single line, <= 80 chars, duplicate -> 400, missing -> 404. Inline double-click edit + inspector field. tests/api for edit, duplicate, 404. (human: ~2h / CC: ~10 min). Risk low.                                                                                                    |
+| B) Delete + recreate                                                                                                                                                                                                                                                                                                        |
+| Label fixed at create. Renaming deletes the edge and creates a new one with a new id. (human: ~1h / CC: ~5 min). Risk: id churn, two-write partial failure.                                                                                                                                                                 |
 
 State: approved
 Actual answer: A) Add PATCH /links/[id] (Recommended) - D19
@@ -673,44 +692,46 @@ Accepted scope: `PATCH /api/admin/whiteboard/links/[id]` with `{ label }` (singl
 History: none
 
 ### R3-17: restoring from the JSON backup
+
 Finding: Section 1 Architecture, P2, confidence 8/10, plan "Delete (hard, premise 4) > Backup" and route `GET /api/admin/whiteboard/backup`: a download exists but there is no restore path. Reviewer: spec review R3-17.
 Plan baseline: backup download only, described as "cheap insurance".
 Runtime evidence: none (no code yet).
 Comparison grid:
-| Choice | Current | A | B | C |
-|---|---|---|---|---|
-| R3-17 restore path | none | `POST /api/admin/whiteboard/restore`: upload a backup file, validate every item/link with the same write validation, preview "N items, M links, K already exist", then upsert by `_id` (existing ids untouched unless "overwrite" is ticked). maxBytes 16 MB. | documented manual restore: `mongoimport` of the backup's `items` and `links` arrays with ids preserved, in `docs/whiteboard/restore.md` | none; backup reworded as "export a copy"; restore deferred to v2 |
-| Backup format | JSON | versioned `{ version: 1, exportedAt, items, links }` | same versioned format | same versioned format |
-| Tests | none | tests/api: round-trip backup -> delete -> restore = same docs; invalid file -> 400 with no writes; re-import is idempotent | unit test that the backup shape is mongoimport-ready | none |
-Question D20:
-D20 - How do you get your board back from a backup?
-Project/branch/task: main, whiteboard backup (`GET /api/admin/whiteboard/backup`).
-ELI10: delete is permanent, so the plan adds a "Download backup (JSON)" button as insurance. But there's no way to load that file back in. A backup you can't restore only lets you read your old data, it doesn't bring it back. We can add a restore button, write down a manual database command, or call it an "export" and add restore later.
-Stakes if we pick wrong: the day you delete a frame by mistake, you have a file on disk and no safe way to put those cards back on the canvas.
-Recommendation: A because it's the only option that turns the backup into a real undo for hard delete, and the upsert-by-id rule makes it safe to run twice.
-Completeness: A=10/10, B=7/10, C=4/10
-Pros / cons:
-A) Restore button in the app (recommended)
-  ✅ One click brings deleted cards and links back with their original ids and links intact
-  ✅ Validates the whole file first and previews counts, so a bad file writes nothing at all
-  ❌ One more owner route and an upload UI to build, validate and test end to end
-B) Documented manual mongoimport
-  ✅ No new code path. It's a short doc page with the exact commands to run
-  ✅ Works even if the app itself is broken, since it goes straight to the database
-  ❌ Needs shell access to production Mongo and skips the app's validation rules
-C) Defer restore to v2
-  ✅ Zero extra work in v1, and the backup is still a readable copy of everything
-  ✅ Honest labelling: calling it an export stops it being mistaken for real insurance
-  ❌ Hard delete has no recovery path at all until v2 actually ships
-Net: a small restore route versus hard delete with no way back.
-Header: Restore
-Options:
-A) Restore in the app (Recommended)
-POST /api/admin/whiteboard/restore: upload, validate everything first, preview counts, upsert by _id (overwrite opt-in). Versioned backup format. tests/api for round-trip, invalid-file-no-writes, idempotent re-import. (human: ~4h / CC: ~20 min). Risk low.
-B) Manual mongoimport doc
-docs/whiteboard/restore.md with exact mongoimport commands for items + links, ids preserved. Versioned format. (human: ~1h / CC: ~5 min). Risk: needs prod DB shell, bypasses validation.
-C) Defer to v2
-Rename the button "Export a copy (JSON)". Versioned format so v2 can import it. (human: ~10 min / CC: ~2 min). Risk: no recovery from hard delete in v1.
+
+| Choice                                                                                                                                                                                                                                                                                                                                             | Current | A                                                                                                                                                                                                                                                             | B                                                                                                                                       | C                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| R3-17 restore path                                                                                                                                                                                                                                                                                                                                 | none    | `POST /api/admin/whiteboard/restore`: upload a backup file, validate every item/link with the same write validation, preview "N items, M links, K already exist", then upsert by `_id` (existing ids untouched unless "overwrite" is ticked). maxBytes 16 MB. | documented manual restore: `mongoimport` of the backup's `items` and `links` arrays with ids preserved, in `docs/whiteboard/restore.md` | none; backup reworded as "export a copy"; restore deferred to v2 |
+| Backup format                                                                                                                                                                                                                                                                                                                                      | JSON    | versioned `{ version: 1, exportedAt, items, links }`                                                                                                                                                                                                          | same versioned format                                                                                                                   | same versioned format                                            |
+| Tests                                                                                                                                                                                                                                                                                                                                              | none    | tests/api: round-trip backup -> delete -> restore = same docs; invalid file -> 400 with no writes; re-import is idempotent                                                                                                                                    | unit test that the backup shape is mongoimport-ready                                                                                    | none                                                             |
+| Question D20:                                                                                                                                                                                                                                                                                                                                      |
+| D20 - How do you get your board back from a backup?                                                                                                                                                                                                                                                                                                |
+| Project/branch/task: main, whiteboard backup (`GET /api/admin/whiteboard/backup`).                                                                                                                                                                                                                                                                 |
+| ELI10: delete is permanent, so the plan adds a "Download backup (JSON)" button as insurance. But there's no way to load that file back in. A backup you can't restore only lets you read your old data, it doesn't bring it back. We can add a restore button, write down a manual database command, or call it an "export" and add restore later. |
+| Stakes if we pick wrong: the day you delete a frame by mistake, you have a file on disk and no safe way to put those cards back on the canvas.                                                                                                                                                                                                     |
+| Recommendation: A because it's the only option that turns the backup into a real undo for hard delete, and the upsert-by-id rule makes it safe to run twice.                                                                                                                                                                                       |
+| Completeness: A=10/10, B=7/10, C=4/10                                                                                                                                                                                                                                                                                                              |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                                       |
+| A) Restore button in the app (recommended)                                                                                                                                                                                                                                                                                                         |
+| ✅ One click brings deleted cards and links back with their original ids and links intact                                                                                                                                                                                                                                                          |
+| ✅ Validates the whole file first and previews counts, so a bad file writes nothing at all                                                                                                                                                                                                                                                         |
+| ❌ One more owner route and an upload UI to build, validate and test end to end                                                                                                                                                                                                                                                                    |
+| B) Documented manual mongoimport                                                                                                                                                                                                                                                                                                                   |
+| ✅ No new code path. It's a short doc page with the exact commands to run                                                                                                                                                                                                                                                                          |
+| ✅ Works even if the app itself is broken, since it goes straight to the database                                                                                                                                                                                                                                                                  |
+| ❌ Needs shell access to production Mongo and skips the app's validation rules                                                                                                                                                                                                                                                                     |
+| C) Defer restore to v2                                                                                                                                                                                                                                                                                                                             |
+| ✅ Zero extra work in v1, and the backup is still a readable copy of everything                                                                                                                                                                                                                                                                    |
+| ✅ Honest labelling: calling it an export stops it being mistaken for real insurance                                                                                                                                                                                                                                                               |
+| ❌ Hard delete has no recovery path at all until v2 actually ships                                                                                                                                                                                                                                                                                 |
+| Net: a small restore route versus hard delete with no way back.                                                                                                                                                                                                                                                                                    |
+| Header: Restore                                                                                                                                                                                                                                                                                                                                    |
+| Options:                                                                                                                                                                                                                                                                                                                                           |
+| A) Restore in the app (Recommended)                                                                                                                                                                                                                                                                                                                |
+| POST /api/admin/whiteboard/restore: upload, validate everything first, preview counts, upsert by _id (overwrite opt-in). Versioned backup format. tests/api for round-trip, invalid-file-no-writes, idempotent re-import. (human: ~4h / CC: ~20 min). Risk low.                                                                                    |
+| B) Manual mongoimport doc                                                                                                                                                                                                                                                                                                                          |
+| docs/whiteboard/restore.md with exact mongoimport commands for items + links, ids preserved. Versioned format. (human: ~1h / CC: ~5 min). Risk: needs prod DB shell, bypasses validation.                                                                                                                                                          |
+| C) Defer to v2                                                                                                                                                                                                                                                                                                                                     |
+| Rename the button "Export a copy (JSON)". Versioned format so v2 can import it. (human: ~10 min / CC: ~2 min). Risk: no recovery from hard delete in v1.                                                                                                                                                                                           |
 
 State: approved
 Actual answer: A) Restore in the app (Recommended) - D20
@@ -718,40 +739,42 @@ Accepted scope: backup format is versioned `{ version: 1, exportedAt, items, lin
 History: D21 (A6) superseded this record's single-request `maxBytes 16 MB` bound after the Vercel 4.5 MB body limit was found. Restore is now sent in <= 2 MB validated batches. Every other D20 behavior still stands.
 
 ### A6: Vercel's 4.5 MB function body limit (board load, backup, restore)
+
 Finding: Section 1 Architecture, P1, confidence 8/10. `vercel.json` exists, and `src/app/api/cron/blog/route.ts:36` quotes the Vercel error "Serverless Functions must have a maxDuration between 1 and 300 for plan pro". Vercel docs (vercel.com/docs/functions/limitations): "The maximum payload size for the request body or the response body of a Vercel Function is 4.5 MB"; streaming functions are exempt from the response limit. Plan: `GET /api/admin/whiteboard` returns every item including ink points; D20 restore uses `maxBytes 16 MB`. Reviewer: Claude (eng review).
 Plan baseline: D20 approved restore with maxBytes 16 MB validated in one request. Canvas load and backup download are single, unstreamed JSON responses.
 Runtime evidence: deployment platform confirmed as Vercel from repo files. No whiteboard code exists yet. The actual board size is unknown (it grows with ink).
 Comparison grid:
-| Choice | Current | A | B |
-|---|---|---|---|
-| Canvas load `GET /api/admin/whiteboard` | one JSON body, unbounded | streamed NDJSON (one item/link per line), client parses incrementally | one JSON body; board hard-capped so it stays < 4 MB (reject new ink past the cap with a clear message) |
-| Backup download | one JSON body | streamed (same NDJSON writer, wrapped as the versioned file) | one JSON body, same board cap |
-| Restore request | one request, maxBytes 16 MB (D20) | client validates the whole file with the shared validator, then sends batches <= 2 MB (dry run first); the server re-validates each batch; batches are idempotent upserts, so a failed run is safe to re-run | one request, maxBytes 4 MB |
-| D20 behaviors (validate before writing, preview counts, upsert by id, overwrite opt-in, keep includeInAi) | approved D20 | kept (all-or-nothing becomes "validated in full before the first batch; re-run to finish") | kept |
-| Tests | none | tests/api: streamed load returns every doc; a restore split across batches round-trips; re-running after a mid-way failure converges | tests/api: cap rejection message; 4 MB restore |
-Question D21:
-D21 - How do we stay under Vercel's 4.5 MB limit?
-Project/branch/task: main, whiteboard load / backup / restore routes on Vercel.
-ELI10: Vercel refuses any function request or reply bigger than 4.5 MB unless the reply is streamed. Ink strokes are lists of points, so a board with a lot of drawing can pass 4.5 MB. Then the canvas won't load, the backup won't download, and the restore I just approved (16 MB) can never be sent. We can stream the big replies and send restores in small batches, or cap the board size so it never gets that big.
-Stakes if we pick wrong: the board works for months, then one day stops loading once you've drawn enough, and that's when you'd reach for the backup that also fails.
-Recommendation: A because streaming removes the limit on reads, and batched restores keep D20's safety rules, so the board never hits a size wall.
-Completeness: A=10/10, B=6/10
-Pros / cons:
-A) Stream reads, batch restores (recommended)
-  ✅ No board-size ceiling: load and backup stream past 4.5 MB without any extra infrastructure
-  ✅ Restore keeps validate-first, and idempotent batches make a half-finished run safe to repeat
-  ❌ Streaming parser on the client plus batch logic is more code and more tests to maintain
-B) Cap the board below 4 MB
-  ✅ Simple single-request routes exactly as planned, with no streaming code to build
-  ✅ A clear error at the cap is honest and easy to understand when you hit it
-  ❌ Your life-storage board gets a hard size limit, which fights the product's whole premise
-Net: some streaming code now versus a size wall on a board meant to hold everything.
-Header: Size limit
-Options:
-A) Stream + batched restore (Recommended)
-Canvas load + backup stream NDJSON. Restore: validate whole file client-side, dry run, then <= 2 MB batches re-validated server-side, idempotent upserts (re-run to finish). Supersedes D20's 16 MB bound. tests/api for streamed load, batched round-trip, re-run convergence. (human: ~5h / CC: ~25 min). Risk low.
-B) Cap board under 4 MB
-Single-request routes; restore maxBytes 4 MB; new ink rejected past the cap with a message. (human: ~2h / CC: ~10 min). Risk: hard ceiling on a board meant to grow forever.
+
+| Choice                                                                                                                                                                                                                                                                                                                                                                                                                       | Current                           | A                                                                                                                                                                                                            | B                                                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Canvas load `GET /api/admin/whiteboard`                                                                                                                                                                                                                                                                                                                                                                                      | one JSON body, unbounded          | streamed NDJSON (one item/link per line), client parses incrementally                                                                                                                                        | one JSON body; board hard-capped so it stays < 4 MB (reject new ink past the cap with a clear message) |
+| Backup download                                                                                                                                                                                                                                                                                                                                                                                                              | one JSON body                     | streamed (same NDJSON writer, wrapped as the versioned file)                                                                                                                                                 | one JSON body, same board cap                                                                          |
+| Restore request                                                                                                                                                                                                                                                                                                                                                                                                              | one request, maxBytes 16 MB (D20) | client validates the whole file with the shared validator, then sends batches <= 2 MB (dry run first); the server re-validates each batch; batches are idempotent upserts, so a failed run is safe to re-run | one request, maxBytes 4 MB                                                                             |
+| D20 behaviors (validate before writing, preview counts, upsert by id, overwrite opt-in, keep includeInAi)                                                                                                                                                                                                                                                                                                                    | approved D20                      | kept (all-or-nothing becomes "validated in full before the first batch; re-run to finish")                                                                                                                   | kept                                                                                                   |
+| Tests                                                                                                                                                                                                                                                                                                                                                                                                                        | none                              | tests/api: streamed load returns every doc; a restore split across batches round-trips; re-running after a mid-way failure converges                                                                         | tests/api: cap rejection message; 4 MB restore                                                         |
+| Question D21:                                                                                                                                                                                                                                                                                                                                                                                                                |
+| D21 - How do we stay under Vercel's 4.5 MB limit?                                                                                                                                                                                                                                                                                                                                                                            |
+| Project/branch/task: main, whiteboard load / backup / restore routes on Vercel.                                                                                                                                                                                                                                                                                                                                              |
+| ELI10: Vercel refuses any function request or reply bigger than 4.5 MB unless the reply is streamed. Ink strokes are lists of points, so a board with a lot of drawing can pass 4.5 MB. Then the canvas won't load, the backup won't download, and the restore I just approved (16 MB) can never be sent. We can stream the big replies and send restores in small batches, or cap the board size so it never gets that big. |
+| Stakes if we pick wrong: the board works for months, then one day stops loading once you've drawn enough, and that's when you'd reach for the backup that also fails.                                                                                                                                                                                                                                                        |
+| Recommendation: A because streaming removes the limit on reads, and batched restores keep D20's safety rules, so the board never hits a size wall.                                                                                                                                                                                                                                                                           |
+| Completeness: A=10/10, B=6/10                                                                                                                                                                                                                                                                                                                                                                                                |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| A) Stream reads, batch restores (recommended)                                                                                                                                                                                                                                                                                                                                                                                |
+| ✅ No board-size ceiling: load and backup stream past 4.5 MB without any extra infrastructure                                                                                                                                                                                                                                                                                                                                |
+| ✅ Restore keeps validate-first, and idempotent batches make a half-finished run safe to repeat                                                                                                                                                                                                                                                                                                                              |
+| ❌ Streaming parser on the client plus batch logic is more code and more tests to maintain                                                                                                                                                                                                                                                                                                                                   |
+| B) Cap the board below 4 MB                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ✅ Simple single-request routes exactly as planned, with no streaming code to build                                                                                                                                                                                                                                                                                                                                          |
+| ✅ A clear error at the cap is honest and easy to understand when you hit it                                                                                                                                                                                                                                                                                                                                                 |
+| ❌ Your life-storage board gets a hard size limit, which fights the product's whole premise                                                                                                                                                                                                                                                                                                                                  |
+| Net: some streaming code now versus a size wall on a board meant to hold everything.                                                                                                                                                                                                                                                                                                                                         |
+| Header: Size limit                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Options:                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| A) Stream + batched restore (Recommended)                                                                                                                                                                                                                                                                                                                                                                                    |
+| Canvas load + backup stream NDJSON. Restore: validate whole file client-side, dry run, then <= 2 MB batches re-validated server-side, idempotent upserts (re-run to finish). Supersedes D20's 16 MB bound. tests/api for streamed load, batched round-trip, re-run convergence. (human: ~5h / CC: ~25 min). Risk low.                                                                                                        |
+| B) Cap board under 4 MB                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Single-request routes; restore maxBytes 4 MB; new ink rejected past the cap with a message. (human: ~2h / CC: ~10 min). Risk: hard ceiling on a board meant to grow forever.                                                                                                                                                                                                                                                 |
 
 State: approved
 Actual answer: A) Stream + batched restore (Recommended) - D21
@@ -759,40 +782,42 @@ Accepted scope: `GET /api/admin/whiteboard` and `GET /api/admin/whiteboard/backu
 History: none
 
 ### R3-12: date format, bounds and timezone
+
 Finding: Section 2 Code quality, P2, confidence 8/10. Plan "Modules > context.ts > Date rule" and `search_context(... from?, to?, targetFrom?, targetTo? ...)`: no format, inclusivity or timezone is defined, and the storage of `when`/`targetBy` is unspecified. The owner is in UTC+7 (Vietnamese content, vi/en site). Reviewer: spec review R3-12.
 Plan baseline: `when`/`targetBy` are `Date | null`; ranges match `when ?? createdAt` / `targetBy`.
 Runtime evidence: none (no code yet).
 Comparison grid:
-| Choice | Current | A | B |
-|---|---|---|---|
-| Storage of when/targetBy | Date, unspecified | calendar date: stored as UTC midnight of the picked day (a date-only meaning) | full instant (UTC timestamp) from a date-time picker |
-| Range params | unspecified | `YYYY-MM-DD`; `from` inclusive, `to` inclusive through the end of that day | ISO 8601 instants; `[from, to)` half-open |
-| createdAt fallback | unspecified | converted to a calendar day in the fixed owner timezone `Asia/Ho_Chi_Minh` (constant in limits.ts), then compared | compared as an instant |
-| Meta line | unspecified | `when 2025-03-14` / `created 2025-03-14` | full ISO timestamps |
-| Tests | none | unit: boundary day (`to=2025-12-31` includes a card created 2025-12-31 23:30 +07:00); API: search boundary | unit: half-open boundary |
-Question D22:
-D22 - How should dates on cards behave?
-Project/branch/task: main, whiteboard `when` / `targetBy` fields and the `from`/`to` search filters.
-ELI10: cards get "when" and "target by" dates, and agents search them ("what did I want in 2025?"). If dates are stored as exact moments in UTC, a card you wrote at 06:00 on 1 Jan 2026 in Vietnam is 23:00 on 31 Dec 2025 in UTC, so a search for 2025 wrongly includes it. Treating them as plain calendar days, with your timezone fixed, avoids that.
-Stakes if we pick wrong: year and month questions quietly include or miss cards near midnight, and an agent answers your "what did I want in 2025" slightly wrong.
-Recommendation: A because these are life dates ("since March 2025"), not timestamps, and calendar days with inclusive ends match how you'll ask.
-Completeness: A=10/10, B=7/10
-Pros / cons:
-A) Calendar days, owner timezone (recommended)
-  ✅ "2025" means 1 Jan to 31 Dec in your own day, with no midnight-UTC surprises
-  ✅ Inclusive YYYY-MM-DD ranges are exactly what an agent naturally passes in
-  ❌ The timezone is a fixed constant, so moving country later means changing one value
-B) Exact UTC instants
-  ✅ Standard timestamp handling, with no timezone constant anywhere in the code
-  ✅ Precise to the minute, if you ever want time-of-day on a card
-  ❌ Day and year boundaries shift by 7 hours, so year searches miss or add cards
-Net: date-only semantics that match how you think, versus timestamps that drift at midnight.
-Header: Dates
-Options:
-A) Calendar days + VN time (Recommended)
-when/targetBy stored as UTC midnight of the picked day. Params YYYY-MM-DD, from and to inclusive. createdAt fallback converted to a day in Asia/Ho_Chi_Minh (one constant). Meta line prints the day. Boundary tests. (human: ~2h / CC: ~10 min). Risk low.
-B) UTC instants
-Date-time values everywhere, ISO params, half-open [from, to). (human: ~1h / CC: ~5 min). Risk: midnight boundary errors for UTC+7.
+
+| Choice                                                                                                                                                                                                                                                                                                                                                     | Current           | A                                                                                                                 | B                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Storage of when/targetBy                                                                                                                                                                                                                                                                                                                                   | Date, unspecified | calendar date: stored as UTC midnight of the picked day (a date-only meaning)                                     | full instant (UTC timestamp) from a date-time picker |
+| Range params                                                                                                                                                                                                                                                                                                                                               | unspecified       | `YYYY-MM-DD`; `from` inclusive, `to` inclusive through the end of that day                                        | ISO 8601 instants; `[from, to)` half-open            |
+| createdAt fallback                                                                                                                                                                                                                                                                                                                                         | unspecified       | converted to a calendar day in the fixed owner timezone `Asia/Ho_Chi_Minh` (constant in limits.ts), then compared | compared as an instant                               |
+| Meta line                                                                                                                                                                                                                                                                                                                                                  | unspecified       | `when 2025-03-14` / `created 2025-03-14`                                                                          | full ISO timestamps                                  |
+| Tests                                                                                                                                                                                                                                                                                                                                                      | none              | unit: boundary day (`to=2025-12-31` includes a card created 2025-12-31 23:30 +07:00); API: search boundary        | unit: half-open boundary                             |
+| Question D22:                                                                                                                                                                                                                                                                                                                                              |
+| D22 - How should dates on cards behave?                                                                                                                                                                                                                                                                                                                    |
+| Project/branch/task: main, whiteboard `when` / `targetBy` fields and the `from`/`to` search filters.                                                                                                                                                                                                                                                       |
+| ELI10: cards get "when" and "target by" dates, and agents search them ("what did I want in 2025?"). If dates are stored as exact moments in UTC, a card you wrote at 06:00 on 1 Jan 2026 in Vietnam is 23:00 on 31 Dec 2025 in UTC, so a search for 2025 wrongly includes it. Treating them as plain calendar days, with your timezone fixed, avoids that. |
+| Stakes if we pick wrong: year and month questions quietly include or miss cards near midnight, and an agent answers your "what did I want in 2025" slightly wrong.                                                                                                                                                                                         |
+| Recommendation: A because these are life dates ("since March 2025"), not timestamps, and calendar days with inclusive ends match how you'll ask.                                                                                                                                                                                                           |
+| Completeness: A=10/10, B=7/10                                                                                                                                                                                                                                                                                                                              |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                                               |
+| A) Calendar days, owner timezone (recommended)                                                                                                                                                                                                                                                                                                             |
+| ✅ "2025" means 1 Jan to 31 Dec in your own day, with no midnight-UTC surprises                                                                                                                                                                                                                                                                            |
+| ✅ Inclusive YYYY-MM-DD ranges are exactly what an agent naturally passes in                                                                                                                                                                                                                                                                               |
+| ❌ The timezone is a fixed constant, so moving country later means changing one value                                                                                                                                                                                                                                                                      |
+| B) Exact UTC instants                                                                                                                                                                                                                                                                                                                                      |
+| ✅ Standard timestamp handling, with no timezone constant anywhere in the code                                                                                                                                                                                                                                                                             |
+| ✅ Precise to the minute, if you ever want time-of-day on a card                                                                                                                                                                                                                                                                                           |
+| ❌ Day and year boundaries shift by 7 hours, so year searches miss or add cards                                                                                                                                                                                                                                                                            |
+| Net: date-only semantics that match how you think, versus timestamps that drift at midnight.                                                                                                                                                                                                                                                               |
+| Header: Dates                                                                                                                                                                                                                                                                                                                                              |
+| Options:                                                                                                                                                                                                                                                                                                                                                   |
+| A) Calendar days + VN time (Recommended)                                                                                                                                                                                                                                                                                                                   |
+| when/targetBy stored as UTC midnight of the picked day. Params YYYY-MM-DD, from and to inclusive. createdAt fallback converted to a day in Asia/Ho_Chi_Minh (one constant). Meta line prints the day. Boundary tests. (human: ~2h / CC: ~10 min). Risk low.                                                                                                |
+| B) UTC instants                                                                                                                                                                                                                                                                                                                                            |
+| Date-time values everywhere, ISO params, half-open [from, to). (human: ~1h / CC: ~5 min). Risk: midnight boundary errors for UTC+7.                                                                                                                                                                                                                        |
 
 State: approved
 Actual answer: A) Calendar days + VN time (Recommended) - D22
@@ -800,37 +825,39 @@ Accepted scope: `when`/`targetBy` are calendar dates stored as UTC midnight of t
 History: none
 
 ### R3-13: `search_context` with no query and no filters
+
 Finding: Section 2 Code quality, P3, confidence 8/10. Plan `search_context(query, ...)`: "`query` ... may be empty when filters are given", but the case where the query and every filter are empty is undefined. Reviewer: spec review R3-13.
 Plan baseline: undefined.
 Runtime evidence: none (no code yet).
 Comparison grid:
-| Choice | Current | A | B |
-|---|---|---|---|
-| R3-13 empty call | undefined | MCP tool error (isError): "Give a query or at least one filter. For a summary of the board, call get_overview." | treated as "most recent": the 10 most recently updated visible items, same budget as D18 |
-| Test | none | tests/api: empty call returns isError with that text | tests/api: empty call returns the 10 newest visible items |
-Question D23:
-D23 - What does an empty search return?
-Project/branch/task: main, whiteboard MCP tool `search_context`.
-ELI10: an agent can call search with no words and no filters. We can answer with a short error saying "give me something to search, or call get_overview for a summary", or quietly return your 10 newest cards. The error teaches the agent the right tool. The fallback always returns something but duplicates get_overview.
-Stakes if we pick wrong: small. The worst case is one wasted agent call, or an agent treating "newest 10" as if it were the whole board.
-Recommendation: A because get_overview already exists for "show me what's there", and an explicit error keeps the two tools' jobs separate.
-Note: options differ in kind, not coverage - no completeness score.
-Pros / cons:
-A) Error that points to get_overview (recommended)
-  ✅ Agents learn the right tool from the message and get_overview stays the one summary path
-  ✅ No second "recent items" code path to keep in step with get_overview's list
-  ❌ The agent spends one extra round trip if it called search with nothing by mistake
-B) Return the 10 newest items
-  ✅ Every call returns useful content and the agent never hits an error at all
-  ✅ Simple to explain: an empty search simply means show me what is recent
-  ❌ Duplicates get_overview and can mislead an agent into thinking 10 cards is everything
-Net: a teaching error versus a friendly but overlapping fallback.
-Header: Empty search
-Options:
-A) Error, point to get_overview (Recommended)
-isError result: "Give a query or at least one filter. For a summary of the board, call get_overview." tests/api asserts it. (human: ~15 min / CC: ~2 min). Risk low.
-B) Return 10 newest
-Empty call = 10 most recently updated visible items within the D18 budget. tests/api asserts it. (human: ~15 min / CC: ~2 min). Risk: overlap with get_overview.
+
+| Choice                                                                                                                                                                                                                                                                                                                          | Current   | A                                                                                                               | B                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| R3-13 empty call                                                                                                                                                                                                                                                                                                                | undefined | MCP tool error (isError): "Give a query or at least one filter. For a summary of the board, call get_overview." | treated as "most recent": the 10 most recently updated visible items, same budget as D18 |
+| Test                                                                                                                                                                                                                                                                                                                            | none      | tests/api: empty call returns isError with that text                                                            | tests/api: empty call returns the 10 newest visible items                                |
+| Question D23:                                                                                                                                                                                                                                                                                                                   |
+| D23 - What does an empty search return?                                                                                                                                                                                                                                                                                         |
+| Project/branch/task: main, whiteboard MCP tool `search_context`.                                                                                                                                                                                                                                                                |
+| ELI10: an agent can call search with no words and no filters. We can answer with a short error saying "give me something to search, or call get_overview for a summary", or quietly return your 10 newest cards. The error teaches the agent the right tool. The fallback always returns something but duplicates get_overview. |
+| Stakes if we pick wrong: small. The worst case is one wasted agent call, or an agent treating "newest 10" as if it were the whole board.                                                                                                                                                                                        |
+| Recommendation: A because get_overview already exists for "show me what's there", and an explicit error keeps the two tools' jobs separate.                                                                                                                                                                                     |
+| Note: options differ in kind, not coverage - no completeness score.                                                                                                                                                                                                                                                             |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                    |
+| A) Error that points to get_overview (recommended)                                                                                                                                                                                                                                                                              |
+| ✅ Agents learn the right tool from the message and get_overview stays the one summary path                                                                                                                                                                                                                                     |
+| ✅ No second "recent items" code path to keep in step with get_overview's list                                                                                                                                                                                                                                                  |
+| ❌ The agent spends one extra round trip if it called search with nothing by mistake                                                                                                                                                                                                                                            |
+| B) Return the 10 newest items                                                                                                                                                                                                                                                                                                   |
+| ✅ Every call returns useful content and the agent never hits an error at all                                                                                                                                                                                                                                                   |
+| ✅ Simple to explain: an empty search simply means show me what is recent                                                                                                                                                                                                                                                       |
+| ❌ Duplicates get_overview and can mislead an agent into thinking 10 cards is everything                                                                                                                                                                                                                                        |
+| Net: a teaching error versus a friendly but overlapping fallback.                                                                                                                                                                                                                                                               |
+| Header: Empty search                                                                                                                                                                                                                                                                                                            |
+| Options:                                                                                                                                                                                                                                                                                                                        |
+| A) Error, point to get_overview (Recommended)                                                                                                                                                                                                                                                                                   |
+| isError result: "Give a query or at least one filter. For a summary of the board, call get_overview." tests/api asserts it. (human: ~15 min / CC: ~2 min). Risk low.                                                                                                                                                            |
+| B) Return 10 newest                                                                                                                                                                                                                                                                                                             |
+| Empty call = 10 most recently updated visible items within the D18 budget. tests/api asserts it. (human: ~15 min / CC: ~2 min). Risk: overlap with get_overview.                                                                                                                                                                |
 
 State: approved
 Actual answer: A) Error, point to get_overview (Recommended) - D23
@@ -838,37 +865,39 @@ Accepted scope: a `search_context` call with an empty query and no filters retur
 History: none
 
 ### R3-16: un-hiding a frame whose children were never chosen
+
 Finding: Section 3 Tests / user flows, P2, confidence 8/10. Plan "Privacy" rule 1 (a hidden frame hides its children whatever their own flag) + "Showing visibility" (the child toggle is disabled while the frame is hidden) + `includeInAi` default true. Turning the frame's toggle back on makes every child readable at once. Reviewer: spec review R3-16.
 Plan baseline: un-hiding a frame is a single toggle, with no confirm.
 Runtime evidence: none (no code yet).
 Comparison grid:
-| Choice | Current | A | B |
-|---|---|---|---|
-| R3-16 un-hide flow | one toggle, children exposed silently | confirm dialog: "N items inside become agent-readable" with [Make all readable] / [Keep items private]. "Keep" writes `includeInAi: false` on each child in the same request as the frame change | children's own toggles stay editable while the frame is hidden ("readable once the frame is visible"), and un-hiding just applies them, no dialog |
-| Tests | none | tests/api: un-hide with keepChildrenPrivate -> children hidden; without -> readable. UI: dialog shows the count | tests/api: child flag edit while the frame is hidden persists; un-hide respects it |
-Question D24:
-D24 - What happens when you un-hide a private frame?
-Project/branch/task: main, whiteboard frame visibility toggle.
-ELI10: you can hide a whole frame ("Private") from agents. Cards inside it follow the frame, so you never decide about them one by one. If you later switch the frame back to visible, every card inside instantly becomes readable by Claude Code, including ones you only wrote because the frame was private. We can ask first, or let you set each card's own switch while the frame is still hidden.
-Stakes if we pick wrong: one click could expose a whole private area to agents with no warning. That's the exact leak this privacy design exists to prevent.
-Recommendation: A because the moment of un-hiding is when the risk appears, and a confirm with a "keep private" choice makes it a deliberate act.
-Completeness: A=10/10, B=8/10
-Pros / cons:
-A) Confirm on un-hide (recommended)
-  ✅ Shows how many cards become readable at the exact moment it matters
-  ✅ The "Keep items private" choice protects every card in a single click
-  ❌ One more dialog, plus a request flag the server has to apply atomically
-B) Per-card switches while hidden
-  ✅ Finer control, since you can pre-decide each card long before un-hiding
-  ✅ No dialog, because un-hiding does exactly what the switches already say
-  ❌ Default-true switches mean un-hiding still exposes every card you never touched
-Net: a warning at the risky moment versus finer control that still defaults to exposure.
-Header: Un-hide frame
-Options:
-A) Confirm on un-hide (Recommended)
-Dialog "N items inside become agent-readable" with [Make all readable] / [Keep items private]. Keep = includeInAi:false on each child in the same request. tests/api for both paths; the UI shows the count. (human: ~2h / CC: ~10 min). Risk low.
-B) Editable child switches
-Children's toggles stay live while the frame is hidden; un-hiding applies them without a dialog. tests/api for persistence. (human: ~1.5h / CC: ~8 min). Risk: untouched default-true cards still get exposed.
+
+| Choice                                                                                                                                                                                                                                                                                                                                                                                                    | Current                               | A                                                                                                                                                                                                | B                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R3-16 un-hide flow                                                                                                                                                                                                                                                                                                                                                                                        | one toggle, children exposed silently | confirm dialog: "N items inside become agent-readable" with [Make all readable] / [Keep items private]. "Keep" writes `includeInAi: false` on each child in the same request as the frame change | children's own toggles stay editable while the frame is hidden ("readable once the frame is visible"), and un-hiding just applies them, no dialog |
+| Tests                                                                                                                                                                                                                                                                                                                                                                                                     | none                                  | tests/api: un-hide with keepChildrenPrivate -> children hidden; without -> readable. UI: dialog shows the count                                                                                  | tests/api: child flag edit while the frame is hidden persists; un-hide respects it                                                                |
+| Question D24:                                                                                                                                                                                                                                                                                                                                                                                             |
+| D24 - What happens when you un-hide a private frame?                                                                                                                                                                                                                                                                                                                                                      |
+| Project/branch/task: main, whiteboard frame visibility toggle.                                                                                                                                                                                                                                                                                                                                            |
+| ELI10: you can hide a whole frame ("Private") from agents. Cards inside it follow the frame, so you never decide about them one by one. If you later switch the frame back to visible, every card inside instantly becomes readable by Claude Code, including ones you only wrote because the frame was private. We can ask first, or let you set each card's own switch while the frame is still hidden. |
+| Stakes if we pick wrong: one click could expose a whole private area to agents with no warning. That's the exact leak this privacy design exists to prevent.                                                                                                                                                                                                                                              |
+| Recommendation: A because the moment of un-hiding is when the risk appears, and a confirm with a "keep private" choice makes it a deliberate act.                                                                                                                                                                                                                                                         |
+| Completeness: A=10/10, B=8/10                                                                                                                                                                                                                                                                                                                                                                             |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                                                                                              |
+| A) Confirm on un-hide (recommended)                                                                                                                                                                                                                                                                                                                                                                       |
+| ✅ Shows how many cards become readable at the exact moment it matters                                                                                                                                                                                                                                                                                                                                    |
+| ✅ The "Keep items private" choice protects every card in a single click                                                                                                                                                                                                                                                                                                                                  |
+| ❌ One more dialog, plus a request flag the server has to apply atomically                                                                                                                                                                                                                                                                                                                                |
+| B) Per-card switches while hidden                                                                                                                                                                                                                                                                                                                                                                         |
+| ✅ Finer control, since you can pre-decide each card long before un-hiding                                                                                                                                                                                                                                                                                                                                |
+| ✅ No dialog, because un-hiding does exactly what the switches already say                                                                                                                                                                                                                                                                                                                                |
+| ❌ Default-true switches mean un-hiding still exposes every card you never touched                                                                                                                                                                                                                                                                                                                        |
+| Net: a warning at the risky moment versus finer control that still defaults to exposure.                                                                                                                                                                                                                                                                                                                  |
+| Header: Un-hide frame                                                                                                                                                                                                                                                                                                                                                                                     |
+| Options:                                                                                                                                                                                                                                                                                                                                                                                                  |
+| A) Confirm on un-hide (Recommended)                                                                                                                                                                                                                                                                                                                                                                       |
+| Dialog "N items inside become agent-readable" with [Make all readable] / [Keep items private]. Keep = includeInAi:false on each child in the same request. tests/api for both paths; the UI shows the count. (human: ~2h / CC: ~10 min). Risk low.                                                                                                                                                        |
+| B) Editable child switches                                                                                                                                                                                                                                                                                                                                                                                |
+| Children's toggles stay live while the frame is hidden; un-hiding applies them without a dialog. tests/api for persistence. (human: ~1.5h / CC: ~8 min). Risk: untouched default-true cards still get exposed.                                                                                                                                                                                            |
 
 State: approved
 Actual answer: A) Confirm on un-hide (Recommended) - D24
@@ -876,37 +905,39 @@ Accepted scope: switching a hidden frame to visible opens a confirm, "N items in
 History: none
 
 ### R3-18: telling you what an export left out
+
 Finding: Section 3 Tests / user flows, P2, confidence 8/10. Plan "Routes > POST /api/admin/whiteboard/context": every scope passes through `loadAgentVisible`, so a hidden frame exports empty and hidden items in a selection are dropped silently. Reviewer: spec review R3-18.
 Plan baseline: the response is markdown only, with no signal about exclusions.
 Runtime evidence: none (no code yet).
 Comparison grid:
-| Choice | Current | A | B |
-|---|---|---|---|
-| R3-18 drawer notice | none | response `{ markdown, excludedCount, scopeHidden }`; drawer shows "3 selected items are hidden and not included" / "This frame is hidden from AI - nothing to export" above the preview; Copy is disabled when the export is empty | markdown only, no notice |
-| Tests | none | tests/api: excludedCount for a mixed selection, scopeHidden for a hidden frame | none |
-Question D25:
-D25 - Should the export drawer say what it left out?
-Project/branch/task: main, whiteboard Export to AI drawer (`POST /api/admin/whiteboard/context`).
-ELI10: the export runs through the privacy filter, so hidden cards never get copied. But the drawer doesn't tell you. Pick a hidden frame and you get an empty export. Select 10 cards where 3 are hidden and you silently get 7. A one-line notice ("3 selected items are hidden") makes the filter visible.
-Stakes if we pick wrong: you paste an export into ChatGPT believing it holds your whole plan, and the AI answers without the 3 cards that mattered.
-Recommendation: A because it's one count in the response and one line of UI, and it turns a silent gap into a visible one.
-Completeness: A=10/10, B=5/10
-Pros / cons:
-A) Show an excluded-items notice (recommended)
-  ✅ You always know when the copy is missing cards, and exactly how many
-  ✅ An empty export disables Copy instead of handing you a blank page to paste
-  ❌ One more response field and a notice state to test on the server and in the drawer
-B) No notice
-  ✅ Nothing extra to build, and the drawer stays exactly as the plan designed it
-  ✅ The privacy filter still works the same, so hidden cards are never leaked
-  ❌ Silent gaps: you can paste an incomplete export without ever realising it
-Net: one count and one line of UI versus exports that are quietly incomplete.
-Header: Export notice
-Options:
-A) Show excluded notice (Recommended)
-Response { markdown, excludedCount, scopeHidden }. The drawer shows "N selected items are hidden and not included" or "This frame is hidden from AI"; Copy is disabled when empty. tests/api for both. (human: ~1h / CC: ~5 min). Risk low.
-B) No notice
-Markdown only. (human: 0 / CC: 0). Risk: silently incomplete exports.
+
+| Choice                                                                                                                                                                                                                                                                                                        | Current | A                                                                                                                                                                                                                                  | B                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| R3-18 drawer notice                                                                                                                                                                                                                                                                                           | none    | response `{ markdown, excludedCount, scopeHidden }`; drawer shows "3 selected items are hidden and not included" / "This frame is hidden from AI - nothing to export" above the preview; Copy is disabled when the export is empty | markdown only, no notice |
+| Tests                                                                                                                                                                                                                                                                                                         | none    | tests/api: excludedCount for a mixed selection, scopeHidden for a hidden frame                                                                                                                                                     | none                     |
+| Question D25:                                                                                                                                                                                                                                                                                                 |
+| D25 - Should the export drawer say what it left out?                                                                                                                                                                                                                                                          |
+| Project/branch/task: main, whiteboard Export to AI drawer (`POST /api/admin/whiteboard/context`).                                                                                                                                                                                                             |
+| ELI10: the export runs through the privacy filter, so hidden cards never get copied. But the drawer doesn't tell you. Pick a hidden frame and you get an empty export. Select 10 cards where 3 are hidden and you silently get 7. A one-line notice ("3 selected items are hidden") makes the filter visible. |
+| Stakes if we pick wrong: you paste an export into ChatGPT believing it holds your whole plan, and the AI answers without the 3 cards that mattered.                                                                                                                                                           |
+| Recommendation: A because it's one count in the response and one line of UI, and it turns a silent gap into a visible one.                                                                                                                                                                                    |
+| Completeness: A=10/10, B=5/10                                                                                                                                                                                                                                                                                 |
+| Pros / cons:                                                                                                                                                                                                                                                                                                  |
+| A) Show an excluded-items notice (recommended)                                                                                                                                                                                                                                                                |
+| ✅ You always know when the copy is missing cards, and exactly how many                                                                                                                                                                                                                                       |
+| ✅ An empty export disables Copy instead of handing you a blank page to paste                                                                                                                                                                                                                                 |
+| ❌ One more response field and a notice state to test on the server and in the drawer                                                                                                                                                                                                                         |
+| B) No notice                                                                                                                                                                                                                                                                                                  |
+| ✅ Nothing extra to build, and the drawer stays exactly as the plan designed it                                                                                                                                                                                                                               |
+| ✅ The privacy filter still works the same, so hidden cards are never leaked                                                                                                                                                                                                                                  |
+| ❌ Silent gaps: you can paste an incomplete export without ever realising it                                                                                                                                                                                                                                  |
+| Net: one count and one line of UI versus exports that are quietly incomplete.                                                                                                                                                                                                                                 |
+| Header: Export notice                                                                                                                                                                                                                                                                                         |
+| Options:                                                                                                                                                                                                                                                                                                      |
+| A) Show excluded notice (Recommended)                                                                                                                                                                                                                                                                         |
+| Response { markdown, excludedCount, scopeHidden }. The drawer shows "N selected items are hidden and not included" or "This frame is hidden from AI"; Copy is disabled when empty. tests/api for both. (human: ~1h / CC: ~5 min). Risk low.                                                                   |
+| B) No notice                                                                                                                                                                                                                                                                                                  |
+| Markdown only. (human: 0 / CC: 0). Risk: silently incomplete exports.                                                                                                                                                                                                                                         |
 
 State: approved
 Actual answer: A) Show excluded notice (Recommended) - D25
@@ -914,39 +945,445 @@ Accepted scope: `POST /api/admin/whiteboard/context` returns `{ markdown, exclud
 History: none
 
 ### T1: browser (Playwright) coverage for the canvas flows
+
 Finding: Section 3 Tests, P2, confidence 8/10. The plan's tests are `tests/unit` + `tests/api` only. The E2E decision matrix flags three flows as E2E-worthy (data destruction, privacy, multi-component save): (1) draw card -> autosave -> reload -> still there; (2) delete a frame -> confirm -> restore from backup -> back; (3) mark a card hidden -> Export drawer excludes it and shows the D25 notice. The repo has an owner-cookie e2e harness (`tests/e2e/global-setup.ts` mints the cookie; `bun run test:e2e:local` uses a throwaway DB). Reviewer: Claude (eng review).
 Plan baseline: no e2e for the whiteboard. (The per-handler owner-gate spec `tests/e2e/whiteboard-owner-gate.spec.ts`, mirroring `blog-owner-gate.spec.ts`, is required proof of the approved `requireOwner` rule and is common work, not part of this choice.)
 Runtime evidence: `tests/e2e/blog-owner-gate.spec.ts` and `global-setup.ts` exist and use a disposable DB (AGENTS.md).
 Comparison grid:
-| Choice | Current | A | B |
-|---|---|---|---|
-| T1 canvas e2e | none | `tests/e2e/whiteboard.spec.ts` with the 3 flows (persist-after-reload, delete+restore round-trip, hidden-card export notice), against the prod build like the blog specs | none; rely on unit (save queue, serializer) + tests/api (routes, privacy, restore) |
-| Owner-gate spec | required (common) | kept | kept |
-Question D26:
-D26 - Add browser tests for the three risky canvas flows?
-Project/branch/task: main, whiteboard tests (`tests/e2e`).
-ELI10: unit and API tests prove each piece works alone. They don't prove that drawing a card in the real page, reloading, deleting a frame and restoring it, or hiding a card and exporting all work end to end in a browser. The repo already runs Playwright against a production build with a throwaway database, so adding one spec file with three flows is cheap.
-Stakes if we pick wrong: a wiring bug between the canvas, the save queue and the routes (the card saves but never reloads) ships unnoticed, because every piece passes its own test.
-Recommendation: A because these three flows touch your data's survival and privacy, and the harness already exists, so it's one file.
-Completeness: A=10/10, B=8/10
-Pros / cons:
-A) Add 3 Playwright flows (recommended)
-  ✅ Proves save, reload, delete, restore and export privacy in a real browser end to end
-  ✅ Reuses the existing owner-cookie harness and disposable DB, so it's one new spec file
-  ❌ Slower suite: e2e builds and starts production, adding a few minutes per run
-B) Unit + API tests only
-  ✅ Fast feedback loop, since everything runs in vitest without a production build
-  ✅ The pieces are still well covered: serializer, queue, routes, privacy and restore
-  ❌ Wiring bugs between canvas, queue and routes only show up when you use it
-Net: a few minutes of e2e per run versus trusting that the pieces fit together.
-Header: Canvas e2e
-Options:
-A) Add 3 Playwright flows (Recommended)
-tests/e2e/whiteboard.spec.ts: (1) card persists after reload, (2) delete frame -> restore brings it back, (3) hidden card is left out of the export and the notice shows. Runs via test:e2e:local. (human: ~4h / CC: ~20 min). Risk low.
-B) Unit + API only
-No canvas e2e. The owner-gate e2e spec is still added (required). (human: 0 / CC: 0). Risk: integration bugs caught by hand.
+
+| Choice                                                                                                                                                                                                                                                                                                                                                                  | Current           | A                                                                                                                                                                        | B                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| T1 canvas e2e                                                                                                                                                                                                                                                                                                                                                           | none              | `tests/e2e/whiteboard.spec.ts` with the 3 flows (persist-after-reload, delete+restore round-trip, hidden-card export notice), against the prod build like the blog specs | none; rely on unit (save queue, serializer) + tests/api (routes, privacy, restore) |
+| Owner-gate spec                                                                                                                                                                                                                                                                                                                                                         | required (common) | kept                                                                                                                                                                     | kept                                                                               |
+| Question D26:                                                                                                                                                                                                                                                                                                                                                           |
+| D26 - Add browser tests for the three risky canvas flows?                                                                                                                                                                                                                                                                                                               |
+| Project/branch/task: main, whiteboard tests (`tests/e2e`).                                                                                                                                                                                                                                                                                                              |
+| ELI10: unit and API tests prove each piece works alone. They don't prove that drawing a card in the real page, reloading, deleting a frame and restoring it, or hiding a card and exporting all work end to end in a browser. The repo already runs Playwright against a production build with a throwaway database, so adding one spec file with three flows is cheap. |
+| Stakes if we pick wrong: a wiring bug between the canvas, the save queue and the routes (the card saves but never reloads) ships unnoticed, because every piece passes its own test.                                                                                                                                                                                    |
+| Recommendation: A because these three flows touch your data's survival and privacy, and the harness already exists, so it's one file.                                                                                                                                                                                                                                   |
+| Completeness: A=10/10, B=8/10                                                                                                                                                                                                                                                                                                                                           |
+| Pros / cons:                                                                                                                                                                                                                                                                                                                                                            |
+| A) Add 3 Playwright flows (recommended)                                                                                                                                                                                                                                                                                                                                 |
+| ✅ Proves save, reload, delete, restore and export privacy in a real browser end to end                                                                                                                                                                                                                                                                                 |
+| ✅ Reuses the existing owner-cookie harness and disposable DB, so it's one new spec file                                                                                                                                                                                                                                                                                |
+| ❌ Slower suite: e2e builds and starts production, adding a few minutes per run                                                                                                                                                                                                                                                                                         |
+| B) Unit + API tests only                                                                                                                                                                                                                                                                                                                                                |
+| ✅ Fast feedback loop, since everything runs in vitest without a production build                                                                                                                                                                                                                                                                                       |
+| ✅ The pieces are still well covered: serializer, queue, routes, privacy and restore                                                                                                                                                                                                                                                                                    |
+| ❌ Wiring bugs between canvas, queue and routes only show up when you use it                                                                                                                                                                                                                                                                                            |
+| Net: a few minutes of e2e per run versus trusting that the pieces fit together.                                                                                                                                                                                                                                                                                         |
+| Header: Canvas e2e                                                                                                                                                                                                                                                                                                                                                      |
+| Options:                                                                                                                                                                                                                                                                                                                                                                |
+| A) Add 3 Playwright flows (Recommended)                                                                                                                                                                                                                                                                                                                                 |
+| tests/e2e/whiteboard.spec.ts: (1) card persists after reload, (2) delete frame -> restore brings it back, (3) hidden card is left out of the export and the notice shows. Runs via test:e2e:local. (human: ~4h / CC: ~20 min). Risk low.                                                                                                                                |
+| B) Unit + API only                                                                                                                                                                                                                                                                                                                                                      |
+| No canvas e2e. The owner-gate e2e spec is still added (required). (human: 0 / CC: 0). Risk: integration bugs caught by hand.                                                                                                                                                                                                                                            |
 
 State: approved
 Actual answer: A) Add 3 Playwright flows (Recommended) - D26
 Accepted scope: `tests/e2e/whiteboard.spec.ts` (owner storage state from global-setup, prod build, `test:e2e:local`) with three flows: (1) a card persists after autosave + reload; (2) delete a frame -> confirm -> restore from backup brings the frame, children and links back; (3) a hidden card is left out of the export and the D25 notice shows. The owner-gate spec `tests/e2e/whiteboard-owner-gate.spec.ts` stays required (common).
 History: none
+
+### Section 4: Performance (resumed session, 2026-09-23)
+
+The earlier session covered Architecture, Code Quality and Tests (D15-D26) and stopped before Performance. This session resumed from there. It did not reopen D15-D26.
+
+- **D27 - ink bbox, agent reads skip points.** Finding: P1, confidence 8/10. Plan quotes `ink { points: [x, y, pressure][] }, <= 2,000 points` and the ink neighbour rule, which needs only a bounding box. Every agent read (drawer preview every ~400 ms, `context.md`, each MCP call, `get_overview` counts) would load every point, roughly 50 KB per stroke. Answer: **A) Stored bbox (Recommended)**. Accepted scope: the server derives `ink.bbox` from points on every create/PATCH/restore and ignores any client or file value. `loadAgentVisible` projects out `ink.points`. Counts use `countDocuments` / aggregate. Search-path ink labels are computed over all visible items, loaded bbox-only. Tests: unit bbox derivation (incl. a restore file with a wrong bbox), tests/api "no agent-facing response or read contains points".
+- **D28 - ordered stream, batched state, memoized ink.** Finding: P1 (correctness + perf), confidence 8/10. Plan quote: `GET /api/admin/whiteboard - all items + links ... streamed as NDJSON` with child `x, y` relative to the parent. React Flow requires a parent node before its children, and the stream order was unspecified. Answer: **A) Ordered + batched (Recommended)**. Accepted scope: stream order is frames, then other items, then links (tests/api asserts it). The client batches parsed lines into state per chunk / animation frame. The ink node memoizes its path on `points`. `onlyRenderVisibleElements` is on. Drag positions save on drag stop.
+- **D29 - throttled `lastUsedAt`.** Finding: P3, confidence 7/10. Every tool call already writes once for the rate limit (`src/lib/rate-limit.ts:79`, `findByIdAndUpdate(... upsert: true)`), and the touch would be a second write. Answer: **A) Throttled 5 min (Recommended)**. Accepted scope: a conditional `updateOne` that writes only when `lastUsedAt` is null or older than 5 minutes, scheduled with `after()` from `next/server` (verified present: `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/after.md`). An un-awaited promise can be cut off when a Vercel function returns, so `after()` is used, not a fire-and-forget promise. Errors are logged and never fail the request. Test: two calls within 5 minutes cause one write.
+- **D30 - undo/redo** (TODOS.md review): **A) Add to TODOS.md (Recommended)**. Not in v1. Captured in `TODOS.md` > Whiteboard with the delete-recreate caveat.
+
+Outside voice: skipped. This doc already carries a Codex cold read (office-hours) and a 19-item, 3-round spec review (R3-1..R3-19). Run `/codex review` on the doc if a second model is wanted before building.
+
+### Common work added by this session (proof of approved behavior, no new approval)
+
+Same category as the D11 ledger above: tests that prove behavior the doc already promises but that no planned test asserted.
+
+- Agent routes: the 121st request in a 10-minute window gets 429 **before** token verification (a bad token still counts). A token in the query string is ignored (401). A token-lookup DB error returns 503, never 200 (Scope 4).
+- Every whiteboard route response carries `Cache-Control: no-store, private` (one tests/api table test over all routes).
+- `limits.ts` unit tests: every cap, the single-line rule, and the same verdicts on client and server imports.
+- Save queue unit tests: 5xx/network retries with backoff; a 4xx is permanent and drops dependent writes.
+- Frame join/leave coordinate conversion (absolute <-> relative, centre-inside rule) as a pure helper with unit tests.
+
+### What already exists (reuse, do not rebuild)
+
+| Need                        | Existing code                                                            | Plan uses it?                                                         |
+| --------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Owner gate on UI routes     | `src/lib/require-owner.ts`, `src/lib/admin-gate.ts`                      | Yes, every `/api/admin/whiteboard/*` handler                          |
+| Owner page shell            | `OwnerAuthGate`, `AdminChrome`, `AdminBackdrop`, hub `BOARDS`            | Yes                                                                   |
+| Error / body helpers        | `jsonError` (`api-response.ts`), `readJsonBody` with `maxBytes`          | Yes (256 KB items, 2 MB restore)                                      |
+| Rate limiting               | `checkRateLimit` + named limits in `src/lib/rate-limit.ts`               | Yes, new `WHITEBOARD_AGENT_LIMIT`                                     |
+| Model compile               | `compileModel` (`src/lib/mongoose-model.ts`)                             | Yes, all 3 new models                                                 |
+| Dropdowns                   | `SelectField`                                                            | Yes, Meaning / Status / scope picker                                  |
+| Env                         | `getRequiredEnv`                                                         | Nothing new needed (tokens live in Mongo)                             |
+| Deferred work after respond | `after()` from `next/server`                                             | Yes (D29)                                                             |
+| e2e owner harness           | `tests/e2e/global-setup.ts`, `blog-owner-gate.spec.ts`, `test:e2e:local` | Yes (D26 + owner-gate spec)                                           |
+| Real mongod in tests        | `tests/api` + `mongodb-memory-server`                                    | Yes (text index `default_language: 'none'` must be built in the test) |
+
+Nothing in the plan rebuilds an existing piece.
+
+### NOT in scope (v1)
+
+- Agent writes / ghost cards - v2. Agents are read-only in v1 (premise 5).
+- MCP `whiteboard://context` resource - cut (D15). Overflows the 25k-token MCP output cap.
+- Undo/redo - `TODOS.md` (D30).
+- Summarised export past 1 MB - v2. v1 truncates by priority and points at `search_context`.
+- OCR or any reading of ink - never pretended. Ink is `[Sketch near: ...]`.
+- Real-time multi-tab conflict detection - last write wins, one owner (stated).
+- JSON Canvas import/export, in-app chat, cited-answer highlighting, belief timeline - v2 list.
+- Bulk delete route - multi-delete is per item through the queue (R3-19).
+- Drawing on phone width - view, pan and inspector only.
+- Converting the 8 legacy models to `compileModel` - open repo cleanup, not this feature.
+
+### Test coverage diagram (planned tests vs planned code paths)
+
+```
+CODE PATHS                                              USER FLOWS
+[+] lib/whiteboard/context.ts (pure)                    [+] Build the board
+  ├ grouping frame > meaning > item   [★★★ unit, step1]   ├ card persists after reload     [★★★ →E2E D26]
+  ├ untitled / in+out links / outside [★★★ unit]          ├ frame drag moves children      [GAP→ unit: coord helper]
+  ├ truncated-target + priority       [★★★ unit R3-10]    ├ child into unsaved frame       [★★★ unit queue R3-3]
+  ├ ink near-labels, hidden neighbour [★★★ unit]          └ label edit on edge             [★★ api D19]
+  ├ escaping # ]] > in title/body/todo[★★★ unit]
+  ├ date rule + VN boundary           [★★★ unit D22]      [+] Delete + recover
+  └ D18 budget clipping               [★★★ unit]            ├ delete frame -> restore       [★★★ →E2E D26]
+[+] lib/whiteboard/limits.ts                                ├ batched restore + re-run      [★★★ api D21]
+  └ caps, single-line                 [added: unit]         └ deleted id never recreated    [★★★ unit R3-6]
+[+] lib/whiteboard/data.ts
+  ├ loadAgentVisible rules 1-10       [★★★ api]           [+] Privacy
+  ├ bulk PATCH rule 8 + all-or-none   [★★★ api R3-2]        ├ hidden card not in export    [★★★ →E2E D26]
+  ├ delete order + dangling tolerance [★★★ api]             ├ un-hide confirm both paths   [★★★ api D24]
+  ├ ink.bbox derive / no points out   [added: unit+api D27] ├ drawer excluded notice       [★★★ api D25]
+  └ NDJSON order frames>items>links   [added: api D28]      └ drag out, then edit -> hidden[★★★ api R3-1]
+[+] lib/whiteboard/token.ts
+  ├ create/list(no hash)/revoke       [★★★ api]           [+] Agent access
+  ├ unknown == revoked                [★★★ api]             ├ 401 missing/unknown/revoked  [★★★ api]
+  ├ DB error -> 503                   [added: api]          ├ REQUIRE_ADMIN=false no bypass[★★★ api]
+  └ throttled touch                   [added: api D29]      ├ 429 before verify            [added: api]
+[+] app/api/whiteboard/mcp (mcp-handler)                    ├ ?token= ignored              [added: api]
+  ├ initialize/ping/list/call/notif   [★★★ api]             ├ Vietnamese search            [★★★ api]
+  ├ GET/DELETE 405, unknown req -32601[★★★ api]             └ real Claude Code session     [manual, step 8]
+  ├ malformed id == unknown           [★★★ api R3-14]
+  └ empty search -> isError           [★★★ api D23]       [+] Every route: no-store header [added: api]
+[+] useSaveQueue
+  ├ 5xx retry / 4xx permanent         [added: unit]
+  └ bulk reject re-queues others      [★★★ unit R3-15]
+
+COVERAGE (planned): every code path and user flow above has a planned test after this session.
+GAPS closed this session: 10 (all added as common work or D27-D29). Remaining: 0. E2E: 3 (D26). Evals: none (no LLM call in the app).
+```
+
+Test plan for `/qa`: [whiteboard-plan.md](whiteboard-plan.md).
+
+### Failure modes
+
+| New path                 | Realistic production failure                  | Test          | Handling                                           | User sees                |
+| ------------------------ | --------------------------------------------- | ------------- | -------------------------------------------------- | ------------------------ |
+| Canvas NDJSON load       | child line before its frame                   | api (D28)     | fixed stream order                                 | n/a (prevented)          |
+| Canvas NDJSON load       | stream cut mid-way (network)                  | unit (parser) | client shows "Failed to load - retry", no save     | clear error              |
+| Save queue               | 5xx storm / offline                           | unit          | backoff retry, pill "Failed - retry", beforeunload | clear                    |
+| Bulk PATCH               | one bad entry                                 | unit + api    | named entry marked, others re-queued (R3-15)       | clear                    |
+| Move out of hidden frame | client merges stale `includeInAi: true`       | api (R3-1)    | only-changed-fields PATCH + server doc merge       | badge stays              |
+| Delete sequence          | function dies between steps                   | api           | dangling links ignored, orphan reads hidden        | silent but safe          |
+| Restore                  | batch 3 of 5 fails                            | api (D21)     | idempotent, re-run converges                       | clear "re-run to finish" |
+| Agent token verify       | Mongo down                                    | api (added)   | 503, never grants                                  | agent gets error         |
+| Rate limit               | Mongo down -> fails open (`rate-limit.ts:92`) | existing      | token check still fails closed                     | n/a                      |
+| MCP tool                 | huge board answer                             | unit (D18)    | 32k-char budget + pointers                         | clear markers            |
+| Agent reads              | many ink strokes slow every call              | api (D27)     | points projected out                               | n/a (prevented)          |
+| lastUsedAt touch         | write fails                                   | api (D29)     | logged in `after()`, request unaffected            | none (fine)              |
+
+Critical gaps (no test AND no handling AND silent): **0**.
+
+### Worktree parallelization
+
+| Step                                  | Modules touched                                                                   | Depends on       |
+| ------------------------------------- | --------------------------------------------------------------------------------- | ---------------- |
+| 1 serializer + limits                 | `src/lib/whiteboard/`, `tests/unit/`                                              | -                |
+| 2 models + data.ts                    | `src/models/`, `src/lib/whiteboard/`, `tests/api/`                                | 1                |
+| 3 UI routes + hub card                | `src/app/api/admin/whiteboard/`, `src/app/(admin)/admin/`                         | 2                |
+| 4-6 canvas, shapes/ink, export drawer | `src/components/whiteboard/`, `src/app/(admin)/admin/whiteboard/`                 | 3 (API contract) |
+| 7-8 token + agent routes + MCP        | `src/lib/whiteboard/token.ts`, `src/app/api/whiteboard/`, `src/lib/rate-limit.ts` | 2                |
+| e2e                                   | `tests/e2e/`                                                                      | 4-6, 7           |
+
+- Lane A: 1 -> 2 (sequential, shared `src/lib/whiteboard/`).
+- Then, in parallel: Lane B: 3 -> 4-6 (UI) and Lane C: 7-8 (agent side).
+- Then e2e once B and C merge.
+- Conflict flag: B and C both touch `src/lib/whiteboard/` (C adds `token.ts`, B may extend `data.ts`). Keep `data.ts` frozen after Lane A, or merge C first.
+
+## Implementation Tasks
+
+Synthesized from this review's findings (both sessions). Each task derives from a specific finding above.
+
+- [ ] **T1 (P1, human: ~1d / CC: ~40min)** - context.ts + limits.ts - build the serializer and shared limits with the full step-1 unit suite
+  - Surfaced by: premises + R3-10, R3-11, D18, D22
+  - Files: `src/lib/whiteboard/context.ts`, `src/lib/whiteboard/limits.ts`, `tests/unit/whiteboard-context.test.ts`, `tests/unit/whiteboard-limits.test.ts`
+  - Verify: `bunx vitest run tests/unit/whiteboard-*.test.ts`
+- [ ] **T2 (P1, human: ~1d / CC: ~45min)** - models + data.ts - models, `loadAgentVisible` rules 1-10, validation, delete order, bulk rule 8, ink bbox
+  - Surfaced by: R3-1, R3-2, R3-4, R3-6, D27
+  - Files: `src/models/Whiteboard{Item,Link,Token}.ts`, `src/lib/whiteboard/data.ts`, `tests/api/whiteboard-*.test.ts`
+  - Verify: `bun run test:api`
+- [ ] **T3 (P1, human: ~1d / CC: ~40min)** - UI routes - CRUD, bulk PATCH, link PATCH, context, ordered NDJSON load, streamed backup, batched restore, no-store headers
+  - Surfaced by: D19, D20, D21, D24, D25, D28
+  - Files: `src/app/api/admin/whiteboard/**`
+  - Verify: `bun run test:api`; `tests/e2e/whiteboard-owner-gate.spec.ts`
+- [ ] **T4 (P1, human: ~2d / CC: ~1.5h)** - canvas - React Flow page, nodes, inspector, save queue, frames, delete confirm, backup/restore UI, batched load, memoized ink
+  - Surfaced by: R3-3, R3-6, R3-7, R3-15, R3-19, D28
+  - Files: `src/app/(admin)/admin/whiteboard/`, `src/components/whiteboard/`, `tests/unit/whiteboard-save-queue.test.ts`
+  - Verify: `bun run typecheck && bun run lint`; manual draw/reload
+- [ ] **T5 (P2, human: ~4h / CC: ~20min)** - export drawer - scope picker, server preview, excluded notice, Copy disabled when empty
+  - Surfaced by: D25
+  - Files: `src/components/whiteboard/ExportDrawer.tsx`
+  - Verify: tests/api excludedCount / scopeHidden
+- [ ] **T6 (P1, human: ~4h / CC: ~20min)** - token.ts + panel - create/list/revoke, fail-closed verify, throttled touch in `after()`, `${VAR}` connect command
+  - Surfaced by: Scope 3, Scope 4, D29
+  - Files: `src/lib/whiteboard/token.ts`, `src/app/api/admin/whiteboard/tokens/**`, `src/lib/rate-limit.ts`
+  - Verify: tests/api token suite incl. 503 + one-write-per-5-min
+- [ ] **T7 (P1, human: ~1d / CC: ~40min)** - agent routes - `context.md` + MCP via mcp-handler, 3 tools, budget, 405/202/-32601, 429-before-verify, query token ignored
+  - Surfaced by: D15, D17, D18, D23, R3-14
+  - Files: `src/app/api/whiteboard/context.md/route.ts`, `src/app/api/whiteboard/mcp/route.ts`, `tests/api/whiteboard-agent.test.ts`
+  - Verify: `bun run test:api`; then a real `claude mcp add --scope user` session
+- [ ] **T8 (P2, human: ~4h / CC: ~20min)** - e2e - the three D26 flows
+  - Surfaced by: D26
+  - Files: `tests/e2e/whiteboard.spec.ts`
+  - Verify: `bun run test:e2e:local`
+
+## Completion summary
+
+- Step 0: Scope Challenge - scope accepted as-is (D15 cut the MCP resource, D16 kept the arrangement)
+- Architecture Review: 9 issues (S1/D17, R3-9/D18, R3-5/D19, R3-17/D20, A6/D21, Scope 2, Scope 4, R3-1..R3-4, R3-6..R3-8 as common work)
+- Code Quality Review: 2 issues (D22, D23) + R3-10, R3-11, R3-14, R3-15, R3-19 as common work
+- Test Review: diagram produced, 10 gaps closed this session, 0 remaining (plus D24, D25, D26 earlier)
+- Performance Review: 3 issues (D27, D28, D29)
+- NOT in scope: written
+- What already exists: written
+- TODOS.md updates: 1 item proposed, 1 added (D30)
+- Failure modes: 0 critical gaps flagged
+- Outside voice: skipped (Codex cold read + 3-round spec review already in doc)
+- Parallelization: 3 lanes, 2 parallel / 1 sequential (A first)
+- Lake Score: 16/16 recommendations chose the complete option
+
+## Design Review (/plan-design-review, 2026-09-23)
+
+Target: this doc, at `f9dd527` plus the uncommitted eng-review edits. Decision ids are **DR1-DR12**, so they don't collide with the office-hours / eng-review D-numbers above. No DESIGN.md exists. The `pp-*` tokens in `src/styles/globals.css` + `tailwind.config.ts` are the design system, and they are enough for an owner tool, so `/design-consultation` is not recommended. The designer binary is not installed, so the approved wireframe is hand-built HTML on the real tokens, screenshotted with headless Chrome.
+
+Initial design completeness: **5/10.** Behaviour was specified in depth. What the owner sees was not: card visuals, meaning styling, the empty board, where the secondary surfaces live, body editing and states.
+
+### Approved Mockups
+
+| Screen                   | Mockup path                                                                            | Direction                                                                            | Notes                                           |
+| ------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| Board, one card selected | `~/.gstack/projects/NaKMiers-Port4lio/designs/whiteboard-20260923/wireframe-board.png` | Framed app, top bar, floating rail, always-open 320px inspector, meaning chips (DR2) | Shows Body field (DR10), one unsaved card (DR4) |
+| Empty board              | `.../whiteboard-20260923/wireframe-empty.png`                                          | Left-aligned prompt "Put down one true thing." + privacy line + 3 actions            | Export to AI disabled here (DR4)                |
+| Multi-select             | `.../whiteboard-20260923/wireframe-multi.png`                                          | Inspector summary + bulk meaning / AI toggle / export / delete (DR11)                |                                                 |
+
+Source: `.../whiteboard-20260923/wireframe.html` (set `window.WB_MODE` to `board` / `empty` / `multi`). Approval record: `approved.json`.
+
+### Layout and hierarchy (Pass 1: 6 -> 9)
+
+```
+┌ frame (p-4 around, rounded-panel, pp-line) ───────────────────────────────────────────────┐
+│ [grid] Whiteboard (Saved)                     [EyeOff 4 hidden] [Backup v] [Agents 1] [Export to AI] │  56px
+├──────────────────────────────────────────────────────────────────────────┬──────────────┤
+│ ┌rail┐                                                                    │ Inspector    │
+│ │ V  │   canvas: dot grid, frames (title tab), cards, edges with label    │ 320px        │
+│ │ T L│   pills, ink strokes, shapes                                       │ single /     │
+│ │ROD │                                                                    │ none / multi │
+│ │ F  │                                             ┌ Export sheet 480px ┐ │              │
+│ │ A  │                                             │ (non-modal, DR3)   │ │              │
+│ │ P E│                                             └────────────────────┘ │              │
+│ └────┘  [- 100% + fit]                                                    │              │
+└──────────────────────────────────────────────────────────────────────────┴──────────────┘
+```
+
+- What you see first: your cards and their meaning chips. Second: frame titles and hidden areas. Third: the one primary action, Export to AI.
+- **DR2** (approved wireframe): the framed-app layout above. `AdminHomeLink` is hidden on this route. The grid icon at top-left goes back to `/admin`.
+- **DR3** - secondary surfaces: **Export to AI** = a 480px non-modal right sheet over the inspector. Esc closes it. The canvas stays live, so the Selection scope follows the canvas selection. **Agents** = a popover under its button: token list, create, connect steps. **Backup** = a menu with Download backup / Restore from backup. Restore preview + confirm go in `ConfirmDialog`.
+- The `EyeOff N hidden` chip counts effectively hidden items. Clicking it pulses their outlines once (reduced motion: no pulse, the count only).
+
+### Card and meaning visual spec (Passes 4-5)
+
+- **DR7** - `src/components/whiteboard/meaning-style.ts` exports `MEANING_STYLE: Record<Meaning | 'none', { label, Icon, chipCls }>`, the only place meaning colours live. It is used by the card chip, the inspector SelectField options, the export filter chips, the hidden legend and the multi-select summary.
+
+  | Meaning | Icon (lucide)   | Chip text       | Fill / border                                  |
+  | ------- | --------------- | --------------- | ---------------------------------------------- |
+  | goal    | `Target`        | `pp-ink-blue`   | `bg-pp-blue/10 border-pp-blue/30`              |
+  | dream   | `Moon`          | `pp-ink-violet` | `bg-pp-violet/10 border-pp-violet/30`          |
+  | failure | `TriangleAlert` | `pp-ink-amber`  | `bg-pp-orange/10 border-pp-orange/30`          |
+  | draft   | `PenLine`       | `pp-ink-rose`   | `bg-pp-pink/10 border-pp-pink/30`              |
+  | note    | `StickyNote`    | `pp-ink-green`  | `bg-pp-green/10 border-pp-green/30`            |
+  | none    | -               | `pp-muted`      | `bg-pp-text/5 border-pp-line` ("Unclassified") |
+
+  Chip text is always the label, never colour alone. The ink family clears 4.5:1 on `pp-bg` (measured in `globals.css`).
+
+- Card: `bg-pp-panel-strong`, 1px `pp-line`, radius 16px, soft panel shadow, 12-13px padding. Row 1: meaning chip + status/date meta (small caps, `pp-muted`). Row 2: title (Montserrat 600, ~14.5px). Row 3: body (`pp-muted`, clamp). Row 4: tags (mono, `bg-pp-text/5`). The to-do form swaps the body for checkbox rows plus "2 of 4 done".
+- Frame: 1.5px `pp-line` border, radius 18px, faint white wash, title tab pill on the top edge with the child count. **Hidden frame:** dashed border, 135deg hatch, `EyeOff` + "Hidden from AI" in the tab, children at 55% opacity with an `EyeOff` badge.
+- Edges: 1.6px `pp-muted` with an arrowhead, and the label as a small `panel-strong` pill at the midpoint.
+- Selected: 2px `pp-ink-blue` outline, 2px offset. Unsaved (4xx): 2px `pp-ink-rose` outline + `TriangleAlert` badge (DR4).
+- Pass 4 (AI slop): 8/10, no issues. App UI rules hold: no card mosaic as the first impression, one accent family used only for meaning, real typefaces.
+- **DR6** - `ConfirmDialog` gets an optional `secondaryLabel` / `onSecondary` (for the D24 un-hide: [Make all readable] / [Keep items private] / Cancel). It moves to `src/components/admin/ConfirmDialog.tsx`, with the blog imports updated. It traps focus and returns it to the trigger (DR9).
+
+### Card editing (DR10, Pass 7)
+
+- Double-click or Enter on a card edits the title and body in place. Esc or a click outside commits through the normal debounced PATCH. The frame title is edited by double-clicking its tab.
+- The inspector gets an auto-growing **Body** textarea (max 50dvh, then it scrolls) with a live `1,240 / 20,000` counter. At the limit, typing stops and the counter turns rose.
+- Cards are 240px wide by default, resizable to 160-480px wide. Height auto-fits up to a 6-line body clamp, then `... more` focuses the inspector Body. Inline and inspector edits share one store, so they can't diverge.
+
+### Multi-select inspector (DR11, Pass 7)
+
+- It shows "N items selected", per-meaning `MEANING_STYLE` chips with counts, and "K of N are hidden from AI".
+- Actions: **Set meaning** (SelectField, "Mixed" when mixed), **Include in AI export** on/off, **Export selection** (opens the sheet with the Selection scope), **Delete N items** (the normal confirm).
+- Bulk edits go out as one PATCH per item through each item's queue (same shape as R3-19 delete), with per-item results. A partial failure reads "4 of 5 updated - 1 not saved" and marks the failed card. "Include in AI: on" is skipped, and counted as skipped, for children of a hidden frame (privacy rule 1 still wins).
+
+### Interaction states (DR4, Pass 2: 3 -> 9)
+
+| Surface        | Loading                                                                     | Empty                                                                                            | Error                                                                   | Partial / other                                                                                       |
+| -------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Board load     | frame + rail shown, rail disabled, pill "Loading 128 items", batches appear | `wireframe-empty.png`: "Put down one true thing." + Text card / Frame / Restore; Export disabled | panel on the canvas: "Couldn't load the board." + Retry; **no editing** | stream cut mid-way = Error. A partial board is never editable, so it can't autosave over the real one |
+| Save pill      | "Saving" + spinner                                                          | "Saved"                                                                                          | "N not saved - retry" (rose). Click retries all                         | offline: "Offline - changes kept", resume on `online`                                                 |
+| Card (4xx)     | -                                                                           | -                                                                                                | rose outline + badge. Inspector top: server message + Discard           | Discard drops the dependent writes                                                                    |
+| Inspector      | -                                                                           | "Nothing selected" + shortcuts                                                                   | -                                                                       | multi-select: DR11                                                                                    |
+| Export sheet   | skeleton lines (~400 ms debounce)                                           | "This frame is hidden from AI" / "Nothing to export"; Copy disabled                              | "Preview failed" + Retry; Copy disabled                                 | "N selected items are hidden" (D25); truncation line in amber                                         |
+| Copy           | -                                                                           | -                                                                                                | clipboard denied: select-all in a read-only textarea                    | "Copied - ~12k tokens" for 2 s                                                                        |
+| Agents popover | spinner row                                                                 | "No tokens yet" + Create token                                                                   | "Couldn't load tokens" + Retry                                          | just created: token shown once + Copy + "won't be shown again"; revoked rows greyed                   |
+| Restore        | "Checking file..." then counts                                              | -                                                                                                | invalid file: which entry + why, zero writes                            | "Batch 3 of 5". Mid-way failure: "Stopped at 3/5 - Run again"                                         |
+
+### Journey (Pass 3: 5 -> 9)
+
+| Step | Owner does                             | Feels             | Supported by                     |
+| ---- | -------------------------------------- | ----------------- | -------------------------------- |
+| 1    | opens the board the first time         | where do I start? | empty state (DR4)                |
+| 2    | writes a goal, sets meaning            | this is mine      | inline edit + chip (DR10, DR7)   |
+| 3    | links a failure to it                  | it's connected    | labelled edges                   |
+| 4    | hides a Private frame                  | safe              | hatched frame + un-hide confirm  |
+| 5    | exports, pastes into a chat            | it knows me       | export sheet (DR3, D25)          |
+| 6    | creates a token, runs `claude mcp add` | did that work?    | **DR5**                          |
+| 7    | weeks later, asks about 2025           | trust             | search_context, if step 6 landed |
+
+- **DR5** - after a token is created, the Agents popover shows 3 numbered steps: (1) `export PORT4LIO_WB_TOKEN=...` into your shell profile, (2) the single-quoted `claude mcp add ... --header 'Authorization: Bearer ${PORT4LIO_WB_TOKEN}'` command (Codex tab beside it), (3) "Now ask Claude: _What are my active goals?_". While the popover is open and a token has `lastUsedAt: null`, it re-fetches `GET /tokens` every 5 s. The first call always writes (null is older than 5 minutes, D29), so the row flips to "Connected - first call just now". Polling stops when the popover closes or the row flips.
+
+### Responsive and accessibility (Pass 6: 3 -> 9)
+
+- **DR8** - three tiers:
+  - `>= 1024px` (lg): the approved layout.
+  - `768-1023px` (md): every tool, pen included (pointer events, so an Apple Pencil draws). The inspector and export become a bottom sheet over the canvas, max 60dvh. Rail buttons are 44px.
+  - `< 768px`: view + edit only. Pan and pinch-zoom work, tapping a card opens the inspector bottom sheet, and the rail is replaced by "Drawing needs a larger screen". The frame drops `lg:h-[100dvh]` and fills the viewport minus the safe areas.
+  - Touch targets are at least 44px at every tier below lg.
+- **DR9** - keyboard and a11y:
+  - A shortcut guard: tool keys, Delete and `?` do nothing while focus is in an input, textarea or contenteditable.
+  - Esc order: exit the tool, then close the sheet/popover, then clear the selection.
+  - Cmd/Ctrl+E opens Export. `?` opens the shortcut list.
+  - Tab order: top bar, rail, canvas, inspector. On the canvas, React Flow node focus: Tab between nodes, Enter edits, arrows move 10px, Shift+arrow 50px (saved via the debounced PATCH).
+  - Rail and icon buttons: `aria-label` with the shortcut ("Text card, T"), and `aria-pressed` on the active tool.
+  - The save pill is `aria-live="polite"`. A card error is announced once.
+  - Focus ring: 2px `pp-ink-blue`, 2px offset.
+  - Hidden state is never shown by colour alone (`EyeOff` + "Hidden from AI" text / aria-label).
+  - `prefers-reduced-motion`: no hover lift, no sheet slide, instant fit.
+  - Dialogs trap focus. Sheets focus their heading.
+
+### Tests added by this review
+
+- Unit: shortcut guard (no tool switch or Delete confirm while an input is focused). `MEANING_STYLE` covers every `Meaning` + `none`. Multi-select fan-out through the queue (partial failure marks only the failed item).
+- tests/api: bulk "Include in AI: on" over a hidden frame's child leaves it hidden (rule 1).
+- e2e (added to `tests/e2e/whiteboard.spec.ts`, D26): a failed board load shows Retry and the rail stays disabled (no writes). Esc order. Token panel flips to "Connected" after one MCP call.
+
+### NOT in scope (design)
+
+- DESIGN.md / `/design-consultation` - the `pp-*` tokens are enough for an owner tool.
+- Full screen-reader narration of the canvas (spatial description of cards and edges) - one sighted owner. Keyboard use + labels are covered by DR9.
+- Dark mode - the admin area is cream-only today.
+- Custom per-card colours - meaning is the only colour channel, on purpose (DR7).
+- Minimap - zoom-to-fit covers it at v1 board sizes.
+
+### What already exists (design reuse)
+
+| Need              | Existing                                                                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- |
+| Framed app layout | `/admin/certificates/ccaf/vocab` page + `AdminHomeLink` early return                                            |
+| Dialogs           | `ConfirmDialog` (extended + moved, DR6)                                                                         |
+| Toggle            | `ToggleSwitch` (`role="switch"`, `aria-labelledby`)                                                             |
+| Dropdowns         | `SelectField`                                                                                                   |
+| Buttons / inputs  | `primaryBtnCls`, `secondaryBtnCls`, `ghostBtnCls`, `inputCls`, `textareaCls`, `labelCls` in `settings-utils.ts` |
+| Spinner           | `Spinner`                                                                                                       |
+| Hub card          | `BOARDS` in `src/app/(admin)/admin/page.tsx` (card + tint)                                                      |
+| Colour / contrast | `pp-*` + `pp-ink-*` tokens, `ppColor()` opacity resolver                                                        |
+
+### TODOS
+
+No design debt was deferred. Every pass took the complete option, so nothing new goes to `TODOS.md`.
+
+### Design implementation tasks
+
+- [ ] **DT1 (P1, human: ~3h / CC: ~15min)** - page shell - framed app layout, `AdminHomeLink` hidden on `/admin/whiteboard`, top bar
+  - Surfaced by: Pass 1 / DR2
+  - Files: `src/app/(admin)/admin/whiteboard/page.tsx`, `src/components/admin/AdminHomeLink.tsx`, `src/components/whiteboard/TopBar.tsx`
+  - Verify: matches `wireframe-board.png` at 1440x900
+- [ ] **DT2 (P1, human: ~4h / CC: ~20min)** - cards - `MEANING_STYLE` + card/frame/edge visuals, hidden and error styling
+  - Surfaced by: Pass 5 / DR7, DR4
+  - Files: `src/components/whiteboard/meaning-style.ts`, `src/components/whiteboard/nodes/*`
+  - Verify: unit `MEANING_STYLE` coverage. Visual check against the wireframe
+- [ ] **DT3 (P1, human: ~1d / CC: ~30min)** - states - every row of the DR4 table, incl. no-edit on partial load
+  - Surfaced by: Pass 2 / DR4
+  - Files: `src/components/whiteboard/*`
+  - Verify: e2e failed-load case
+- [ ] **DT4 (P1, human: ~1d / CC: ~30min)** - responsive + a11y - DR8 tiers, DR9 shortcut guard, focus, labels, reduced motion
+  - Surfaced by: Pass 6 / DR8, DR9
+  - Files: `src/components/whiteboard/useShortcuts.ts`, layout components
+  - Verify: unit shortcut guard. Manual at 390 / 820 / 1440 widths
+- [ ] **DT5 (P2, human: ~1d / CC: ~30min)** - surfaces - export sheet, Agents popover with connect steps + first-call check, Backup menu
+  - Surfaced by: Pass 1, Pass 3 / DR3, DR5
+  - Files: `src/components/whiteboard/{ExportSheet,AgentsPopover,BackupMenu}.tsx`
+  - Verify: e2e "Connected" flip
+- [ ] **DT6 (P2, human: ~1h / CC: ~5min)** - ConfirmDialog - optional secondary action, move to `components/admin/`
+  - Surfaced by: Pass 5 / DR6
+  - Files: `src/components/admin/ConfirmDialog.tsx`, blog imports
+  - Verify: `bun run typecheck`, blog delete still confirms
+- [ ] **DT7 (P2, human: ~5h / CC: ~20min)** - editing - inline title/body edit, inspector Body + counter, card sizing
+  - Surfaced by: Pass 7 / DR10
+  - Files: `src/components/whiteboard/nodes/TextNode.tsx`, `Inspector.tsx`
+  - Verify: manual. Body at 20,000 stops input
+- [ ] **DT8 (P2, human: ~4h / CC: ~20min)** - multi-select - summary + bulk meaning / AI toggle via the queue
+  - Surfaced by: Pass 7 / DR11
+  - Files: `Inspector.tsx`, `useSaveQueue`
+  - Verify: unit fan-out, tests/api hidden-frame child stays hidden
+
+### Design completion summary
+
+```
++====================================================================+
+|         DESIGN PLAN REVIEW - COMPLETION SUMMARY                    |
++====================================================================+
+| System Audit         | no DESIGN.md (pp-* tokens used); heavy UI   |
+| Step 0               | 5/10; all 7 passes + HTML wireframe (DR1)   |
+| Pass 1  (Info Arch)  | 6/10 -> 9/10 (DR2, DR3)                     |
+| Pass 2  (States)     | 3/10 -> 9/10 (DR4)                          |
+| Pass 3  (Journey)    | 5/10 -> 9/10 (DR5)                          |
+| Pass 4  (AI Slop)    | 8/10 -> 8/10 (no issues)                    |
+| Pass 5  (Design Sys) | 5/10 -> 9/10 (DR6, DR7)                     |
+| Pass 6  (Responsive) | 3/10 -> 9/10 (DR8, DR9)                     |
+| Pass 7  (Decisions)  | 2 resolved (DR10, DR11), 0 deferred         |
++--------------------------------------------------------------------+
+| NOT in scope         | written (5 items)                           |
+| What already exists  | written                                     |
+| TODOS.md updates     | 0 items (nothing deferred)                  |
+| Approved Mockups     | 3 generated (hand-built HTML), 3 approved   |
+| Decisions made       | 11 added to plan (DR2-DR12)                 |
+| Decisions deferred   | 0                                           |
+| Overall design score | 5/10 -> 9/10                                |
++====================================================================+
+```
+
+All passes are at 8 or higher. The plan is design-complete. Run `/design-review` after implementation for visual QA.
+
+## GSTACK REVIEW REPORT
+
+| Review        | Trigger               | Why                             | Runs | Status       | Findings                                     |
+| ------------- | --------------------- | ------------------------------- | ---- | ------------ | -------------------------------------------- |
+| CEO Review    | `/plan-ceo-review`    | Scope & strategy                | 0    | -            | -                                            |
+| Codex Review  | `/codex review`       | Independent 2nd opinion         | 0    | -            | - (Codex cold read done in office-hours)     |
+| Eng Review    | `/plan-eng-review`    | Architecture & tests (required) | 1    | CLEAR (PLAN) | 27 issues, 0 critical gaps (D15-D30)         |
+| Design Review | `/plan-design-review` | UI/UX gaps                      | 1    | CLEAR (FULL) | score: 5/10 -> 9/10, 11 decisions (DR2-DR12) |
+| DX Review     | `/plan-devex-review`  | Developer experience gaps       | 0    | -            | -                                            |
+
+- **VERDICT:** ENG + DESIGN CLEARED - ready to implement. Eng tasks T1-T8 and design tasks DT1-DT8 together; DT1-DT4 land with T4 (canvas).
+
+NO UNRESOLVED DECISIONS

@@ -48,11 +48,13 @@ export default function ExportSheet({
   selectionIds,
   initialScope,
   onClose,
+  className,
 }: {
   board: Board
   selectionIds: string[]
   initialScope: 'all' | 'selection'
   onClose: () => void
+  className?: string
 }) {
   const headingRef = useRef<HTMLHeadingElement | null>(null)
   const reduced = useReducedMotion()
@@ -171,8 +173,13 @@ export default function ExportSheet({
       aria-labelledby="wb-export-title"
       data-testid="wb-export-sheet"
       className={cn(
-        'absolute bottom-0 right-0 top-14 z-30 flex w-full max-w-[480px] flex-col border-l border-pp-line bg-pp-panel-strong shadow-[-24px_0_60px_rgba(46,35,28,0.1)]',
-        !reduced && 'animate-[wb-sheet-in_180ms_ease-out]'
+        // Below lg a bottom sheet over the canvas like the inspector, max 60dvh (DR8); from
+        // lg the 480px right sheet over the inspector (DR3).
+        'absolute inset-x-0 bottom-0 z-30 flex max-h-[60dvh] flex-col rounded-t-[1.4rem] border-t border-pp-line bg-pp-panel-strong pb-[env(safe-area-inset-bottom)] shadow-[0_-24px_60px_rgba(46,35,28,0.1)]',
+        'lg:left-auto lg:top-14 lg:max-h-none lg:w-full lg:max-w-[480px] lg:rounded-none lg:border-l lg:border-t-0 lg:pb-0 lg:shadow-[-24px_0_60px_rgba(46,35,28,0.1)]',
+        !reduced &&
+          'animate-[wb-sheet-up_180ms_ease-out] lg:animate-[wb-sheet-in_180ms_ease-out]',
+        className
       )}
     >
       <header className="flex items-center justify-between border-b border-pp-line px-5 py-3.5">
@@ -188,7 +195,7 @@ export default function ExportSheet({
           type="button"
           aria-label="Close export (Esc)"
           onClick={onClose}
-          className="text-pp-muted hover:text-pp-text"
+          className="-mr-2 grid h-11 w-11 place-items-center rounded-full text-pp-muted hover:text-pp-text lg:h-8 lg:w-8"
         >
           <X size={18} />
         </button>

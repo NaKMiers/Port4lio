@@ -100,12 +100,19 @@ export function EmptyBoard({
 export function BoardLoadFailed({
   message,
   onRetry,
+  className,
 }: {
   message: string
   onRetry: () => void
+  className?: string
 }) {
   return (
-    <div className="absolute inset-0 z-[6] grid place-items-center p-6">
+    <div
+      className={cn(
+        'absolute inset-0 z-[6] grid place-items-center p-6',
+        className
+      )}
+    >
       <div
         role="alert"
         className="w-full max-w-sm rounded-[1.4rem] border border-pp-line bg-pp-panel-strong p-5 shadow-panel"

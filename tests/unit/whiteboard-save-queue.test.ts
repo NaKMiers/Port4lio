@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { movePatch } from '@/components/whiteboard/frame-geometry'
 import {
   SaveQueue,
   type GroupResult,
@@ -110,6 +111,40 @@ describe('ordering and dependencies', () => {
         type: 'createItem',
         id: A,
         body: { _id: A, form: 'text', parentId: F, title: 'typed fast' },
+      },
+    ])
+  })
+
+  it('a card dragged out of a hidden frame before its first save is created hidden (rule 8)', async () => {
+    const h = harness()
+    h.queue.markPersisted([F])
+    h.queue.setOnline(false)
+    h.queue.createItem(A, {
+      _id: A,
+      form: 'text',
+      parentId: F,
+      includeInAi: true,
+    })
+    // The drop's patch: left the hidden frame F, so it carries the flag (movePatch).
+    h.queue.patchItem(
+      A,
+      movePatch({ x: 10, y: 20, parentId: null, changed: true }, true),
+      { delay: 0 }
+    )
+    h.queue.setOnline(true)
+    await h.flush()
+    expect(h.sent).toEqual([
+      {
+        type: 'createItem',
+        id: A,
+        body: {
+          _id: A,
+          form: 'text',
+          parentId: null,
+          includeInAi: false,
+          x: 10,
+          y: 20,
+        },
       },
     ])
   })
@@ -405,6 +440,37 @@ describe('delete (R3-6)', () => {
       entries: [{ id: B, x: 2, y: 2, parentId: null }],
     })
   })
+
+  it('a board load that lists a deleted id again (restore) makes it editable', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.deleteItem(A)
+    await h.flush()
+    await h.resolveNext() // the DELETE lands
+    h.queue.patchItem(A, { title: 'dropped' }, { delay: 0 })
+    await h.advance(1_000)
+    expect(h.sent.map(op => op.type)).toEqual(['deleteItem'])
+
+    // "Restore from backup" re-streams the board, and A is in it.
+    h.queue.revive([A])
+    h.queue.markPersisted([A])
+    h.queue.patchItem(A, { title: 'kept' }, { delay: 0 })
+    await h.flush()
+    expect(h.sent.at(-1)).toEqual({
+      type: 'patchItem',
+      id: A,
+      patch: { title: 'kept' },
+    })
+  })
+
+  it('revive leaves an id alone while its delete is still queued', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.setOnline(false)
+    h.queue.deleteItem(A)
+    h.queue.revive([A])
+    expect(h.queue.isDeleted(A)).toBe(true)
+  })
 })
 
 describe('links', () => {
@@ -499,4 +565,216 @@ it('reports status on every change', async () => {
   expect(onStatus).toHaveBeenLastCalledWith(
     expect.objectContaining({ pending: 0, failing: 0 })
   )
+})
+
+describe('review fixes', () => {
+  const C = 'd'.repeat(24)
+
+  it('retries 401, 408 and 429: they refuse the moment, not the content', async () => {
+    for (const status of [401, 408, 429]) {
+      const h = harness()
+      h.queue.markPersisted([A])
+      h.queue.patchItem(A, { title: 'x' }, { delay: 0 })
+      await h.flush()
+      await h.resolveNext({ ok: false, status, error: 'later' })
+      expect(h.rejected).toHaveLength(0)
+      await h.advance(1_000)
+      expect(h.sent).toHaveLength(2)
+    }
+  })
+
+  it('a create rejected after its delete was queued does not block that delete', async () => {
+    const h = harness()
+    h.queue.createItem(A, { _id: A, form: 'text' })
+    await h.flush() // create in flight
+    h.queue.deleteItem(A)
+    await h.resolveNext({ ok: false, status: 400, error: 'bad' })
+    // The delete still goes (the server may answer 404, which is "already gone")...
+    expect(h.sent.map(op => op.type)).toEqual(['createItem', 'deleteItem'])
+    await h.resolveNext({ ok: false, status: 404, error: 'Item not found.' })
+    // ...and nothing is left pending or reported for a card that is gone.
+    expect(h.queue.status().pending).toBe(0)
+    expect(h.rejected).toHaveLength(0)
+  })
+
+  it('an edit made while a sent create waits to retry goes out as its own PATCH', async () => {
+    const h = harness()
+    h.queue.createItem(A, { _id: A, form: 'text', title: '' })
+    await h.flush()
+    // Committed on the server, but the answer was a 502.
+    await h.resolveNext({ ok: false, status: 502, error: 'gateway' })
+    h.queue.patchItem(A, { title: 'typed during the retry' })
+    expect(h.queue.pendingFields(A).has('title')).toBe(true)
+    await h.advance(1_000)
+    await h.resolveNext() // the retried create
+    await h.advance(600)
+    expect(h.sent.at(-1)).toEqual({
+      type: 'patchItem',
+      id: A,
+      patch: { title: 'typed during the retry' },
+    })
+  })
+
+  it('a refused delete makes the card editable again', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.deleteItem(A)
+    await h.flush()
+    await h.resolveNext({ ok: false, status: 400, error: 'no' })
+    expect(h.queue.isDeleted(A)).toBe(false)
+    h.queue.patchItem(A, { title: 'still here' }, { delay: 0 })
+    await h.flush()
+    expect(h.sent.at(-1)?.type).toBe('patchItem')
+  })
+
+  it('a rejected PATCH rides along with the next edit instead of being forgotten', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.patchItem(A, { title: 'T'.repeat(300) }, { delay: 0 })
+    await h.flush()
+    await h.resolveNext({ ok: false, status: 400, error: 'title is over 200' })
+    // Still unconfirmed, so a server doc merge must not overwrite it on the canvas.
+    expect(h.queue.pendingFields(A).has('title')).toBe(true)
+    h.queue.patchItem(A, { tags: ['x'] }, { delay: 0 })
+    await h.flush()
+    expect(h.sent.at(-1)).toEqual({
+      type: 'patchItem',
+      id: A,
+      patch: { title: 'T'.repeat(300), tags: ['x'] },
+    })
+  })
+
+  it('discard forgets a rejected PATCH', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.patchItem(A, { title: 'bad' }, { delay: 0 })
+    await h.flush()
+    await h.resolveNext({ ok: false, status: 400, error: 'no' })
+    h.queue.discard(A)
+    h.queue.patchItem(A, { tags: [] }, { delay: 0 })
+    await h.flush()
+    expect(h.sent.at(-1)).toEqual({
+      type: 'patchItem',
+      id: A,
+      patch: { tags: [] },
+    })
+  })
+
+  it('splits a bulk move at the server cap', async () => {
+    const h = harness(() => ({ ok: true }))
+    const ids = Array.from({ length: 1_100 }, (_, i) =>
+      i.toString(16).padStart(24, '0')
+    )
+    h.queue.markPersisted(ids)
+    h.queue.bulkMove(ids.map(id => ({ id, x: 1, y: 1, parentId: null })))
+    await h.flush()
+    await h.flush()
+    await h.flush()
+    const sizes = h.sent.map(op =>
+      op.type === 'bulkMove' ? op.entries.length : 0
+    )
+    expect(sizes).toEqual([500, 500, 100])
+  })
+
+  it('children of a never-saved frame that is deleted are created un-parented, hidden if it was', async () => {
+    const h = harness()
+    h.queue.setOnline(false)
+    h.queue.createItem(F, { _id: F, form: 'frame', includeInAi: false })
+    h.queue.createItem(A, {
+      _id: A,
+      form: 'text',
+      parentId: F,
+      x: 10,
+      y: 10,
+      includeInAi: true,
+    })
+    h.queue.unparent(F, [{ id: A, x: 110, y: 210, hidden: true }])
+    h.queue.deleteItem(F)
+    h.queue.setOnline(true)
+    await h.flush()
+    // No frame request at all, and the child no longer waits on it.
+    expect(h.sent).toEqual([
+      {
+        type: 'createItem',
+        id: A,
+        body: {
+          _id: A,
+          form: 'text',
+          parentId: null,
+          x: 110,
+          y: 210,
+          includeInAi: false,
+        },
+      },
+    ])
+  })
+
+  it("a frame's DELETE waits for a child create in flight, then the child is moved out", async () => {
+    const h = harness()
+    h.queue.markPersisted([F])
+    h.queue.createItem(A, { _id: A, form: 'text', parentId: F, x: 1, y: 1 })
+    await h.flush() // child create in flight, naming F
+    h.queue.unparent(F, [{ id: A, x: 101, y: 101, hidden: false }])
+    h.queue.deleteItem(F)
+    await h.flush()
+    expect(h.sent.map(op => op.type)).toEqual(['createItem'])
+    await h.resolveNext() // the child lands inside F
+    await h.flush()
+    // Now the delete, and a follow-up that takes the child out (either order is correct).
+    expect(
+      h.sent
+        .slice(1)
+        .map(op => op.type)
+        .sort()
+    ).toEqual(['deleteItem', 'patchItem'])
+    expect(h.sent.find(op => op.type === 'patchItem')).toEqual({
+      type: 'patchItem',
+      id: A,
+      patch: { parentId: null, x: 101, y: 101 },
+    })
+  })
+
+  it('stop: debounced edits go now, and nothing retries afterwards', async () => {
+    const h = harness()
+    h.queue.markPersisted([A, B])
+    h.queue.patchItem(A, { title: 'typed' })
+    h.queue.stop()
+    await h.flush()
+    expect(h.sent).toHaveLength(1)
+    await h.resolveNext({ ok: false, status: 503, error: 'down' })
+    await h.advance(60_000)
+    expect(h.sent).toHaveLength(1)
+    // React's dev double-mount: start brings it back.
+    h.queue.start()
+    await h.advance(60_000)
+    expect(h.sent).toHaveLength(2)
+  })
+
+  it('a multi-delete counts a never-saved card as deleted, and a 404 PATCH as not saved', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.setOnline(false)
+    h.queue.createItem(C, { _id: C, form: 'text' })
+    h.queue.openGroup('delete-1')
+    h.queue.deleteItem(A, { group: 'delete-1' })
+    h.queue.deleteItem(C, { group: 'delete-1' })
+    h.queue.closeGroup('delete-1')
+    h.queue.setOnline(true)
+    await h.flush()
+    await h.resolveNext()
+    expect(h.groups).toEqual([
+      { id: 'delete-1', result: { ok: [C, A], failed: [], skipped: [] } },
+    ])
+
+    h.queue.markPersisted([B])
+    h.queue.openGroup('g2')
+    h.queue.patchItem(B, { meaning: 'goal' }, { delay: 0, group: 'g2' })
+    h.queue.closeGroup('g2')
+    await h.flush()
+    await h.resolveNext({ ok: false, status: 404, error: 'Item not found.' })
+    expect(h.groups.at(-1)).toEqual({
+      id: 'g2',
+      result: { ok: [], failed: [B], skipped: [] },
+    })
+  })
 })

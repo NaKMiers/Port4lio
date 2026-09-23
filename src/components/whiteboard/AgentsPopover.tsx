@@ -102,10 +102,12 @@ export function AgentsButton({
   open,
   onToggle,
   compact,
+  className,
 }: {
   open: boolean
   onToggle: (open: boolean) => void
   compact: boolean
+  className?: string
 }) {
   const [tokens, setTokens] = useState<ClientToken[] | null>(null)
   const [failed, setFailed] = useState(false)
@@ -121,10 +123,15 @@ export function AgentsButton({
   }, [])
 
   useEffect(() => {
-    // The count on the button; the popover refreshes on its own schedule.
+    // Once for the count on the button, then again on every open: a token used by an agent
+    // while the popover was closed must not still read "never used" when it reopens.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh()
   }, [refresh])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (open) void refresh()
+  }, [open, refresh])
 
   useEffect(() => {
     if (!open) return
@@ -141,7 +148,7 @@ export function AgentsButton({
   return (
     <div
       ref={rootRef}
-      className="relative"
+      className={cn('relative', className)}
     >
       <button
         type="button"

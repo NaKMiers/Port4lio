@@ -66,11 +66,19 @@ function requestFor(op: SaveOp): [string, RequestInit & { json?: unknown }] {
   }
 }
 
+/**
+ * A save that hangs holds its item's queue (and shows "Saving" forever), so it is cut off
+ * and handed back as a network failure, which the queue retries. Generous on purpose: an
+ * ink stroke is up to 256 KB on a slow link.
+ */
+const SAVE_TIMEOUT_MS = 30_000
+
 export async function sendSaveOpApi(op: SaveOp): Promise<SendResult> {
   const [url, init] = requestFor(op)
+  const signal = AbortSignal.timeout(SAVE_TIMEOUT_MS)
   let res: Response
   try {
-    res = await call(url, init)
+    res = await call(url, { ...init, signal })
   } catch {
     return { ok: false, status: 0, error: 'Network error' }
   }
@@ -78,6 +86,8 @@ export async function sendSaveOpApi(op: SaveOp): Promise<SendResult> {
   try {
     body = await res.json()
   } catch {
+    // A body cut off by the timeout is a lost answer, not a verdict: retry it.
+    if (signal.aborted) return { ok: false, status: 0, error: 'Timed out' }
     body = null
   }
   if (res.ok) return { ok: true, data: body }

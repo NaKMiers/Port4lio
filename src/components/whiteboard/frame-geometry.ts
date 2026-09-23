@@ -110,3 +110,59 @@ export function resolveMembership(
     left: changed ? item.parentId : null,
   }
 }
+
+/**
+ * The single-item PATCH a drop writes.
+ *
+ * Leaving a hidden (or missing) frame carries `includeInAi: false` (rule 8). For a card the
+ * server already has, the server writes that flag itself and this is only belt and braces.
+ * It matters for a card whose create has not gone out yet (offline, or its frame still
+ * saving): the queue merges this patch into the queued create, whose body still says
+ * `includeInAi: true`, and a create has no "left a frame" for the server to react to.
+ * Without the flag, a card drawn in a hidden frame and dragged out before its first save
+ * was stored agent-readable.
+ */
+export function movePatch(
+  membership: Pick<Membership, 'x' | 'y' | 'parentId' | 'changed'>,
+  leftHidden: boolean
+): Record<string, unknown> {
+  return {
+    x: membership.x,
+    y: membership.y,
+    ...(membership.changed ? { parentId: membership.parentId } : {}),
+    ...(leftHidden ? { includeInAi: false } : {}),
+  }
+}
+
+/**
+ * The N in the D24 confirm, "N items inside become agent-readable": the frame's children
+ * whose own flag is on. A child already switched off stays hidden after the un-hide, so it
+ * is not counted - the number is exactly how many cards the click would expose.
+ */
+export function readableChildren(
+  frameId: string,
+  items: Iterable<{ parentId: string | null; includeInAi: boolean }>
+): number {
+  let n = 0
+  for (const item of items)
+    if (item.parentId === frameId && item.includeInAi) n++
+  return n
+}
+
+/**
+ * Whether a multi-select "Include in AI: on" must leave this item alone (DR11, D24).
+ *
+ * A child of a hidden (or missing) frame stays hidden whatever its own flag says (rule 1),
+ * so writing its flag would only look like a change. A hidden frame is skipped too: un-hiding
+ * one makes every child inside it agent-readable, which is what the D24 confirm ("N items
+ * inside become agent-readable") exists for. The bulk toggle has no such confirm, and used to
+ * expose children nobody had selected. A frame is un-hidden from its own inspector only.
+ */
+export function skipsBulkAiOn(
+  item: { form: string; parentId: string | null; includeInAi: boolean },
+  items: Readonly<Record<string, { includeInAi: boolean } | undefined>>
+): boolean {
+  if (item.form === 'frame') return !item.includeInAi
+  if (!item.parentId) return false
+  return !items[item.parentId]?.includeInAi
+}

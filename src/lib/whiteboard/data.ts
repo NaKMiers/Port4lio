@@ -90,8 +90,9 @@ import {
  *
  * ## PATCH sends only what changed (R3-1)
  *
- * An absent key means "unchanged". `includeInAi` is sent only by the explicit toggle, so a
- * later title edit cannot carry a stale `true` back over a rule-8 `false`.
+ * An absent key means "unchanged". `includeInAi` is sent only by the explicit toggle (and as
+ * `false` by a move out of a hidden frame), so a later title edit cannot carry a stale `true`
+ * back over a rule-8 `false`.
  */
 
 // MARK: Types and conversion

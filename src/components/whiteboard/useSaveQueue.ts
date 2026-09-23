@@ -18,6 +18,7 @@ import { sendSaveOpApi } from '@/requests/whiteboard'
  *   window 'offline' ──▶ queue.setOnline(false)   pill: "Offline - changes kept"
  *   window 'online'  ──▶ queue.setOnline(true)    everything waiting goes now
  *   beforeunload     ──▶ warn while anything is pending or rejected
+ *   unmount          ──▶ queue.stop(): debounced edits go now, no more retry timers
  * ```
  *
  * ## Why the queue is a plain class, created once
@@ -36,6 +37,12 @@ export function useSaveQueue({ rejectedCount }: { rejectedCount: number }) {
   const [queue] = useState(() => new SaveQueue({ send: sendSaveOpApi }))
 
   const [status, setStatus] = useState<QueueStatus>(() => queue.status())
+
+  // Leaving the page stops the timers (no retries in a tab that moved on); see `stop`.
+  useEffect(() => {
+    queue.start()
+    return () => queue.stop()
+  }, [queue])
 
   useEffect(() => {
     const goOnline = () => queue.setOnline(true)
