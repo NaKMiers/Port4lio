@@ -70,6 +70,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
+        suppressHydrationWarning
         className={`${sora.variable} ${montserrat.variable} ${sourceSans3.variable} min-h-screen antialiased`}
       >
         {children}

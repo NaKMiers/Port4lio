@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react'
 
+import { browserLocale } from '@/lib/blog/browser-locale'
 import { BLOG_COPY, type BlogCopy } from '@/lib/blog/ui-copy'
 import { isLocale, type Locale } from '@/lib/i18n'
 
@@ -17,10 +18,18 @@ const STORAGE_KEY = 'blog:locale'
  * The reader's preferred language for blog CHROME, remembered across visits.
  *
  * ```
- *   server render  ->  always 'en'   ->  matches the HTML a crawler and a first-time
- *                                        visitor get, and matches `<html lang='en'>`
- *   after hydration ->  localStorage ->  swaps the furniture if a preference is stored
+ *   server render   ->  always 'en'     ->  matches the HTML a crawler and a first-time
+ *                                           visitor get, and matches `<html lang='en'>`
+ *   after hydration ->  localStorage    ->  the reader's own choice from the VI/EN toggle
+ *                   ->  else browser    ->  `navigator.languages`, first supported one
+ *                   ->  else 'en'
  * ```
+ *
+ * ## Why the browser language is a default and never stored
+ *
+ * It is a guess, and a stored guess stops being one: it would look exactly like a choice
+ * the reader made, and outlive a change to their browser settings. So only the toggle writes
+ * `localStorage`; a reader who never touches it keeps following their browser.
  *
  * ## Why this is not in the URL, unlike MBTI and IQ
  *
@@ -67,12 +76,16 @@ export default function BlogLocaleProvider({
   const [ready, setReady] = useState(false)
 
   const applyStored = useEffectEvent(() => {
+    let stored: string | null = null
     try {
-      const stored = window.localStorage.getItem(STORAGE_KEY)
-      if (isLocale(stored ?? undefined)) setLocaleState(stored as Locale)
+      stored = window.localStorage.getItem(STORAGE_KEY)
     } catch {
-      // Private mode or storage disabled. English furniture is a fine outcome.
+      // Private mode or storage disabled: fall through to the browser's language.
     }
+    const next = isLocale(stored ?? undefined)
+      ? (stored as Locale)
+      : browserLocale()
+    if (next) setLocaleState(next)
     setReady(true)
   })
 

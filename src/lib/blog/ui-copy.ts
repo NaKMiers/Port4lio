@@ -48,6 +48,10 @@ export type BlogCopy = {
   noMatchBody: (query: string) => string
   startHere: string
   morePosts: string
+  viewLabel: string
+  viewByCategory: string
+  viewList: string
+  searchShortcut: string
   emptyBlog: string
   backToWriting: string
 }
@@ -73,6 +77,10 @@ export const BLOG_COPY: Record<Locale, BlogCopy> = {
       `Nothing here for "${query}". This searches titles, tags and series - not the text inside a post.`,
     startHere: 'Start here',
     morePosts: 'More posts',
+    viewLabel: 'View',
+    viewByCategory: 'By category',
+    viewList: 'List',
+    searchShortcut: 'Press / to search',
     emptyBlog: 'Nothing published yet. The first posts are in progress.',
     backToWriting: 'All posts',
   },
@@ -96,6 +104,10 @@ export const BLOG_COPY: Record<Locale, BlogCopy> = {
       `Không có gì cho "${query}". Ô này tìm trong tiêu đề, thẻ và chuyên mục - không tìm trong nội dung bài.`,
     startHere: 'Bắt đầu từ đây',
     morePosts: 'Các bài khác',
+    viewLabel: 'Cách hiển thị',
+    viewByCategory: 'Theo chuyên mục',
+    viewList: 'Danh sách',
+    searchShortcut: 'Nhấn / để tìm',
     emptyBlog: 'Chưa có bài nào được đăng. Những bài đầu tiên đang được viết.',
     backToWriting: 'Tất cả bài viết',
   },

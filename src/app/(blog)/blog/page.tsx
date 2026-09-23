@@ -6,7 +6,11 @@ import BlogIndexList from '@/components/blog/BlogIndexList'
 import Breadcrumbs from '@/components/blog/Breadcrumbs'
 import SubscribeForm from '@/components/blog/SubscribeForm'
 import { listPublishedPosts } from '@/lib/blog/post-data'
-import { buildBlogIndexJsonLd, buildBlogIndexMetadata } from '@/lib/blog/seo'
+import {
+  BLOG_BREADCRUMB_NAME,
+  buildBlogIndexJsonLd,
+  buildBlogIndexMetadata,
+} from '@/lib/blog/seo'
 import { loadPublicProfileUncached } from '@/lib/profile-data'
 import { resolveSiteOrigin } from '@/lib/seo'
 import { kindPresentationMap } from '@/lib/blog/kind-data'
@@ -102,6 +106,17 @@ export default async function BlogIndexPage() {
 
   const origin = resolveSiteOrigin().replace(/\/$/, '')
 
+  /*
+    Newest-created first, for both views and for search results. Sorted here rather than in
+    `listPublishedPosts`, which the sitemap, the RSS feed and the metadata also read in
+    `publishedAt` order - the index's ordering is a reading choice, theirs is a feed's.
+  */
+  const ordered = [...posts].sort(
+    (a, b) =>
+      new Date(b.createdAt ?? 0).getTime() -
+      new Date(a.createdAt ?? 0).getTime()
+  )
+
   /**
    * The three most common tags, for the one-line "mostly X, Y, Z" in the header.
    *
@@ -135,16 +150,10 @@ export default async function BlogIndexPage() {
 
       <div className="mx-auto w-full max-w-editorial flex-1 px-gutter py-12">
         {/*
-          The trail this page's `BreadcrumbList` describes, rendered rather than only
-          declared. Two levels is a short trail, and it is still the one Google prints in
-          place of the raw URL in a result. See `components/blog/Breadcrumbs.tsx`.
+          A single crumb: the index is the root of the blog's trail. No `BreadcrumbList` is
+          emitted for it - Google wants at least two items - see `buildBlogIndexJsonLd`.
         */}
-        <Breadcrumbs
-          trail={[
-            { name: 'Home', href: '/' },
-            { name: 'Writing', href: '/blog' },
-          ]}
-        />
+        <Breadcrumbs trail={[{ name: BLOG_BREADCRUMB_NAME, href: '/blog' }]} />
 
         <BlogIndexHeader
           postCount={posts.length}
@@ -167,13 +176,13 @@ export default async function BlogIndexPage() {
           /*
             The grouping and the search both live in a client component, because search needs
             state. It still renders on the server for the initial HTML, so a crawler sees the
-            full grouped list; only the input needs hydration. See `BlogIndexList`.
+            full list of posts; only the input needs hydration. See `BlogIndexList`.
 
             `kinds` is handed over as entries rather than as the `Map` it is on the server: a
             `Map` does not survive serialisation across the server-to-client boundary.
           */
           <BlogIndexList
-            posts={posts}
+            posts={ordered}
             series={allSeries}
             kinds={Array.from(kinds)}
           />

@@ -59,6 +59,13 @@ const AUTHOR_FALLBACK = 'Anh Khoa Nguyen'
 const BLOG_NAME = 'Writing'
 
 /**
+ * The blog index's label in the breadcrumb trail. Separate from {@link BLOG_NAME} so the
+ * visible trail can say "Blogs" without renaming the blog in titles and share cards. Must
+ * match the label `Breadcrumbs` renders on the post page - the JSON-LD describes that trail.
+ */
+export const BLOG_BREADCRUMB_NAME = 'Blogs'
+
+/**
  * Longest a `<title>` may get before the brand suffix is dropped.
  *
  * Google renders roughly 60 characters and rewrites titles it finds unhelpful. A suffix is
@@ -406,11 +413,15 @@ function breadcrumbNode(
 }
 
 /**
- * The `@graph` for `/blog`: Person, Blog (with its posts), BreadcrumbList.
+ * The `@graph` for `/blog`: Person and Blog (with its posts).
  *
  * The index had no structured data at all, which meant the hub of a hub-and-spoke content
  * model was the one page in it a crawler could learn nothing about. Every post pointed at a
  * blog that was never described.
+ *
+ * No BreadcrumbList here. The visible trail on `/blog` is a single crumb now that "Home" is
+ * gone, and Google requires at least two `ListItem`s - a one-item list is flagged as invalid
+ * rather than ignored.
  */
 export function buildBlogIndexJsonLd(
   origin: string,
@@ -420,10 +431,6 @@ export function buildBlogIndexJsonLd(
   const graph: JsonLdThing[] = [
     personNode(origin, profile),
     blogNode(origin, profile, posts),
-    breadcrumbNode(`${blogIndexUrl(origin)}#breadcrumb`, [
-      { name: 'Home', url: `${origin}/` },
-      { name: BLOG_NAME, url: blogIndexUrl(origin) },
-    ]),
   ]
 
   return serializeGraph(graph)
@@ -565,8 +572,7 @@ export function buildPostJsonLd({
     webPage,
     blogPosting,
     breadcrumbNode(breadcrumbId, [
-      { name: 'Home', url: `${origin}/` },
-      { name: BLOG_NAME, url: blogIndexUrl(origin) },
+      { name: BLOG_BREADCRUMB_NAME, url: blogIndexUrl(origin) },
       { name: post.title, url },
     ]),
   ]

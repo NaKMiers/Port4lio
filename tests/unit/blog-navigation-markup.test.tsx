@@ -29,8 +29,7 @@ describe('Breadcrumbs', () => {
     const html = renderToStaticMarkup(
       <Breadcrumbs
         trail={[
-          { name: 'Home', href: '/' },
-          { name: 'Writing', href: '/blog' },
+          { name: 'Blogs', href: '/blog' },
           {
             name: 'Measuring revalidatePath',
             href: '/blog/measuring-revalidatepath',
@@ -40,7 +39,6 @@ describe('Breadcrumbs', () => {
     )
 
     expect(html).toContain('aria-label="Breadcrumb"')
-    expect(html).toContain('href="/"')
     expect(html).toContain('href="/blog"')
     // The current page is text, not a link: a link to the URL you are on is a dead control.
     expect(html).not.toContain('href="/blog/measuring-revalidatepath"')
@@ -68,6 +66,25 @@ describe('PostToc', () => {
     expect(html.indexOf('#first')).toBeLessThan(html.indexOf('#nested'))
     // Labelled rather than `aria-label`ed, so the visible heading names the landmark once.
     expect(html).toContain('aria-labelledby="post-toc-heading"')
+  })
+
+  it('gives small screens a pill that opens a labelled dialog of the same anchors', () => {
+    const html = renderToStaticMarkup(
+      <PostToc
+        entries={[
+          { id: 'first', level: 2, text: 'First' },
+          { id: 'nested', level: 3, text: 'Nested' },
+        ]}
+      />
+    )
+
+    // The pill names the dialog it opens, and the dialog is labelled by its own heading -
+    // a second id, since the sticky column's heading already uses `post-toc-heading`.
+    expect(html).toContain('aria-controls="post-toc-dialog"')
+    expect(html).toContain('id="post-toc-dialog"')
+    expect(html).toContain('aria-labelledby="post-toc-dialog-heading"')
+    // Both lists are real anchors, so the dialog works as navigation with JavaScript off.
+    expect(html.match(/href="#first"/g)).toHaveLength(2)
   })
 
   it('renders nothing for a post with no anchored headings', () => {

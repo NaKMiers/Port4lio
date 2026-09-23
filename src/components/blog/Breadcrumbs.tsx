@@ -12,7 +12,7 @@ import Link from 'next/link'
  * was one a reader could not see.
  *
  * The payoff for getting it right is concrete: Google renders the trail in place of the raw
- * URL in a result, and `anhkhoa.info › Writing › Measuring revalidatePath` earns a click that
+ * URL in a result, and `anhkhoa.info › Blogs › Measuring revalidatePath` earns a click that
  * `anhkhoa.info/blog/measuring-revalidatepath` does not. `lib/iq/seo.ts` records the same
  * reasoning for the same reason.
  *

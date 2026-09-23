@@ -507,6 +507,11 @@
   border-radius: 999px;
   background: linear-gradient(180deg, var(--pp-violet), var(--pp-blue));
 }
+/* Room above a heading reached through the contents list, so it does not land flush
+   against the top edge of the viewport. */
+.blog-prose :is(h2, h3, h4)[id] {
+  scroll-margin-top: 1.5rem;
+}
 .blog-prose h3 {
   font-family: var(--font-montserrat), system-ui, sans-serif;
   font-size: 1.2rem;

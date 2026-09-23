@@ -72,11 +72,19 @@ const nextConfig = {
    * `/blog/:path*` does NOT match `/blog` itself. Listing only the wildcard leaves the index
    * page - the one linked from `/`, `/cv` and both test products - with no CSP at all, which
    * is the kind of gap that looks fine in every spot check of a post page.
+   *
+   * ## 'unsafe-eval' in development only
+   *
+   * React's development build uses `eval()` to rebuild server-component call stacks, and
+   * logs a console error on every blog page when the CSP forbids it. Production React never
+   * calls `eval`, so the production header stays without it - `next build` sets
+   * `NODE_ENV=production`, which is also what the Playwright CSP test runs against.
    */
   async headers() {
+    const isDev = process.env.NODE_ENV === 'development'
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' https://res.cloudinary.com",
       "font-src 'self' https://fonts.gstatic.com",

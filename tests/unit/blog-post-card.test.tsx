@@ -47,6 +47,7 @@ const BASE: PostListItem = {
   tags: ['nextjs', 'caching'],
   publishedAt: new Date('2026-09-18T23:40:00.000Z'),
   contentUpdatedAt: new Date('2026-09-18T23:40:00.000Z'),
+  createdAt: new Date('2026-09-18T23:30:00.000Z'),
 }
 
 function render(post: Partial<PostListItem> = {}, props = {}) {
@@ -223,5 +224,35 @@ describe('the tag list', () => {
 
     expect(html).toContain('>four<')
     expect(html).not.toContain('>five<')
+  })
+})
+
+describe('the category', () => {
+  it('shows the category above the title when the List view passes one', () => {
+    const html = render({}, { category: 'Measured in production' })
+
+    expect(html).toContain('Measured in production')
+    // Above the title, and outside the link - the link's name stays the title alone.
+    expect(html.indexOf('Measured in production')).toBeLessThan(
+      html.indexOf('revalidatePath did not revalidate')
+    )
+    expect(anchors(html)[0]).not.toContain('Measured in production')
+  })
+
+  it('shows no category when none is passed, as under "By category"', () => {
+    expect(render()).not.toContain('Measured in production')
+  })
+
+  it('shares the eyebrow line with the kind label when a post has both', () => {
+    const html = render(
+      {},
+      {
+        category: 'Measured in production',
+        kind: { label: 'Note', eyebrow: true },
+      }
+    )
+
+    expect(html).toContain('Measured in production')
+    expect(html).toContain('>Note<')
   })
 })

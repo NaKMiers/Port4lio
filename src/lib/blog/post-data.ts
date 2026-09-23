@@ -44,6 +44,7 @@ export type PostListItem = Pick<
   | 'tags'
   | 'publishedAt'
   | 'contentUpdatedAt'
+  | 'createdAt'
 >
 
 /**
@@ -64,7 +65,7 @@ export type PostListItem = Pick<
  * `publishedAt` and `contentUpdatedAt` stay as `Date`s - React serialises those natively.
  */
 const LIST_FIELDS =
-  '-_id slug title excerpt kind series isPillar language coverImage coverCaption tags publishedAt contentUpdatedAt'
+  '-_id slug title excerpt kind series isPillar language coverImage coverCaption tags publishedAt contentUpdatedAt createdAt'
 
 export async function listPublishedPosts(): Promise<PostListItem[]> {
   await connectDatabase()

@@ -71,13 +71,20 @@ export default function PostCard({
   post,
   kind,
   featured = false,
+  category = null,
 }: {
   post: PostListItem
   /** Presentation for `post.kind`, looked up once by the page rather than per card. */
   kind?: { label: string; eyebrow: boolean }
   featured?: boolean
+  /**
+   * The post's category (series) title, shown above the title. Only the flat List view
+   * passes it - under "By category" the section heading already says it.
+   */
+  category?: string | null
 }) {
-  const showEyebrow = kind?.eyebrow === true
+  const showKind = kind?.eyebrow === true
+  const showEyebrow = showKind || Boolean(category)
   const { locale } = useBlogLocale()
   return (
     <article
@@ -129,8 +136,23 @@ export default function PostCard({
         post bodies by source order; there is no third copy of this problem.
       */}
       {showEyebrow ? (
-        <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-pp-ink-rose">
-          {kind?.label}
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]">
+          {/* Violet, the ink a series wears everywhere else: the category headings on the
+              index and the series label above a post's title. */}
+          {category ? (
+            <span className="text-pp-ink-violet">{category}</span>
+          ) : null}
+          {category && showKind ? (
+            <span
+              aria-hidden
+              className="text-pp-muted/60"
+            >
+              &middot;
+            </span>
+          ) : null}
+          {showKind ? (
+            <span className="text-pp-ink-rose">{kind?.label}</span>
+          ) : null}
         </span>
       ) : null}
 

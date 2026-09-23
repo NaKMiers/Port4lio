@@ -1,7 +1,13 @@
 'use client'
 
-import { Search, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { LayoutGrid, List, Search, X } from 'lucide-react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 
 import PostCard from '@/components/blog/PostCard'
 import { useBlogLocale } from '@/components/blog/BlogLocaleProvider'
@@ -11,9 +17,12 @@ import type { PostListItem } from '@/lib/blog/post-data'
  * The `/blog` index list, with search over it.
  *
  * ```
- *   query empty  ->  Start here  /  <series>  /  Everything else     (the grouped browse)
- *   query set    ->  one flat list, newest first, "N posts match"    (the results view)
+ *   query empty, "By category"  ->  Start here  /  <series>  /  More posts   (the grouped browse)
+ *   query empty, "List"         ->  every post as a card, two columns, no groups
+ *   query set                   ->  one flat list of cards, "N posts match"   (the results view)
  * ```
+ *
+ * Every view is in the order the page hands down: newest-created first.
  *
  * ## Why searching collapses the grouping instead of filtering inside it
  *
@@ -33,7 +42,7 @@ import type { PostListItem } from '@/lib/blog/post-data'
  * keystroke.
  *
  * Client components still render on the server for the initial HTML, so a crawler and a
- * reader with JS disabled both get the full grouped list exactly as before. The search input
+ * reader with JS disabled both get every post, in the default List view. The search input
  * is the only part that needs hydration, and it degrades to an inert box rather than to an
  * empty page.
  *
@@ -48,6 +57,49 @@ import type { PostListItem } from '@/lib/blog/post-data'
 type SeriesInfo = { slug: string; title: string; blurb: string }
 type KindInfo = { label: string; eyebrow: boolean }
 
+/**
+ * "By category" or "List", remembered per browser.
+ *
+ * `localStorage`, read through `useSyncExternalStore` with a server snapshot of `list`, the
+ * default: the server HTML (what a crawler and a no-JS reader get) is always the list, and
+ * a reader who chose "By category" switches to it one commit after hydration, with no
+ * mismatch.
+ */
+type IndexView = 'grouped' | 'list'
+
+const VIEW_STORAGE_KEY = 'blog-index-view'
+const viewListeners = new Set<() => void>()
+// This visit's choice; wins over storage, and carries it when storage throws.
+let memoryView: IndexView | null = null
+
+function readView(): IndexView {
+  if (memoryView) return memoryView
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'grouped'
+      ? 'grouped'
+      : 'list'
+  } catch {
+    return 'list'
+  }
+}
+
+function writeView(view: IndexView) {
+  memoryView = view
+  try {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, view)
+  } catch {
+    // Private mode or blocked storage: `memoryView` keeps the toggle working this visit.
+  }
+  viewListeners.forEach(listener => listener())
+}
+
+function subscribeView(listener: () => void) {
+  viewListeners.add(listener)
+  return () => {
+    viewListeners.delete(listener)
+  }
+}
+
 export default function BlogIndexList({
   posts,
   series,
@@ -59,7 +111,33 @@ export default function BlogIndexList({
   kinds: [string, KindInfo][]
 }) {
   const [query, setQuery] = useState('')
+  const view = useSyncExternalStore(
+    subscribeView,
+    readView,
+    () => 'list' as const
+  )
+  const inputRef = useRef<HTMLInputElement>(null)
   const { copy } = useBlogLocale()
+
+  // `/` focuses the search from anywhere on the page, unless the reader is already typing
+  // somewhere - a slash in a textarea or the subscribe box is a slash, not a shortcut.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey)
+        return
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+      )
+        return
+      event.preventDefault()
+      inputRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const kindMap = useMemo(() => new Map(kinds), [kinds])
   const seriesTitle = useMemo(
     () => new Map(series.map(item => [item.slug, item.title])),
@@ -104,40 +182,107 @@ export default function BlogIndexList({
 
   return (
     <>
-      <div className="mt-8">
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
         <label
           className="sr-only"
           htmlFor="blog-search"
         >
           {copy.searchLabel}
         </label>
-        <div className="relative">
+        <div className="group/search relative flex-1">
+          {/* After the input in paint order would be simpler, but the icon comes first so
+              it reads naturally in the source - `z-10` is what keeps it above the input,
+              whose `backdrop-blur` makes it a stacking context that would otherwise cover it
+              (which is exactly how it vanished on focus before). */}
           <Search
             aria-hidden
-            size={15}
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-pp-muted"
+            size={17}
+            className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-pp-muted transition-colors group-focus-within/search:text-pp-ink-blue"
           />
           <input
+            ref={inputRef}
             id="blog-search"
             type="search"
             value={query}
             onChange={event => setQuery(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Escape' && query) {
+                event.preventDefault()
+                setQuery('')
+              }
+            }}
             placeholder={copy.searchPlaceholder}
-            className="w-full rounded-full border border-pp-line bg-pp-panel py-3 pl-11 pr-11 text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none backdrop-blur-md transition placeholder:text-pp-muted/75 focus:border-pp-blue/55 focus:bg-white focus:ring-4 focus:ring-pp-blue/10"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-12 w-full rounded-2xl border border-pp-line bg-white/80 pl-11 pr-24 text-[0.95rem] text-pp-text shadow-[0_10px_30px_rgba(46,35,28,0.06),inset_0_1px_0_rgba(255,255,255,0.9)] outline-none backdrop-blur-md transition-[border-color,box-shadow,background-color] placeholder:text-pp-muted/70 hover:border-pp-muted/35 focus:border-pp-ink-blue/45 focus:bg-white focus:shadow-[0_0_0_4px_rgba(51,152,255,0.14),0_10px_30px_rgba(46,35,28,0.06)] [&::-webkit-search-cancel-button]:appearance-none"
           />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery('')}
-              aria-label={copy.searchClear}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-pp-muted transition hover:bg-white hover:text-pp-text"
-            >
-              <X
-                aria-hidden
-                size={14}
-              />
-            </button>
-          ) : null}
+          <div className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center">
+            {query ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('')
+                  inputRef.current?.focus()
+                }}
+                aria-label={copy.searchClear}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-pp-muted transition hover:bg-pp-bg hover:text-pp-text"
+              >
+                <X
+                  aria-hidden
+                  size={15}
+                />
+              </button>
+            ) : (
+              <kbd
+                title={copy.searchShortcut}
+                className="pointer-events-none hidden h-7 min-w-[1.75rem] items-center justify-center rounded-lg border border-pp-line bg-pp-bg px-2 font-mono text-xs text-pp-muted sm:inline-flex"
+              >
+                /
+              </kbd>
+            )}
+          </div>
+        </div>
+
+        {/* The view only changes the browse; a search always shows its flat results, so the
+            toggle is disabled while there is a query rather than silently doing nothing. */}
+        <div
+          role="group"
+          aria-label={copy.viewLabel}
+          className="inline-flex shrink-0 items-center gap-0.5 self-end rounded-2xl border border-pp-line bg-white/80 p-1 shadow-[0_10px_30px_rgba(46,35,28,0.06)] backdrop-blur-md sm:self-auto"
+        >
+          {(
+            [
+              {
+                value: 'grouped',
+                label: copy.viewByCategory,
+                Icon: LayoutGrid,
+              },
+              { value: 'list', label: copy.viewList, Icon: List },
+            ] as const
+          ).map(({ value, label, Icon }) => {
+            const active = view === value
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => writeView(value)}
+                aria-pressed={active}
+                disabled={Boolean(trimmed)}
+                className={[
+                  'inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50',
+                  active
+                    ? 'bg-pp-text text-[var(--pp-bg)] shadow-[0_6px_14px_rgba(31,28,26,0.18)]'
+                    : 'text-pp-muted hover:bg-pp-bg hover:text-pp-text',
+                ].join(' ')}
+              >
+                <Icon
+                  aria-hidden
+                  size={15}
+                />
+                {label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -169,6 +314,23 @@ export default function BlogIndexList({
               ))}
             </div>
           )}
+        </section>
+      ) : view === 'list' ? (
+        // The same cards as the grouped browse, in one grid: every post, no headings. With
+        // no section heading to say which category a post is in, each card says it itself.
+        <section className="mt-10">
+          <div className="grid gap-5 sm:grid-cols-2">
+            {posts.map(post => (
+              <PostCard
+                key={post.slug}
+                post={post}
+                kind={kindMap.get(post.kind)}
+                category={
+                  post.series ? (seriesTitle.get(post.series) ?? null) : null
+                }
+              />
+            ))}
+          </div>
         </section>
       ) : (
         <>

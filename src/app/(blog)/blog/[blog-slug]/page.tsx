@@ -14,7 +14,12 @@ import {
   resolveRelatedSlugs,
 } from '@/lib/blog/post-data'
 import { countProseWords, readingMinutes } from '@/lib/blog/reading'
-import { buildPostJsonLd, buildPostMetadata, postUrl } from '@/lib/blog/seo'
+import {
+  BLOG_BREADCRUMB_NAME,
+  buildPostJsonLd,
+  buildPostMetadata,
+  postUrl,
+} from '@/lib/blog/seo'
 import { listSeries } from '@/lib/blog/series-data'
 import { extractToc, TOC_MIN_ENTRIES } from '@/lib/blog/toc'
 import { loadPublicProfileUncached } from '@/lib/profile-data'
@@ -147,9 +152,10 @@ export default async function BlogPostPage({ params }: PageProps) {
   const minutes = readingMinutes(words)
 
   /*
-    A contents list is worth the space above the fold only on a post with real structure, and
-    a post still stored as `blog-md-1` has no heading ids at all - see BLOG_PIPELINE_VERSION.
-    Both cases resolve to the same thing here: no list, rather than a stub of one.
+    A contents list (sticky column, or the floating pill on small screens) is worth showing
+    only on a post with real structure, and a post still stored as `blog-md-1` has no heading
+    ids at all - see BLOG_PIPELINE_VERSION. Both cases resolve to the same thing here: no
+    list, rather than a stub of one.
   */
   const toc = extractToc(post.bodyHtml)
   const showToc = toc.length >= TOC_MIN_ENTRIES
@@ -190,55 +196,82 @@ export default async function BlogPostPage({ params }: PageProps) {
       <div className="mx-auto w-full max-w-editorial flex-1 px-gutter py-10">
         <Breadcrumbs
           trail={[
-            { name: 'Home', href: '/' },
-            { name: 'Writing', href: '/blog' },
+            { name: BLOG_BREADCRUMB_NAME, href: '/blog' },
             { name: post.title, href: `/blog/${post.slug}` },
           ]}
         />
 
         {/*
-          `lang` on the article, not the document. See the header - only the root layout can
-          render `<html>`. This is the element a screen reader switches voice on and the
-          subtree Google reads a language from, so it belongs on the content and not on a
-          wrapper further out that also contains English navigation.
+          With a contents list, the article and a sticky column sit side by side from `lg`.
+          Below `lg` the grid is off and `PostToc` shows a floating pill and a full-screen
+          list instead, so the page is the article alone.
         */}
-        <article lang={post.language}>
-          <header className="mb-8">
-            {series ? (
-              /*
+        <div
+          className={
+            showToc
+              ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_14.5rem] lg:gap-12 xl:gap-16'
+              : undefined
+          }
+        >
+          {/*
+            Before the article in the DOM, so a keyboard or screen-reader user reaches the
+            contents (the pill, below `lg`) before the whole post, as they did when the list
+            sat above the body. The grid still places it in the right-hand column.
+            Deliberately not `hidden` below `lg`: this wrapper also holds the pill and its
+            dialog, and a fixed child of a `display: none` parent does not render.
+          */}
+          {showToc ? (
+            <div className="lg:col-start-2 lg:row-start-1">
+              <PostToc entries={toc} />
+            </div>
+          ) : null}
+
+          {/*
+            `lang` on the article, not the document. See the header - only the root layout
+            can render `<html>`. This is the element a screen reader switches voice on and the
+            subtree Google reads a language from, so it belongs on the content and not on a
+            wrapper further out that also contains English navigation.
+          */}
+          <article
+            lang={post.language}
+            className="min-w-0 lg:col-start-1 lg:row-start-1"
+          >
+            <header className="mb-8">
+              {series ? (
+                /*
                 The series, above the title, linking to its section on the index. This is the
                 cluster's hub link on every post in it - the "up" edge of a hub-and-spoke
                 model, which previously existed only as a heading on `/blog` with no way back
                 to it from a post.
               */
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
-                {/* Violet, the same ink the body's h2s use. This line and those headings are
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                  {/* Violet, the same ink the body's h2s use. This line and those headings are
                     the two things on the page that say "where am I", so they match. */}
-                <Link
-                  href={`/blog#${series.slug}`}
-                  className="text-pp-ink-violet no-underline hover:underline"
-                >
-                  {series.title}
-                </Link>
-              </p>
-            ) : null}
-            <h1 className="mt-2 font-display text-3xl font-semibold leading-tight text-pp-text sm:text-4xl">
-              {post.title}
-            </h1>
-            {post.excerpt ? (
-              <p className="mt-4 max-w-[62ch] text-lg leading-relaxed text-pp-muted">
-                {post.excerpt}
-              </p>
-            ) : null}
-            <PostByline
-              authorName={authorName}
-              publishedAt={post.publishedAt}
-              contentUpdatedAt={post.contentUpdatedAt}
-              readingMinutes={minutes}
-            />
-          </header>
+                  <Link
+                    href={`/blog#${series.slug}`}
+                    className="text-pp-ink-violet no-underline hover:underline"
+                  >
+                    {series.title}
+                  </Link>
+                </p>
+              ) : null}
+              <h1 className="mt-2 font-display text-3xl font-semibold leading-tight text-pp-text sm:text-4xl">
+                {post.title}
+              </h1>
+              {post.excerpt ? (
+                <p className="mt-4 max-w-[62ch] text-lg leading-relaxed text-pp-muted">
+                  {post.excerpt}
+                </p>
+              ) : null}
+              <PostByline
+                authorName={authorName}
+                publishedAt={post.publishedAt}
+                contentUpdatedAt={post.contentUpdatedAt}
+                readingMinutes={minutes}
+              />
+            </header>
 
-          {/*
+            {/*
             The cover, on the page rather than only in the share card.
 
             It was previously referenced by `openGraph.images` and by `image` in the JSON-LD
@@ -257,39 +290,37 @@ export default async function BlogPostPage({ params }: PageProps) {
             is decoration that the `h1` above already describes, so `alt=''` keeps a screen
             reader from reading the post twice.
           */}
-          {post.coverImage ? (
-            post.coverCaption ? (
-              <figure className="mb-8">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+            {post.coverImage ? (
+              post.coverCaption ? (
+                <figure className="mb-8">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={post.coverImage}
+                    alt=""
+                    width={1200}
+                    height={630}
+                    fetchPriority="high"
+                    className="aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
+                  />
+                  <figcaption className="mt-2 text-xs leading-relaxed text-pp-muted">
+                    {post.coverCaption}
+                  </figcaption>
+                </figure>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={post.coverImage}
                   alt=""
+                  aria-hidden
                   width={1200}
                   height={630}
                   fetchPriority="high"
-                  className="aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
+                  className="mb-8 aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
                 />
-                <figcaption className="mt-2 text-xs leading-relaxed text-pp-muted">
-                  {post.coverCaption}
-                </figcaption>
-              </figure>
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={post.coverImage}
-                alt=""
-                aria-hidden
-                width={1200}
-                height={630}
-                fetchPriority="high"
-                className="mb-8 aspect-[1200/630] w-full rounded-[0.9rem] border border-pp-line object-cover"
-              />
-            )
-          ) : null}
+              )
+            ) : null}
 
-          {showToc ? <PostToc entries={toc} /> : null}
-
-          {/*
+            {/*
             `bodyHtml` was sanitized and highlighted at SAVE time (D9), by the pipeline in
             `lib/blog/markdown.ts`: raw HTML dropped at remark-rehype, everything else through
             `rehype-sanitize`, image hosts restricted to our own Cloudinary, heading ids added
@@ -297,12 +328,12 @@ export default async function BlogPostPage({ params }: PageProps) {
             not go through that, and nothing renders markdown in a request path - Shiki's
             ~5.5s per-process bootstrap is the reason.
           */}
-          <div
-            className="blog-prose"
-            dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
-          />
+            <div
+              className="blog-prose"
+              dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
+            />
 
-          {/*
+            {/*
             The tags, visible at last. They were already three machine-readable claims -
             `keywords` in the metadata, `keywords` and `about` in the JSON-LD - about a page
             that showed a reader none of them. Rendered as plain text rather than as links,
@@ -311,24 +342,25 @@ export default async function BlogPostPage({ params }: PageProps) {
             That is thin content, and it is a trade worth making only once the tag has enough
             behind it to be a destination.
           */}
-          {post.tags.length > 0 ? (
-            <ul
-              aria-label="Tags"
-              className="mt-10 flex flex-wrap gap-2 border-t border-pp-line pt-6"
-            >
-              {post.tags.map(tag => (
-                /* `blog-tag` carries the whole chip, including a colour chosen by its
+            {post.tags.length > 0 ? (
+              <ul
+                aria-label="Tags"
+                className="mt-10 flex flex-wrap gap-2 border-t border-pp-line pt-6"
+              >
+                {post.tags.map(tag => (
+                  /* `blog-tag` carries the whole chip, including a colour chosen by its
                    position in the row - see the rule in `styles/globals.css`. */
-                <li
-                  key={tag}
-                  className="blog-tag"
-                >
-                  {tag}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </article>
+                  <li
+                    key={tag}
+                    className="blog-tag"
+                  >
+                    {tag}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </article>
+        </div>
 
         {/*
           The view beacon and the share button. A client island, and it has to be: the share

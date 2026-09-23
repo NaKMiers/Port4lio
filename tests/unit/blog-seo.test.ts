@@ -130,13 +130,13 @@ describe('post JSON-LD', () => {
       item: string
     }[]
 
-    expect(crumbs.map(c => c.position)).toEqual([1, 2, 3])
+    expect(crumbs.map(c => c.position)).toEqual([1, 2])
     expect(crumbs.map(c => c.name)).toEqual([
-      'Home',
-      'Writing',
+      'Blogs',
       'Measuring revalidatePath',
     ])
-    expect(crumbs[2].item).toBe(`${ORIGIN}/blog/measuring-revalidatepath`)
+    expect(crumbs[0].item).toBe(`${ORIGIN}/blog`)
+    expect(crumbs[1].item).toBe(`${ORIGIN}/blog/measuring-revalidatepath`)
   })
 
   it('prefers the series title over the slug for articleSection', () => {
@@ -256,13 +256,10 @@ describe('blog index JSON-LD', () => {
     expect(blog).not.toHaveProperty('blogPost')
   })
 
-  it('stops the breadcrumb at Writing, matching the two crumbs the page renders', () => {
+  it('emits no BreadcrumbList on the index, whose trail is a single crumb', () => {
+    // Google rejects a BreadcrumbList with fewer than two items.
     const graph = parseGraph(buildBlogIndexJsonLd(ORIGIN, PROFILE, []))
-    const crumbs = nodeOfType(graph, 'BreadcrumbList').itemListElement as {
-      name: string
-    }[]
-
-    expect(crumbs.map(c => c.name)).toEqual(['Home', 'Writing'])
+    expect(graph.some(node => node['@type'] === 'BreadcrumbList')).toBe(false)
   })
 })
 
