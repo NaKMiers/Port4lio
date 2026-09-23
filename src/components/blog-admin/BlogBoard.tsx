@@ -4,7 +4,7 @@ import { Archive, Eye, Pencil, RotateCcw, Send, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 
-import ConfirmDialog from '@/components/blog-admin/ConfirmDialog'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
 import GenerateBlogDialog from '@/components/blog-admin/GenerateBlogDialog'
 import PostRowActions from '@/components/blog-admin/PostRowActions'

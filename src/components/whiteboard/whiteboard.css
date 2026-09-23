@@ -1,0 +1,106 @@
+/*
+  The few React Flow surfaces Tailwind cannot reach: its handles, edge paths, the selection
+  box and the resizer. Everything else is utilities on the components.
+*/
+.wb-flow {
+  --xy-edge-stroke: #6d6661;
+  --xy-selection-background-color: rgba(51, 152, 255, 0.08);
+  --xy-selection-border: 1px solid rgba(22, 103, 196, 0.45);
+  background: transparent;
+}
+
+.wb-flow .react-flow__node:focus-visible,
+.wb-flow button:focus-visible,
+.wb-flow input:focus-visible {
+  outline: 2px solid var(--pp-ink-blue);
+  outline-offset: 2px;
+}
+
+.wb-flow .react-flow__node-card,
+.wb-flow .react-flow__node-shape {
+  cursor: grab;
+}
+
+.wb-handle.react-flow__handle {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--pp-ink-blue);
+  background: var(--pp-panel-strong);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.wb-flow .react-flow__node:hover .wb-handle,
+.wb-flow .react-flow__node.selected .wb-handle {
+  opacity: 0.55;
+}
+.wb-flow[data-tool='arrow'] .wb-handle {
+  width: 13px;
+  height: 13px;
+  opacity: 1;
+}
+
+.wb-edge {
+  stroke: #6d6661;
+  stroke-width: 1.6;
+}
+.wb-edge-selected {
+  stroke: var(--pp-ink-blue);
+  stroke-width: 2;
+}
+.wb-edge-error {
+  stroke: var(--pp-ink-rose);
+}
+
+.wb-resize-line.react-flow__resize-control.line {
+  border-color: rgba(22, 103, 196, 0.35);
+}
+.wb-resize-handle.react-flow__resize-control.handle,
+.wb-resize-x.react-flow__resize-control {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  border: 1.5px solid var(--pp-ink-blue);
+  background: var(--pp-panel-strong);
+}
+.wb-resize-x.react-flow__resize-control {
+  height: 22px;
+  width: 7px;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+/* The "4 hidden" chip pulses hidden outlines once (DR3). */
+@keyframes wb-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(184, 50, 128, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(184, 50, 128, 0);
+  }
+}
+.wb-pulse {
+  animation: wb-pulse 900ms ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-pulse {
+    animation: none;
+  }
+  .wb-handle.react-flow__handle {
+    transition: none;
+  }
+}
+
+/* React Flow's attribution stays visible (MIT, and they ask); kept small and out of the way. */
+.wb-flow .react-flow__attribution {
+  background: transparent;
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+/* Link labels read above the cards they pass behind. */
+.wb-flow .react-flow__edgelabel-renderer {
+  z-index: 5;
+}
