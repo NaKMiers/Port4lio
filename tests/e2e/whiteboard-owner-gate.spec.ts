@@ -90,3 +90,34 @@ test('POST /restore is 401', async ({ request }) => {
     })
   )
 })
+
+test('GET /tokens is 401', async ({ request }) => {
+  await expect401(await request.get(`${API}/tokens`))
+})
+
+test('POST /tokens is 401 - it mints agent access', async ({ request }) => {
+  await expect401(await request.post(`${API}/tokens`, { data: { name: 'x' } }))
+})
+
+test('DELETE /tokens/[id] is 401', async ({ request }) => {
+  await expect401(await request.delete(`${API}/tokens/${FAKE_ID}`))
+})
+
+/*
+  The agent routes take a bearer token and nothing else. Anonymous is 401 like the owner
+  routes; the api suite additionally proves the owner cookie and REQUIRE_ADMIN=false do not
+  open them either.
+*/
+test('GET /api/whiteboard/context.md is 401 without a token', async ({
+  request,
+}) => {
+  await expect401(await request.get('/api/whiteboard/context.md'))
+})
+
+test('POST /api/whiteboard/mcp is 401 without a token', async ({ request }) => {
+  await expect401(
+    await request.post('/api/whiteboard/mcp', {
+      data: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+    })
+  )
+})

@@ -350,6 +350,24 @@ export const CONTACT_LIMIT: RateLimitOptions = {
   windowSeconds: 60 * 60,
 }
 
+/**
+ * The whiteboard's agent routes (`/api/whiteboard/context.md` and `/api/whiteboard/mcp`),
+ * one bucket for both.
+ *
+ * Checked BEFORE the bearer token is verified, so a stranger guessing tokens is throttled on
+ * the same budget as a real agent - a failed guess still counts. 120 in 10 minutes is sized
+ * for Claude Code answering one question with several tool calls in a row (overview, two
+ * searches, a few `get_item`s), repeatedly, with room to spare.
+ *
+ * Remember this limiter fails OPEN on a Mongo error. That is fine here only because the token
+ * check behind it fails CLOSED: a database outage means no rate limit, and also no access.
+ */
+export const WHITEBOARD_AGENT_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-agent',
+  limit: 120,
+  windowSeconds: 10 * 60,
+}
+
 /*
  * IQ checkout has no limit of its own: `/api/iq/checkout` uses `CHECKOUT_LIMIT` above.
  *
