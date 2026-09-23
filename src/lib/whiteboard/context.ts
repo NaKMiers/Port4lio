@@ -69,6 +69,8 @@ import {
 
 /** An item as the serializer sees it: no ink points, ever (D27). */
 export interface ContextItem {
+  /** Which board it is on (D32). Absent in older fixtures and in single-board renders. */
+  boardId?: string
   id: string
   form: Form
   meaning: Meaning | null
@@ -98,9 +100,20 @@ export interface ContextLink {
   label: string
 }
 
+/** A board, for the export's top-level sections when there is more than one (D32). */
+export interface ContextBoard {
+  id: string
+  title: string
+}
+
 export interface ContextInput {
   /** The items the scope selects, frames included. Already visible. */
   items: ContextItem[]
+  /**
+   * The visible boards, in order. One board (or none given) renders exactly as it always
+   * did - frames at `##` - so an agent reading a single-board export sees no change.
+   */
+  boards?: ContextBoard[]
   /** Every visible frame, for group headings and absolute coordinates. */
   frames: ContextItem[]
   /** Visible items outside the scope that a link names. Title and id only. */
@@ -556,8 +569,12 @@ function frameOrder(a: ContextItem, b: ContextItem) {
 
 function renderGrouped(
   picked: readonly ContextItem[],
-  ctx: EntryContext
+  ctx: EntryContext,
+  /** Heading level for a frame. Meanings sit one below it. */
+  level = 2
 ): string {
+  const frameHash = '#'.repeat(level)
+  const meaningHash = '#'.repeat(level + 1)
   const inScopeFrames = picked.filter(item => item.form === 'frame')
   const sectionIds = new Set(inScopeFrames.map(frame => frame.id))
   for (const item of picked)
@@ -582,14 +599,16 @@ function renderGrouped(
     for (const meaning of [...MEANINGS, null] as const) {
       const group = byMeaning.get(meaning)
       if (!group?.length) continue
-      blocks.push(`### ${meaning ? MEANING_LABEL[meaning] : 'Unclassified'}`)
+      blocks.push(
+        `${meaningHash} ${meaning ? MEANING_LABEL[meaning] : 'Unclassified'}`
+      )
       for (const item of [...group].sort(byRecency))
         blocks.push(renderEntry(item, ctx))
     }
   }
 
   for (const frame of sections) {
-    blocks.push(`## ${displayTitle(frame)}`)
+    blocks.push(`${frameHash} ${displayTitle(frame)}`)
     if (pickedIds.has(frame.id)) {
       // The frame's own entry: meta, body and links, without a second heading.
       const entry = renderEntry(frame, ctx).split('\n').slice(1).join('\n')
@@ -605,7 +624,7 @@ function renderGrouped(
       item.form !== 'frame' && !(item.parentId && sectionIds.has(item.parentId))
   )
   if (unframed.length) {
-    blocks.push('## Unframed')
+    blocks.push(`${frameHash} Unframed`)
     renderMembers(unframed)
   }
 
@@ -617,6 +636,36 @@ const EXPORT_HEADER = [
   '',
   "The owner's own notes: dreams, goals, failures, drafts and notes, grouped by frame and meaning. Every item has an id; links name the other item's title and id.",
 ].join('\n')
+
+/**
+ * One board keeps the shape it has always had. Several (D32) get a heading each and push
+ * frames down a level, so a card is never ambiguous about which context it came from -
+ * "Ship it" on the client board and on the side project are different sentences.
+ */
+function renderBody(
+  picked: readonly ContextItem[],
+  ctx: EntryContext,
+  boards: ContextBoard[] | undefined
+): string {
+  if (!boards || boards.length < 2) return renderGrouped(picked, ctx)
+  const blocks: string[] = []
+  for (const board of boards) {
+    const mine = picked.filter(item => item.boardId === board.id)
+    if (!mine.length) continue
+    blocks.push(`## ${escapeInline(board.title) || 'Untitled board'}`)
+    blocks.push(renderGrouped(mine, ctx, 3))
+  }
+  // A picked item whose board is not listed cannot happen through `loadAgentVisible`, but
+  // rendering nothing for it would be a silent drop, so it lands in its own section.
+  const orphans = picked.filter(
+    item => !boards.some(board => board.id === item.boardId)
+  )
+  if (orphans.length) {
+    blocks.push('## Other')
+    blocks.push(renderGrouped(orphans, ctx, 3))
+  }
+  return blocks.join('\n\n')
+}
 
 /**
  * The full export (Export sheet, `context.md`). Grouped frame > meaning > item, capped at
@@ -634,7 +683,7 @@ export function renderContext(
   const full = buildEntryContext(input, id =>
     scopeIds.has(id) ? 'in' : 'outside'
   )
-  const whole = `${EXPORT_HEADER}\n\n${renderGrouped(input.items, full)}\n`
+  const whole = `${EXPORT_HEADER}\n\n${renderBody(input.items, full, input.boards)}\n`
   if (byteLength(whole) <= maxBytes)
     return {
       markdown: whole,
@@ -666,7 +715,7 @@ export function renderContext(
     const ctx = buildEntryContext(input, id =>
       chosenIds.has(id) ? 'in' : scopeIds.has(id) ? 'truncated' : 'outside'
     )
-    return `${EXPORT_HEADER}\n\n${renderGrouped(chosen, ctx)}\n\n${footer(chosen.length)}\n`
+    return `${EXPORT_HEADER}\n\n${renderBody(chosen, ctx, input.boards)}\n\n${footer(chosen.length)}\n`
   }
 
   let markdown = render(picked)

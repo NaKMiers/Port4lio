@@ -18,6 +18,7 @@ import { createItem, createLink } from '@/lib/whiteboard/data'
 import { validateItem, validateLink } from '@/lib/whiteboard/limits'
 import { createToken, hashToken, touchLastUsed } from '@/lib/whiteboard/token'
 import { RateLimitModel } from '@/models/RateLimit'
+import { WhiteboardBoardModel } from '@/models/WhiteboardBoard'
 import { WhiteboardItemModel } from '@/models/WhiteboardItem'
 import { WhiteboardLinkModel } from '@/models/WhiteboardLink'
 import { WhiteboardTokenModel } from '@/models/WhiteboardToken'
@@ -47,6 +48,7 @@ let mcpGet: Handler
 let mcpDelete: Handler
 let tokensRoute: Record<'GET' | 'POST', Handler>
 let revokeRoute: Handler
+let BOARD = ''
 
 beforeAll(async () => {
   memory = await MongoMemoryServer.create()
@@ -57,6 +59,10 @@ beforeAll(async () => {
   await WhiteboardItemModel.syncIndexes()
   await WhiteboardLinkModel.syncIndexes()
   await WhiteboardTokenModel.syncIndexes()
+  // Every item lives on a board (D32), and an agent only reads boards whose switch is on.
+  BOARD = String(
+    (await WhiteboardBoardModel.create({ title: 'Test board' }))._id
+  )
 
   contextMd = (await import('@/app/api/whiteboard/context.md/route'))
     .GET as Handler
@@ -71,6 +77,7 @@ beforeAll(async () => {
 }, 120_000)
 
 afterAll(async () => {
+  await WhiteboardBoardModel.deleteMany({})
   await mongoose.disconnect()
   await memory.stop()
 })
@@ -150,7 +157,7 @@ async function callTool(token: string, name: string, args: unknown = {}) {
 async function item(overrides: Record<string, unknown> = {}) {
   const checked = validateItem({ _id: newId(), form: 'text', ...overrides })
   if (!checked.ok) throw new Error(checked.error)
-  const result = await createItem(checked.value)
+  const result = await createItem(BOARD, checked.value)
   if (!result.ok) throw new Error(result.error)
   return result.value
 }
@@ -595,7 +602,7 @@ describe('MCP tools', () => {
       label: 'because',
     })
     if (!checked.ok) throw new Error()
-    await createLink(checked.value)
+    await createLink(BOARD, checked.value)
 
     const { text } = await callTool(token, 'get_item', { id: goal._id })
     expect(text).not.toContain('(clipped')

@@ -165,6 +165,7 @@ Other indexes: text index on `title`, `body`, `tags`, `todos.text` with **`defau
 
 `src/lib/whiteboard/data.ts` exports `loadAgentVisible(scope)`. It is the **only** way the export drawer, `context.md`, and the MCP tools read data:
 
+0. **Excluded boards (D32)** = boards with `includeInAi: false`. Every agent query is filtered by the visible board ids first, so a hidden board is invisible whatever its cards say about themselves. It is rule 1 one level up, and it exists for the same reason: a whole board is often one context, and hiding it once is more honest than remembering to hide forty cards.
 1. Excluded frames = frames with `includeInAi: false`. **Hiding a frame hides everything inside it**, whatever the children's own flag says. That's how you keep a whole "Private" area off-limits.
 2. Visible items = `includeInAi: true` AND `parentId` not in the excluded frames.
 3. Visible links = links with **both** ends visible.
@@ -200,21 +201,55 @@ Other indexes: text index on `title`, `body`, `tags`, `todos.text` with **`defau
 - **Client-generated ObjectIds.** Every item and link gets its id when drawn. `POST` is an idempotent upsert (`$setOnInsert`), so a retried create is harmless and a link or edit can reference a card before its first save lands.
 - A per-item write queue: creates, then edits, in order. A link's `POST` waits until both ends' creates have resolved.
 - Debounced `PATCH` per item (~600 ms). After a multi-select drag, one bulk `PATCH /items` carries all the new positions.
-- A status pill: Saved / Saving / Failed - retry. **Only network errors and 5xx are retried** (with backoff). A 4xx (400/413 validation) is permanent: the write leaves the queue and the item is marked with the server's message. You can fix it, or discard the change, which also drops the queued writes that depend on it (for example a link to a card whose create was rejected). `beforeunload` warns while anything is pending or failed.
+- A status pill: Saved / Saving / N unsaved / Failed - retry. **Only network errors and 5xx are retried** (with backoff). A 4xx (400/413 validation) is permanent: the write leaves the queue and the item is marked with the server's message. You can fix it, or discard the change, which also drops the queued writes that depend on it (for example a link to a card whose create was rejected). `beforeunload` warns while anything is pending or failed.
 - Concurrency: one owner, **last write wins**, stated and accepted. No conflict detection in v1.
+
+### Manual save (D31, after v1)
+
+- An **Auto-save** switch in the top bar, on by default and remembered per browser (`localStorage`). Turning it off pauses the queue: every rule it has - coalescing, ordering, dependencies, rule 8 - still applies, and nothing is sent.
+- **Save** (the button, or Cmd/Ctrl+S in either mode) drains the queue: the debounce is cleared and it runs to empty, retries and dependent writes included, before it goes back to holding. The pill reads "N unsaved" in amber while writes are held - not the Saving spinner, which would claim they were on their way.
+- Paused is not offline, although both stop the pump. Offline happened to the owner and resolves itself; paused is what they asked for, so the network coming back does not send anything.
+- **Leaving with writes still waiting asks first**, in both directions: `beforeunload` for a reload or a closed tab, and a confirm dialog on every client-side way off the canvas - the top bar's link back to the hub and the switcher's three (another board, a new one, the index) - which a client-side navigation would otherwise take silently. "New board" asks before it creates, so cancelling leaves nothing behind.
+- Held writes are on the canvas and nowhere else, so what the server can answer for - the AI export preview, the context a backup file is built from - does not include them. The pill's count is the standing reminder; Save first. The Backup menu says it outright above Download, because that file is the only way back from a hard delete and a silent one-edit-behind copy is the worst kind to have.
+
+### Many boards (D32, after v1)
+
+- `/admin/whiteboard` is the board index (new, rename in place, the per-board agent switch, delete); `/admin/whiteboard/<id>` is a canvas. A switcher in the top bar moves between them.
+- Switching is a navigation, not a state change: the canvas remounts, so one board's save queue, undo history and held writes can never reach another.
+- Every item and link carries `boardId`, and every index leads with it. The text index stays global, because agent search crosses boards.
+- **One migration, once:** the first read that finds no board creates "Whiteboard" and adopts every item and link written before boards existed. It only ever runs while no board exists, and two first reads at once both keep the oldest board and drop the other, so the adoption always has exactly one target.
+- **Agents read every board whose switch is on**, and an export with more than one board gives each a `##` section, pushing frames to `###`. A single board renders exactly as it always did, so nothing changed for an agent reading one board.
+- A board delete is the one destructive act undo cannot answer for - the history lives in the canvas and dies with it - so it is the one place that still asks first, with the item count in the question.
+- **Backup and restore are per board**: the file is the board you are looking at, restored into the board you are looking at. An id in the file that already exists on another board is refused rather than moved.
+
+### Sample data (D33)
+
+"Add sample data" (`mock-data.ts`) drops a frame, ten cards (a dream, goals, a failure, a draft, a to-do, a hidden note, a shape) and five labelled links on the board, as one undo step. It is offered on an empty board and in the Backup menu. The seed is a pure function with no ids and no dates of its own, so `tests/unit` checks its shape - every link end exists, every child fits inside its frame - without a canvas or a database.
+
+### Undo/redo (D30, after v1)
+
+- **Cmd/Ctrl+Z** undoes, **Shift+Cmd/Ctrl+Z** and **Ctrl+Y** redo. Inside a field the chord is left to the field, where it undoes the characters just typed.
+- Every local edit passes through one function (`useBoard.commit`), which records the board as it was before it. Undo diffs that snapshot against the board and sends the difference through the same save queue as any other edit - there is no second write path. The diff is pure and tested alone (`history.ts`, `tests/unit/whiteboard-history.test.ts`).
+- Keystrokes in one field coalesce into one step (700 ms), 60 steps are kept, and a board load or a restore clears the stack: it describes a board that no longer exists.
+- **A card brought back by undo is a copy under a new `_id`.** R3-6 makes a deleted id dead for the session, which is what stops a retrying create from resurrecting it; undo does not get an exception, because reviving the id would be a POST racing its own DELETE. The copy carries every field, `includeInAi` included (rule 8 holds: a card that was hidden comes back hidden), and the links it took with it. The rest of the undo stack is rewritten to the new id.
 
 ### Delete (hard, premise 4)
 
 - The server deletes in a safe order, with no transaction (the repo doesn't use them, and `mongodb-memory-server` runs standalone): (1) links touching the item, (2) un-parent the children of a frame (convert their `x/y` to absolute, and for a **hidden** frame set `includeInAi: false` on each in the same update), (3) the item. If it stops partway, links to missing items are ignored and a `parentId` pointing at a missing frame reads as hidden, so nothing becomes visible by accident. The confirm for a hidden frame says "its N items stay private".
-- The canvas disables React Flow's default Backspace/Delete removal. The Delete key opens the same confirm dialog as the inspector's "Delete permanently" ("Delete 3 items and 5 links?").
-- The **eraser removes ink strokes only.** Deleting a lone edge (a link) needs no confirm.
+- The canvas disables React Flow's default Backspace/Delete removal. The Delete key, and the inspector's "Delete", remove the selection at once and leave a toast that says what went ("2 items and 1 link deleted", plus "its 3 items stay on the board, and stay private" for a hidden frame) and carries **Undo**. There is no confirm dialog: since undo/redo shipped (D30), a confirm in front of an undoable action is a click that protects nothing, and the one it used to protect against - a mis-aimed Delete - is now Cmd/Ctrl+Z.
+- The **eraser removes ink strokes only.**
 - **Backup and restore (D20):** "Download backup (JSON)" and "Restore from backup" (preview counts, then confirm) on the page. This is the recovery path for hard delete.
 
 ### Routes
 
 UI (cookie, `requireOwner`):
 
-- `GET    /api/admin/whiteboard` - all items + links for the canvas, **streamed as NDJSON** (D21, Vercel's 4.5 MB limit does not apply to streamed responses). **Order is fixed (D28):** frames, then other items, then links, because React Flow needs a parent node before its children and a link needs both ends. The client adds parsed lines to state in batches (per chunk / animation frame), not one render per line.
+Every route below that touches items or links carries **`?board=<id>`** (D32) and is refused with a 400 without one - "the board" stopped being a thing that can be assumed the moment there could be two. An id from another board answers 404: the pair (board, id) is what a write is allowed to name, never the id alone.
+
+- `GET    /api/admin/whiteboard/boards` - every board, oldest first, with item counts. Also the call that creates the first board and adopts the items written before boards existed.
+- `POST   /api/admin/whiteboard/boards` - `{ title, includeInAi }`.
+- `PATCH  /api/admin/whiteboard/boards/[id]` - `{ title?, includeInAi? }`. `DELETE` removes the board, its links and its items, and refuses the last one.
+- `GET    /api/admin/whiteboard` - all items + links of one board for the canvas, **streamed as NDJSON** (D21, Vercel's 4.5 MB limit does not apply to streamed responses). **Order is fixed (D28):** frames, then other items, then links, because React Flow needs a parent node before its children and a link needs both ends. The client adds parsed lines to state in batches (per chunk / animation frame), not one render per line.
 - `POST   /api/admin/whiteboard/items` - idempotent upsert create.
 - `PATCH  /api/admin/whiteboard/items` - bulk position update `{ updates: [{ id, x, y, parentId }] }`, max 500.
 - `PATCH  /api/admin/whiteboard/items/[id]`, `DELETE /api/admin/whiteboard/items/[id]`.
@@ -253,7 +288,7 @@ Use user scope, **never project scope**. Project scope writes `.mcp.json`, which
 - Server page with its own `metadata` (`title: 'Whiteboard'`, `robots: noindex`), rendering inside **`OwnerAuthGate`** like every other board. The canvas is a client component loaded client-only.
 - Layout (DR2, supersedes the `fixed ... top-12` line that was here): a **framed app sized to the viewport**, following `/admin/certificates/ccaf/vocab`. `<main className="w-full p-4 lg:h-[100dvh]">`, one rounded `pp-line` frame, 56px top bar, canvas, 320px inspector. `AdminHomeLink` hides itself on `/admin/whiteboard` (add the path to its early return and its comment), and the top bar's grid icon is the way back to the hub. The old `top-12` offset would have sat under the ~68px pill row. The React Flow background is transparent over `pp-bg` with a dot grid.
 - Tool rail: select (V), text card (T), to-do card (L), rect (R), ellipse (O), diamond (D), frame (F), arrow (A), pen (P), eraser (E, ink only), lucide icons, shortcut letter shown on each button. Behaviour: DR9.
-- Inspector: Title, **Body** (auto-growing textarea, counter, DR10), Meaning and Status via `SelectField`, when + target-by dates, tags, links list (in and out), "Include in AI export" toggle, "Delete permanently" with confirm. Nothing selected: shortcuts. 2+ selected: DR11.
+- Inspector: Title, **Body** (auto-growing textarea, counter, DR10), Meaning and Status via `SelectField`, when + target-by dates, tags, links list (in and out), "Include in AI export" toggle, "Delete" (no confirm - D30). Nothing selected: shortcuts. 2+ selected: DR11.
 - Export drawer (a 480px non-modal right sheet over the inspector, DR3): scope picker, live server-rendered preview, rough token estimate (chars / 4), Copy button. It shows what the privacy filter dropped ("N selected items are hidden and not included" / "This frame is hidden from AI"), and Copy is disabled on an empty export (D25).
 - Responsive: three tiers (DR8), see Design Review.
 - Navigation: add one card to `BOARDS` in `src/app/(admin)/admin/page.tsx` with a lucide icon and tint. There is no `AdminChrome` nav change - hub -> board -> hub is the navigation model by design.
@@ -266,7 +301,7 @@ Use user scope, **never project scope**. Project scope writes `.mcp.json`, which
 
 - **mcp-handler defaults (D17):** confirm at build time how it answers GET/DELETE and notifications in stateless mode, and wrap the handler where it differs from the approved 405 / 202 behavior.
 - **Codex MCP config keys** for a remote HTTP server with a bearer token from an env var - verify against current Codex docs before writing the panel text.
-- ~~Undo/redo~~ - resolved (D30): not in v1, captured in `TODOS.md` with the delete-recreate caveat.
+- ~~Undo/redo~~ - resolved (D30): deferred out of v1, then shipped after it. See "Undo/redo" above.
 - **Export beyond 1 MB:** v1 truncates and points at `search_context`. Summarisation is v2.
 
 ## Success Criteria
@@ -1025,8 +1060,9 @@ Nothing in the plan rebuilds an existing piece.
 ### NOT in scope (v1)
 
 - Agent writes / ghost cards - v2. Agents are read-only in v1 (premise 5).
+- Per-board `get_overview` grouping - `get_overview`, `search_context` and `get_item` read across every visible board and do not group by board (D32); only the full export has board sections. Ids are unique, so nothing is ambiguous, but an agent cannot ask "what is on the Scratch board".
 - MCP `whiteboard://context` resource - cut (D15). Overflows the 25k-token MCP output cap.
-- Undo/redo - `TODOS.md` (D30).
+- ~~Undo/redo~~ - was `TODOS.md` (D30); shipped after v1.
 - Summarised export past 1 MB - v2. v1 truncates by priority and points at `search_context`.
 - OCR or any reading of ink - never pretended. Ink is `[Sketch near: ...]`.
 - Real-time multi-tab conflict detection - last write wins, one owner (stated).
@@ -1236,16 +1272,16 @@ Source: `.../whiteboard-20260923/wireframe.html` (set `window.WB_MODE` to `board
 
 ### Interaction states (DR4, Pass 2: 3 -> 9)
 
-| Surface        | Loading                                                                     | Empty                                                                                            | Error                                                                   | Partial / other                                                                                       |
-| -------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Board load     | frame + rail shown, rail disabled, pill "Loading 128 items", batches appear | `wireframe-empty.png`: "Put down one true thing." + Text card / Frame / Restore; Export disabled | panel on the canvas: "Couldn't load the board." + Retry; **no editing** | stream cut mid-way = Error. A partial board is never editable, so it can't autosave over the real one |
-| Save pill      | "Saving" + spinner                                                          | "Saved"                                                                                          | "N not saved - retry" (rose). Click retries all                         | offline: "Offline - changes kept", resume on `online`                                                 |
-| Card (4xx)     | -                                                                           | -                                                                                                | rose outline + badge. Inspector top: server message + Discard           | Discard drops the dependent writes                                                                    |
-| Inspector      | -                                                                           | "Nothing selected" + shortcuts                                                                   | -                                                                       | multi-select: DR11                                                                                    |
-| Export sheet   | skeleton lines (~400 ms debounce)                                           | "This frame is hidden from AI" / "Nothing to export"; Copy disabled                              | "Preview failed" + Retry; Copy disabled                                 | "N selected items are hidden" (D25); truncation line in amber                                         |
-| Copy           | -                                                                           | -                                                                                                | clipboard denied: select-all in a read-only textarea                    | "Copied - ~12k tokens" for 2 s                                                                        |
-| Agents popover | spinner row                                                                 | "No tokens yet" + Create token                                                                   | "Couldn't load tokens" + Retry                                          | just created: token shown once + Copy + "won't be shown again"; revoked rows greyed                   |
-| Restore        | "Checking file..." then counts                                              | -                                                                                                | invalid file: which entry + why, zero writes                            | "Batch 3 of 5". Mid-way failure: "Stopped at 3/5 - Run again"                                         |
+| Surface        | Loading                                                                     | Empty                                                                                            | Error                                                                   | Partial / other                                                                                        |
+| -------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Board load     | frame + rail shown, rail disabled, pill "Loading 128 items", batches appear | `wireframe-empty.png`: "Put down one true thing." + Text card / Frame / Restore; Export disabled | panel on the canvas: "Couldn't load the board." + Retry; **no editing** | stream cut mid-way = Error. A partial board is never editable, so it can't autosave over the real one  |
+| Save pill      | "Saving" + spinner                                                          | "Saved"                                                                                          | "N not saved - retry" (rose). Click retries all                         | offline: "Offline - changes kept", resume on `online`; auto-save off: "N unsaved" (amber) + Save (D31) |
+| Card (4xx)     | -                                                                           | -                                                                                                | rose outline + badge. Inspector top: server message + Discard           | Discard drops the dependent writes                                                                     |
+| Inspector      | -                                                                           | "Nothing selected" + shortcuts                                                                   | -                                                                       | multi-select: DR11                                                                                     |
+| Export sheet   | skeleton lines (~400 ms debounce)                                           | "This frame is hidden from AI" / "Nothing to export"; Copy disabled                              | "Preview failed" + Retry; Copy disabled                                 | "N selected items are hidden" (D25); truncation line in amber                                          |
+| Copy           | -                                                                           | -                                                                                                | clipboard denied: select-all in a read-only textarea                    | "Copied - ~12k tokens" for 2 s                                                                         |
+| Agents popover | spinner row                                                                 | "No tokens yet" + Create token                                                                   | "Couldn't load tokens" + Retry                                          | just created: token shown once + Copy + "won't be shown again"; revoked rows greyed                    |
+| Restore        | "Checking file..." then counts                                              | -                                                                                                | invalid file: which entry + why, zero writes                            | "Batch 3 of 5". Mid-way failure: "Stopped at 3/5 - Run again"                                          |
 
 ### Journey (Pass 3: 5 -> 9)
 

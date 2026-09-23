@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { createLink } from '@/lib/whiteboard/data'
-import { noStore, wbError, wbJson } from '@/lib/whiteboard/http'
+import { boardParam, noStore, wbError, wbJson } from '@/lib/whiteboard/http'
 import { validateLink } from '@/lib/whiteboard/limits'
 
 export const runtime = 'nodejs'
@@ -20,6 +20,9 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   const parsed = await readJsonBody(request)
   if (!parsed.ok) return wbError(parsed.error, parsed.status)
 
@@ -27,7 +30,7 @@ export async function POST(request: NextRequest) {
   if (!checked.ok) return wbError(checked.error, checked.status)
 
   try {
-    const result = await createLink(checked.value)
+    const result = await createLink(scope.board, checked.value)
     if (!result.ok) return wbError(result.error, result.status)
     return wbJson({ link: result.value })
   } catch (error) {

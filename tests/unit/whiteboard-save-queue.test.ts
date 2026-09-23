@@ -778,3 +778,115 @@ describe('review fixes', () => {
     })
   })
 })
+
+describe('manual save (D31)', () => {
+  it('holds every write while paused, and sends them all on Save', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.setPaused(true)
+
+    h.queue.patchItem(A, { title: 'held' }, { delay: 0 })
+    h.queue.createItem(B, { _id: B, form: 'text' })
+    await h.advance(60_000) // no debounce, no backoff, no anything: nothing goes
+    expect(h.sent).toEqual([])
+    expect(h.queue.status()).toMatchObject({ pending: 2, holding: true })
+
+    h.queue.saveNow()
+    await h.flush()
+    expect(h.sent).toHaveLength(2)
+    // Mid-save it is no longer "holding": these writes are on their way.
+    expect(h.queue.status().holding).toBe(false)
+    await h.resolveNext()
+    await h.resolveNext()
+    expect(h.queue.status()).toMatchObject({ pending: 0, holding: false })
+  })
+
+  it('clears the debounce, so an edit typed a moment ago is in the save', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.setPaused(true)
+    h.queue.patchItem(A, { title: 'typed' }) // the 600 ms debounce
+    h.queue.saveNow()
+    await h.flush()
+    expect(h.sent).toEqual([
+      { type: 'patchItem', id: A, patch: { title: 'typed' } },
+    ])
+  })
+
+  // The drain has to outlive the first round trip: a link waits for its card's create, and
+  // a retried write waits for its backoff. Neither may be stranded until the next Save.
+  it('keeps running until the queue is empty, dependencies and retries included', async () => {
+    const h = harness()
+    h.queue.setPaused(true)
+    h.queue.createItem(A, { _id: A, form: 'text' })
+    h.queue.createLink({
+      _id: L,
+      from: A,
+      to: A,
+      label: '',
+      fromHandle: null,
+      toHandle: null,
+    })
+    h.queue.saveNow()
+    await h.flush()
+    expect(h.sent).toHaveLength(1) // the link waits for the card
+
+    await h.resolveNext({ ok: false, status: 500, error: 'boom' })
+    await h.advance(1_000) // backoff, still draining
+    expect(h.sent).toHaveLength(2)
+    await h.resolveNext({ ok: true })
+    await h.flush()
+    expect(h.sent.at(-1)).toMatchObject({ type: 'createLink' })
+    await h.resolveNext()
+    expect(h.queue.status()).toMatchObject({ pending: 0, holding: false })
+  })
+
+  it('sends what piled up when auto-save is switched back on', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.setPaused(true)
+    h.queue.patchItem(A, { title: 'held' }, { delay: 0 })
+    await h.flush()
+    expect(h.sent).toEqual([])
+    h.queue.setPaused(false)
+    await h.flush()
+    expect(h.sent).toHaveLength(1)
+  })
+
+  // The drain has to END too. A create the server refused is parked for good, and so is the
+  // child waiting on it - if those keep the drain open, the queue goes on auto-saving with
+  // the switch still off, and `holding` stays false so nothing on screen says so.
+  it('ends the save when a refused create has left its dependants stranded', async () => {
+    const h = harness()
+    h.queue.setPaused(true)
+    h.queue.createItem(F, { _id: F, form: 'frame' })
+    h.queue.createItem(A, { _id: A, form: 'text', parentId: F })
+
+    h.queue.saveNow()
+    await h.flush()
+    await h.resolveNext({ ok: false, status: 400, error: 'no' })
+    await h.advance(60_000)
+
+    // The child never went: its frame is not on the server and never will be.
+    expect(h.sent).toHaveLength(1)
+    expect(h.queue.status()).toMatchObject({ pending: 1, holding: true })
+
+    // And the queue is holding again, so the next edit waits for the next Save.
+    h.queue.markPersisted([B])
+    h.queue.patchItem(B, { title: 'typed after' }, { delay: 0 })
+    await h.advance(60_000)
+    expect(h.sent).toHaveLength(1)
+  })
+
+  it('is not the offline state: a paused queue offline stays paused when the network returns', async () => {
+    const h = harness()
+    h.queue.markPersisted([A])
+    h.queue.setPaused(true)
+    h.queue.setOnline(false)
+    h.queue.patchItem(A, { title: 'held' }, { delay: 0 })
+    h.queue.setOnline(true)
+    await h.advance(60_000)
+    expect(h.sent).toEqual([])
+    expect(h.queue.status()).toMatchObject({ online: true, holding: true })
+  })
+})

@@ -46,6 +46,8 @@ import {
 
 export type WhiteboardItemDocument = {
   _id: Types.ObjectId
+  /** The board this lives on (D32). Every read is filtered by it. */
+  boardId: Types.ObjectId
   form: Form
   meaning: Meaning | null
   status: Status | null
@@ -98,6 +100,7 @@ const inkSchema = new Schema(
 const whiteboardItemSchema = new Schema<WhiteboardItemDocument>(
   {
     _id: { type: Schema.Types.ObjectId, required: true },
+    boardId: { type: Schema.Types.ObjectId, required: true },
     form: { type: String, enum: FORMS, required: true },
     meaning: { type: String, enum: [...MEANINGS, null], default: null },
     status: { type: String, enum: [...STATUSES, null], default: null },
@@ -130,10 +133,16 @@ whiteboardItemSchema.index(
   { title: 'text', body: 'text', tags: 'text', 'todos.text': 'text' },
   { name: 'whiteboard_text', default_language: 'none' }
 )
-whiteboardItemSchema.index({ meaning: 1, status: 1 })
-whiteboardItemSchema.index({ parentId: 1 })
-whiteboardItemSchema.index({ form: 1, includeInAi: 1 })
-whiteboardItemSchema.index({ updatedAt: -1 })
+/*
+  Every index leads with `boardId` (D32): every owner read is one board, and the agent reads
+  are "the visible boards", so a board is the prefix of every query rather than a field that
+  happens to be checked after the fact. The text index is the exception - it stays global
+  because agent search crosses boards, and `boardId` rides along as a filter beside `$text`.
+*/
+whiteboardItemSchema.index({ boardId: 1, meaning: 1, status: 1 })
+whiteboardItemSchema.index({ boardId: 1, parentId: 1 })
+whiteboardItemSchema.index({ boardId: 1, form: 1, includeInAi: 1 })
+whiteboardItemSchema.index({ boardId: 1, updatedAt: -1 })
 
 export const WhiteboardItemModel: mongoose.Model<WhiteboardItemDocument> =
   compileModel('WhiteboardItem', whiteboardItemSchema)

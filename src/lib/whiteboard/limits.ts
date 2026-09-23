@@ -631,6 +631,51 @@ export function validateLinkPatch(input: unknown): Verdict<{ label: string }> {
   return { ok: true, value: { label: label.value.trim() } }
 }
 
+// MARK: Board validators (D32)
+
+export interface BoardFields {
+  title: string
+  includeInAi: boolean
+}
+
+/**
+ * A board is a title and one privacy switch. The switch is the frame rule one level up: a
+ * board agents cannot read hides everything on it, whatever each card says about itself.
+ */
+export function validateBoard(input: unknown): Verdict<BoardFields> {
+  const raw = (input ?? {}) as Record<string, unknown>
+  const title = singleLine('title', raw.title ?? '', LIMITS.title)
+  if (!title.ok) return fail(title.error)
+  if (raw.includeInAi !== undefined && typeof raw.includeInAi !== 'boolean')
+    return fail('includeInAi must be a boolean.')
+  return {
+    ok: true,
+    value: {
+      title: title.value.trim(),
+      includeInAi: raw.includeInAi !== false,
+    },
+  }
+}
+
+export function validateBoardPatch(
+  input: unknown
+): Verdict<Partial<BoardFields>> {
+  const raw = (input ?? {}) as Record<string, unknown>
+  const patch: Partial<BoardFields> = {}
+  if ('title' in raw) {
+    const title = singleLine('title', raw.title, LIMITS.title)
+    if (!title.ok) return fail(title.error)
+    patch.title = title.value.trim()
+  }
+  if ('includeInAi' in raw) {
+    if (typeof raw.includeInAi !== 'boolean')
+      return fail('includeInAi must be a boolean.')
+    patch.includeInAi = raw.includeInAi
+  }
+  if (Object.keys(patch).length === 0) return fail('Nothing to update.')
+  return { ok: true, value: patch }
+}
+
 // MARK: Backup file
 
 export const BACKUP_VERSION = 1

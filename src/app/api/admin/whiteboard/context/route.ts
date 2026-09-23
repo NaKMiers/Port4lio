@@ -4,7 +4,7 @@ import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { renderContext } from '@/lib/whiteboard/context'
 import { loadAgentVisible } from '@/lib/whiteboard/data'
-import { noStore, wbError, wbJson } from '@/lib/whiteboard/http'
+import { boardParam, noStore, wbError, wbJson } from '@/lib/whiteboard/http'
 import { parseExportScope } from '@/lib/whiteboard/scope'
 import type { ContextResponse } from '@/lib/whiteboard/types'
 
@@ -12,7 +12,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * [POST] /api/admin/whiteboard/context - the Export sheet's live preview.
+ * [POST] /api/admin/whiteboard/context?board=<id> - the Export sheet's live preview.
+ *
+ * Scoped to one board (D32): the sheet exports the board it is open on. A board an agent
+ * cannot read answers like a hidden frame - no markdown, and the count of what was held
+ * back, so the sheet can say why it is empty.
  *
  * Body `{ scope }`, response `{ markdown, excludedCount, scopeHidden, ... }` (D25).
  *
@@ -26,6 +30,9 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const board = boardParam(request)
+  if (!board.ok) return board.response
+
   const parsed = await readJsonBody<{ scope?: unknown }>(request, {
     maxBytes: 64 * 1024,
   })
@@ -35,7 +42,7 @@ export async function POST(request: NextRequest) {
   if (!scope.ok) return wbError(scope.error, 400)
 
   try {
-    const load = await loadAgentVisible(scope.value)
+    const load = await loadAgentVisible(scope.value, { board: board.board })
     const rendered = renderContext(load.input)
     const body: ContextResponse = {
       markdown: rendered.markdown,

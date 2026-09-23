@@ -21,6 +21,6 @@ const WhiteboardApp = dynamic(
   }
 )
 
-export default function WhiteboardClient() {
-  return <WhiteboardApp />
+export default function WhiteboardClient({ boardId }: { boardId: string }) {
+  return <WhiteboardApp boardId={boardId} />
 }

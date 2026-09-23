@@ -1,12 +1,13 @@
 'use client'
 
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
-import { Pencil } from 'lucide-react'
+import { Pencil, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import { AgentsButton } from '@/components/whiteboard/AgentsPopover'
 import { BackupMenu, RestoreDialog } from '@/components/whiteboard/Backup'
+import BoardSwitcher from '@/components/whiteboard/BoardSwitcher'
 import ExportSheet from '@/components/whiteboard/ExportSheet'
 import InkLayer from '@/components/whiteboard/InkLayer'
 import {
@@ -20,9 +21,10 @@ import {
   type TransientMap,
 } from '@/components/whiteboard/canvas-state'
 import Inspector from '@/components/whiteboard/Inspector'
+import SaveControls from '@/components/whiteboard/SaveControls'
 import SavePill from '@/components/whiteboard/SavePill'
 import ShortcutsHelp from '@/components/whiteboard/ShortcutsHelp'
-import { deletePlan } from '@/components/whiteboard/delete-plan'
+import { deletePlan, deletedText } from '@/components/whiteboard/delete-plan'
 import {
   canvasNodeId,
   escapeTarget,
@@ -32,6 +34,7 @@ import {
 import ToolRail from '@/components/whiteboard/ToolRail'
 import TopBar from '@/components/whiteboard/TopBar'
 import { useBoard } from '@/components/whiteboard/useBoard'
+import { useBoards } from '@/components/whiteboard/useBoards'
 import { useReducedMotion, useTier } from '@/components/whiteboard/useTier'
 import ZoomControls from '@/components/whiteboard/ZoomControls'
 import { cn } from '@/lib/utils'
@@ -55,11 +58,19 @@ import type { ClientItem } from '@/lib/whiteboard/types'
  *
  * One window listener, gated by `shortcutFor`, which refuses every single-key shortcut while
  * focus is in a field - a "t" typed into a title must be a letter. Esc peels one layer at a
- * time (tool, then an open surface, then the selection). Delete on a selection that holds
- * any item opens the confirm with counts; a selection of links only is deleted at once
- * (R3-7). Tab onto a card selects it, Enter edits it, and the arrows nudge the selection
- * 10px (Shift 50px) through the debounced PATCH. Nothing reaches the canvas while a dialog
- * is open.
+ * time (tool, then an open surface, then the selection). Tab onto a card selects it, Enter
+ * edits it, and the arrows nudge the selection 10px (Shift 50px) through the debounced
+ * PATCH. Nothing reaches the canvas while a dialog is open.
+ *
+ * ## Delete does not ask (R3-7, D30)
+ *
+ * Delete removes the selection at once and says so on a toast that carries Undo, and
+ * Cmd/Ctrl+Z does the same from the keyboard. It used to open a confirm counting the items
+ * and links, which was the only thing standing between a mis-aimed Delete and a hard delete
+ * - and it charged that toll on every deliberate delete too, which is most of them. An undo
+ * that restores the cards, their links and their frame membership is a better answer to the
+ * same danger, so the dialog came out rather than being kept as well: a confirm in front of
+ * an undoable action is a click that protects nothing.
  */
 
 const CREATE_FORM: Partial<Record<Tool, { form: Form; shape?: Shape }>> = {
@@ -79,23 +90,18 @@ const HALF: Record<Form, { x: number; y: number }> = {
   ink: { x: 0, y: 0 },
 }
 
-interface PendingDelete {
-  items: string[]
-  links: number
-  frameChildren: number
-  hiddenFrame: boolean
-}
-
-export default function WhiteboardApp() {
+export default function WhiteboardApp({ boardId }: { boardId: string }) {
   return (
     <ReactFlowProvider>
-      <WhiteboardShell />
+      <WhiteboardShell boardId={boardId} />
     </ReactFlowProvider>
   )
 }
 
-function WhiteboardShell() {
-  const board = useBoard()
+function WhiteboardShell({ boardId }: { boardId: string }) {
+  const board = useBoard(boardId)
+  const boards = useBoards()
+  const current = boards.boards.find(entry => entry._id === boardId) ?? null
   const { data, load, actions } = board
   const tier = useTier()
   const reducedMotion = useReducedMotion()
@@ -121,7 +127,6 @@ function WhiteboardShell() {
     null
   )
   const [helpOpen, setHelpOpen] = useState(false)
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [pulse, setPulse] = useState(0)
   const [exportScope, setExportScope] = useState<'all' | 'selection'>('all')
   const [restoreFile, setRestoreFile] = useState<File | null>(null)
@@ -170,18 +175,19 @@ function WhiteboardShell() {
     [actions, readOnly, selectOnly]
   )
 
+  const viewCentre = useCallback(() => {
+    const bounds = document.querySelector('.wb-flow')?.getBoundingClientRect()
+    return bounds
+      ? flow.screenToFlowPosition({
+          x: bounds.left + bounds.width / 2,
+          y: bounds.top + bounds.height / 2,
+        })
+      : { x: 0, y: 0 }
+  }, [flow])
+
   const createAtCentre = useCallback(
-    (which: Tool) => {
-      const bounds = document.querySelector('.wb-flow')?.getBoundingClientRect()
-      const centre = bounds
-        ? flow.screenToFlowPosition({
-            x: bounds.left + bounds.width / 2,
-            y: bounds.top + bounds.height / 2,
-          })
-        : { x: 0, y: 0 }
-      create(which, centre)
-    },
-    [create, flow]
+    (which: Tool) => create(which, viewCentre()),
+    [create, viewCentre]
   )
 
   const openExport = useCallback(
@@ -195,26 +201,54 @@ function WhiteboardShell() {
 
   const pickRestoreFile = useCallback(() => fileInputRef.current?.click(), [])
 
-  // MARK: Delete (R3-7, R3-19)
+  /** "Add sample data" (D33): a board's worth of cards around the middle of the view. */
+  const addMock = useCallback(() => {
+    if (readOnly) return
+    const ids = actions.addMock(viewCentre())
+    setSurface(null)
+    selectOnly([])
+    // Frame the result, so the seed is not dropped somewhere off screen.
+    requestAnimationFrame(() =>
+      flow.fitView({
+        nodes: ids.map(id => ({ id })),
+        duration: 300,
+        padding: 0.2,
+      })
+    )
+  }, [actions, flow, readOnly, selectOnly, viewCentre])
 
-  const requestDelete = useCallback(() => {
+  // MARK: Undo / redo (D30)
+
+  const stepHistory = useCallback(
+    (which: 'undo' | 'redo') => {
+      if (readOnly) return
+      const plan =
+        which === 'undo' ? board.history.undo() : board.history.redo()
+      // Cards that came back are selected, so the inspector is on what just reappeared and
+      // a second Delete is aimed at it rather than at nothing.
+      if (plan?.createItems.length)
+        selectOnly(plan.createItems.map(item => item._id))
+    },
+    [board.history, readOnly, selectOnly]
+  )
+  const undoStep = useCallback(() => stepHistory('undo'), [stepHistory])
+
+  // MARK: Delete (R3-7, R3-19, D30)
+
+  const deleteSelection = useCallback(() => {
     if (readOnly) return
     const plan = deletePlan(selection, data)
-    if (plan?.kind === 'links') actions.deleteLinks(plan.ids)
-    if (plan?.kind === 'confirm') {
-      const { items, links, frameChildren, hiddenFrame } = plan
-      setPendingDelete({ items, links, frameChildren, hiddenFrame })
-    }
-  }, [actions, data, readOnly, selection])
-
-  const confirmDelete = useCallback(() => {
-    if (!pendingDelete) return
-    const extraLinks = selection.edges.filter(id => data.links[id])
-    actions.deleteItems(pendingDelete.items)
-    if (extraLinks.length) actions.deleteLinks(extraLinks)
-    setPendingDelete(null)
+    if (!plan) return
+    if (plan.kind === 'links') actions.deleteLinks(plan.ids)
+    else
+      actions.deleteItems(
+        plan.items,
+        selection.edges.filter(id => data.links[id])
+      )
     clearSelection()
-  }, [actions, clearSelection, data.links, pendingDelete, selection.edges])
+    // After the actions: each of them clears a stale Undo toast as it records its own step.
+    board.setNotice({ text: deletedText(plan), undo: undoStep })
+  }, [actions, board, clearSelection, data, readOnly, selection, undoStep])
 
   const erase = useCallback(
     (id: string) => actions.deleteItems([id]),
@@ -240,7 +274,7 @@ function WhiteboardShell() {
     const onKeyDown = (event: KeyboardEvent) => {
       // A dialog owns the keyboard while it is open, Esc included (its own handler).
       const action = shortcutFor(event, {
-        modalOpen: Boolean(pendingDelete || helpOpen || unhide || restoreFile),
+        modalOpen: Boolean(helpOpen || unhide || restoreFile),
       })
       if (!action) return
       switch (action.type) {
@@ -262,7 +296,18 @@ function WhiteboardShell() {
           return
         case 'delete':
           event.preventDefault()
-          requestDelete()
+          deleteSelection()
+          return
+        case 'save':
+          // Always prevented, in both modes: the browser's own Save dialog on a canvas app
+          // is never what the chord meant.
+          event.preventDefault()
+          if (!readOnly) board.saveNow()
+          return
+        case 'undo':
+        case 'redo':
+          event.preventDefault()
+          stepHistory(action.type)
           return
         case 'help':
           event.preventDefault()
@@ -304,22 +349,32 @@ function WhiteboardShell() {
       window.removeEventListener('focusin', onFocusIn)
     }
   }, [
+    board,
     clearSelection,
+    deleteSelection,
     empty,
     helpOpen,
     nudge,
     openExport,
-    pendingDelete,
     readOnly,
-    requestDelete,
     restoreFile,
     selectOnly,
     selection,
     setTool,
+    stepHistory,
     surface,
     tool,
     unhide,
   ])
+
+  // An Undo toast takes itself away: its offer expires with the next edit anyway (useBoard
+  // clears it), and a delete the owner meant to make should not leave a bar on the canvas.
+  const { notice, setNotice } = board
+  useEffect(() => {
+    if (!notice?.undo) return
+    const timer = setTimeout(() => setNotice(null), 8_000)
+    return () => clearTimeout(timer)
+  }, [notice, setNotice])
 
   // MARK: Context for nodes
 
@@ -365,7 +420,7 @@ function WhiteboardShell() {
     <Inspector
       board={board}
       selection={selection}
-      onDelete={requestDelete}
+      onDelete={deleteSelection}
       onSelect={selectOnly}
       onExportSelection={() => openExport('selection')}
       onUnhideFrame={(frame, readable) => setUnhide({ frame, readable })}
@@ -373,6 +428,30 @@ function WhiteboardShell() {
     />
   )
   const hasSelection = selection.nodes.length + selection.edges.length > 0
+  /**
+   * Writes that leaving would lose. A write that is merely queued under auto-save is not one
+   * of them: it goes out on unmount and finishes during the navigation. One that is held
+   * (D31), failed, refused, or waiting for the network does not.
+   */
+  const unsavedCount =
+    (board.status.holding || !board.status.online
+      ? board.status.pending
+      : board.status.failing) + Object.keys(board.errors).length
+
+  /**
+   * Every way off this canvas (the top bar's grid icon, and the switcher's three) runs
+   * through here: leaving unmounts the board and stops its queue, and a paused queue sends
+   * nothing on the way out, so anything held is gone. `beforeunload` covers a reload or a
+   * closed tab; a client-side navigation never fires it.
+   */
+  const [leaving, setLeaving] = useState<{ go: () => void } | null>(null)
+  const onLeave = useCallback(
+    (go: () => void) => {
+      if (unsavedCount > 0) setLeaving({ go })
+      else go()
+    },
+    [unsavedCount]
+  )
 
   return (
     <BoardUiContext.Provider value={ui}>
@@ -383,11 +462,7 @@ function WhiteboardShell() {
         )}
       >
         <TopBar
-          unsaved={
-            board.status.failing > 0 ||
-            (!board.status.online && board.status.pending > 0) ||
-            Object.keys(board.errors).length > 0
-          }
+          onLeave={onLeave}
           className="col-span-full"
           pill={
             <SavePill
@@ -397,14 +472,47 @@ function WhiteboardShell() {
               onRetry={actions.retryAll}
             />
           }
-          hiddenCount={board.hiddenCount}
+          saveControls={
+            <SaveControls
+              autoSave={board.autoSave}
+              onAutoSave={board.setAutoSave}
+              onSave={board.saveNow}
+              pending={board.status.pending}
+              disabled={readOnly}
+              compact={tier !== 'lg'}
+            />
+          }
+          hiddenCount={
+            // A board agents cannot read hides everything on it, so the chip says so rather
+            // than counting the cards that happen to carry their own switch (D32).
+            current && !current.includeInAi
+              ? Object.keys(data.items).length
+              : board.hiddenCount
+          }
+          boardHidden={current ? !current.includeInAi : false}
           onHiddenClick={showHidden}
+          boardSwitcher={
+            <BoardSwitcher
+              boards={boards.boards}
+              currentId={boardId}
+              title={current?.title || 'Whiteboard'}
+              onCreate={async () => {
+                const made = await boards.create('New board').catch(() => null)
+                return made?._id ?? null
+              }}
+              onLeave={onLeave}
+            />
+          }
           backup={
             <BackupMenu
+              boardId={boardId}
               open={surface === 'backup'}
               onToggle={open => setSurface(open ? 'backup' : null)}
               onRestore={pickRestoreFile}
+              onMock={addMock}
+              mockDisabled={readOnly}
               beforeDownload={() => board.queue.flush()}
+              heldWrites={board.status.holding ? board.status.pending : 0}
               compact={tier !== 'lg'}
             />
           }
@@ -473,6 +581,7 @@ function WhiteboardShell() {
             <EmptyBoard
               onText={() => createAtCentre('text')}
               onFrame={() => createAtCentre('frame')}
+              onMock={addMock}
               onRestore={pickRestoreFile}
             />
           ) : null}
@@ -485,9 +594,23 @@ function WhiteboardShell() {
           {board.notice ? (
             <div
               role="status"
+              data-testid="wb-notice"
               className="absolute bottom-3.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-pp-line bg-pp-panel-strong px-4 py-2 text-[12.5px] text-pp-text shadow-panel"
             >
-              {board.notice}
+              {board.notice.text}
+              {board.notice.undo ? (
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 font-semibold text-pp-text hover:text-pp-blue"
+                  onClick={board.notice.undo}
+                >
+                  <Undo2
+                    aria-hidden
+                    size={13}
+                  />
+                  Undo
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="font-semibold text-pp-muted hover:text-pp-text"
@@ -539,6 +662,7 @@ function WhiteboardShell() {
       />
       {restoreFile ? (
         <RestoreDialog
+          boardId={boardId}
           file={restoreFile}
           pendingSaves={board.status.pending}
           onClose={() => setRestoreFile(null)}
@@ -579,35 +703,25 @@ function WhiteboardShell() {
       />
 
       <ConfirmDialog
-        open={pendingDelete !== null}
-        title={
-          pendingDelete
-            ? `Delete ${pendingDelete.items.length} item${pendingDelete.items.length === 1 ? '' : 's'}${
-                pendingDelete.links
-                  ? ` and ${pendingDelete.links} link${pendingDelete.links === 1 ? '' : 's'}`
-                  : ''
-              }?`
-            : ''
-        }
+        open={leaving !== null}
+        title="Leave with unsaved changes?"
         message={
-          <>
-            <p>
-              This is permanent. Download a backup first if you might want it
-              back.
-            </p>
-            {pendingDelete?.frameChildren ? (
-              <p className="mt-2">
-                {pendingDelete.hiddenFrame
-                  ? `Its ${pendingDelete.frameChildren} items stay on the board, and stay private.`
-                  : `Its ${pendingDelete.frameChildren} items stay on the board.`}
-              </p>
-            ) : null}
-          </>
+          <p>
+            {unsavedCount === 1
+              ? '1 change has not been written to the server'
+              : `${unsavedCount} changes have not been written to the server`}
+            . Leaving loses them. Save first, or download a backup.
+          </p>
         }
-        confirmLabel="Delete permanently"
-        onConfirm={confirmDelete}
-        onCancel={() => setPendingDelete(null)}
+        confirmLabel="Leave without saving"
+        onConfirm={() => {
+          const go = leaving?.go
+          setLeaving(null)
+          go?.()
+        }}
+        onCancel={() => setLeaving(null)}
       />
+
       <ShortcutsHelp
         open={helpOpen}
         onClose={() => setHelpOpen(false)}

@@ -3,7 +3,13 @@ import type { NextRequest } from 'next/server'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { bulkMoveItems, createItem } from '@/lib/whiteboard/data'
-import { noStore, wbEntryError, wbError, wbJson } from '@/lib/whiteboard/http'
+import {
+  boardParam,
+  noStore,
+  wbEntryError,
+  wbError,
+  wbJson,
+} from '@/lib/whiteboard/http'
 import {
   ITEM_MAX_BODY_BYTES,
   validateBulkUpdates,
@@ -14,8 +20,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * [POST]  /api/admin/whiteboard/items - create one item (idempotent upsert by client `_id`)
- * [PATCH] /api/admin/whiteboard/items - bulk position update `{ updates: [{ id, x, y, parentId }] }`
+ * [POST]  /api/admin/whiteboard/items?board=<id> - create one item (idempotent upsert by `_id`)
+ * [PATCH] /api/admin/whiteboard/items?board=<id> - bulk `{ updates: [{ id, x, y, parentId }] }`
  *
  * The body cap is 256 KB, not the 16 KB default: an ink stroke is up to 2,000 points and
  * a points array at that size is well past 16 KB. The point cap itself (413) lives in
@@ -29,6 +35,9 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   const parsed = await readJsonBody(request, { maxBytes: ITEM_MAX_BODY_BYTES })
   if (!parsed.ok) return wbError(parsed.error, parsed.status)
 
@@ -36,7 +45,7 @@ export async function POST(request: NextRequest) {
   if (!checked.ok) return wbError(checked.error, checked.status)
 
   try {
-    const result = await createItem(checked.value)
+    const result = await createItem(scope.board, checked.value)
     if (!result.ok) return wbError(result.error, result.status)
     return wbJson({ item: result.value })
   } catch (error) {
@@ -49,6 +58,9 @@ export async function PATCH(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   const parsed = await readJsonBody(request, { maxBytes: ITEM_MAX_BODY_BYTES })
   if (!parsed.ok) return wbError(parsed.error, parsed.status)
 
@@ -60,7 +72,7 @@ export async function PATCH(request: NextRequest) {
     })
 
   try {
-    const result = await bulkMoveItems(checked.value)
+    const result = await bulkMoveItems(scope.board, checked.value)
     if (!result.ok)
       return wbEntryError(result.error, result.status, {
         id: result.id,

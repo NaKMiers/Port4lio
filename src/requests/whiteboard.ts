@@ -1,4 +1,5 @@
 import type { SaveOp, SendResult } from '@/components/whiteboard/save-queue'
+import type { ClientBoard } from '@/lib/whiteboard/data'
 import type {
   ClientToken,
   ContextResponse,
@@ -8,6 +9,10 @@ import type {
 
 /**
  * Fetch wrappers for `/api/admin/whiteboard/*`, all `no-store` (owner data, always fresh).
+ *
+ * Everything that touches items or links carries `?board=<id>` (D32) - the server refuses a
+ * request without one rather than guessing, so the board travels with the request instead of
+ * being a thing the server remembers about the session.
  *
  * The save queue's `sendSaveOpApi` never throws: a thrown fetch is a network failure, which
  * the queue retries, and the queue must be able to tell it apart from a 4xx, which it never
@@ -41,26 +46,31 @@ async function call(
   })
 }
 
-function requestFor(op: SaveOp): [string, RequestInit & { json?: unknown }] {
+const on = (path: string, board: string) => `${API}${path}?board=${board}`
+
+function requestFor(
+  op: SaveOp,
+  board: string
+): [string, RequestInit & { json?: unknown }] {
   switch (op.type) {
     case 'createItem':
-      return [`${API}/items`, { method: 'POST', json: op.body }]
+      return [on('/items', board), { method: 'POST', json: op.body }]
     case 'patchItem':
-      return [`${API}/items/${op.id}`, { method: 'PATCH', json: op.patch }]
+      return [on(`/items/${op.id}`, board), { method: 'PATCH', json: op.patch }]
     case 'deleteItem':
-      return [`${API}/items/${op.id}`, { method: 'DELETE' }]
+      return [on(`/items/${op.id}`, board), { method: 'DELETE' }]
     case 'createLink':
-      return [`${API}/links`, { method: 'POST', json: op.body }]
+      return [on('/links', board), { method: 'POST', json: op.body }]
     case 'patchLink':
       return [
-        `${API}/links/${op.id}`,
+        on(`/links/${op.id}`, board),
         { method: 'PATCH', json: { label: op.label } },
       ]
     case 'deleteLink':
-      return [`${API}/links/${op.id}`, { method: 'DELETE' }]
+      return [on(`/links/${op.id}`, board), { method: 'DELETE' }]
     case 'bulkMove':
       return [
-        `${API}/items`,
+        on('/items', board),
         { method: 'PATCH', json: { updates: op.entries } },
       ]
   }
@@ -73,8 +83,11 @@ function requestFor(op: SaveOp): [string, RequestInit & { json?: unknown }] {
  */
 const SAVE_TIMEOUT_MS = 30_000
 
-export async function sendSaveOpApi(op: SaveOp): Promise<SendResult> {
-  const [url, init] = requestFor(op)
+export async function sendSaveOpApi(
+  op: SaveOp,
+  board: string
+): Promise<SendResult> {
+  const [url, init] = requestFor(op, board)
   const signal = AbortSignal.timeout(SAVE_TIMEOUT_MS)
   let res: Response
   try {
@@ -100,17 +113,18 @@ export async function sendSaveOpApi(op: SaveOp): Promise<SendResult> {
   }
 }
 
-export async function getBoardStreamApi(signal?: AbortSignal) {
-  const res = await call(API, { signal })
+export async function getBoardStreamApi(board: string, signal?: AbortSignal) {
+  const res = await call(`${API}?board=${board}`, { signal })
   if (!res.ok || !res.body) throw new Error(await errorMessage(res))
   return res.body
 }
 
 export async function getContextApi(
+  board: string,
   scope: ExportScope,
   signal?: AbortSignal
 ): Promise<ContextResponse> {
-  const res = await call(`${API}/context`, {
+  const res = await call(on('/context', board), {
     method: 'POST',
     json: { scope },
     signal,
@@ -119,21 +133,58 @@ export async function getContextApi(
   return res.json()
 }
 
-export async function getBackupApi(): Promise<Blob> {
-  const res = await call(`${API}/backup`)
+export async function getBackupApi(board: string): Promise<Blob> {
+  const res = await call(on('/backup', board))
   if (!res.ok) throw new Error(await errorMessage(res))
   return res.blob()
 }
 
-export async function restoreBatchApi(batch: {
-  dryRun: boolean
-  overwrite: boolean
-  items: unknown[]
-  links: unknown[]
-}): Promise<RestoreBatchResult> {
-  const res = await call(`${API}/restore`, { method: 'POST', json: batch })
+export async function restoreBatchApi(
+  board: string,
+  batch: {
+    dryRun: boolean
+    overwrite: boolean
+    items: unknown[]
+    links: unknown[]
+  }
+): Promise<RestoreBatchResult> {
+  const res = await call(on('/restore', board), {
+    method: 'POST',
+    json: batch,
+  })
   if (!res.ok) throw new Error(await errorMessage(res))
   return res.json()
+}
+
+// MARK: Boards (D32)
+
+export async function getBoardsApi(): Promise<ClientBoard[]> {
+  const res = await call(`${API}/boards`)
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return (await res.json()).boards
+}
+
+export async function createBoardApi(title: string): Promise<ClientBoard> {
+  const res = await call(`${API}/boards`, { method: 'POST', json: { title } })
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return (await res.json()).board
+}
+
+export async function patchBoardApi(
+  id: string,
+  patch: { title?: string; includeInAi?: boolean }
+): Promise<ClientBoard> {
+  const res = await call(`${API}/boards/${id}`, {
+    method: 'PATCH',
+    json: patch,
+  })
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return (await res.json()).board
+}
+
+export async function deleteBoardApi(id: string): Promise<void> {
+  const res = await call(`${API}/boards/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await errorMessage(res))
 }
 
 export async function getTokensApi(): Promise<ClientToken[]> {

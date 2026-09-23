@@ -39,6 +39,22 @@ export function wbEntryError(
 }
 
 /**
+ * The board a write or a read is about (D32), from `?board=<id>`.
+ *
+ * Every owner route carries it, and a missing or malformed one is a 400 rather than a
+ * default: "the board" stopped being a thing that can be assumed the moment there could be
+ * two of them, and a write that lands on the wrong canvas is worse than a refused one.
+ */
+export function boardParam(
+  request: Request
+): { ok: true; board: string } | { ok: false; response: Response } {
+  const board = new URL(request.url).searchParams.get('board') ?? ''
+  if (!/^[0-9a-f]{24}$/i.test(board))
+    return { ok: false, response: wbError('A board id is required.', 400) }
+  return { ok: true, board: board.toLowerCase() }
+}
+
+/**
  * An async generator of strings as a streamed response body (D21: streamed responses are
  * exempt from Vercel's 4.5 MB limit). Lines are coalesced into ~64 KB chunks so a 500-item
  * board is not 500 network writes.

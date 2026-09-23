@@ -5,6 +5,7 @@ import mongoose, { Types, type QueryFilter } from 'mongoose'
 import { connectDatabase } from '@/lib/mongodb'
 import {
   dayRangeBounds,
+  type ContextBoard,
   type ContextInput,
   type ContextItem,
   type ContextLink,
@@ -14,6 +15,7 @@ import {
 import {
   BACKUP_VERSION,
   MEANINGS,
+  type BoardFields,
   checkMergedItem,
   deriveInkBBox,
   isObjectIdString,
@@ -36,6 +38,10 @@ import type {
   RestoreBatchResult,
 } from '@/lib/whiteboard/types'
 import {
+  WhiteboardBoardModel,
+  type WhiteboardBoardDocument,
+} from '@/models/WhiteboardBoard'
+import {
   WhiteboardItemModel,
   type WhiteboardItemDocument,
 } from '@/models/WhiteboardItem'
@@ -49,7 +55,9 @@ import {
  *
  * ```
  *                       ┌────────────────────── loadAgentVisible(scope) ──────────────────────┐
- *   Export sheet ──┐    │ 1 visible frames = form:frame AND includeInAi:true                  │
+ *   Export sheet ──┐    │ 0 visible boards = includeInAi:true, and every query below is        │
+ *                  │    │                    filtered by them (D32)                           │
+ *                  │    │ 1 visible frames = form:frame AND includeInAi:true                  │
  *   context.md ────┼──▶ │ 2 visible items  = includeInAi:true AND                             │
  *   MCP tools ─────┘    │                    (parentId:null OR parentId IN visible frames)    │
  *                       │     - a hidden frame hides its children whatever their own flag     │
@@ -62,6 +70,14 @@ import {
  *   owner writes:  create (idempotent upsert) · PATCH (only changed fields) · bulk move
  *                  delete: links ─▶ un-parent children ─▶ item      (no transaction)
  * ```
+ *
+ * ## Boards scope every query (D32)
+ *
+ * Owner reads and writes name one board, and a write that names an id from another board is
+ * a 404 - the id is not proof of anything, the pair (board, id) is. Agent reads have no
+ * board of their own: they see every board whose `includeInAi` is true, which is rule 1 one
+ * level up and is applied in `visibleFilter` beside the frame rule, so a path that forgot to
+ * ask about boards does not exist.
  *
  * ## Why one function is the only agent read path
  *
@@ -164,6 +180,7 @@ export function toClientLink(doc: LinkLean): ClientLink {
 export function toContextItem(doc: ItemLean): ContextItem {
   return {
     id: String(doc._id),
+    boardId: doc.boardId ? String(doc.boardId) : undefined,
     form: doc.form,
     meaning: doc.meaning ?? null,
     status: doc.status ?? null,
@@ -194,29 +211,213 @@ function toContextLink(doc: LinkLean): ContextLink {
   }
 }
 
-// MARK: The privacy filter (rules 1, 2, 7)
+// MARK: Boards (D32)
 
-async function visibleFrameIds(): Promise<Types.ObjectId[]> {
-  const frames = await WhiteboardItemModel.find(
-    { form: 'frame', includeInAi: true },
-    { _id: 1 }
-  ).lean()
-  return frames.map(frame => frame._id)
+export interface ClientBoard {
+  _id: string
+  title: string
+  includeInAi: boolean
+  /** Items on it, for the index page. */
+  items: number
+  createdAt: string
+  updatedAt: string
 }
 
-function visibleFilter(frameIds: Types.ObjectId[]): QueryFilter<ItemLean> {
+function toClientBoard(doc: WhiteboardBoardDocument, items = 0): ClientBoard {
   return {
+    _id: String(doc._id),
+    title: doc.title ?? '',
+    includeInAi: doc.includeInAi,
+    items,
+    createdAt: new Date(doc.createdAt).toISOString(),
+    updatedAt: new Date(doc.updatedAt).toISOString(),
+  }
+}
+
+/**
+ * The board list, and the only migration this feature needs. If no board exists yet, one is
+ * created and every item and link written before boards existed is adopted into it - which
+ * happens once, because from then on a board exists.
+ *
+ * Read-then-create is not atomic, and a board has no natural key to make unique, so two
+ * first loads at once (two tabs, or React's dev double-effect) can both find nothing and
+ * both create. Each racer then re-reads and keeps only the OLDEST board, dropping its own -
+ * `_id` is a total order every racer agrees on, where `createdAt` can tie at the
+ * millisecond and leave them disagreeing about who won. The window is narrowed rather than
+ * closed: a create landing after that re-read would still leave two. The remaining cost is
+ * a spare empty board on a page that lists them, not a lost item - the adoption below runs
+ * against the winner, so nothing is ever adopted into a board that is about to go.
+ */
+export async function ensureBoards(): Promise<WhiteboardBoardDocument[]> {
+  await connectDatabase()
+  const boards = await WhiteboardBoardModel.find().sort({ createdAt: 1 }).lean()
+  if (boards.length) return boards
+
+  const created = await WhiteboardBoardModel.create({
+    title: 'Whiteboard',
     includeInAi: true,
-    $or: [{ parentId: null }, { parentId: { $in: frameIds } }],
+  })
+  const all = await WhiteboardBoardModel.find().sort({ _id: 1 }).lean()
+  const winner = all[0] ?? created.toObject()
+  if (String(winner._id) !== String(created._id))
+    await WhiteboardBoardModel.deleteOne({ _id: created._id })
+
+  // `boardId: null` matches both a missing field and an explicit null, which is what the
+  // pre-board documents look like. Items first: a link with no board is unreachable anyway.
+  await Promise.all([
+    WhiteboardItemModel.updateMany(
+      { boardId: null },
+      { $set: { boardId: winner._id } },
+      { timestamps: false }
+    ),
+    WhiteboardLinkModel.updateMany(
+      { boardId: null },
+      { $set: { boardId: winner._id } },
+      { timestamps: false }
+    ),
+  ])
+  return [winner]
+}
+
+export async function listBoards(): Promise<ClientBoard[]> {
+  const boards = await ensureBoards()
+  const counts = await WhiteboardItemModel.aggregate<{
+    _id: Types.ObjectId
+    n: number
+  }>([
+    { $match: { boardId: { $in: boards.map(board => board._id) } } },
+    { $group: { _id: '$boardId', n: { $sum: 1 } } },
+  ])
+  const byId = new Map(counts.map(count => [String(count._id), count.n]))
+  return boards.map(board =>
+    toClientBoard(board, byId.get(String(board._id)) ?? 0)
+  )
+}
+
+export async function createBoard(
+  fields: BoardFields
+): Promise<DataResult<ClientBoard>> {
+  await connectDatabase()
+  const doc = await WhiteboardBoardModel.create(fields)
+  return { ok: true, value: toClientBoard(doc.toObject()) }
+}
+
+export async function patchBoard(
+  id: string,
+  patch: Partial<BoardFields>
+): Promise<DataResult<ClientBoard>> {
+  await connectDatabase()
+  if (!isObjectIdString(id)) return failure(404, 'Board not found.')
+  const doc = await WhiteboardBoardModel.findByIdAndUpdate(
+    id,
+    { $set: patch },
+    { returnDocument: 'after', lean: true }
+  )
+  if (!doc) return failure(404, 'Board not found.')
+  // The count comes back with the board because the client replaces its whole list entry
+  // with this answer. Leaving it at the default 0 made a rename say "0 items", and the
+  // delete confirm - which reads that count and is the only guard in front of a permanent,
+  // undo-proof board delete - say "It is empty." about a board that was not.
+  const items = await WhiteboardItemModel.countDocuments({ boardId: doc._id })
+  return { ok: true, value: toClientBoard(doc, items) }
+}
+
+/**
+ * Hard delete, board included: its links, then its items, then the board. Same order and
+ * the same lack of a transaction as a single item delete, and safe for the same reason - a
+ * run that dies part way leaves dangling links and orphaned children, both of which every
+ * read already treats as invisible.
+ *
+ * The last board is never deleted. An owner who empties their only board still has a canvas
+ * to draw on, and `ensureBoards` would silently make a new one anyway, which reads as the
+ * delete having failed.
+ */
+export async function deleteBoard(
+  id: string
+): Promise<DataResult<{ items: number; links: number }>> {
+  await connectDatabase()
+  if (!isObjectIdString(id)) return failure(404, 'Board not found.')
+  const board = await WhiteboardBoardModel.findById(id).lean()
+  if (!board) return failure(404, 'Board not found.')
+  if ((await WhiteboardBoardModel.countDocuments({})) <= 1)
+    return failure(400, 'This is your only board.')
+
+  const { deletedCount: links } = await WhiteboardLinkModel.deleteMany({
+    boardId: board._id,
+  })
+  const { deletedCount: items } = await WhiteboardItemModel.deleteMany({
+    boardId: board._id,
+  })
+  await WhiteboardBoardModel.deleteOne({ _id: board._id })
+  return { ok: true, value: { items, links } }
+}
+
+/** Board ids an agent may read: rule 1, one level up. */
+async function visibleBoardIds(): Promise<Types.ObjectId[]> {
+  const boards = await WhiteboardBoardModel.find(
+    { includeInAi: true },
+    { _id: 1 }
+  ).lean()
+  return boards.map(board => board._id)
+}
+
+async function boardExists(id: string): Promise<boolean> {
+  return (
+    isObjectIdString(id) &&
+    Boolean(await WhiteboardBoardModel.exists({ _id: oid(id) }))
+  )
+}
+
+// MARK: The privacy filter (rules 0, 1, 2, 7)
+
+/**
+ * What an agent read is allowed to touch: the visible boards, and the visible frames inside
+ * them. Carried as one value so no call site can pass the frames and forget the boards.
+ */
+interface VisibleScope {
+  boardIds: Types.ObjectId[]
+  frameIds: Types.ObjectId[]
+}
+
+/** The visible boards as the export renderer names them (D32). */
+async function visibleBoardSections(
+  boardIds: Types.ObjectId[]
+): Promise<ContextBoard[]> {
+  if (boardIds.length < 2) return []
+  const boards = await WhiteboardBoardModel.find(
+    { _id: { $in: boardIds } },
+    { title: 1 }
+  )
+    .sort({ createdAt: 1 })
+    .lean()
+  return boards.map(board => ({
+    id: String(board._id),
+    title: board.title ?? '',
+  }))
+}
+
+async function visibleScope(boardIds: Types.ObjectId[]): Promise<VisibleScope> {
+  const frames = await WhiteboardItemModel.find(
+    { boardId: { $in: boardIds }, form: 'frame', includeInAi: true },
+    { _id: 1 }
+  ).lean()
+  return { boardIds, frameIds: frames.map(frame => frame._id) }
+}
+
+function visibleFilter(scope: VisibleScope): QueryFilter<ItemLean> {
+  return {
+    boardId: { $in: scope.boardIds },
+    includeInAi: true,
+    $or: [{ parentId: null }, { parentId: { $in: scope.frameIds } }],
   }
 }
 
 /** `visible AND extra`, with `$and` so neither side's `$or` can overwrite the other's. */
 function visibleAnd(
-  frameIds: Types.ObjectId[],
+  scope: VisibleScope,
   ...extra: QueryFilter<ItemLean>[]
 ): QueryFilter<ItemLean> {
-  return { $and: [visibleFilter(frameIds), ...extra] }
+  return { $and: [visibleFilter(scope), ...extra] }
 }
 
 /** The shared date rule (D22) as query clauses. */
@@ -263,13 +464,14 @@ function fieldClauses(filter: FieldFilter): QueryFilter<ItemLean>[] {
  */
 async function linksAndNeighbours(
   inScope: ContextItem[],
-  frameIds: Types.ObjectId[]
+  visible: VisibleScope
 ): Promise<{ links: ContextLink[]; neighbours: ContextItem[] }> {
   if (inScope.length === 0) return { links: [], neighbours: [] }
   const scopeIds = new Set(inScope.map(item => item.id))
   const ids = inScope.map(item => oid(item.id))
 
   const touching = await WhiteboardLinkModel.find({
+    boardId: { $in: visible.boardIds },
     $or: [{ from: { $in: ids } }, { to: { $in: ids } }],
   }).lean()
 
@@ -281,28 +483,26 @@ async function linksAndNeighbours(
   const neighbours = otherIds.size
     ? (
         await WhiteboardItemModel.find(
-          visibleAnd(frameIds, { _id: { $in: [...otherIds].map(oid) } }),
+          visibleAnd(visible, { _id: { $in: [...otherIds].map(oid) } }),
           AGENT_PROJECTION
         ).lean()
       ).map(toContextItem)
     : []
 
-  const visible = new Set([...scopeIds, ...neighbours.map(n => n.id)])
+  const shown = new Set([...scopeIds, ...neighbours.map(n => n.id)])
   const links = touching
-    .filter(
-      link => visible.has(String(link.from)) && visible.has(String(link.to))
-    )
+    .filter(link => shown.has(String(link.from)) && shown.has(String(link.to)))
     .map(toContextLink)
   return { links, neighbours }
 }
 
 async function loadVisibleFrames(
-  frameIds: Types.ObjectId[]
+  visible: VisibleScope
 ): Promise<ContextItem[]> {
-  if (frameIds.length === 0) return []
+  if (visible.frameIds.length === 0) return []
   return (
     await WhiteboardItemModel.find(
-      { _id: { $in: frameIds } },
+      { _id: { $in: visible.frameIds } },
       AGENT_PROJECTION
     ).lean()
   ).map(toContextItem)
@@ -344,7 +544,18 @@ export interface ItemLoad {
  * The only agent-facing read. Export scopes, search, one item, or the overview - all built
  * on `visibleFilter`, all without ink points.
  */
-export async function loadAgentVisible(scope: ExportScope): Promise<ExportLoad>
+/**
+ * `board` is the owner's export preview, which is about the board they are looking at. An
+ * agent read passes nothing and gets every board it is allowed to see (D32).
+ */
+export interface AgentReadOptions {
+  board?: string
+}
+
+export async function loadAgentVisible(
+  scope: ExportScope,
+  options?: AgentReadOptions
+): Promise<ExportLoad>
 export async function loadAgentVisible(scope: SearchScope): Promise<SearchLoad>
 export async function loadAgentVisible(scope: {
   kind: 'item'
@@ -354,32 +565,51 @@ export async function loadAgentVisible(scope: {
   kind: 'overview'
 }): Promise<OverviewInput>
 export async function loadAgentVisible(
-  scope: AgentScope
+  scope: AgentScope,
+  options: AgentReadOptions = {}
 ): Promise<ExportLoad | SearchLoad | ItemLoad | OverviewInput> {
   await connectDatabase()
-  const frameIds = await visibleFrameIds()
+  const allowed = await visibleBoardIds()
+  // One board asked for: it is in scope only if it is one an agent could read anyway.
+  const boardIds = options.board
+    ? allowed.filter(id => String(id) === options.board!.toLowerCase())
+    : allowed
+  const visible = await visibleScope(boardIds)
 
   switch (scope.kind) {
     case 'search':
-      return loadSearch(scope, frameIds)
+      return loadSearch(scope, visible)
     case 'item':
-      return loadItem(scope.id, frameIds)
+      return loadItem(scope.id, visible)
     case 'overview':
-      return loadOverview(frameIds)
+      return loadOverview(visible)
     default:
-      return loadExport(scope, frameIds)
+      return loadExport(scope, visible, options.board)
   }
 }
 
 async function loadExport(
   scope: ExportScope,
-  frameIds: Types.ObjectId[]
+  visible: VisibleScope,
+  board?: string
 ): Promise<ExportLoad> {
-  const frames = await loadVisibleFrames(frameIds)
+  const frames = await loadVisibleFrames(visible)
   const empty: ExportLoad = {
     input: { items: [], frames, neighbours: [], links: [] },
     excludedCount: 0,
     scopeHidden: false,
+  }
+
+  // The board itself is hidden from agents (D32): the same answer as a hidden frame, with
+  // the count of what it is holding back, so the export sheet can say so.
+  if (board && visible.boardIds.length === 0) {
+    const hidden = await WhiteboardItemModel.countDocuments(
+      isObjectIdString(board) ? { boardId: oid(board) } : { _id: null }
+    )
+    return { ...empty, excludedCount: hidden, scopeHidden: true }
+  }
+  const inBoard: QueryFilter<ItemLean> = {
+    boardId: { $in: visible.boardIds },
   }
 
   // The candidate set BEFORE visibility, so the sheet can say what the filter dropped (D25).
@@ -391,12 +621,13 @@ async function loadExport(
     case 'frame': {
       if (!isObjectIdString(scope.id)) return empty
       const frame = await WhiteboardItemModel.findOne(
-        { _id: oid(scope.id), form: 'frame' },
+        { ...inBoard, _id: oid(scope.id), form: 'frame' },
         { includeInAi: 1 }
       ).lean()
       if (!frame) return empty
       if (!frame.includeInAi) {
         const hiddenCount = await WhiteboardItemModel.countDocuments({
+          ...inBoard,
           $or: [{ _id: frame._id }, { parentId: frame._id }],
         })
         return { ...empty, excludedCount: hiddenCount, scopeHidden: true }
@@ -417,18 +648,22 @@ async function loadExport(
       break
   }
 
-  const [docs, candidateCount] = await Promise.all([
-    WhiteboardItemModel.find(
-      visibleAnd(frameIds, candidates),
-      AGENT_PROJECTION
-    ).lean(),
-    WhiteboardItemModel.countDocuments(candidates),
+  const [boards, [docs, candidateCount]] = await Promise.all([
+    visibleBoardSections(visible.boardIds),
+    Promise.all([
+      WhiteboardItemModel.find(
+        visibleAnd(visible, candidates),
+        AGENT_PROJECTION
+      ).lean(),
+      // "What the filter dropped" is counted inside the same boards, never across all.
+      WhiteboardItemModel.countDocuments({ $and: [inBoard, candidates] }),
+    ]),
   ])
   const items = docs.map(toContextItem)
-  const { links, neighbours } = await linksAndNeighbours(items, frameIds)
+  const { links, neighbours } = await linksAndNeighbours(items, visible)
 
   return {
-    input: { items, frames, neighbours, links },
+    input: { items, boards, frames, neighbours, links },
     excludedCount: Math.max(0, candidateCount - items.length),
     scopeHidden: false,
   }
@@ -436,9 +671,9 @@ async function loadExport(
 
 async function loadSearch(
   scope: SearchScope,
-  frameIds: Types.ObjectId[]
+  visible: VisibleScope
 ): Promise<SearchLoad> {
-  const frames = await loadVisibleFrames(frameIds)
+  const frames = await loadVisibleFrames(visible)
   const clauses = fieldClauses(scope)
 
   const { frameId } = scope
@@ -454,8 +689,8 @@ async function loadSearch(
 
   const query = scope.query.trim()
   const filter: QueryFilter<ItemLean> = query
-    ? { $text: { $search: query }, ...visibleAnd(frameIds, ...clauses) }
-    : visibleAnd(frameIds, ...clauses)
+    ? { $text: { $search: query }, ...visibleAnd(visible, ...clauses) }
+    : visibleAnd(visible, ...clauses)
 
   const docs = query
     ? await WhiteboardItemModel.find(filter, {
@@ -471,13 +706,13 @@ async function loadSearch(
         .lean()
 
   const results = docs.map(toContextItem)
-  const { links, neighbours } = await linksAndNeighbours(results, frameIds)
+  const { links, neighbours } = await linksAndNeighbours(results, visible)
 
   // D27: ink labels for search are computed over every visible item, bbox-only. Only
   // loaded when a result is actually a sketch.
   const inkPeers = results.some(r => r.form === 'ink')
     ? (
-        await WhiteboardItemModel.find(visibleFilter(frameIds), {
+        await WhiteboardItemModel.find(visibleFilter(visible), {
           ...AGENT_PROJECTION,
           body: 0,
           todos: 0,
@@ -488,11 +723,8 @@ async function loadSearch(
   return { results, input: { frames, neighbours, links, inkPeers } }
 }
 
-async function loadItem(
-  id: string,
-  frameIds: Types.ObjectId[]
-): Promise<ItemLoad> {
-  const frames = await loadVisibleFrames(frameIds)
+async function loadItem(id: string, visible: VisibleScope): Promise<ItemLoad> {
+  const frames = await loadVisibleFrames(visible)
   const none: ItemLoad = {
     item: null,
     input: { frames, neighbours: [], links: [] },
@@ -501,17 +733,17 @@ async function loadItem(
   if (!isObjectIdString(id)) return none
 
   const doc = await WhiteboardItemModel.findOne(
-    visibleAnd(frameIds, { _id: oid(id) }),
+    visibleAnd(visible, { _id: oid(id) }),
     AGENT_PROJECTION
   ).lean()
   if (!doc) return none
 
   const item = toContextItem(doc)
-  const { links, neighbours } = await linksAndNeighbours([item], frameIds)
+  const { links, neighbours } = await linksAndNeighbours([item], visible)
   const inkPeers =
     item.form === 'ink'
       ? (
-          await WhiteboardItemModel.find(visibleFilter(frameIds), {
+          await WhiteboardItemModel.find(visibleFilter(visible), {
             ...AGENT_PROJECTION,
             body: 0,
             todos: 0,
@@ -521,16 +753,16 @@ async function loadItem(
   return { item, input: { frames, neighbours, links, inkPeers } }
 }
 
-async function loadOverview(
-  frameIds: Types.ObjectId[]
-): Promise<OverviewInput> {
-  const frames = await loadVisibleFrames(frameIds)
-  const members = visibleAnd(frameIds, { form: { $ne: 'frame' } })
+async function loadOverview(visible: VisibleScope): Promise<OverviewInput> {
+  const frames = await loadVisibleFrames(visible)
+  const members = visibleAnd(visible, { form: { $ne: 'frame' } })
 
   const [childCounts, meaningGroups, totalVisible, active, recent] =
     await Promise.all([
       WhiteboardItemModel.aggregate<{ _id: Types.ObjectId; n: number }>([
-        { $match: visibleAnd(frameIds, { parentId: { $in: frameIds } }) },
+        {
+          $match: visibleAnd(visible, { parentId: { $in: visible.frameIds } }),
+        },
         { $group: { _id: '$parentId', n: { $sum: 1 } } },
       ]),
       WhiteboardItemModel.aggregate<{ _id: Meaning | null; n: number }>([
@@ -539,7 +771,7 @@ async function loadOverview(
       ]),
       WhiteboardItemModel.countDocuments(members),
       WhiteboardItemModel.find(
-        visibleAnd(frameIds, {
+        visibleAnd(visible, {
           meaning: { $in: ['dream', 'goal'] },
           status: 'active',
         }),
@@ -579,23 +811,27 @@ async function loadOverview(
  * The canvas load, in the fixed order D28 requires: frames, then other items, then links.
  * React Flow needs a parent node before its children, and a link needs both ends.
  */
-export async function* streamBoard(): AsyncGenerator<BoardLine> {
+export async function* streamBoard(board: string): AsyncGenerator<BoardLine> {
   await connectDatabase()
+  const boardId = oid(board)
   const [itemCount, linkCount] = await Promise.all([
-    WhiteboardItemModel.countDocuments({}),
-    WhiteboardLinkModel.countDocuments({}),
+    WhiteboardItemModel.countDocuments({ boardId }),
+    WhiteboardLinkModel.countDocuments({ boardId }),
   ])
   yield { t: 'start', items: itemCount, links: linkCount }
 
   let items = 0
-  for await (const doc of WhiteboardItemModel.find({ form: 'frame' })
+  for await (const doc of WhiteboardItemModel.find({ boardId, form: 'frame' })
     .sort({ _id: 1 })
     .lean()
     .cursor()) {
     items++
     yield { t: 'item', item: toClientItem(doc as ItemLean) }
   }
-  for await (const doc of WhiteboardItemModel.find({ form: { $ne: 'frame' } })
+  for await (const doc of WhiteboardItemModel.find({
+    boardId,
+    form: { $ne: 'frame' },
+  })
     .sort({ z: 1, _id: 1 })
     .lean()
     .cursor()) {
@@ -603,7 +839,7 @@ export async function* streamBoard(): AsyncGenerator<BoardLine> {
     yield { t: 'item', item: toClientItem(doc as ItemLean) }
   }
   let links = 0
-  for await (const doc of WhiteboardLinkModel.find({})
+  for await (const doc of WhiteboardLinkModel.find({ boardId })
     .sort({ _id: 1 })
     .lean()
     .cursor()) {
@@ -617,11 +853,14 @@ export async function* streamBoard(): AsyncGenerator<BoardLine> {
  * The versioned backup file `{ version: 1, exportedAt, items, links }`, streamed as text so
  * it has no size ceiling (D21). One entry per line inside each array, same order as the load.
  */
-export async function* streamBackup(now = new Date()): AsyncGenerator<string> {
+export async function* streamBackup(
+  board: string,
+  now = new Date()
+): AsyncGenerator<string> {
   yield `{"version":${BACKUP_VERSION},"exportedAt":${JSON.stringify(now.toISOString())},"items":[`
   let first = true
   let links = false
-  for await (const line of streamBoard()) {
+  for await (const line of streamBoard(board)) {
     if (line.t === 'link' && !links) {
       yield '\n],"links":['
       links = true
@@ -638,9 +877,9 @@ export async function* streamBackup(now = new Date()): AsyncGenerator<string> {
 
 // MARK: Item writes
 
-async function findFrame(id: string) {
+async function findFrame(board: string, id: string) {
   return WhiteboardItemModel.findOne(
-    { _id: oid(id), form: 'frame' },
+    { boardId: oid(board), _id: oid(id), form: 'frame' },
     { includeInAi: 1, x: 1, y: 1 }
   ).lean()
 }
@@ -660,30 +899,39 @@ function withBBox(fields: ItemFields) {
  * unchanged - the client can retry a create whose response was lost without harm.
  */
 export async function createItem(
+  board: string,
   fields: ItemFields
 ): Promise<DataResult<ClientItem>> {
   await connectDatabase()
 
-  if (fields.parentId && !(await findFrame(fields.parentId)))
+  if (!(await boardExists(board))) return failure(404, 'Board not found.')
+  if (fields.parentId && !(await findFrame(board, fields.parentId)))
     return failure(400, 'parentId must be an existing frame.')
 
   await WhiteboardItemModel.updateOne(
     { _id: oid(fields._id) },
-    { $setOnInsert: withBBox(fields) },
+    { $setOnInsert: { ...withBBox(fields), boardId: oid(board) } },
     { upsert: true }
   )
+  // By id alone, then checked: an id that belongs to another board answers like any other
+  // id that is not this board's, rather than being quietly rewritten onto it.
   const doc = await WhiteboardItemModel.findById(fields._id).lean()
   if (!doc) return failure(500, 'The item could not be saved.')
+  if (String(doc.boardId) !== board.toLowerCase())
+    return failure(409, 'That id already belongs to another board.')
   if (doc.form !== fields.form)
     return failure(409, 'That id already belongs to an item of another form.')
   return { ok: true, value: toClientItem(doc) }
 }
 
 /** Is `parentId` a frame that agents cannot see (hidden, or missing - rule 7)? */
-async function isHiddenParent(parentId: Types.ObjectId | null) {
+async function isHiddenParent(
+  boardId: Types.ObjectId,
+  parentId: Types.ObjectId | null
+) {
   if (!parentId) return false
   const frame = await WhiteboardItemModel.findOne(
-    { _id: parentId, form: 'frame' },
+    { boardId, _id: parentId, form: 'frame' },
     { includeInAi: 1 }
   ).lean()
   return !frame || !frame.includeInAi
@@ -695,6 +943,7 @@ export interface PatchOptions {
 }
 
 export async function patchItem(
+  board: string,
   id: string,
   patch: ItemPatch,
   { keepChildrenPrivate = false }: PatchOptions = {}
@@ -702,7 +951,11 @@ export async function patchItem(
   await connectDatabase()
   if (!isObjectIdString(id)) return failure(404, 'Item not found.')
 
-  const current = await WhiteboardItemModel.findById(id).lean()
+  const boardId = oid(board)
+  const current = await WhiteboardItemModel.findOne({
+    boardId,
+    _id: oid(id),
+  }).lean()
   if (!current) return failure(404, 'Item not found.')
 
   const currentFields = toClientItem(current)
@@ -734,13 +987,13 @@ export async function patchItem(
 
   if ('parentId' in patch) {
     const next = patch.parentId ?? null
-    if (next && !(await findFrame(next)))
+    if (next && !(await findFrame(board, next)))
       return failure(400, 'parentId must be an existing frame.')
     $set.parentId = next ? oid(next) : null
 
     const moved = String(current.parentId ?? '') !== String(next ?? '')
     // Rule 8: leaving a hidden (or missing) frame writes the exclusion down, in this write.
-    if (moved && (await isHiddenParent(current.parentId)))
+    if (moved && (await isHiddenParent(boardId, current.parentId)))
       $set.includeInAi = false
   }
 
@@ -753,12 +1006,12 @@ export async function patchItem(
     keepChildrenPrivate
   )
     await WhiteboardItemModel.updateMany(
-      { parentId: current._id },
+      { boardId, parentId: current._id },
       { $set: { includeInAi: false } }
     )
 
-  const doc = await WhiteboardItemModel.findByIdAndUpdate(
-    id,
+  const doc = await WhiteboardItemModel.findOneAndUpdate(
+    { boardId, _id: oid(id) },
     { $set },
     { returnDocument: 'after', lean: true }
   )
@@ -772,17 +1025,22 @@ export async function patchItem(
  * Rule 8 is applied per entry inside the same `bulkWrite` (R3-2).
  */
 export async function bulkMoveItems(
+  board: string,
   updates: BulkPositionUpdate[]
 ): Promise<DataResult<ClientItem[]>> {
   await connectDatabase()
 
+  const boardId = oid(board)
   const ids = updates.map(u => oid(u.id))
   const [docs, frames] = await Promise.all([
     WhiteboardItemModel.find(
-      { _id: { $in: ids } },
+      { boardId, _id: { $in: ids } },
       { form: 1, parentId: 1 }
     ).lean(),
-    WhiteboardItemModel.find({ form: 'frame' }, { includeInAi: 1 }).lean(),
+    WhiteboardItemModel.find(
+      { boardId, form: 'frame' },
+      { includeInAi: 1 }
+    ).lean(),
   ])
   const byId = new Map(docs.map(d => [String(d._id), d]))
   const frameById = new Map(frames.map(f => [String(f._id), f]))
@@ -822,13 +1080,19 @@ export async function bulkMoveItems(
       }
       if (moved && hidden(doc.parentId)) $set.includeInAi = false
       return {
-        updateOne: { filter: { _id: oid(update.id) }, update: { $set } },
+        updateOne: {
+          filter: { boardId, _id: oid(update.id) },
+          update: { $set },
+        },
       }
     }),
     { ordered: true }
   )
 
-  const after = await WhiteboardItemModel.find({ _id: { $in: ids } }).lean()
+  const after = await WhiteboardItemModel.find({
+    boardId,
+    _id: { $in: ids },
+  }).lean()
   return { ok: true, value: after.map(toClientItem) }
 }
 
@@ -839,27 +1103,28 @@ export async function bulkMoveItems(
  * are ignored and an orphaned `parentId` reads as hidden.
  */
 export async function deleteItem(
+  board: string,
   id: string
 ): Promise<DataResult<{ links: number; children: number }>> {
   await connectDatabase()
   if (!isObjectIdString(id)) return failure(404, 'Item not found.')
 
-  const doc = await WhiteboardItemModel.findById(id, {
-    form: 1,
-    x: 1,
-    y: 1,
-    includeInAi: 1,
-  }).lean()
+  const boardId = oid(board)
+  const doc = await WhiteboardItemModel.findOne(
+    { boardId, _id: oid(id) },
+    { form: 1, x: 1, y: 1, includeInAi: 1 }
+  ).lean()
   if (!doc) return failure(404, 'Item not found.')
 
   const { deletedCount: links } = await WhiteboardLinkModel.deleteMany({
+    boardId,
     $or: [{ from: doc._id }, { to: doc._id }],
   })
 
   let children = 0
   if (doc.form === 'frame') {
     const result = await WhiteboardItemModel.updateMany(
-      { parentId: doc._id },
+      { boardId, parentId: doc._id },
       [
         {
           $set: {
@@ -875,19 +1140,21 @@ export async function deleteItem(
     children = result.modifiedCount
   }
 
-  await WhiteboardItemModel.deleteOne({ _id: doc._id })
+  await WhiteboardItemModel.deleteOne({ boardId, _id: doc._id })
   return { ok: true, value: { links, children } }
 }
 
 /** Counts for the delete confirm ("Delete 3 items and 5 links?", "its N items stay private"). */
-export async function countDeleteImpact(ids: string[]) {
+export async function countDeleteImpact(board: string, ids: string[]) {
   await connectDatabase()
+  const boardId = oid(board)
   const oids = ids.filter(isObjectIdString).map(oid)
   const [links, children] = await Promise.all([
     WhiteboardLinkModel.countDocuments({
+      boardId,
       $or: [{ from: { $in: oids } }, { to: { $in: oids } }],
     }),
-    WhiteboardItemModel.countDocuments({ parentId: { $in: oids } }),
+    WhiteboardItemModel.countDocuments({ boardId, parentId: { $in: oids } }),
   ])
   return { links, children }
 }
@@ -905,14 +1172,21 @@ function isDuplicateKey(error: unknown) {
  * OTHER ids, so a replay of the same id is a 200 and not a permanent 400.
  */
 export async function createLink(
+  board: string,
   fields: LinkFields
 ): Promise<DataResult<ClientLink>> {
   await connectDatabase()
 
+  const boardId = oid(board)
   const existing = await WhiteboardLinkModel.findById(fields._id).lean()
-  if (existing) return { ok: true, value: toClientLink(existing) }
+  if (existing)
+    return String(existing.boardId) === board.toLowerCase()
+      ? { ok: true, value: toClientLink(existing) }
+      : failure(409, 'That id already belongs to another board.')
 
+  // Both ends on THIS board, which is also what proves the board exists.
   const ends = await WhiteboardItemModel.countDocuments({
+    boardId,
     _id: { $in: [oid(fields.from), oid(fields.to)] },
   })
   if (ends !== 2) return failure(400, 'Both ends of a link must exist.')
@@ -930,6 +1204,7 @@ export async function createLink(
       { _id: oid(fields._id) },
       {
         $setOnInsert: {
+          boardId,
           from: oid(fields.from),
           to: oid(fields.to),
           label: fields.label,
@@ -950,13 +1225,18 @@ export async function createLink(
 
 /** D19: relabel an existing link; a duplicate on another id is a 400, a missing link a 404. */
 export async function patchLink(
+  board: string,
   id: string,
   { label }: { label: string }
 ): Promise<DataResult<ClientLink>> {
   await connectDatabase()
   if (!isObjectIdString(id)) return failure(404, 'Link not found.')
 
-  const current = await WhiteboardLinkModel.findById(id).lean()
+  const boardId = oid(board)
+  const current = await WhiteboardLinkModel.findOne({
+    boardId,
+    _id: oid(id),
+  }).lean()
   if (!current) return failure(404, 'Link not found.')
 
   const duplicate = await WhiteboardLinkModel.exists({
@@ -968,8 +1248,8 @@ export async function patchLink(
   if (duplicate) return failure(400, 'That link already exists.')
 
   try {
-    const doc = await WhiteboardLinkModel.findByIdAndUpdate(
-      id,
+    const doc = await WhiteboardLinkModel.findOneAndUpdate(
+      { boardId, _id: oid(id) },
       { $set: { label } },
       { returnDocument: 'after', lean: true }
     )
@@ -981,10 +1261,16 @@ export async function patchLink(
   }
 }
 
-export async function deleteLink(id: string): Promise<DataResult<null>> {
+export async function deleteLink(
+  board: string,
+  id: string
+): Promise<DataResult<null>> {
   await connectDatabase()
   if (!isObjectIdString(id)) return failure(404, 'Link not found.')
-  const { deletedCount } = await WhiteboardLinkModel.deleteOne({ _id: oid(id) })
+  const { deletedCount } = await WhiteboardLinkModel.deleteOne({
+    boardId: oid(board),
+    _id: oid(id),
+  })
   if (!deletedCount) return failure(404, 'Link not found.')
   return { ok: true, value: null }
 }
@@ -1013,11 +1299,19 @@ export interface RestoreBatch {
  * client sends frames, then items, then links, so by the time a child's batch arrives its
  * frame has been written. A dry run writes nothing, so it cannot see earlier batches, and it
  * relies on the client's whole-file pre-check for those.
+ *
+ * The file goes into the board it was sent to (D32). A backup is per board - the one the
+ * owner was looking at when they downloaded it - so restoring is "put this back here", and
+ * an id in the file that already exists on ANOTHER board is refused rather than moved: a
+ * restore must not quietly empty a board the owner was not thinking about.
  */
 export async function restoreBatch(
+  board: string,
   batch: RestoreBatch
 ): Promise<DataResult<RestoreBatchResult>> {
   await connectDatabase()
+  if (!(await boardExists(board))) return failure(404, 'Board not found.')
+  const boardId = oid(board)
 
   const items: (ItemFields & { createdAt?: Date; updatedAt?: Date })[] = []
   for (const [index, entry] of batch.items.entries()) {
@@ -1042,13 +1336,21 @@ export async function restoreBatch(
   const [existingItems, existingLinks] = await Promise.all([
     WhiteboardItemModel.find(
       { _id: { $in: items.map(i => oid(i._id)) } },
-      { form: 1 }
+      { form: 1, boardId: 1 }
     ).lean(),
     WhiteboardLinkModel.find(
       { _id: { $in: links.map(l => oid(l._id)) } },
-      { _id: 1 }
+      { boardId: 1 }
     ).lean(),
   ])
+  const elsewhere = [...existingItems, ...existingLinks].find(
+    doc => String(doc.boardId) !== board.toLowerCase()
+  )
+  if (elsewhere)
+    return failure(
+      409,
+      `${String(elsewhere._id)} already exists on another board.`
+    )
   const existing = existingItems.length + existingLinks.length
 
   if (!batch.dryRun) {
@@ -1061,7 +1363,7 @@ export async function restoreBatch(
     const storedFrames = new Set(
       (
         await WhiteboardItemModel.find(
-          { _id: { $in: parentIds.map(oid) }, form: 'frame' },
+          { boardId, _id: { $in: parentIds.map(oid) }, form: 'frame' },
           { _id: 1 }
         ).lean()
       ).map(f => String(f._id))
@@ -1094,7 +1396,7 @@ export async function restoreBatch(
         ...items.map(i => i._id),
         ...(
           await WhiteboardItemModel.find(
-            { _id: { $in: endIds.map(oid) } },
+            { boardId, _id: { $in: endIds.map(oid) } },
             { _id: 1 }
           ).lean()
         ).map(d => String(d._id)),
@@ -1129,6 +1431,7 @@ export async function restoreBatch(
           const { _id, ...rest } = withBBox(fields)
           const doc = {
             ...rest,
+            boardId,
             createdAt: createdAt ?? now,
             updatedAt: updatedAt ?? now,
           }
@@ -1146,6 +1449,7 @@ export async function restoreBatch(
       await WhiteboardLinkModel.collection.bulkWrite(
         links.map(link => {
           const doc = {
+            boardId,
             from: oid(link.from),
             to: oid(link.to),
             label: link.label,

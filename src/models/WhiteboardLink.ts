@@ -16,6 +16,8 @@ import { compileModel } from '@/lib/mongoose-model'
 
 export type WhiteboardLinkDocument = {
   _id: Types.ObjectId
+  /** The board both ends live on (D32). */
+  boardId: Types.ObjectId
   from: Types.ObjectId
   to: Types.ObjectId
   label: string
@@ -28,6 +30,7 @@ export type WhiteboardLinkDocument = {
 const whiteboardLinkSchema = new Schema<WhiteboardLinkDocument>(
   {
     _id: { type: Schema.Types.ObjectId, required: true },
+    boardId: { type: Schema.Types.ObjectId, required: true },
     from: { type: Schema.Types.ObjectId, required: true },
     to: { type: Schema.Types.ObjectId, required: true },
     label: { type: String, default: '' },
@@ -38,6 +41,7 @@ const whiteboardLinkSchema = new Schema<WhiteboardLinkDocument>(
 )
 
 whiteboardLinkSchema.index({ from: 1, to: 1, label: 1 }, { unique: true })
+whiteboardLinkSchema.index({ boardId: 1 })
 whiteboardLinkSchema.index({ from: 1 })
 whiteboardLinkSchema.index({ to: 1 })
 

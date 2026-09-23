@@ -5,10 +5,16 @@
  *   keydown ──▶ already handled (defaultPrevented)? ──▶ ignore   a dropdown's own Esc
  *           ──▶ a modal is open? ──────────────────────▶ ignore   it owns the keyboard
  *           ──▶ Cmd/Ctrl+E ────────────────────────────▶ export   (a chord is never a typo)
+ *           ──▶ Cmd/Ctrl+S ────────────────────────────▶ save now (D31)
  *           ──▶ Escape in a field ─────────────────────▶ leave the field, nothing else
  *           ──▶ in a field ────────────────────────────▶ ignore   letters are letters
+ *           ──▶ Cmd/Ctrl+Z / +Shift+Z / +Y ────────────▶ undo / redo
  *           ──▶ Escape / Delete / ? / arrows / Enter on a node / tool letter
  * ```
+ *
+ * Undo is the one chord that is NOT taken while typing: inside a field Cmd+Z belongs to the
+ * field, where it undoes the characters just typed. Taking it there would undo the whole
+ * edit instead, which is never what a half-typed title wants.
  *
  * The guard is the whole point: a tool key typed into the title field must type a letter,
  * not switch to the pen, and Delete in a textarea must delete a character, not open "Delete 3
@@ -46,6 +52,9 @@ export const TOOL_KEYS: Record<string, Tool> = {
 export type ShortcutAction =
   | { type: 'tool'; tool: Tool }
   | { type: 'delete' }
+  | { type: 'save' }
+  | { type: 'undo' }
+  | { type: 'redo' }
   | { type: 'help' }
   | { type: 'export' }
   | { type: 'escape' }
@@ -105,11 +114,20 @@ export function shortcutFor(
   if (event.defaultPrevented || modalOpen) return null
   const chord = Boolean(event.metaKey || event.ctrlKey)
   if (chord && event.key.toLowerCase() === 'e') return { type: 'export' }
+  // Also while typing: the browser's Save dialog must not open over a half-typed card.
+  if (chord && event.key.toLowerCase() === 's') return { type: 'save' }
 
   const typing = isTypingTarget(event.target)
   if (event.key === 'Escape')
     return typing ? { type: 'leaveField' } : { type: 'escape' }
   if (typing) return null
+
+  if (chord && !event.altKey) {
+    const key = event.key.toLowerCase()
+    if (key === 'z') return { type: event.shiftKey ? 'redo' : 'undo' }
+    // Ctrl+Y is redo on Windows keyboards, where Ctrl+Shift+Z is awkward.
+    if (key === 'y') return { type: 'redo' }
+  }
   if (chord || event.altKey) return null
 
   if (event.key === 'Delete' || event.key === 'Backspace')

@@ -105,6 +105,7 @@ export default function ExportSheet({
       setFailed(false)
       try {
         const next = await getContextApi(
+          board.boardId,
           JSON.parse(scopeJson),
           controller.signal
         )
@@ -122,7 +123,7 @@ export default function ExportSheet({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [scopeJson, nonce, boardVersion])
+  }, [board.boardId, scopeJson, nonce, boardVersion])
 
   const markdown = result?.markdown ?? ''
   const empty = !markdown

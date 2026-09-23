@@ -9,6 +9,13 @@ import {
   resolveMembership,
   type Placeable,
 } from '@/components/whiteboard/frame-geometry'
+import {
+  isNoOp,
+  planRestore,
+  remapSnapshot,
+  type RestorePlan,
+} from '@/components/whiteboard/history'
+import { mockBoard } from '@/components/whiteboard/mock-data'
 import { newObjectId } from '@/components/whiteboard/object-id'
 import type {
   LinkBody,
@@ -49,6 +56,13 @@ import { getBoardStreamApi } from '@/requests/whiteboard'
  * back as if it were. So a load either completes (the server's `end` line arrived) or it is
  * an error with a Retry, and the partial state is thrown away.
  *
+ * ## Undo/redo (D30)
+ *
+ * `commit` is the one place local state changes, so it is also where history is recorded: an
+ * edit hands it the state before the change, and Cmd/Ctrl+Z diffs that state against the
+ * board and sends the difference through the same queue as any other edit. The reasoning,
+ * and why a card brought back by undo gets a new id, is in `history.ts`.
+ *
  * ## Rule 8 on the client (R3-1)
  *
  * When a card is dropped out of a hidden frame, the server writes `includeInAi: false`. The
@@ -68,6 +82,27 @@ export type LoadState =
   | { phase: 'error'; message: string }
 
 const EMPTY: BoardData = { items: {}, links: {} }
+
+/** A toast on the canvas. `undo` is set only while that undo is still the top of the stack. */
+export interface BoardNotice {
+  text: string
+  undo?: () => void
+}
+
+/** Steps kept. Each one is a map of shared item references, not a copy of the board. */
+const HISTORY_LIMIT = 60
+/**
+ * Typing is one undo step, not one per keystroke: consecutive edits with the same label
+ * (the same fields of the same item) merge while they keep coming this fast.
+ */
+const COALESCE_MS = 700
+
+interface HistoryEntry {
+  /** The board as it was BEFORE the edit this entry undoes. */
+  data: BoardData
+  label: string
+  at: number
+}
 
 const DEFAULT_SIZE: Record<Form, { width: number; height: number }> = {
   text: { width: 240, height: 120 },
@@ -169,7 +204,7 @@ function framesOf(items: Record<string, ClientItem>): Placeable[] {
     }))
 }
 
-export function useBoard() {
+export function useBoard(boardId: string) {
   const [data, setData] = useState<BoardData>(EMPTY)
   const dataRef = useRef<BoardData>(EMPTY)
   const [load, setLoad] = useState<LoadState>({
@@ -184,17 +219,61 @@ export function useBoard() {
   const serverChildren = useRef(
     new Map<string, Pick<ClientItem, 'parentId' | 'x' | 'y' | 'includeInAi'>>()
   )
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<BoardNotice | null>(null)
 
-  const { queue, status, setStatus } = useSaveQueue({
-    rejectedCount: Object.keys(errors).length,
-  })
+  const { queue, status, setStatus, autoSave, setAutoSave, saveNow } =
+    useSaveQueue({
+      boardId,
+      rejectedCount: Object.keys(errors).length,
+    })
 
-  const commit = useCallback((update: (prev: BoardData) => BoardData) => {
-    const next = update(dataRef.current)
-    dataRef.current = next
-    setData(next)
-  }, [])
+  // MARK: History (D30)
+
+  const past = useRef<HistoryEntry[]>([])
+  const future = useRef<HistoryEntry[]>([])
+  const [depth, setDepth] = useState({ undo: 0, redo: 0 })
+  const syncDepth = useCallback(
+    () => setDepth({ undo: past.current.length, redo: future.current.length }),
+    []
+  )
+
+  const record = useCallback(
+    (before: BoardData, label: string) => {
+      const now = Date.now()
+      const top = past.current[past.current.length - 1]
+      // Merge into the burst rather than push: the entry keeps the state from before the
+      // first keystroke, which is what one Cmd+Z should give back.
+      if (top && top.label === label && now - top.at < COALESCE_MS)
+        past.current = [...past.current.slice(0, -1), { ...top, at: now }]
+      else
+        past.current = [
+          ...past.current.slice(-(HISTORY_LIMIT - 1)),
+          { data: before, label, at: now },
+        ]
+      // A new edit ends the redo branch, and with it any "Undo" still offered on a toast:
+      // that button would now undo this edit instead of the one it was offered for.
+      future.current = []
+      setNotice(prev => (prev?.undo ? null : prev))
+      syncDepth()
+    },
+    [syncDepth]
+  )
+
+  /**
+   * `label` is what makes this edit undoable, and how it coalesces with the one before it.
+   * A commit with no label is not the owner's doing - a server document merged in, a refused
+   * write put back, the board loaded - and must not become a step they can undo.
+   */
+  const commit = useCallback(
+    (update: (prev: BoardData) => BoardData, label?: string) => {
+      const before = dataRef.current
+      const next = update(before)
+      if (label) record(before, label)
+      dataRef.current = next
+      setData(next)
+    },
+    [record]
+  )
 
   const clearError = useCallback((id: string) => {
     setErrors(prev => {
@@ -273,6 +352,10 @@ export function useBoard() {
         setErrors(prev => ({ ...prev, [id]: error }))
       },
       onGroupSettled: (groupId, result) => {
+        // Only when something did not go through (DR11: "a partial failure reads ..."). A
+        // bulk edit that fully succeeded is what the save pill already says, and the toast
+        // would take the place of the one the delete offers its Undo on.
+        if (!result.failed.length && !result.skipped.length) return
         const deleting = groupId.startsWith(DELETE_GROUP)
         const total =
           result.ok.length + result.failed.length + result.skipped.length
@@ -287,7 +370,7 @@ export function useBoard() {
           parts.push(
             `${result.skipped.length} skipped (a hidden frame or inside one)`
           )
-        setNotice(parts.join(' - '))
+        setNotice({ text: parts.join(' - ') })
       },
     })
   }, [commit, mergeServerItem, queue, setStatus])
@@ -302,7 +385,7 @@ export function useBoard() {
       let total = 0
       let loaded = 0
       try {
-        const body = await getBoardStreamApi(signal)
+        const body = await getBoardStreamApi(boardId, signal)
         await readBoardStream(body, lines => {
           for (const line of lines) {
             if (line.t === 'start') total = line.items
@@ -320,6 +403,12 @@ export function useBoard() {
         })
         serverItems.current = new Map(Object.entries(items))
         serverLinks.current = new Map(Object.entries(links))
+        // The board on screen is the server's again, so every step on the stack is about a
+        // board that no longer exists - after a restore from backup, about ids that were
+        // dead and are live again (`revive`). Undoing into it would write nonsense.
+        past.current = []
+        future.current = []
+        setDepth({ undo: 0, redo: 0 })
         // A card deleted earlier this session and brought back by a restore is live again.
         queue.revive([...Object.keys(items), ...Object.keys(links)])
         queue.markPersisted(Object.keys(items))
@@ -332,7 +421,7 @@ export function useBoard() {
         setLoad({ phase: 'error', message: "Couldn't load the board." })
       }
     },
-    [queue]
+    [boardId, queue]
   )
 
   useEffect(() => {
@@ -351,6 +440,86 @@ export function useBoard() {
     setLoad({ phase: 'loading', total: 0, loaded: 0 })
     void loadBoard()
   }, [loadBoard])
+
+  // MARK: Undo / redo (D30)
+
+  /**
+   * Put the board back to `target` and send the difference. Records nothing itself - the
+   * caller moves the entry between the two stacks, which is what makes redo the undo of undo.
+   */
+  const applyBoard = useCallback(
+    (target: BoardData): RestorePlan => {
+      const plan = planRestore(dataRef.current, target, {
+        isDead: id => queue.isDeleted(id),
+        newId: newObjectId,
+      })
+      commit(() => plan.next)
+      for (const item of plan.createItems)
+        queue.createItem(item._id, createBody(item))
+      for (const { id, patch } of plan.patchItems) {
+        clearError(id)
+        queue.patchItem(id, patchBody(patch), { delay: 0 })
+      }
+      // Before the DELETEs, as in `deleteItems`: a child's queued write still names the frame.
+      for (const { frameId, children } of plan.unparent)
+        queue.unparent(frameId, children)
+      for (const id of plan.deleteItems) {
+        clearError(id)
+        queue.deleteItem(id)
+      }
+      for (const link of plan.createLinks) queue.createLink(link)
+      for (const { id, label } of plan.patchLinks) {
+        clearError(id)
+        queue.patchLink(id, label, { delay: 0 })
+      }
+      for (const id of plan.deleteLinks) {
+        clearError(id)
+        queue.deleteLink(id)
+      }
+      if (plan.remap.size) {
+        const rewrite = (entry: HistoryEntry) => ({
+          ...entry,
+          data: remapSnapshot(entry.data, plan.remap),
+        })
+        past.current = past.current.map(rewrite)
+        future.current = future.current.map(rewrite)
+      }
+      return plan
+    },
+    [clearError, commit, queue]
+  )
+
+  const step = useCallback(
+    (back: boolean): RestorePlan | null => {
+      const from = back ? past.current : future.current
+      const entry = from[from.length - 1]
+      if (!entry) return null
+      const here = dataRef.current
+      const plan = applyBoard(entry.data)
+      // `applyBoard` may have rewritten both stacks (a resurrected id), so read them after it.
+      const rest = (back ? past.current : future.current).slice(0, -1)
+      const other = back ? future.current : past.current
+      // An undo that changes nothing (the edit was already undone by hand) still consumes
+      // its entry, but leaves no step on the other stack to redo.
+      const kept = isNoOp(plan)
+        ? other
+        : [...other, { ...entry, data: here, at: Date.now() }]
+      if (back) {
+        past.current = rest
+        future.current = kept
+      } else {
+        future.current = rest
+        past.current = kept
+      }
+      setNotice(prev => (prev?.undo ? null : prev))
+      syncDepth()
+      return plan
+    },
+    [applyBoard, syncDepth]
+  )
+
+  const undo = useCallback(() => step(true), [step])
+  const redo = useCallback(() => step(false), [step])
 
   // MARK: Item actions
 
@@ -395,7 +564,10 @@ export function useBoard() {
       }
       if (item.ink)
         item.ink = { ...item.ink, bbox: deriveInkBBox(item.ink.points) }
-      commit(prev => ({ ...prev, items: { ...prev.items, [id]: item } }))
+      commit(
+        prev => ({ ...prev, items: { ...prev.items, [id]: item } }),
+        `create:${id}`
+      )
       queue.createItem(id, createBody(item))
       return id
     },
@@ -429,15 +601,19 @@ export function useBoard() {
 
       if (next.ink)
         next.ink = { ...next.ink, bbox: deriveInkBBox(next.ink.points) }
-      commit(prev => {
-        const items = { ...prev.items, [id]: { ...current, ...next } }
-        // Mirror the server (children first, then the frame) so no badge lies meanwhile.
-        if (keepChildrenPrivate)
-          for (const child of Object.values(prev.items))
-            if (child.parentId === id)
-              items[child._id] = { ...child, includeInAi: false }
-        return { ...prev, items }
-      })
+      commit(
+        prev => {
+          const items = { ...prev.items, [id]: { ...current, ...next } }
+          // Mirror the server (children first, then the frame) so no badge lies meanwhile.
+          if (keepChildrenPrivate)
+            for (const child of Object.values(prev.items))
+              if (child.parentId === id)
+                items[child._id] = { ...child, includeInAi: false }
+          return { ...prev, items }
+        },
+        // Typing in one field is one undo step; switching field starts another.
+        `edit:${id}:${Object.keys(next).sort().join(',')}`
+      )
       clearError(id)
       queue.patchItem(
         id,
@@ -522,7 +698,11 @@ export function useBoard() {
           leftHidden,
         })
       }
-      commit(prev => ({ ...prev, items: nextItems }))
+      if (!updates.length) return
+      commit(
+        prev => ({ ...prev, items: nextItems }),
+        `move:${updates.map(u => u.id).join(',')}`
+      )
       for (const update of updates) clearError(update.id)
 
       const persisted = updates.filter(u => queue.isPersisted(u.id))
@@ -544,8 +724,12 @@ export function useBoard() {
     [clearError, commit, queue]
   )
 
+  /**
+   * `alsoLinks` are links the selection held that no doomed item touches. They go in the
+   * same call, and so in the same undo step: one Delete press is one Cmd+Z.
+   */
   const deleteItems = useCallback(
-    (ids: string[]) => {
+    (ids: string[], alsoLinks: string[] = []) => {
       const { items, links } = dataRef.current
       const doomed = new Set(ids.filter(id => items[id]))
       const nextItems = { ...items }
@@ -574,7 +758,13 @@ export function useBoard() {
       for (const link of Object.values(links))
         if (doomed.has(link.from) || doomed.has(link.to))
           delete nextLinks[link._id]
-      commit(() => ({ items: nextItems, links: nextLinks }))
+      const looseLinks = alsoLinks.filter(id => nextLinks[id])
+      for (const id of looseLinks) delete nextLinks[id]
+      if (!doomed.size) return
+      commit(
+        () => ({ items: nextItems, links: nextLinks }),
+        `delete:${[...doomed].join(',')}`
+      )
       // The children's own queued writes still name the frame; rewrite them first.
       for (const [frameId, children] of orphans)
         queue.unparent(frameId, children)
@@ -587,6 +777,10 @@ export function useBoard() {
         queue.deleteItem(id, { group })
       }
       if (group) queue.closeGroup(group)
+      for (const id of looseLinks) {
+        clearError(id)
+        queue.deleteLink(id)
+      }
     },
     [clearError, commit, queue]
   )
@@ -613,7 +807,10 @@ export function useBoard() {
         fromHandle,
         toHandle,
       }
-      commit(prev => ({ ...prev, links: { ...prev.links, [link._id]: link } }))
+      commit(
+        prev => ({ ...prev, links: { ...prev.links, [link._id]: link } }),
+        `link:${link._id}`
+      )
       queue.createLink(link)
       return link._id
     },
@@ -624,10 +821,13 @@ export function useBoard() {
     (id: string, label: string) => {
       const link = dataRef.current.links[id]
       if (!link || link.label === label) return
-      commit(prev => ({
-        ...prev,
-        links: { ...prev.links, [id]: { ...link, label } },
-      }))
+      commit(
+        prev => ({
+          ...prev,
+          links: { ...prev.links, [id]: { ...link, label } },
+        }),
+        `label:${id}`
+      )
       clearError(id)
       queue.patchLink(id, label)
     },
@@ -636,11 +836,15 @@ export function useBoard() {
 
   const deleteLinks = useCallback(
     (ids: string[]) => {
-      commit(prev => {
-        const links = { ...prev.links }
-        for (const id of ids) delete links[id]
-        return { ...prev, links }
-      })
+      if (!ids.some(id => dataRef.current.links[id])) return
+      commit(
+        prev => {
+          const links = { ...prev.links }
+          for (const id of ids) delete links[id]
+          return { ...prev, links }
+        },
+        `unlink:${ids.join(',')}`
+      )
       for (const id of ids) {
         clearError(id)
         queue.deleteLink(id)
@@ -696,6 +900,81 @@ export function useBoard() {
     [createItem]
   )
 
+  /**
+   * "Add sample data" (D33): a whole board in one step, and one undo step. Every card and
+   * link is created the normal way - client ids, the same queue, the same rules - so what
+   * lands is indistinguishable from a board someone drew, and Cmd+Z takes all of it back.
+   */
+  const addMock = useCallback(
+    (at: { x: number; y: number }): string[] => {
+      const seed = mockBoard()
+      const ids = new Map(seed.items.map(spec => [spec.key, newObjectId()]))
+      const now = new Date().toISOString()
+      const items = { ...dataRef.current.items }
+      const created: ClientItem[] = []
+      for (const spec of seed.items) {
+        const id = ids.get(spec.key)!
+        const parentId = spec.parent ? (ids.get(spec.parent) ?? null) : null
+        const item: ClientItem = {
+          _id: id,
+          form: spec.form,
+          meaning: spec.meaning ?? null,
+          status: spec.status ?? null,
+          title: spec.title,
+          body: spec.body ?? '',
+          todos: (spec.todos ?? []).map((row, index) => ({
+            id: `${id}-${index}`,
+            text: row.text,
+            done: row.done,
+          })),
+          shape: spec.shape ?? null,
+          ink: null,
+          parentId,
+          // A child's x/y are already relative to its frame; everything else is dropped
+          // where the board was asked to put it.
+          x: Math.round(parentId ? spec.x : at.x + spec.x),
+          y: Math.round(parentId ? spec.y : at.y + spec.y),
+          width: spec.width,
+          height: spec.height,
+          z: spec.form === 'frame' ? 0 : 1,
+          tags: spec.tags ?? [],
+          when: spec.when ?? null,
+          targetBy: spec.targetBy ?? null,
+          includeInAi: spec.includeInAi !== false,
+          createdAt: now,
+          updatedAt: now,
+        }
+        items[id] = item
+        created.push(item)
+      }
+
+      const links = { ...dataRef.current.links }
+      const newLinks: LinkBody[] = []
+      for (const spec of seed.links) {
+        const from = ids.get(spec.from)
+        const to = ids.get(spec.to)
+        if (!from || !to) continue
+        const link: LinkBody = {
+          _id: newObjectId(),
+          from,
+          to,
+          label: spec.label,
+          fromHandle: null,
+          toHandle: null,
+        }
+        links[link._id] = link
+        newLinks.push(link)
+      }
+
+      commit(() => ({ items, links }), `mock:${Date.now()}`)
+      // Frames are first in the seed, and a child's create waits on its parent anyway (R3-3).
+      for (const item of created) queue.createItem(item._id, createBody(item))
+      for (const link of newLinks) queue.createLink(link)
+      return created.map(item => item._id)
+    },
+    [commit, queue]
+  )
+
   const addShape = useCallback(
     (shape: Shape, at: { x: number; y: number }) =>
       createItem('shape', at, {
@@ -721,6 +1000,7 @@ export function useBoard() {
   )
 
   return {
+    boardId,
     data,
     dataRef,
     load,
@@ -731,10 +1011,21 @@ export function useBoard() {
     hiddenCount,
     notice,
     setNotice,
+    /** Manual save (D31). `autoSave` off means every write waits for `saveNow`. */
+    autoSave,
+    setAutoSave,
+    saveNow,
+    history: {
+      undo,
+      redo,
+      canUndo: depth.undo > 0,
+      canRedo: depth.redo > 0,
+    },
     actions: {
       createItem,
       addShape,
       addInk,
+      addMock,
       updateItem,
       moveItems,
       deleteItems,

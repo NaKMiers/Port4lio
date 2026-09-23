@@ -3,7 +3,13 @@ import type { NextRequest } from 'next/server'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { restoreBatch } from '@/lib/whiteboard/data'
-import { noStore, wbEntryError, wbError, wbJson } from '@/lib/whiteboard/http'
+import {
+  boardParam,
+  noStore,
+  wbEntryError,
+  wbError,
+  wbJson,
+} from '@/lib/whiteboard/http'
 import { RESTORE_MAX_BODY_BYTES } from '@/lib/whiteboard/limits'
 
 export const runtime = 'nodejs'
@@ -31,6 +37,9 @@ export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   const parsed = await readJsonBody<Record<string, unknown>>(request, {
     maxBytes: RESTORE_MAX_BODY_BYTES,
   })
@@ -43,7 +52,12 @@ export async function POST(request: NextRequest) {
     return wbError('items and links must be arrays.', 400)
 
   try {
-    const result = await restoreBatch({ dryRun, overwrite, items, links })
+    const result = await restoreBatch(scope.board, {
+      dryRun,
+      overwrite,
+      items,
+      links,
+    })
     if (!result.ok)
       return wbEntryError(result.error, result.status, { index: result.index })
     return wbJson(result.value)

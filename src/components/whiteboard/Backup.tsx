@@ -1,6 +1,6 @@
 'use client'
 
-import { Archive, ChevronDown, Download, Upload } from 'lucide-react'
+import { Archive, ChevronDown, Download, Sparkles, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
@@ -83,11 +83,14 @@ type Phase =
   | { step: 'done'; written: number }
 
 export function RestoreDialog({
+  boardId,
   file,
   pendingSaves,
   onClose,
   onRestored,
 }: {
+  /** A backup is restored into the board it is opened on (D32). */
+  boardId: string
   file: File
   pendingSaves: number
   onClose: () => void
@@ -110,7 +113,7 @@ export function RestoreDialog({
         batches.current = planBatches(parsed)
         let existing = 0
         for (const batch of batches.current) {
-          const result = await restoreBatchApi({
+          const result = await restoreBatchApi(boardId, {
             dryRun: true,
             overwrite: false,
             ...batch,
@@ -140,7 +143,7 @@ export function RestoreDialog({
     return () => {
       cancelled = true
     }
-  }, [file])
+  }, [boardId, file])
 
   const run = async () => {
     const all = batches.current
@@ -148,7 +151,7 @@ export function RestoreDialog({
     for (const [index, batch] of all.entries()) {
       setPhase({ step: 'running', batch: index + 1, of: all.length })
       try {
-        const result = await restoreBatchApi({
+        const result = await restoreBatchApi(boardId, {
           dryRun: false,
           overwrite,
           ...batch,
@@ -259,17 +262,33 @@ export function RestoreDialog({
 }
 
 export function BackupMenu({
+  boardId,
   open,
   onToggle,
   onRestore,
+  onMock,
+  mockDisabled,
   beforeDownload,
+  heldWrites,
   compact,
   className,
 }: {
+  boardId: string
   open: boolean
   onToggle: (open: boolean) => void
   onRestore: () => void
+  /** D33. It lives in this menu because it is the other way to fill a board you can see. */
+  onMock: () => void
+  mockDisabled: boolean
   beforeDownload: () => void
+  /**
+   * Writes auto-save is holding (D31), or 0. `beforeDownload` flushes the debounce, but a
+   * paused queue sends nothing, so those writes are not in the file - and this file is the
+   * only way back from a hard delete, so the menu says so rather than quietly shipping a
+   * board that is one edit behind. Saying it beats saving behind the owner's back: holding
+   * writes is what they asked for.
+   */
+  heldWrites: number
   compact: boolean
   className?: string
 }) {
@@ -292,7 +311,7 @@ export function BackupMenu({
     setError(null)
     beforeDownload()
     try {
-      const blob = await getBackupApi()
+      const blob = await getBackupApi(boardId)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -339,6 +358,12 @@ export function BackupMenu({
           role="menu"
           className="absolute right-0 top-[calc(100%+8px)] z-40 w-64 rounded-2xl border border-pp-line bg-pp-panel-strong p-1.5 shadow-panel"
         >
+          {heldWrites > 0 ? (
+            <p className="px-3 py-1.5 text-[12px] text-pp-ink-amber">
+              {heldWrites === 1 ? '1 change is' : `${heldWrites} changes are`}{' '}
+              waiting for Save and will not be in this file.
+            </p>
+          ) : null}
           <button
             type="button"
             role="menuitem"
@@ -360,6 +385,21 @@ export function BackupMenu({
           >
             <Upload size={14} />
             Restore from backup
+          </button>
+          <div className="my-1 h-px bg-pp-line" />
+          <button
+            type="button"
+            role="menuitem"
+            disabled={mockDisabled}
+            onClick={() => {
+              onToggle(false)
+              onMock()
+            }}
+            data-testid="wb-mock-menu"
+            className={cn(item, 'disabled:opacity-50')}
+          >
+            <Sparkles size={14} />
+            Add sample data
           </button>
           {error ? (
             <p className="px-3 py-1.5 text-[12px] text-pp-ink-rose">{error}</p>

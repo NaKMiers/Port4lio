@@ -9,8 +9,13 @@ import { cn } from '@/lib/utils'
 
 /**
  * The save pill next to the title (DR4): Loading N items / Saving / Saved / N not saved -
- * retry / Offline - changes kept. `aria-live="polite"`, so a screen reader hears the state
- * change without being interrupted by it.
+ * retry / Offline - changes kept / N unsaved. `aria-live="polite"`, so a screen reader hears
+ * the state change without being interrupted by it.
+ *
+ * "N unsaved" is manual save (D31), and it is deliberately not the "Saving" spinner: with
+ * auto-save off those writes are not on their way anywhere, and a spinner would say they
+ * were. It is amber rather than rose because nothing has failed - the queue is doing exactly
+ * what it was told - and the Save button beside it is the way out.
  */
 function SavePill({
   load,
@@ -54,6 +59,11 @@ function SavePill({
         {status.failing + rejected} not saved - retry
       </>
     )
+  } else if (status.holding) {
+    // After the error branch on purpose: a refused write is the more urgent thing to say,
+    // and it is not what the Save button next to this pill can fix.
+    tone = 'border-pp-orange/30 bg-pp-orange/10 text-pp-ink-amber'
+    content = `${status.pending} unsaved`
   } else if (status.pending > 0)
     content = (
       <>

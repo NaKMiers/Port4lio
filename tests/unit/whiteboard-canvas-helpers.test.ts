@@ -12,8 +12,9 @@ import {
   skipsBulkAiOn,
   type Placeable,
 } from '@/components/whiteboard/frame-geometry'
-import { deletePlan } from '@/components/whiteboard/delete-plan'
+import { deletePlan, deletedText } from '@/components/whiteboard/delete-plan'
 import { MEANING_STYLE } from '@/components/whiteboard/meaning-style'
+import { mockBoard } from '@/components/whiteboard/mock-data'
 import { newObjectId } from '@/components/whiteboard/object-id'
 import {
   TOOL_KEYS,
@@ -21,7 +22,12 @@ import {
   escapeTarget,
   shortcutFor,
 } from '@/components/whiteboard/shortcuts'
-import { MEANINGS } from '@/lib/whiteboard/limits'
+import {
+  MEANINGS,
+  validateBoard,
+  validateBoardPatch,
+  validateItem,
+} from '@/lib/whiteboard/limits'
 import type { BoardLine, ClientItem, ClientLink } from '@/lib/whiteboard/types'
 
 describe('frame membership and coordinates', () => {
@@ -150,7 +156,7 @@ describe('Delete on a selection (R3-7, R3-19)', () => {
     },
   }
 
-  it('deletes a links-only selection at once, with no confirm', () => {
+  it('deletes a links-only selection on its own', () => {
     expect(deletePlan({ nodes: [], edges: ['L1', 'L3'] }, data)).toEqual({
       kind: 'links',
       ids: ['L1', 'L3'],
@@ -158,9 +164,9 @@ describe('Delete on a selection (R3-7, R3-19)', () => {
     expect(deletePlan({ nodes: [], edges: [] }, data)).toBeNull()
   })
 
-  it('confirms any selection with an item, counting the links it takes along', () => {
+  it('counts the links an item selection takes along', () => {
     expect(deletePlan({ nodes: ['A'], edges: ['L3'] }, data)).toEqual({
-      kind: 'confirm',
+      kind: 'items',
       items: ['A'],
       links: 2, // L1 goes with A, L3 was selected
       frameChildren: 0,
@@ -170,12 +176,26 @@ describe('Delete on a selection (R3-7, R3-19)', () => {
 
   it('says how many children a hidden frame leaves behind (they stay private)', () => {
     expect(deletePlan({ nodes: ['F', 'C2'], edges: [] }, data)).toEqual({
-      kind: 'confirm',
+      kind: 'items',
       items: ['F', 'C2'],
       links: 0,
       frameChildren: 1, // C1 stays; C2 is being deleted too
       hiddenFrame: true,
     })
+  })
+
+  // The toast is the only account of a delete now that nothing asks first, so it has to
+  // carry what the confirm used to say: the counts, and that a frame's cards stay.
+  it('reports what went and what stayed', () => {
+    expect(deletedText(deletePlan({ nodes: [], edges: ['L1'] }, data)!)).toBe(
+      '1 link deleted'
+    )
+    expect(
+      deletedText(deletePlan({ nodes: ['A'], edges: ['L3'] }, data)!)
+    ).toBe('1 item and 2 links deleted')
+    expect(deletedText(deletePlan({ nodes: ['F'], edges: [] }, data)!)).toBe(
+      '1 item deleted - 2 items stay on the board, and stay private'
+    )
   })
 })
 
@@ -323,6 +343,47 @@ describe('shortcut guard (DR9)', () => {
     })
   })
 
+  // Both modes, and inside a field: it has to beat the browser's own Save dialog.
+  it('Cmd/Ctrl+S is save, typing or not', () => {
+    expect(
+      shortcutFor({ key: 's', metaKey: true, target: canvas as never })
+    ).toEqual({ type: 'save' })
+    expect(
+      shortcutFor({ key: 'S', ctrlKey: true, target: textarea as never })
+    ).toEqual({ type: 'save' })
+  })
+
+  it('Cmd/Ctrl+Z undoes, with Shift or Ctrl+Y for redo', () => {
+    expect(
+      shortcutFor({ key: 'z', metaKey: true, target: canvas as never })
+    ).toEqual({ type: 'undo' })
+    expect(
+      shortcutFor({
+        key: 'z',
+        ctrlKey: true,
+        shiftKey: true,
+        target: canvas as never,
+      })
+    ).toEqual({ type: 'redo' })
+    expect(
+      shortcutFor({ key: 'y', ctrlKey: true, target: canvas as never })
+    ).toEqual({ type: 'redo' })
+  })
+
+  // The one chord that a field keeps: inside a title Cmd+Z undoes the characters typed,
+  // which is not the same thing as undoing the whole edit.
+  it('leaves Cmd+Z to the field while typing', () => {
+    expect(
+      shortcutFor({ key: 'z', metaKey: true, target: input as never })
+    ).toBeNull()
+    expect(
+      shortcutFor(
+        { key: 'z', metaKey: true, target: canvas as never },
+        { modalOpen: true }
+      )
+    ).toBeNull()
+  })
+
   it('Esc order: tool, then surface, then selection', () => {
     expect(
       escapeTarget({ tool: 'pen', surfaceOpen: true, hasSelection: true })
@@ -411,5 +472,107 @@ describe('NDJSON board loader (D28, DR4)', () => {
     await expect(readBoardStream(body, () => {})).rejects.toThrow(
       BoardLoadError
     )
+  })
+})
+
+describe('sample data (D33)', () => {
+  const seed = mockBoard(2030)
+
+  it('is a board the validators would accept', () => {
+    for (const spec of seed.items) {
+      const checked = validateItem({
+        _id: 'a'.repeat(24),
+        form: spec.form,
+        meaning: spec.meaning ?? null,
+        status: spec.status ?? null,
+        title: spec.title,
+        body: spec.body ?? '',
+        shape: spec.shape ?? null,
+        todos: (spec.todos ?? []).map((row, index) => ({
+          id: `${index}`,
+          ...row,
+        })),
+        tags: spec.tags ?? [],
+        when: spec.when ?? null,
+        targetBy: spec.targetBy ?? null,
+        parentId: spec.parent ? 'b'.repeat(24) : null,
+        x: spec.x,
+        y: spec.y,
+        width: spec.width,
+        height: spec.height,
+      })
+      expect([spec.key, checked.ok]).toEqual([spec.key, true])
+    }
+  })
+
+  it('links only what it creates, and never an item to itself', () => {
+    const keys = new Set(seed.items.map(item => item.key))
+    for (const link of seed.links) {
+      expect(keys.has(link.from)).toBe(true)
+      expect(keys.has(link.to)).toBe(true)
+      expect(link.from).not.toBe(link.to)
+    }
+  })
+
+  // A child is stored relative to its frame, so "inside" is a claim about these numbers -
+  // and a seed whose cards spill out of the frame teaches the wrong thing about frames.
+  it('keeps every child inside its frame, and everything else outside it', () => {
+    const byKey = new Map(seed.items.map(item => [item.key, item]))
+    const frames = seed.items.filter(item => item.form === 'frame')
+    expect(frames.length).toBeGreaterThan(0)
+
+    for (const item of seed.items) {
+      if (!item.parent) continue
+      const frame = byKey.get(item.parent)!
+      expect(frame.form).toBe('frame')
+      expect(item.x).toBeGreaterThanOrEqual(0)
+      expect(item.y).toBeGreaterThanOrEqual(0)
+      expect(item.x + item.width).toBeLessThanOrEqual(frame.width)
+      expect(item.y + item.height).toBeLessThanOrEqual(frame.height)
+    }
+
+    for (const item of seed.items) {
+      if (item.parent || item.form === 'frame') continue
+      const clear = frames.every(
+        frame =>
+          item.x >= frame.x + frame.width ||
+          item.x + item.width <= frame.x ||
+          item.y >= frame.y + frame.height ||
+          item.y + item.height <= frame.y
+      )
+      expect([item.key, clear]).toEqual([item.key, true])
+    }
+  })
+
+  it('shows what a hidden card looks like', () => {
+    expect(seed.items.some(item => item.includeInAi === false)).toBe(true)
+    expect(seed.items.some(item => item.meaning === 'failure')).toBe(true)
+    expect(seed.items.filter(item => item.form === 'todo')).toHaveLength(1)
+  })
+})
+
+describe('board validators (D32)', () => {
+  it('trims a title, defaults the switch on, and refuses a newline', () => {
+    expect(validateBoard({ title: '  Scratch  ' })).toEqual({
+      ok: true,
+      value: { title: 'Scratch', includeInAi: true },
+    })
+    expect(validateBoard({ title: 'a\nb' }).ok).toBe(false)
+    expect(validateBoard({ title: 'x'.repeat(201) }).ok).toBe(false)
+    expect(validateBoard({ includeInAi: false })).toMatchObject({
+      ok: true,
+      value: { includeInAi: false },
+    })
+  })
+
+  it('patches only what was sent, and refuses an empty patch', () => {
+    expect(validateBoardPatch({ includeInAi: false })).toEqual({
+      ok: true,
+      value: { includeInAi: false },
+    })
+    expect(validateBoardPatch({})).toMatchObject({ ok: false })
+    expect(validateBoardPatch({ includeInAi: 'no' })).toMatchObject({
+      ok: false,
+    })
   })
 })

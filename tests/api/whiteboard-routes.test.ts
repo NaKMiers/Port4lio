@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { getAuthCookieName, makeAuthToken } from '@/lib/auth'
 import type { BoardLine } from '@/lib/whiteboard/types'
+import { WhiteboardBoardModel } from '@/models/WhiteboardBoard'
 import { WhiteboardItemModel } from '@/models/WhiteboardItem'
 import { WhiteboardLinkModel } from '@/models/WhiteboardLink'
 
@@ -25,6 +26,8 @@ type Handler = (
 let memory: MongoMemoryServer
 const routes: Record<string, Record<string, Handler>> = {}
 let cookie = ''
+/** Every owner route names a board (D32); these tests use one throughout. */
+let BOARD = ''
 
 beforeAll(async () => {
   memory = await MongoMemoryServer.create()
@@ -35,6 +38,7 @@ beforeAll(async () => {
   await WhiteboardItemModel.syncIndexes()
   await WhiteboardLinkModel.syncIndexes()
 
+  BOARD = String((await WhiteboardBoardModel.create({ title: 'Test' }))._id)
   cookie = `${getAuthCookieName()}=${makeAuthToken(Date.now() + 3_600_000)}`
   routes.board = (await import('@/app/api/admin/whiteboard/route')) as never
   routes.items =
@@ -51,9 +55,14 @@ beforeAll(async () => {
     (await import('@/app/api/admin/whiteboard/backup/route')) as never
   routes.restore =
     (await import('@/app/api/admin/whiteboard/restore/route')) as never
+  routes.boards =
+    (await import('@/app/api/admin/whiteboard/boards/route')) as never
+  routes.boardId =
+    (await import('@/app/api/admin/whiteboard/boards/[id]/route')) as never
 }, 120_000)
 
 afterAll(async () => {
+  await WhiteboardBoardModel.deleteMany({})
   await mongoose.disconnect()
   await memory.stop()
 })
@@ -73,19 +82,30 @@ async function call(
     raw,
     id = '',
     auth = true,
-  }: { body?: unknown; raw?: string; id?: string; auth?: boolean } = {}
+    board = BOARD,
+  }: {
+    body?: unknown
+    raw?: string
+    id?: string
+    auth?: boolean
+    board?: string | null
+  } = {}
 ) {
   const handler = routes[route][method]
-  const request = new NextRequest(`http://localhost/api/admin/whiteboard`, {
-    method,
-    headers: {
-      ...(auth ? { cookie } : {}),
-      ...(body !== undefined || raw !== undefined
-        ? { 'content-type': 'application/json' }
-        : {}),
-    },
-    body: raw ?? (body === undefined ? undefined : JSON.stringify(body)),
-  })
+  const query = board === null ? '' : `?board=${board}`
+  const request = new NextRequest(
+    `http://localhost/api/admin/whiteboard${query}`,
+    {
+      method,
+      headers: {
+        ...(auth ? { cookie } : {}),
+        ...(body !== undefined || raw !== undefined
+          ? { 'content-type': 'application/json' }
+          : {}),
+      },
+      body: raw ?? (body === undefined ? undefined : JSON.stringify(body)),
+    }
+  )
   return handler(request, { params: Promise.resolve({ id }) })
 }
 
@@ -427,5 +447,71 @@ describe('bulk "Include in AI: on" (DR11)', () => {
     const { markdown } = await res.json()
     expect(markdown).toContain('Outside')
     expect(markdown).not.toContain('Inside')
+  })
+})
+
+describe('boards (D32)', () => {
+  afterEach(async () => {
+    await WhiteboardBoardModel.deleteMany({ _id: { $ne: BOARD } })
+  })
+
+  it('refuses any item or link call that does not name a board', async () => {
+    for (const [route, method] of [
+      ['board', 'GET'],
+      ['items', 'POST'],
+      ['items', 'PATCH'],
+      ['item', 'PATCH'],
+      ['item', 'DELETE'],
+      ['links', 'POST'],
+      ['link', 'PATCH'],
+      ['link', 'DELETE'],
+      ['context', 'POST'],
+      ['backup', 'GET'],
+      ['restore', 'POST'],
+    ] as const) {
+      const body = method === 'GET' ? undefined : {}
+      const res = await call(route, method, { board: null, body })
+      expect([route, method, res.status]).toEqual([route, method, 400])
+      const bad = await call(route, method, { board: 'nope', body })
+      expect(bad.status).toBe(400)
+    }
+  })
+
+  it('lists, creates, renames and deletes', async () => {
+    const list = await call('boards', 'GET')
+    expect(list.status).toBe(200)
+    expect((await list.json()).boards).toHaveLength(1)
+
+    const created = await call('boards', 'POST', { body: { title: 'Second' } })
+    expect(created.status).toBe(201)
+    const board = (await created.json()).board as { _id: string }
+
+    const renamed = await call('boardId', 'PATCH', {
+      id: board._id,
+      body: { title: 'Renamed', includeInAi: false },
+    })
+    expect(renamed.status).toBe(200)
+    expect((await renamed.json()).board).toMatchObject({
+      title: 'Renamed',
+      includeInAi: false,
+    })
+
+    expect((await call('boardId', 'DELETE', { id: board._id })).status).toBe(
+      200
+    )
+    expect((await call('boardId', 'DELETE', { id: board._id })).status).toBe(
+      404
+    )
+  })
+
+  it('refuses an empty patch and an anonymous caller', async () => {
+    expect(
+      (await call('boardId', 'PATCH', { id: BOARD, body: {} })).status
+    ).toBe(400)
+    for (const method of ['GET', 'POST'] as const)
+      expect((await call('boards', method, { auth: false })).status).toBe(401)
+    expect(
+      (await call('boardId', 'DELETE', { id: BOARD, auth: false })).status
+    ).toBe(401)
   })
 })

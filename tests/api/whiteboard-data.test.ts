@@ -13,7 +13,12 @@ import {
 import { renderContext } from '@/lib/whiteboard/context'
 import {
   bulkMoveItems,
+  createBoard,
   createItem,
+  deleteBoard,
+  ensureBoards,
+  listBoards,
+  patchBoard,
   createLink,
   deleteItem,
   deleteLink,
@@ -31,6 +36,7 @@ import {
   type LinkFields,
 } from '@/lib/whiteboard/limits'
 import type { BoardLine } from '@/lib/whiteboard/types'
+import { WhiteboardBoardModel } from '@/models/WhiteboardBoard'
 import { WhiteboardItemModel } from '@/models/WhiteboardItem'
 import { WhiteboardLinkModel } from '@/models/WhiteboardLink'
 
@@ -43,6 +49,8 @@ import { WhiteboardLinkModel } from '@/models/WhiteboardLink'
  */
 
 let memory: MongoMemoryServer
+/** Every item and link belongs to a board (D32); these tests use one throughout. */
+let BOARD = ''
 
 beforeAll(async () => {
   memory = await MongoMemoryServer.create()
@@ -50,9 +58,13 @@ beforeAll(async () => {
   await mongoose.connect(memory.getUri())
   await WhiteboardItemModel.syncIndexes()
   await WhiteboardLinkModel.syncIndexes()
+  BOARD = String(
+    (await WhiteboardBoardModel.create({ title: 'Test board' }))._id
+  )
 }, 120_000)
 
 afterAll(async () => {
+  await WhiteboardBoardModel.deleteMany({})
   await mongoose.disconnect()
   await memory.stop()
 })
@@ -78,7 +90,7 @@ function fields(overrides: Record<string, unknown> = {}): ItemFields {
 }
 
 async function make(overrides: Record<string, unknown> = {}) {
-  const result = await createItem(fields(overrides))
+  const result = await createItem(BOARD, fields(overrides))
   if (!result.ok) throw new Error(result.error)
   return result.value
 }
@@ -86,7 +98,7 @@ async function make(overrides: Record<string, unknown> = {}) {
 async function link(from: string, to: string, label = 'because') {
   const checked = validateLink({ _id: newId(), from, to, label })
   if (!checked.ok) throw new Error(checked.error)
-  const result = await createLink(checked.value)
+  const result = await createLink(BOARD, checked.value)
   if (!result.ok) throw new Error(result.error)
   return result.value
 }
@@ -121,19 +133,26 @@ describe('indexes', () => {
 describe('create', () => {
   it('is an idempotent upsert: a replay leaves one unchanged document', async () => {
     const item = fields({ title: 'First' })
-    await createItem(item)
-    const replay = await createItem({ ...item, title: 'Changed in flight' })
+    await createItem(BOARD, item)
+    const replay = await createItem(BOARD, {
+      ...item,
+      title: 'Changed in flight',
+    })
     expect(replay.ok && replay.value.title).toBe('First')
     expect(await WhiteboardItemModel.countDocuments()).toBe(1)
   })
 
   it('rejects a parentId that is missing or not a frame', async () => {
     const card = await make()
-    expect(await createItem(fields({ parentId: card._id }))).toMatchObject({
+    expect(
+      await createItem(BOARD, fields({ parentId: card._id }))
+    ).toMatchObject({
       ok: false,
       status: 400,
     })
-    expect(await createItem(fields({ parentId: newId() }))).toMatchObject({
+    expect(
+      await createItem(BOARD, fields({ parentId: newId() }))
+    ).toMatchObject({
       ok: false,
       status: 400,
     })
@@ -158,7 +177,7 @@ describe('create', () => {
 describe('patch sends only what changed (R3-1)', () => {
   it('leaves untouched fields alone', async () => {
     const card = await make({ includeInAi: false, tags: ['keep'] })
-    const result = await patchItem(card._id, { title: 'Renamed' })
+    const result = await patchItem(BOARD, card._id, { title: 'Renamed' })
     expect(result.ok && result.value).toMatchObject({
       title: 'Renamed',
       includeInAi: false,
@@ -167,17 +186,17 @@ describe('patch sends only what changed (R3-1)', () => {
   })
 
   it('returns 404 for a missing or malformed id', async () => {
-    expect(await patchItem(newId(), { title: 'x' })).toMatchObject({
+    expect(await patchItem(BOARD, newId(), { title: 'x' })).toMatchObject({
       status: 404,
     })
-    expect(await patchItem('nope', { title: 'x' })).toMatchObject({
+    expect(await patchItem(BOARD, 'nope', { title: 'x' })).toMatchObject({
       status: 404,
     })
   })
 
   it('nulls status when meaning moves off dream/goal', async () => {
     const card = await make({ meaning: 'goal', status: 'active' })
-    const result = await patchItem(card._id, { meaning: 'note' })
+    const result = await patchItem(BOARD, card._id, { meaning: 'note' })
     expect(result.ok && result.value.status).toBeNull()
   })
 
@@ -186,10 +205,14 @@ describe('patch sends only what changed (R3-1)', () => {
     const child = await make({ parentId: frame._id })
     expect(child.includeInAi).toBe(true)
 
-    const moved = await patchItem(child._id, { parentId: null, x: 500, y: 500 })
+    const moved = await patchItem(BOARD, child._id, {
+      parentId: null,
+      x: 500,
+      y: 500,
+    })
     expect(moved.ok && moved.value.includeInAi).toBe(false)
 
-    const edited = await patchItem(child._id, { title: 'Edited later' })
+    const edited = await patchItem(BOARD, child._id, { title: 'Edited later' })
     expect(edited.ok && edited.value.includeInAi).toBe(false)
     expect((await visibleIds()).has(child._id)).toBe(false)
   })
@@ -197,7 +220,7 @@ describe('patch sends only what changed (R3-1)', () => {
   it('moving out of a visible frame keeps the flag', async () => {
     const frame = await make({ form: 'frame' })
     const child = await make({ parentId: frame._id })
-    const moved = await patchItem(child._id, { parentId: null })
+    const moved = await patchItem(BOARD, child._id, { parentId: null })
     expect(moved.ok && moved.value.includeInAi).toBe(true)
   })
 
@@ -210,7 +233,7 @@ describe('patch sends only what changed (R3-1)', () => {
   it('turning includeInAi on for a hidden frame child leaves it hidden (rule 1)', async () => {
     const frame = await make({ form: 'frame', includeInAi: false })
     const child = await make({ parentId: frame._id, includeInAi: false })
-    await patchItem(child._id, { includeInAi: true })
+    await patchItem(BOARD, child._id, { includeInAi: true })
     expect((await visibleIds()).has(child._id)).toBe(false)
   })
 })
@@ -222,7 +245,7 @@ describe('bulk move (R3-2, all-or-nothing)', () => {
     const b = await make({ parentId: frame._id })
     const free = await make()
 
-    const result = await bulkMoveItems([
+    const result = await bulkMoveItems(BOARD, [
       { id: a._id, x: 10, y: 10, parentId: null },
       { id: b._id, x: 20, y: 20, parentId: null },
       { id: free._id, x: 30, y: 30, parentId: null },
@@ -240,7 +263,7 @@ describe('bulk move (R3-2, all-or-nothing)', () => {
   it('rejects the whole request naming the bad entry, and writes nothing', async () => {
     const a = await make({ x: 1, y: 1 })
     const b = await make({ x: 2, y: 2 })
-    const result = await bulkMoveItems([
+    const result = await bulkMoveItems(BOARD, [
       { id: a._id, x: 100, y: 100, parentId: null },
       { id: b._id, x: 200, y: 200, parentId: a._id }, // a is not a frame
     ])
@@ -263,7 +286,7 @@ describe('delete', () => {
     await link(frame._id, other._id)
     await link(child._id, other._id)
 
-    const result = await deleteItem(frame._id)
+    const result = await deleteItem(BOARD, frame._id)
     expect(result).toEqual({ ok: true, value: { links: 1, children: 1 } })
 
     const stored = await WhiteboardItemModel.findById(child._id).lean()
@@ -275,7 +298,7 @@ describe('delete', () => {
   it('deleting a hidden frame leaves its children hidden', async () => {
     const frame = await make({ form: 'frame', includeInAi: false })
     const child = await make({ parentId: frame._id })
-    await deleteItem(frame._id)
+    await deleteItem(BOARD, frame._id)
     const stored = await WhiteboardItemModel.findById(child._id).lean()
     expect(stored?.includeInAi).toBe(false)
     expect((await visibleIds()).has(child._id)).toBe(false)
@@ -299,7 +322,7 @@ describe('delete', () => {
   })
 
   it('returns 404 for an unknown item', async () => {
-    expect(await deleteItem(newId())).toMatchObject({ status: 404 })
+    expect(await deleteItem(BOARD, newId())).toMatchObject({ status: 404 })
   })
 })
 
@@ -308,6 +331,7 @@ describe('un-hiding a frame (D24)', () => {
     const frame = await make({ form: 'frame', includeInAi: false })
     const child = await make({ parentId: frame._id })
     await patchItem(
+      BOARD,
       frame._id,
       { includeInAi: true },
       { keepChildrenPrivate: true }
@@ -320,7 +344,7 @@ describe('un-hiding a frame (D24)', () => {
   it('without it, the children become readable', async () => {
     const frame = await make({ form: 'frame', includeInAi: false })
     const child = await make({ parentId: frame._id })
-    await patchItem(frame._id, { includeInAi: true })
+    await patchItem(BOARD, frame._id, { includeInAi: true })
     expect((await visibleIds()).has(child._id)).toBe(true)
   })
 })
@@ -336,8 +360,8 @@ describe('links', () => {
       label: 'x',
     })
     if (!checked.ok) throw new Error()
-    const first = await createLink(checked.value as LinkFields)
-    const replay = await createLink(checked.value as LinkFields)
+    const first = await createLink(BOARD, checked.value as LinkFields)
+    const replay = await createLink(BOARD, checked.value as LinkFields)
     expect(first.ok && replay.ok).toBe(true)
     expect(await WhiteboardLinkModel.countDocuments()).toBe(1)
   })
@@ -353,7 +377,7 @@ describe('links', () => {
       label: 'blocks',
     })
     if (!again.ok) throw new Error()
-    expect(await createLink(again.value)).toMatchObject({ status: 400 })
+    expect(await createLink(BOARD, again.value)).toMatchObject({ status: 400 })
   })
 
   it('rejects a link whose end does not exist', async () => {
@@ -365,7 +389,9 @@ describe('links', () => {
       label: '',
     })
     if (!checked.ok) throw new Error()
-    expect(await createLink(checked.value)).toMatchObject({ status: 400 })
+    expect(await createLink(BOARD, checked.value)).toMatchObject({
+      status: 400,
+    })
   })
 
   it('relabels, rejects a duplicate label, and 404s a missing link (D19)', async () => {
@@ -373,14 +399,14 @@ describe('links', () => {
     const b = await make()
     const one = await link(a._id, b._id, 'because')
     await link(a._id, b._id, 'blocks')
-    expect(await patchLink(one._id, { label: 'led to' })).toMatchObject({
+    expect(await patchLink(BOARD, one._id, { label: 'led to' })).toMatchObject({
       ok: true,
       value: { label: 'led to' },
     })
-    expect(await patchLink(one._id, { label: 'blocks' })).toMatchObject({
+    expect(await patchLink(BOARD, one._id, { label: 'blocks' })).toMatchObject({
       status: 400,
     })
-    expect(await patchLink(newId(), { label: 'x' })).toMatchObject({
+    expect(await patchLink(BOARD, newId(), { label: 'x' })).toMatchObject({
       status: 404,
     })
   })
@@ -389,8 +415,8 @@ describe('links', () => {
     const a = await make()
     const b = await make()
     const one = await link(a._id, b._id)
-    expect((await deleteLink(one._id)).ok).toBe(true)
-    expect(await deleteLink(one._id)).toMatchObject({ status: 404 })
+    expect((await deleteLink(BOARD, one._id)).ok).toBe(true)
+    expect(await deleteLink(BOARD, one._id)).toMatchObject({ status: 404 })
   })
 })
 
@@ -625,7 +651,7 @@ describe('the canvas stream (D28)', () => {
     await link(card._id, child._id)
 
     const lines: BoardLine[] = []
-    for await (const line of streamBoard()) lines.push(line)
+    for await (const line of streamBoard(BOARD)) lines.push(line)
 
     expect(lines[0]).toEqual({ t: 'start', items: 3, links: 1 })
     expect(lines.at(-1)).toEqual({ t: 'end', items: 3, links: 1 })
@@ -641,7 +667,7 @@ describe('the canvas stream (D28)', () => {
     await make({ includeInAi: false, title: 'Owner only' })
     await make({ form: 'ink', title: '', ink: { points: [[1, 1]] } })
     const lines: BoardLine[] = []
-    for await (const line of streamBoard()) lines.push(line)
+    for await (const line of streamBoard(BOARD)) lines.push(line)
     const text = JSON.stringify(lines)
     expect(text).toContain('Owner only')
     expect(text).toContain('"points":[[1,1,0.5]]')
@@ -652,6 +678,7 @@ describe('backup and restore (D20, D21)', () => {
   async function backupFile() {
     let text = ''
     for await (const chunk of streamBackup(
+      BOARD,
       new Date('2026-01-01T00:00:00.000Z')
     ))
       text += chunk
@@ -705,7 +732,7 @@ describe('backup and restore (D20, D21)', () => {
     await WhiteboardItemModel.deleteMany({})
     await WhiteboardLinkModel.deleteMany({})
 
-    const result = await restoreBatch({
+    const result = await restoreBatch(BOARD, {
       dryRun: false,
       overwrite: false,
       items: file.items,
@@ -719,7 +746,7 @@ describe('backup and restore (D20, D21)', () => {
   })
 
   it('an invalid batch is a 400 with zero writes', async () => {
-    const result = await restoreBatch({
+    const result = await restoreBatch(BOARD, {
       dryRun: false,
       overwrite: false,
       items: [
@@ -736,7 +763,7 @@ describe('backup and restore (D20, D21)', () => {
     const { child } = await seedBoard()
     const file = await backupFile()
     await WhiteboardItemModel.deleteOne({ _id: child._id })
-    const result = await restoreBatch({
+    const result = await restoreBatch(BOARD, {
       dryRun: true,
       overwrite: false,
       items: file.items,
@@ -764,15 +791,25 @@ describe('backup and restore (D20, D21)', () => {
       { items: [], links: file.links },
     ]
     // First run stops after batch 1.
-    await restoreBatch({ dryRun: false, overwrite: false, ...batches[0] })
+    await restoreBatch(BOARD, {
+      dryRun: false,
+      overwrite: false,
+      ...batches[0],
+    })
     // Run again, from the start.
     for (const batch of batches)
       expect(
-        (await restoreBatch({ dryRun: false, overwrite: false, ...batch })).ok
+        (
+          await restoreBatch(BOARD, {
+            dryRun: false,
+            overwrite: false,
+            ...batch,
+          })
+        ).ok
       ).toBe(true)
     // And once more: nothing new.
     for (const batch of batches) {
-      const again = await restoreBatch({
+      const again = await restoreBatch(BOARD, {
         dryRun: false,
         overwrite: false,
         ...batch,
@@ -784,7 +821,7 @@ describe('backup and restore (D20, D21)', () => {
 
   it('keeps includeInAi and createdAt from the file, and re-derives a wrong bbox', async () => {
     const id = newId()
-    const result = await restoreBatch({
+    const result = await restoreBatch(BOARD, {
       dryRun: false,
       overwrite: false,
       items: [
@@ -814,7 +851,7 @@ describe('backup and restore (D20, D21)', () => {
 
   it('overwrite keeps the file createdAt too', async () => {
     const card = await make({ title: 'Current' })
-    await restoreBatch({
+    await restoreBatch(BOARD, {
       dryRun: false,
       overwrite: true,
       items: [
@@ -834,7 +871,7 @@ describe('backup and restore (D20, D21)', () => {
   it('leaves existing ids untouched unless overwrite', async () => {
     const card = await make({ title: 'Current' })
     const entry = { _id: card._id, form: 'text', title: 'From file' }
-    await restoreBatch({
+    await restoreBatch(BOARD, {
       dryRun: false,
       overwrite: false,
       items: [entry],
@@ -843,7 +880,7 @@ describe('backup and restore (D20, D21)', () => {
     expect((await WhiteboardItemModel.findById(card._id).lean())?.title).toBe(
       'Current'
     )
-    await restoreBatch({
+    await restoreBatch(BOARD, {
       dryRun: false,
       overwrite: true,
       items: [entry],
@@ -852,5 +889,191 @@ describe('backup and restore (D20, D21)', () => {
     expect((await WhiteboardItemModel.findById(card._id).lean())?.title).toBe(
       'From file'
     )
+  })
+})
+
+describe('boards (D32)', () => {
+  afterEach(async () => {
+    // Each test here makes its own boards; the shared one outlives them.
+    await WhiteboardBoardModel.deleteMany({ _id: { $ne: BOARD } })
+  })
+
+  async function second(title = 'Second', includeInAi = true) {
+    const made = await createBoard({ title, includeInAi })
+    if (!made.ok) throw new Error(made.error)
+    return made.value
+  }
+
+  it('keeps one board out of another: the stream, and every write', async () => {
+    const other = await second()
+    const mine = await make({ title: 'Mine' })
+
+    const lines: BoardLine[] = []
+    for await (const line of streamBoard(other._id)) lines.push(line)
+    expect(lines.filter(l => l.t === 'item')).toEqual([])
+
+    // The id is real, the board is not its board: that is a 404, not an edit.
+    expect(await patchItem(other._id, mine._id, { title: 'x' })).toMatchObject({
+      ok: false,
+      status: 404,
+    })
+    expect(await deleteItem(other._id, mine._id)).toMatchObject({
+      ok: false,
+      status: 404,
+    })
+    expect(
+      await bulkMoveItems(other._id, [
+        { id: mine._id, x: 5, y: 5, parentId: null },
+      ])
+    ).toMatchObject({ ok: false })
+    expect((await WhiteboardItemModel.findById(mine._id).lean())?.title).toBe(
+      'Mine'
+    )
+  })
+
+  it('refuses a link whose ends are on another board', async () => {
+    const other = await second()
+    const a = await make()
+    const b = await make()
+    const checked = validateLink({
+      _id: newId(),
+      from: a._id,
+      to: b._id,
+      label: '',
+    })
+    if (!checked.ok) throw new Error(checked.error)
+    expect(await createLink(other._id, checked.value)).toMatchObject({
+      ok: false,
+      status: 400,
+    })
+  })
+
+  it('refuses an item on a board that does not exist', async () => {
+    expect(await createItem(newId(), fields())).toMatchObject({
+      ok: false,
+      status: 404,
+    })
+  })
+
+  // Rule 1, one level up: the switch on the board beats every card's own switch.
+  it('hides everything on a board agents cannot read', async () => {
+    const hidden = await second('Private', false)
+    const open = await make({ title: 'Readable' })
+    const secret = fields({ title: 'Secret', includeInAi: true })
+    const written = await createItem(hidden._id, secret)
+    expect(written.ok).toBe(true)
+
+    const { input } = await loadAgentVisible({ kind: 'all' })
+    expect(input.items.map(i => i.title)).toEqual(['Readable'])
+    expect(
+      (await loadAgentVisible({ kind: 'item', id: secret._id })).item
+    ).toBeNull()
+    expect(
+      (await loadAgentVisible({ kind: 'search', query: 'Secret', limit: 10 }))
+        .results
+    ).toEqual([])
+    expect((await loadAgentVisible({ kind: 'overview' })).totalVisible).toBe(1)
+    expect(await visibleIds()).toEqual(new Set([open._id]))
+  })
+
+  it("answers the owner's preview of a hidden board like a hidden frame", async () => {
+    const hidden = await second('Private', false)
+    await createItem(hidden._id, fields({ title: 'Secret' }))
+    const load = await loadAgentVisible({ kind: 'all' }, { board: hidden._id })
+    expect(load).toMatchObject({ scopeHidden: true, excludedCount: 1 })
+    expect(load.input.items).toEqual([])
+  })
+
+  it('gives each board its own section of the export, and only when there are two', async () => {
+    await make({ title: 'On the first' })
+    const other = await second('Other board')
+    await createItem(other._id, fields({ title: 'On the second' }))
+
+    const { input } = await loadAgentVisible({ kind: 'all' })
+    const markdown = renderContext(input).markdown
+    expect(markdown).toContain('## Test board')
+    expect(markdown).toContain('## Other board')
+    // Frames and meanings move down a level under a board heading.
+    expect(markdown).toContain('#### Unclassified')
+
+    await deleteBoard(other._id)
+    const single = await loadAgentVisible({ kind: 'all' })
+    expect(renderContext(single.input).markdown).toContain('## Unframed')
+  })
+
+  it('deletes a board with everything on it, but never the last one', async () => {
+    const other = await second()
+    const a = await createItem(other._id, fields())
+    const b = await createItem(other._id, fields())
+    if (!a.ok || !b.ok) throw new Error('setup')
+    const checked = validateLink({
+      _id: newId(),
+      from: a.value._id,
+      to: b.value._id,
+      label: '',
+    })
+    if (!checked.ok) throw new Error(checked.error)
+    await createLink(other._id, checked.value)
+
+    expect(await deleteBoard(other._id)).toMatchObject({
+      ok: true,
+      value: { items: 2, links: 1 },
+    })
+    expect(await WhiteboardItemModel.countDocuments({})).toBe(0)
+    expect(await WhiteboardLinkModel.countDocuments({})).toBe(0)
+
+    expect(await deleteBoard(BOARD)).toMatchObject({ ok: false, status: 400 })
+  })
+
+  it('renames, and counts what is on each board', async () => {
+    await make()
+    const other = await second('Scratch')
+    expect(await patchBoard(other._id, { title: 'Renamed' })).toMatchObject({
+      ok: true,
+      value: { title: 'Renamed' },
+    })
+    const list = await listBoards()
+    expect(list.map(b => [b.title, b.items])).toEqual([
+      ['Test board', 1],
+      ['Renamed', 0],
+    ])
+  })
+
+  // The one migration: everything written before boards existed joins the first one.
+  it('adopts pre-board items when the first board is created', async () => {
+    await WhiteboardBoardModel.deleteMany({})
+    const orphan = newId()
+    await WhiteboardItemModel.collection.insertOne({
+      _id: new mongoose.Types.ObjectId(orphan),
+      form: 'text',
+      title: 'From before boards',
+      includeInAi: true,
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 120,
+      z: 1,
+      tags: [],
+      todos: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never)
+
+    const boards = await ensureBoards()
+    expect(boards).toHaveLength(1)
+    expect(boards[0].title).toBe('Whiteboard')
+    expect(
+      String((await WhiteboardItemModel.findById(orphan).lean())?.boardId)
+    ).toBe(String(boards[0]._id))
+    // And it only ever runs once: a second call finds a board and adopts nothing.
+    await WhiteboardItemModel.collection.updateOne(
+      { _id: new mongoose.Types.ObjectId(orphan) },
+      { $unset: { boardId: '' } }
+    )
+    await ensureBoards()
+    expect(
+      (await WhiteboardItemModel.findById(orphan).lean())?.boardId
+    ).toBeUndefined()
+    await WhiteboardBoardModel.deleteMany({ _id: { $ne: BOARD } })
   })
 })

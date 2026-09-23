@@ -19,12 +19,13 @@ const pillCls =
  * Renders nothing on `/admin` itself - a "back to the hub" pill on the hub is a link to the
  * page you are reading.
  *
- * Nothing on `/admin/certificates/ccaf/vocab` or `/admin/whiteboard` either, for a different
- * reason: those boards are framed apps sized to the viewport with equal margins on all four
- * sides, and a pill floating above the frame both eats the height they want and breaks the
- * symmetry - the whiteboard's own canvas would also sit under the ~68px pill row. Each
- * carries its own way back instead: the vocab rail's hub and roadmap icons, the whiteboard
- * top bar's grid icon (DR2).
+ * Nothing on `/admin/certificates/ccaf/vocab` or `/admin/whiteboard/<board>` either, for a
+ * different reason: those boards are framed apps sized to the viewport with equal margins on
+ * all four sides, and a pill floating above the frame both eats the height they want and
+ * breaks the symmetry - the whiteboard's own canvas would also sit under the ~68px pill row.
+ * Each carries its own way back instead: the vocab rail's hub and roadmap icons, the
+ * whiteboard top bar's grid icon (DR2). The whiteboard INDEX (`/admin/whiteboard`, no id) is
+ * an ordinary page since D32, so it keeps the pill.
  *
  * Pages under `/admin/certificates/` add a Certificates pill beside the hub one, so the
  * overview is one click back. The CCA-F roadmap also gets a pill on the right straight to
@@ -36,7 +37,7 @@ export default function AdminHomeLink() {
   if (
     pathname === '/admin' ||
     pathname === '/admin/certificates/ccaf/vocab' ||
-    pathname === '/admin/whiteboard'
+    pathname.startsWith('/admin/whiteboard/')
   )
     return null
 

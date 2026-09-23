@@ -21,7 +21,7 @@ export const metadata: Metadata = {
  *   /admin
  *     ├── Portfolio    /admin/settings   the one-page editor + preview rail
  *     ├── Blog         /admin/blog       drafts, publish, the quiet-days signal
- *     ├── Whiteboard   /admin/whiteboard the private context canvas agents read via MCP
+ *     ├── Whiteboard   /admin/whiteboard the private context canvases agents read via MCP
  *     ├── Certificates /admin/certificates  earned + in progress (CCA-F tracker inside)
  *     └── Metrics      /admin/metrics    MBTI + IQ attempt counts
  * ```
@@ -84,7 +84,7 @@ const BOARDS: readonly Board[] = [
     href: '/admin/whiteboard',
     title: 'Whiteboard',
     blurb:
-      'Dreams, goals, failures and drafts as linked cards. Export them to a chat, or let Claude Code read them over MCP.',
+      'Dreams, goals, failures and drafts as linked cards, one board per context. Export them to a chat, or let Claude Code read them over MCP.',
     Icon: Waypoints,
     tint: 'border-pp-green/30 bg-pp-green/10 text-pp-green',
   },

@@ -50,7 +50,7 @@ export const mcpHandler = createMcpHandler(
       {
         title: 'Whiteboard overview',
         description:
-          "Summary of the owner's whiteboard: frames with item counts, counts by meaning (dream, goal, failure, draft, note), active dreams and goals, and recently updated items. Titles and metadata only - call get_item for a full card. Start here for questions like 'what are my active goals?'.",
+          "Summary of the owner's whiteboards: frames with item counts, counts by meaning (dream, goal, failure, draft, note), active dreams and goals, and recently updated items. Titles and metadata only - call get_item for a full card. Start here for questions like 'what are my active goals?'.",
         inputSchema: z.object({}),
         annotations: { readOnlyHint: true, openWorldHint: false },
       },
@@ -63,7 +63,7 @@ export const mcpHandler = createMcpHandler(
       {
         title: 'Search the whiteboard',
         description:
-          "Search the owner's whiteboard cards. Full-text query over titles, bodies, tags and to-do rows (Vietnamese and English), plus optional filters. Dates are calendar days YYYY-MM-DD, both ends inclusive: from/to match the card's date (its 'when', or the day it was created), targetFrom/targetTo match its target-by date. Bodies are clipped; call get_item for the full text.",
+          "Search the owner's whiteboard cards, across every board they share. Full-text query over titles, bodies, tags and to-do rows (Vietnamese and English), plus optional filters. Dates are calendar days YYYY-MM-DD, both ends inclusive: from/to match the card's date (its 'when', or the day it was created), targetFrom/targetTo match its target-by date. Bodies are clipped; call get_item for the full text.",
         inputSchema: z.object({
           query: z.string().max(LIMITS.searchQuery).default(''),
           meanings: z.array(z.enum(MEANINGS)).optional(),
@@ -114,7 +114,7 @@ export const mcpHandler = createMcpHandler(
   {
     serverInfo: { name: 'port4lio-whiteboard', version: '1.0.0' },
     instructions:
-      "The owner's private whiteboard: dreams, goals, failures, drafts and notes, linked with labelled arrows. Read-only. Start with get_overview, then search_context, then get_item for detail. Cite item ids.",
+      "The owner's private whiteboards: dreams, goals, failures, drafts and notes, linked with labelled arrows. They may keep several boards and share only some of them; you see the shared ones. Read-only. Start with get_overview, then search_context, then get_item for detail. Cite item ids.",
   }
 )
 

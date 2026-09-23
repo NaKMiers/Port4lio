@@ -1,6 +1,6 @@
 'use client'
 
-import { Archive, Hash, RotateCw, Type } from 'lucide-react'
+import { Archive, Hash, RotateCw, Sparkles, Type } from 'lucide-react'
 
 import {
   primaryBtnCls,
@@ -14,15 +14,23 @@ import { cn } from '@/lib/utils'
  * The empty state is left-aligned and says what the board is FOR before it says how to use
  * it: this is a context store an agent reads, so the privacy line is part of the welcome, not
  * a setting found later.
+ *
+ * "Add sample data" (D33) is offered last and quietly: an empty board is an invitation to
+ * write one true thing, and a seeded board is a demo. It is here because the alternative to
+ * seeing what meanings, frames, links and the privacy badge look like together is typing
+ * fifteen cards.
  */
 export function EmptyBoard({
   onText,
   onFrame,
+  onMock,
   onRestore,
   className,
 }: {
   onText: () => void
   onFrame: () => void
+  /** "Add sample data" (D33): a board's worth of cards, links and a frame in one click. */
+  onMock: () => void
   onRestore: () => void
   className?: string
 }) {
@@ -81,17 +89,31 @@ export function EmptyBoard({
             <span className={kbd}>F</span>
           </button>
         </div>
-        <button
-          type="button"
-          onClick={onRestore}
-          className="mt-4 inline-flex items-center gap-2 px-4 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted hover:text-pp-text"
-        >
-          <Archive
-            aria-hidden
-            size={14}
-          />
-          Restore from backup
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-1">
+          <button
+            type="button"
+            onClick={onMock}
+            data-testid="wb-mock-empty"
+            className="inline-flex items-center gap-2 px-4 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted hover:text-pp-text"
+          >
+            <Sparkles
+              aria-hidden
+              size={14}
+            />
+            Add sample data
+          </button>
+          <button
+            type="button"
+            onClick={onRestore}
+            className="inline-flex items-center gap-2 px-4 font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted hover:text-pp-text"
+          >
+            <Archive
+              aria-hidden
+              size={14}
+            />
+            Restore from backup
+          </button>
+        </div>
       </div>
     </div>
   )

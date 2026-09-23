@@ -10,6 +10,7 @@ export const SHORTCUT_LINES = [
   'V select \u00b7 T text \u00b7 L to-do \u00b7 R O D shapes',
   'F frame \u00b7 A arrow \u00b7 P pen \u00b7 E eraser',
   'Del delete \u00b7 Space+drag pan \u00b7 \u2318E export',
+  '\u2318Z undo \u00b7 \u21e7\u2318Z redo \u00b7 \u2318S save now',
   'Enter edit \u00b7 arrows move 10px (Shift 50px) \u00b7 Esc back out',
 ]
 

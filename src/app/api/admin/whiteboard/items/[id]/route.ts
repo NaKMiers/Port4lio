@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { deleteItem, patchItem } from '@/lib/whiteboard/data'
-import { noStore, wbError, wbJson } from '@/lib/whiteboard/http'
+import { boardParam, noStore, wbError, wbJson } from '@/lib/whiteboard/http'
 import { ITEM_MAX_BODY_BYTES, validateItemPatch } from '@/lib/whiteboard/limits'
 
 export const runtime = 'nodejs'
@@ -26,6 +26,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   const parsed = await readJsonBody<Record<string, unknown>>(request, {
     maxBytes: ITEM_MAX_BODY_BYTES,
   })
@@ -43,7 +46,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   try {
     const { id } = await params
-    const result = await patchItem(id, checked.value, {
+    const result = await patchItem(scope.board, id, checked.value, {
       keepChildrenPrivate: keepChildrenPrivate === true,
     })
     if (!result.ok) return wbError(result.error, result.status)
@@ -58,9 +61,12 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   try {
     const { id } = await params
-    const result = await deleteItem(id)
+    const result = await deleteItem(scope.board, id)
     if (!result.ok) return wbError(result.error, result.status)
     return wbJson(result.value)
   } catch (error) {

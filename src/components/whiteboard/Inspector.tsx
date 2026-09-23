@@ -370,7 +370,7 @@ function ItemPanel({
           aria-hidden
           size={14}
         />
-        Delete permanently
+        Delete
       </button>
     </>
   )

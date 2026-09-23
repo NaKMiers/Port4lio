@@ -52,6 +52,15 @@ import { LIMITS, type BulkPositionUpdate } from '@/lib/whiteboard/limits'
  * from backup" (`revive`). Without that, every edit to a restored card was dropped in
  * silence for the rest of the session, which is exactly the recovery path D20 exists for.
  *
+ * ## Manual save (D31)
+ *
+ * With auto-save off the queue is PAUSED: every rule above still applies - coalescing,
+ * ordering, dependencies - and nothing is sent. `saveNow` then drains it: the debounce is
+ * cleared and the queue runs to empty (retries and dependent writes included) before it goes
+ * back to holding. Pausing is not `setOnline(false)`, although both stop the pump: offline is
+ * something that happened to the owner and resolves itself, and the pill says so; paused is
+ * something they asked for, and the writes wait for a button rather than for a network.
+ *
  * ## Why a bulk move holds every key at once
  *
  * A multi-select drag writes 50 positions in one request. If it ran beside those items'
@@ -90,6 +99,8 @@ export interface QueueStatus {
   /** Jobs whose last attempt failed and that will be retried. */
   failing: number
   online: boolean
+  /** Auto-save is off and there is work waiting for the Save button (D31). */
+  holding: boolean
 }
 
 export interface GroupResult {
@@ -154,6 +165,10 @@ export class SaveQueue {
   /** Fields of a 4xx PATCH, kept until the next edit of the item re-sends them. */
   private rejectedPatches = new Map<string, Record<string, unknown>>()
   private online = true
+  /** Auto-save is off (D31): edits queue up and wait for `saveNow`. */
+  private paused = false
+  /** A manual save is under way: run to empty, then hold again. */
+  private draining = false
   /** The board page is gone: send what can go now, but set no more timers (no retries). */
   private stopped = false
   private timer: unknown = null
@@ -545,6 +560,24 @@ export class SaveQueue {
     else this.emitStatus()
   }
 
+  /** Auto-save off holds every write; turning it back on sends what piled up. */
+  setPaused(paused: boolean) {
+    if (this.paused === paused) return
+    this.paused = paused
+    if (!paused) this.draining = false
+    this.pump()
+  }
+
+  /**
+   * The Save button (D31). Sends everything queued, debounce included, and keeps the queue
+   * running until nothing is left - a link still waiting for its card's create, or a write
+   * that has to be retried, must not be stranded until the owner presses Save again.
+   */
+  saveNow() {
+    this.draining = true
+    this.flush()
+  }
+
   /** Send every debounced edit now (used before a reload or a backup). */
   flush() {
     for (const job of this.jobs) job.notBefore = 0
@@ -554,7 +587,8 @@ export class SaveQueue {
   /**
    * The board page unmounted. Debounced edits go out now and writes waiting on those still
    * follow as they land, but no timer is set again, so nothing retries forever in a tab that
-   * has moved on. Leaving with failed writes asks first (TopBar), so this loses nothing
+   * has moved on. A paused queue sends nothing here either, which is the point of manual
+   * save. Leaving with writes still waiting asks first (TopBar), so this loses nothing
    * silently. `start` undoes it - React's dev double-mount stops and starts every effect.
    */
   stop() {
@@ -574,6 +608,7 @@ export class SaveQueue {
       inFlight: live.filter(job => job.inFlight).length,
       failing: live.filter(job => job.attempts > 0 && !job.inFlight).length,
       online: this.online,
+      holding: this.paused && !this.draining && live.length > 0,
     }
   }
 
@@ -654,12 +689,47 @@ export class SaveQueue {
     return this.isHead(job)
   }
 
+  /** Paused holds everything, unless a manual save is draining the queue. */
+  private get sending(): boolean {
+    return this.online && (!this.paused || this.draining)
+  }
+
+  /**
+   * Can this job still go out on its own? A 4xx create is parked until an edit fixes it, and
+   * so, in effect, is everything waiting on it: the dep can only ever be satisfied by that
+   * create, and it is not going to run.
+   *
+   * This is what ends a manual save. Asking only "is anything left that is not rejected"
+   * missed the dependents - a refused frame create left its child queued for ever, `draining`
+   * never cleared, and the queue quietly went on auto-saving with the switch still off, with
+   * `holding` false so neither the pill nor the leaving dialog said a word.
+   */
+  private stalled(job: Job, seen: Set<Job> = new Set()): boolean {
+    if (job.rejected || seen.has(job)) return true
+    seen.add(job)
+    for (const dep of job.deps) {
+      if (this.persisted.has(dep)) continue
+      // Only a create makes an id persisted, so it is the only thing this can be waiting for.
+      const provider = this.jobs.find(
+        j => j !== job && j.op.type === 'createItem' && j.op.id === dep
+      )
+      if (!provider || this.stalled(provider, seen)) return true
+    }
+    return false
+  }
+
   private pump() {
-    if (this.online) {
+    if (this.sending) {
       const now = this.now()
       for (const job of [...this.jobs])
         if (this.runnable(job, now)) void this.run(job)
     }
+    // The manual save is over once nothing is left that could still go out - which is not
+    // the same as nothing being left (see `stalled`). An in-flight job, one on backoff and
+    // one waiting for a create that is still coming all keep the drain open; a parked 4xx
+    // and anything that can only ever wait on one do not.
+    if (this.draining && !this.jobs.some(job => !this.stalled(job)))
+      this.draining = false
     this.schedule()
     this.emitStatus()
   }
@@ -667,7 +737,7 @@ export class SaveQueue {
   private schedule() {
     if (this.timer !== null) this.clearTimer(this.timer)
     this.timer = null
-    if (!this.online || this.stopped) return
+    if (!this.sending || this.stopped) return
     const now = this.now()
     let next = Infinity
     for (const job of this.jobs) {
@@ -823,12 +893,8 @@ export class SaveQueue {
   }
 
   private settle(job: Job, outcome: 'ok' | 'failed' | 'skipped') {
-    const id =
-      job.op.type === 'bulkMove'
-        ? null
-        : job.op.type === 'createLink'
-          ? job.op.id
-          : job.op.id
+    // Every op but a bulk move is about one entity, and a bulk move belongs to no group.
+    const id = job.op.type === 'bulkMove' ? null : job.op.id
     for (const groupId of job.groups) {
       const group = this.groups.get(groupId)
       if (!group || !id) continue

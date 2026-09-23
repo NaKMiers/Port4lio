@@ -24,6 +24,13 @@ test.use({ storageState: STORAGE_STATE })
 test.describe.configure({ mode: 'serial' })
 
 const API = '/api/admin/whiteboard'
+/**
+ * The board every test works on (D32). Taken from the boards API in `beforeEach`, which is
+ * also what creates the first board, so the suite never assumes one exists.
+ */
+let BOARD = ''
+/** Item and link calls name their board, exactly as the canvas does. */
+const on = (path: string) => `${API}${path}?board=${BOARD}`
 
 function objectId() {
   const hex = (n: number, len: number) => n.toString(16).padStart(len, '0')
@@ -36,7 +43,7 @@ function objectId() {
 }
 
 async function clearBoard(request: APIRequestContext) {
-  const res = await request.get(API)
+  const res = await request.get(on(''))
   expect(res.ok()).toBe(true)
   const ids = (await res.text())
     .split('\n')
@@ -44,11 +51,11 @@ async function clearBoard(request: APIRequestContext) {
     .map(line => JSON.parse(line))
     .filter(line => line.t === 'item')
     .map(line => line.item._id as string)
-  for (const id of ids) await request.delete(`${API}/items/${id}`)
+  for (const id of ids) await request.delete(on(`/items/${id}`))
 }
 
 async function boardLines(request: APIRequestContext) {
-  const text = await (await request.get(API)).text()
+  const text = await (await request.get(on(''))).text()
   return text
     .split('\n')
     .filter(Boolean)
@@ -56,13 +63,17 @@ async function boardLines(request: APIRequestContext) {
 }
 
 async function openBoard(page: Page) {
-  await page.goto('/admin/whiteboard')
+  await page.goto(`/admin/whiteboard/${BOARD}`)
   await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/, {
     timeout: 30_000,
   })
 }
 
 test.beforeEach(async ({ request }) => {
+  const res = await request.get(`${API}/boards`)
+  expect(res.ok()).toBe(true)
+  const { boards } = await res.json()
+  BOARD = boards[0]._id
   await clearBoard(request)
 })
 
@@ -94,7 +105,7 @@ test('(2) delete a frame, then restore from backup: frame, children and links co
   const child = objectId()
   const other = objectId()
   const link = objectId()
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: {
       _id: frame,
       form: 'frame',
@@ -105,7 +116,7 @@ test('(2) delete a frame, then restore from backup: frame, children and links co
       height: 360,
     },
   })
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: {
       _id: child,
       form: 'text',
@@ -115,10 +126,10 @@ test('(2) delete a frame, then restore from backup: frame, children and links co
       y: 60,
     },
   })
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: { _id: other, form: 'text', title: 'Outside card', x: 700, y: 60 },
   })
-  await request.post(`${API}/links`, {
+  await request.post(on('/links'), {
     data: { _id: link, from: child, to: other, label: 'because' },
   })
 
@@ -140,9 +151,9 @@ test('(2) delete a frame, then restore from backup: frame, children and links co
   await page.getByText('Restore me').click()
   await page.getByText('Child card').click({ modifiers: ['Control'] })
   await page.keyboard.press('Delete')
-  const dialog = page.getByRole('alertdialog')
-  await expect(dialog).toContainText('Delete 2 items and 1 link?')
-  await dialog.getByRole('button', { name: 'Delete permanently' }).click()
+  await expect(page.getByTestId('wb-notice')).toContainText(
+    '2 items and 1 link deleted'
+  )
   await expect(page.getByText('Restore me')).toHaveCount(0)
   await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
   expect(
@@ -176,7 +187,7 @@ test('(3) a hidden card is left out of the export, and the sheet says so (D25)',
   page,
   request,
 }) => {
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: {
       _id: objectId(),
       form: 'text',
@@ -186,7 +197,7 @@ test('(3) a hidden card is left out of the export, and the sheet says so (D25)',
       y: 0,
     },
   })
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: {
       _id: objectId(),
       form: 'text',
@@ -221,7 +232,7 @@ test('(4) a failed load shows Retry, and nothing can be written', async ({
       writes.push(`${req.method()} ${req.url()}`)
   })
   // A stream that stops before its `end` line: a partial board, which must be an error.
-  await page.route(`**${API}`, route =>
+  await page.route(`**${API}?*`, route =>
     route.fulfill({
       status: 200,
       contentType: 'application/x-ndjson',
@@ -229,7 +240,7 @@ test('(4) a failed load shows Retry, and nothing can be written', async ({
     })
   )
 
-  await page.goto('/admin/whiteboard')
+  await page.goto(`/admin/whiteboard/${BOARD}`)
   await expect(page.getByText("Couldn't load the board.")).toBeVisible({
     timeout: 30_000,
   })
@@ -248,7 +259,7 @@ test('(5) Esc peels one layer at a time: tool, then sheet, then selection', asyn
   page,
   request,
 }) => {
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: { _id: objectId(), form: 'text', title: 'Esc target', x: 0, y: 0 },
   })
   await openBoard(page)
@@ -321,7 +332,7 @@ test('(7) a card deleted and brought back by a restore can be edited again', asy
   request,
 }, testInfo) => {
   const card = objectId()
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: { _id: card, form: 'text', title: 'Round trip', x: 0, y: 0 },
   })
   await openBoard(page)
@@ -336,10 +347,6 @@ test('(7) a card deleted and brought back by a restore can be edited again', asy
 
   await page.getByText('Round trip').click()
   await page.keyboard.press('Delete')
-  await page
-    .getByRole('alertdialog')
-    .getByRole('button', { name: 'Delete permanently' })
-    .click()
   await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
 
   await page.getByRole('button', { name: 'Backup', exact: true }).click()
@@ -371,7 +378,7 @@ test('(8) keyboard: Tab selects a card, Esc in a field keeps it, a dialog blocks
   request,
 }) => {
   const card = objectId()
-  await request.post(`${API}/items`, {
+  await request.post(on('/items'), {
     data: { _id: card, form: 'text', title: 'Keyboard card', x: 0, y: 0 },
   })
   await openBoard(page)
@@ -392,10 +399,10 @@ test('(8) keyboard: Tab selects a card, Esc in a field keeps it, a dialog blocks
   await expect(title).not.toBeFocused()
   await expect(title).toHaveValue('Keyboard card')
 
-  // With the delete confirm open, arrows must not move the card behind it.
+  // With a dialog open, arrows must not move the card behind it.
   await node.focus()
-  await page.keyboard.press('Delete')
-  const dialog = page.getByRole('alertdialog')
+  await page.keyboard.press('?')
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
   await expect(dialog).toBeVisible()
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight')
   await page.keyboard.press('Escape')
@@ -403,4 +410,153 @@ test('(8) keyboard: Tab selects a card, Esc in a field keeps it, a dialog blocks
   await page.waitForTimeout(1_200) // past the nudge debounce
   const lines = await boardLines(request)
   expect(lines.find(l => l.t === 'item' && l.item._id === card)?.item.x).toBe(0)
+})
+
+test('(9) Delete takes the card at once, and Undo puts it back (D30)', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Second thoughts', x: 0, y: 0 },
+  })
+  await openBoard(page)
+
+  await page.getByText('Second thoughts').click()
+  await page.keyboard.press('Delete')
+  // No confirm: it is already gone, on the canvas and on the server.
+  await expect(page.getByText('Second thoughts')).toHaveCount(0)
+  await expect(page.getByTestId('wb-notice')).toContainText('1 item deleted')
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  expect((await boardLines(request)).filter(l => l.t === 'item')).toHaveLength(
+    0
+  )
+
+  await page
+    .getByTestId('wb-notice')
+    .getByRole('button', { name: 'Undo' })
+    .click()
+  await expect(page.getByText('Second thoughts')).toBeVisible()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  const back = (await boardLines(request)).filter(l => l.t === 'item')
+  expect(back).toHaveLength(1)
+  expect(back[0].item.title).toBe('Second thoughts')
+  // R3-6: the old id is spent for the session, so the copy carries a new one.
+  expect(back[0].item._id).not.toBe(card)
+
+  // And redo takes it away again.
+  await page.keyboard.press('ControlOrMeta+Shift+KeyZ')
+  await expect(page.getByText('Second thoughts')).toHaveCount(0)
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  expect((await boardLines(request)).filter(l => l.t === 'item')).toHaveLength(
+    0
+  )
+})
+
+test('(10) auto-save off holds every write until Save, and leaving asks first (D31)', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Held card', x: 0, y: 0 },
+  })
+  await openBoard(page)
+
+  // The switch defaults to on; turning it off is what makes the Save button appear.
+  const autoSave = page.getByRole('switch', { name: 'Auto-save' })
+  await expect(autoSave).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByTestId('wb-save-now')).toHaveCount(0)
+  await autoSave.click()
+  await expect(page.getByTestId('wb-save-now')).toBeDisabled()
+
+  await page.getByText('Held card').click()
+  await page.getByRole('textbox', { name: 'Title' }).fill('Edited, not saved')
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/1 unsaved/)
+
+  // Past the debounce that would have saved it: with auto-save off, nothing goes out.
+  await page.waitForTimeout(1_500)
+  let items = (await boardLines(request)).filter(l => l.t === 'item')
+  expect(items[0].item.title).toBe('Held card')
+
+  // Leaving now asks, and Cancel keeps the board (and the edit) where it is.
+  await page.getByRole('link', { name: 'All boards' }).click()
+  const leave = page.getByRole('alertdialog')
+  await expect(leave).toContainText('Leave with unsaved changes?')
+  await leave.getByRole('button', { name: 'Cancel' }).click()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/1 unsaved/)
+
+  await page.getByTestId('wb-save-now').click()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  items = (await boardLines(request)).filter(l => l.t === 'item')
+  expect(items[0].item.title).toBe('Edited, not saved')
+
+  // Nothing is waiting any more, so the way out stops asking.
+  await page.getByRole('link', { name: 'All boards' }).click()
+  await expect(page).toHaveURL(/\/admin\/whiteboard$/)
+})
+
+test('(11) many boards: the index makes one, and nothing crosses between them (D32)', async ({
+  page,
+  request,
+}) => {
+  await request.post(on('/items'), {
+    data: {
+      _id: objectId(),
+      form: 'text',
+      title: 'On the first board',
+      x: 0,
+      y: 0,
+    },
+  })
+
+  // The index lists what exists and makes a new board, landing on its canvas.
+  await page.goto('/admin/whiteboard')
+  await expect(page.getByRole('heading', { name: 'Whiteboards' })).toBeVisible()
+  await page.getByRole('button', { name: 'New board' }).click()
+  await expect(page).toHaveURL(/\/admin\/whiteboard\/[0-9a-f]{24}$/)
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/, {
+    timeout: 30_000,
+  })
+  const second = page.url().split('/').pop()!
+  expect(second).not.toBe(BOARD)
+
+  // A fresh board is empty: the first board's card is not on it.
+  await expect(page.getByText('On the first board')).toHaveCount(0)
+  await expect(page.getByText('Put down one true thing.')).toBeVisible()
+
+  // Sample data (D33) fills it, and lands on this board only.
+  await page.getByTestId('wb-mock-empty').click()
+  await expect(page.getByText('Ship the whiteboard')).toBeVisible()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+
+  const mine = await request.get(`${API}?board=${second}`)
+  const seeded = (await mine.text())
+    .split('\n')
+    .filter(Boolean)
+    .map(line => JSON.parse(line))
+  expect(seeded.filter(l => l.t === 'item').length).toBeGreaterThan(5)
+  expect(seeded.filter(l => l.t === 'link').length).toBeGreaterThan(0)
+  // The first board still holds exactly what it held.
+  expect(
+    (await boardLines(request))
+      .filter(l => l.t === 'item')
+      .map(l => l.item.title)
+  ).toEqual(['On the first board'])
+
+  // The switcher moves between them, and undo takes the whole seed back.
+  await page.keyboard.press('ControlOrMeta+KeyZ')
+  await expect(page.getByText('Ship the whiteboard')).toHaveCount(0)
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+
+  await page.getByTestId('wb-board-switcher').click()
+  await page
+    .getByRole('menuitemradio', { name: /Whiteboard/ })
+    .first()
+    .click()
+  await expect(page).toHaveURL(new RegExp(`/admin/whiteboard/${BOARD}$`))
+  await expect(page.getByText('On the first board')).toBeVisible()
+
+  // Clean up, so the next run starts from one board again.
+  expect((await request.delete(`${API}/boards/${second}`)).ok()).toBe(true)
 })

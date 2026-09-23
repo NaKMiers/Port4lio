@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
 import { deleteLink, patchLink } from '@/lib/whiteboard/data'
-import { noStore, wbError, wbJson } from '@/lib/whiteboard/http'
+import { boardParam, noStore, wbError, wbJson } from '@/lib/whiteboard/http'
 import { validateLinkPatch } from '@/lib/whiteboard/limits'
 
 export const runtime = 'nodejs'
@@ -22,6 +22,9 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   const parsed = await readJsonBody(request)
   if (!parsed.ok) return wbError(parsed.error, parsed.status)
 
@@ -30,7 +33,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   try {
     const { id } = await params
-    const result = await patchLink(id, checked.value)
+    const result = await patchLink(scope.board, id, checked.value)
     if (!result.ok) return wbError(result.error, result.status)
     return wbJson({ link: result.value })
   } catch (error) {
@@ -43,9 +46,12 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const denied = requireOwner(request)
   if (denied) return noStore(denied)
 
+  const scope = boardParam(request)
+  if (!scope.ok) return scope.response
+
   try {
     const { id } = await params
-    const result = await deleteLink(id)
+    const result = await deleteLink(scope.board, id)
     if (!result.ok) return wbError(result.error, result.status)
     return wbJson({ ok: true })
   } catch (error) {
