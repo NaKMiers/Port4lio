@@ -1,6 +1,11 @@
 import mongoose from 'mongoose'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import {
+  AGENT_ACTION_TTL_DAYS,
+  AgentActionModel,
+  agentActionExpiryFrom,
+} from '@/models/AgentAction'
 import { ATTEMPT_TTL_DAYS, AttemptModel } from '@/models/Attempt'
 import { IqAttemptModel } from '@/models/IqAttempt'
 import { IqPaymentModel } from '@/models/IqPayment'
@@ -134,6 +139,41 @@ describe('TTL retention indexes', () => {
       compound,
       'TestEvent is missing the {product,kind,createdAt} read index'
     ).toBeDefined()
+  })
+})
+
+describe('AgentAction (the MCP audit log)', () => {
+  it('expires rows on expireAt, 180 days after the call', async () => {
+    const ttl = ttlIndexOf(await builtIndexes(AgentActionModel as never))
+
+    expect(
+      ttl,
+      'AgentAction has no TTL index - agent audit rows would be kept forever'
+    ).toBeDefined()
+    expect(ttl?.expireAfterSeconds).toBe(0)
+
+    const now = new Date('2026-09-24T00:00:00.000Z')
+    expect(
+      (agentActionExpiryFrom(now).getTime() - now.getTime()) / 86_400_000
+    ).toBe(AGENT_ACTION_TTL_DAYS)
+    expect(AGENT_ACTION_TTL_DAYS).toBe(180)
+  })
+
+  it('claims clientRef with a PARTIAL unique index, so unkeyed rows never collide', async () => {
+    const indexes = await builtIndexes(AgentActionModel as never)
+    const claim = indexes.find(index => {
+      const key = index.key as Record<string, number> | undefined
+      return key?.tokenId !== undefined && key?.clientRef !== undefined
+    })
+
+    expect(
+      claim,
+      'AgentAction is missing the clientRef claim index'
+    ).toBeDefined()
+    expect(claim?.unique).toBe(true)
+    expect(claim?.partialFilterExpression).toEqual({
+      clientRef: { $type: 'string' },
+    })
   })
 })
 

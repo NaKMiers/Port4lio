@@ -351,19 +351,25 @@ export const CONTACT_LIMIT: RateLimitOptions = {
 }
 
 /**
- * The whiteboard's agent routes (`/api/whiteboard/context.md` and `/api/whiteboard/mcp`),
- * one bucket for both.
+ * Every agent route, one bucket for all of them: `/api/mcp`, the `/api/whiteboard/mcp` alias
+ * and `/api/whiteboard/context.md`. Keyed by client IP. (Renamed from
+ * `WHITEBOARD_AGENT_LIMIT` when the MCP moved from the whiteboard to the whole site.)
  *
  * Checked BEFORE the bearer token is verified, so a stranger guessing tokens is throttled on
  * the same budget as a real agent - a failed guess still counts. 120 in 10 minutes is sized
  * for Claude Code answering one question with several tool calls in a row (overview, two
- * searches, a few `get_item`s), repeatedly, with room to spare.
+ * searches, a few reads, a draft), repeatedly, with room to spare.
+ *
+ * This is the front door only. What a single token may SPEND - images, image prompts, saves -
+ * is a second set of buckets keyed `mcp-token:<id>` and checked per tool in `runTool`, reusing
+ * `BLOG_GENERATE_IMAGE_LIMIT`, `BLOG_IMAGE_PROMPT_LIMIT` and `BLOG_SAVE_LIMIT` (mcp-plan.md
+ * R5). Separate buckets, so a runaway agent never spends the owner's editor budget.
  *
  * Remember this limiter fails OPEN on a Mongo error. That is fine here only because the token
  * check behind it fails CLOSED: a database outage means no rate limit, and also no access.
  */
-export const WHITEBOARD_AGENT_LIMIT: RateLimitOptions = {
-  route: 'whiteboard-agent',
+export const MCP_AGENT_LIMIT: RateLimitOptions = {
+  route: 'mcp-agent',
   limit: 120,
   windowSeconds: 10 * 60,
 }

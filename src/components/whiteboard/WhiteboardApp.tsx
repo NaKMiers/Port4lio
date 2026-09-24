@@ -123,9 +123,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
   )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null)
-  const [surface, setSurface] = useState<null | 'export' | 'agents' | 'backup'>(
-    null
-  )
+  const [surface, setSurface] = useState<null | 'export' | 'backup'>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [pulse, setPulse] = useState(0)
   const [exportScope, setExportScope] = useState<'all' | 'selection'>('all')
@@ -516,12 +514,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
               heldWrites={board.status.holding ? board.status.pending : 0}
             />
           }
-          agents={
-            <AgentsButton
-              open={surface === 'agents'}
-              onToggle={open => setSurface(open ? 'agents' : null)}
-            />
-          }
+          agents={<AgentsButton />}
           exportDisabled={readOnly || empty}
           exportOpen={surface === 'export'}
           onExport={() =>

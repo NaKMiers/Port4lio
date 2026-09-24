@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bot,
   FileText,
   GraduationCap,
   SlidersHorizontal,
@@ -23,7 +24,8 @@ export const metadata: Metadata = {
  *     ├── Blog         /admin/blog       drafts, publish, the quiet-days signal
  *     ├── Whiteboard   /admin/whiteboard the private context canvases agents read via MCP
  *     ├── Certificates /admin/certificates  earned + in progress (CCA-F tracker inside)
- *     └── Metrics      /admin/metrics    MBTI + IQ attempt counts
+ *     ├── Metrics      /admin/metrics    MBTI + IQ attempt counts
+ *     └── Agents       /admin/agents     MCP tokens for Claude Code / Codex, and what they did
  * ```
  *
  * ## Why this exists at all
@@ -107,6 +109,14 @@ const BOARDS: readonly Board[] = [
       'MBTI and IQ attempts, completion, and where people stop. The traffic the availability block is aimed at.',
     Icon: BarChart3,
     tint: 'border-pp-violet/30 bg-pp-violet/10 text-pp-violet',
+  },
+  {
+    href: '/admin/agents',
+    title: 'Agents',
+    blurb:
+      'Tokens that let Claude Code and Codex work on this site over MCP, scoped to what each may touch, and a log of everything they did.',
+    Icon: Bot,
+    tint: 'border-pp-blue/30 bg-pp-blue/10 text-pp-blue',
   },
 ]
 

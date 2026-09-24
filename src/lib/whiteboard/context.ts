@@ -1,3 +1,4 @@
+import { MCP_BUDGET_CHARS } from '@/lib/mcp/budget'
 import {
   MEANINGS,
   WHITEBOARD_TIMEZONE,
@@ -135,8 +136,6 @@ export interface ContextInput {
 
 /** The full export. Measured in UTF-8 bytes, because that is what "1 MB" means on the wire. */
 export const EXPORT_MAX_BYTES = 1_000_000
-/** D18: every MCP tool answer, ~8k tokens at chars/4. */
-export const MCP_BUDGET_CHARS = 32_000
 /** D18: a body inside a search result. */
 export const SEARCH_BODY_CLIP = 1_200
 export const INK_NEAR_PX = 200
@@ -371,9 +370,26 @@ interface EntryContext {
   targetState: (id: string) => TargetState
 }
 
+/**
+ * The tool names the agent-facing hints point at. The `/api/whiteboard/mcp` alias keeps the
+ * original names (the default); `/api/mcp` serves the same renderers as `whiteboard_*`, and a
+ * hint naming a tool the server does not have sends the agent to call nothing.
+ */
+export interface ToolNameHints {
+  search: string
+  item: string
+}
+
+const ALIAS_TOOL_NAMES: ToolNameHints = {
+  search: 'search_context',
+  item: 'get_item',
+}
+
 export interface EntryOptions {
   /** Clip the body at N chars with a `get_item` pointer (D18). */
   clipBody?: number
+  /** The item tool that pointer names. */
+  itemTool?: string
   /** Print `in frame <title>` in the meta line - for flat lists with no frame headings. */
   showFrame?: boolean
   /** Leave the body out entirely (get_overview). */
@@ -452,7 +468,8 @@ function entryParts(
       clipped = true
     }
     lines.push(quoteBody(body))
-    if (clipped) lines.push(`(clipped - get_item ${item.id})`)
+    if (clipped)
+      lines.push(`(clipped - ${options.itemTool ?? 'get_item'} ${item.id})`)
   }
 
   // To-do rows are body-sized too (100 rows of 500 chars), so the D18 clip covers them: a
@@ -464,7 +481,7 @@ function entryParts(
       const line = `- [${row.done ? 'x' : ' '}] ${escapeInline(row.text)}`
       if (options.clipBody && used + line.length > options.clipBody) {
         rows.push(
-          `(${item.todos.length - index} more rows - get_item ${item.id})`
+          `(${item.todos.length - index} more rows - ${options.itemTool ?? 'get_item'} ${item.id})`
         )
         break
       }
@@ -766,13 +783,20 @@ function withinBudget(
 export function renderSearchResults(
   results: readonly ContextItem[],
   input: Omit<ContextInput, 'items'>,
-  { budget = MCP_BUDGET_CHARS }: { budget?: number } = {}
+  {
+    budget = MCP_BUDGET_CHARS,
+    tools = ALIAS_TOOL_NAMES,
+  }: { budget?: number; tools?: ToolNameHints } = {}
 ): string {
   if (results.length === 0) return 'No matching items.'
 
   const ctx = buildEntryContext({ ...input, items: [...results] }, () => 'in')
   const blocks = results.map(item =>
-    renderEntry(item, ctx, { clipBody: SEARCH_BODY_CLIP, showFrame: true })
+    renderEntry(item, ctx, {
+      clipBody: SEARCH_BODY_CLIP,
+      itemTool: tools.item,
+      showFrame: true,
+    })
   )
   const head = `${results.length} matching item${results.length === 1 ? '' : 's'}:`
   return withinBudget(
@@ -797,7 +821,10 @@ export interface OverviewInput {
 /** `get_overview`: titles and meta only, never a body. */
 export function renderOverview(
   input: OverviewInput,
-  { budget = MCP_BUDGET_CHARS }: { budget?: number } = {}
+  {
+    budget = MCP_BUDGET_CHARS,
+    tools = ALIAS_TOOL_NAMES,
+  }: { budget?: number; tools?: ToolNameHints } = {}
 ): string {
   const line = (item: ContextItem) =>
     `- ${displayTitle(item)} - ${metaLine(item, input.framesById, true)}`
@@ -822,7 +849,7 @@ export function renderOverview(
     `## Recently updated\n${
       input.recent.length ? input.recent.map(line).join('\n') : '(none)'
     }`,
-    'Use search_context for a topic or date range, and get_item <id> for a full card.',
+    `Use ${tools.search} for a topic or date range, and ${tools.item} <id> for a full card.`,
   ]
 
   // Overview blocks are whole sections; clip a section's lines rather than dropping it.

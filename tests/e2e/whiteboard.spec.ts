@@ -303,40 +303,18 @@ test('(5) Esc peels one layer at a time: tool, then sheet, then selection', asyn
   await expect(page.getByText('Nothing selected')).toBeVisible()
 })
 
-test('(6) the Agents panel flips to Connected after the first MCP call (DR5)', async ({
+test('(6) the Agents button opens /admin/agents, where MCP tokens now live', async ({
   page,
-  playwright,
-  baseURL,
 }) => {
+  // Token creation moved from this board's popover to /admin/agents when the MCP became
+  // site-wide (docs/designs/mcp/mcp.md premise 7). The create-and-Connected flow it used to
+  // cover is tests/e2e/agents.spec.ts (1), against p4_ tokens.
   await openBoard(page)
-  await page.getByRole('button', { name: /^Agents/ }).click()
-  const panel = page.getByTestId('wb-agents-popover')
-  await panel.getByLabel('Token name').fill(`e2e ${Date.now()}`)
-  await panel.getByRole('button', { name: 'Create token' }).click()
-  await expect(panel).toContainText("won't be shown again")
-  await expect(panel).toContainText(
-    "--header 'Authorization: Bearer ${PORT4LIO_WB_TOKEN}'"
-  )
-
-  const token = (await panel.locator('pre').first().textContent())?.trim() ?? ''
-  expect(token).toMatch(/^wbt_/)
-
-  // An agent, with the token and nothing else - no owner cookie.
-  const agent = await playwright.request.newContext({ baseURL })
-  const res = await agent.post('/api/whiteboard/mcp', {
-    headers: {
-      authorization: `Bearer ${token}`,
-      accept: 'application/json, text/event-stream',
-    },
-    data: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
-  })
-  expect(res.status()).toBe(200)
-  await agent.dispose()
-
-  await expect(panel.getByTestId('wb-agents-connected')).toHaveText(
-    /Connected - first call just now/,
-    { timeout: 15_000 }
-  )
+  await page.getByRole('link', { name: /^Agents/ }).click()
+  await expect(page).toHaveURL(/\/admin\/agents$/)
+  await expect(
+    page.getByRole('heading', { name: 'Agents', level: 1 })
+  ).toBeVisible()
 })
 
 test('(7) a card deleted and brought back by a restore can be edited again', async ({
@@ -656,10 +634,11 @@ test('(12) the export preview is built in the browser: live, unsaved edits and t
   expect(exportCalls).toEqual([])
 })
 
-test('(13) a revoked agent token can be deleted forever; an active one only revoked', async ({
-  page,
+test('(13) a legacy token can be deleted forever only once revoked', async ({
   request,
 }) => {
+  // The legacy wbt_ routes stay for one release (acceptance.md D4). Their UI moved to
+  // /admin/agents, which revokes only, so this pins the route contract itself.
   const name = `e2e forever ${Date.now()}`
   const created = await request.post(`${API}/tokens`, { data: { name } })
   expect(created.ok()).toBe(true)
@@ -669,21 +648,10 @@ test('(13) a revoked agent token can be deleted forever; an active one only revo
   const early = await request.delete(`${API}/tokens/${record.id}?forever=1`)
   expect(early.status()).toBe(409)
 
-  await openBoard(page)
-  await page.getByRole('button', { name: /^Agents/ }).click()
-  const panel = page.getByTestId('wb-agents-popover')
-  const row = panel.getByTestId('wb-token-row').filter({ hasText: name })
-
-  // Active rows offer Revoke only.
-  await expect(row.getByRole('button', { name: /forever/ })).toHaveCount(0)
-  await row.getByRole('button', { name: 'Revoke' }).click()
-  await row.getByRole('button', { name: 'Revoke now' }).click()
-  await expect(row).toContainText('revoked')
-
-  // Revoked: two clicks, and the row and the record are gone.
-  await row.getByRole('button', { name: `Delete ${name} forever` }).click()
-  await row.getByRole('button', { name: 'Delete now' }).click()
-  await expect(row).toHaveCount(0)
+  expect((await request.delete(`${API}/tokens/${record.id}`)).ok()).toBe(true)
+  expect(
+    (await request.delete(`${API}/tokens/${record.id}?forever=1`)).status()
+  ).toBe(200)
   const { tokens } = await (await request.get(`${API}/tokens`)).json()
   expect(tokens.some((t: { id: string }) => t.id === record.id)).toBe(false)
 })

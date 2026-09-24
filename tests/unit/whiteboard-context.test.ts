@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { MCP_BUDGET_CHARS } from '@/lib/mcp/budget'
 import {
-  MCP_BUDGET_CHARS,
   SEARCH_BODY_CLIP,
   byteLength,
   dayRangeBounds,

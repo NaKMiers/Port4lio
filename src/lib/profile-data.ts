@@ -112,9 +112,15 @@ async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
  * The CV block, for `/cv` only.
  *
  * Kept off the public profile allowlist on purpose: `/cv` renders these contact details
- * as a page - as it always has - but they are never served as machine-readable JSON,
- * which is what makes them cheap to harvest at scale. `avatar` is on the allowlist
- * already, so including it here exposes nothing new.
+ * as a page - as it always has - but they are never served as machine-readable JSON to
+ * the public, which is what makes them cheap to harvest at scale. `avatar` is on the
+ * allowlist already, so including it here exposes nothing new.
+ *
+ * The one machine-readable exception is token-gated: the site MCP's `get_profile`
+ * (section `resume`, via `profile-sections.ts`) and `get_me` hand the block, contact
+ * details included, to a `p4_` agent token holding `read`. That is the owner's own agent
+ * reading the owner's own CV, and it reveals nothing `/cv` does not already publish
+ * (docs/designs/mcp/mcp.md premise 5, mcp-plan.md C7). No public route serves it as JSON.
  */
 export const loadPublicResume = unstable_cache(
   loadPublicResumeUncached,

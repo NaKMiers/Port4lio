@@ -130,7 +130,7 @@ After each run, open `/admin/agents` and check the AgentAction feed: one row per
 - **Observable result:**
   - One new mock row in `/admin/certificates/ccaf` dated today.
   - The answer reports progress, readiness, the estimated scaled score, days to the exam and the weakest domains.
-  - See open question Q3 below: the tracker stores a mock as correct answers out of 60, not as a scaled score.
+  - The tracker stores a mock as correct answers out of 60, so `ccaf_update` takes `correct` only (decision D3 below). Given "720", the agent asks how many answers were right, then logs that count; `ccaf_status` reports the estimated scaled score back.
 
 ### 10. Check an order
 
@@ -142,11 +142,11 @@ After each run, open `/admin/agents` and check the AgentAction feed: one row per
   - Product, amount, status, created and paid dates for that one order.
   - Never the buyer's email or the certificate name.
   - A token without `pii` does not list `find_order`, and calling it by name is refused with a `refused` row in the feed.
-  - See open question Q2 below: nothing stored today records whether the result email went out.
+  - Whether the result email went out, from the new `resultEmailedAt` on the payment (decision D2 below). An order paid before that field existed reports "not recorded".
 
 ## Tool coverage
 
-Which asks need which registry tool (the 27-tool starting registry in `mcp.md`). Prompts are listed at the end.
+Which asks need which registry tool (the 27-tool starting registry in `mcp.md`). Prompts are listed at the end. The four tools marked **cut** were removed from the registry by decision D1 below.
 
 | Tool                     | Scope   | Needed by asks                     |
 | ------------------------ | ------- | ---------------------------------- |
@@ -164,16 +164,16 @@ Which asks need which registry tool (the 27-tool starting registry in `mcp.md`).
 | `illustrate_post`        | write*  | 1                                  |
 | `publish_post`           | publish | 2                                  |
 | `archive_post`           | publish | 7                                  |
-| `delete_post`            | publish | **none**                           |
-| `save_taxonomy`          | publish | **none**                           |
+| `delete_post`            | publish | **none - cut**                     |
+| `save_taxonomy`          | publish | **none - cut**                     |
 | `get_briefing`           | read    | 3                                  |
-| `get_test_metrics`       | read    | **none**                           |
+| `get_test_metrics`       | read    | **none - cut**                     |
 | `find_order`             | pii     | 10                                 |
 | `whiteboard_overview`    | read    | 1                                  |
 | `whiteboard_search`      | read    | 1, 8                               |
 | `whiteboard_get_item`    | read    | 1                                  |
 | `whiteboard_add_item`    | write   | 8                                  |
-| `whiteboard_update_item` | write   | **none**                           |
+| `whiteboard_update_item` | write   | **none - cut**                     |
 | `whiteboard_link`        | write   | 8                                  |
 | `ccaf_status`            | read    | 9                                  |
 | `ccaf_update`            | write   | 9                                  |
@@ -181,9 +181,9 @@ Which asks need which registry tool (the 27-tool starting registry in `mcp.md`).
 | prompt `weekly-briefing` | read    | 3                                  |
 | prompt `tailor-cv`       | read    | 5                                  |
 
-## Proposed cuts (awaiting the owner's answer)
+## Registry cuts
 
-No ask needs these five tools. Per the Assignment, each is a candidate to cut from the registry before phase 2. **Nothing is cut until the owner answers.**
+No ask needs these five tools. Per the Assignment, each was a candidate to cut from the registry before phase 2. The owner accepted the recommendations (D1): four are cut, `update_post` stays. The registry is 23 tools, and a `read`-only token sees 12.
 
 | Tool                     | What cutting it costs                                                                                                                                                                                                                                                    | Recommendation                                                                                                                     |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
@@ -193,8 +193,10 @@ No ask needs these five tools. Per the Assignment, each is a candidate to cut fr
 | `get_test_metrics`       | No type distribution, IQ score bands or abandonment detail over MCP. `get_briefing` still carries the funnel and conversion for ask 3. `metrics/tests.ts` is still extracted for the admin metrics route.                                                                | **Cut the tool, keep the extraction.**                                                                                             |
 | `whiteboard_update_item` | The agent can add and link cards but not change a card's status or body.                                                                                                                                                                                                 | **Cut.** No ask needs it, and it is the one whiteboard write that can change an owner-written card.                                |
 
-## Open questions for the owner
+## Owner decisions (2026-09-24)
 
-- **Q1 (cuts).** Accept the recommendations above: cut `delete_post`, `save_taxonomy`, `get_test_metrics` and `whiteboard_update_item`, keep `update_post`?
-- **Q2 (ask 10).** `find_order` promises "whether the result email went out", but no stored field records it. `fulfilMbtiPayment` and `fulfilIqPayment` only log `PAID BUT UNDELIVERED` on failure. Either add a `resultEmailedAt` field set on successful delivery (a change to both fulfilment paths and both payment models), or have `find_order` report "not recorded" and leave ask 10's second half unanswered.
-- **Q3 (ask 9).** A mock is stored as `correct` out of 60, and the scaled score is derived by `estimateScaledScore` (100 + 900 x correct / 60). 720 is not reachable exactly: 41 correct gives 715, 42 gives 730. Should `ccaf_update` take `correct` only (the agent asks how many were right), or also accept a scaled score and convert it to the nearest `correct`?
+- **D1 (cuts).** Cut `delete_post`, `save_taxonomy`, `get_test_metrics` and `whiteboard_update_item` from the MCP registry; keep `update_post`. The service extractions behind the cut tools (`taxonomy-service`, `metrics/tests.ts`, the soft delete in `post-service`) still happen, because the admin routes use them.
+- **D2 (ask 10).** `Payment` and `IqPayment` gain a nullable `resultEmailedAt`, set after a successful `deliver()` in `fulfilMbtiPayment` and `fulfilIqPayment` (outside the atomic claim). `find_order` reports it; orders paid before the field existed report "not recorded".
+- **D3 (ask 9).** `ccaf_update` logs a mock as `correct` (0-60) only, exactly as the tracker stores it. Its description tells the agent to ask for the raw count when it is given a scaled score. No conversion is invented.
+- **D4 (legacy tokens).** `POST /api/admin/whiteboard/tokens` keeps working until T11, so `whiteboard-agent.test.ts` passes with only its import paths changed. The whiteboard Agents popover becomes a link to `/admin/agents`, so nothing in the UI creates a `wbt_` token any more.
+- **D5 (image prompts).** `create_draft` and `update_post` accept `coverImagePrompt` and `imagePrompts: [{ key, prompt }]`, the fields the admin PATCH already takes. The agent writes one prompt per `![alt](imageN)` placeholder; `illustrate_post` draws from them. No server-side prompt writing.

@@ -13,10 +13,11 @@ import {
 } from 'vitest'
 
 import { getAuthCookieName, makeAuthToken } from '@/lib/auth'
-import { MCP_BUDGET_CHARS } from '@/lib/whiteboard/context'
+import { MCP_BUDGET_CHARS } from '@/lib/mcp/budget'
+import { hashToken, touchLastUsed } from '@/lib/mcp/token'
 import { createItem, createLink } from '@/lib/whiteboard/data'
 import { validateItem, validateLink } from '@/lib/whiteboard/limits'
-import { createToken, hashToken, touchLastUsed } from '@/lib/whiteboard/token'
+import { createToken } from '@/lib/whiteboard/token'
 import { RateLimitModel } from '@/models/RateLimit'
 import { WhiteboardBoardModel } from '@/models/WhiteboardBoard'
 import { WhiteboardItemModel } from '@/models/WhiteboardItem'

@@ -1,47 +1,33 @@
 import type { NextRequest } from 'next/server'
 
-import { noStore, wbJson } from '@/lib/whiteboard/http'
-import { mcpHandler, sseToJson, withAcceptBoth } from '@/lib/whiteboard/mcp'
-import { guardAgent } from '@/lib/whiteboard/token'
+import { WHITEBOARD_ALIAS_SERVER, handleMcpRequest } from '@/lib/mcp/server'
+import { guardAgent } from '@/lib/mcp/token'
+import { methodNotAllowed } from '@/lib/mcp/transport'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 /**
- * [POST] /api/whiteboard/mcp - stateless streamable-HTTP MCP, JSON responses (D17).
+ * [POST] /api/whiteboard/mcp - the old whiteboard MCP, kept as an alias for one release.
  *
  * ```
- *   POST ──▶ guardAgent (429 / 401 / 503) ──▶ mcp-handler ──▶ SSE unwrapped to JSON
- *              initialize, ping, tools/list, tools/call           200 JSON
- *              any notification (no id)                           202, no body
- *              an unknown request (with an id)                    JSON-RPC -32601
- *   GET, DELETE ──▶ 405                     (no session, no server-initiated stream)
+ *   POST ──▶ guardAgent({ accept: ['agent', 'legacy'] })     429 / 401 / 503
+ *          ──▶ handleMcpRequest(WHITEBOARD_ALIAS_SERVER)
+ *                get_overview · search_context · get_item      the same functions as
+ *                                                               whiteboard_* on /api/mcp
+ *                each accepts read OR whiteboard:legacy (C5)
+ *   GET, DELETE ──▶ 405
  * ```
  *
- * Measured against mcp-handler 2.2 before this was written: it already answers 405 / 202 /
- * -32601 as approved, but replies to requests as `text/event-stream`, which `sseToJson`
- * unwraps. GET and DELETE are answered here without touching the database or the token -
- * there is no session to operate on, so there is nothing to authorise.
+ * Existing `claude mcp add` configs point here with a `wbt_` token, and they keep exactly the
+ * access they had (premise 7): these three tools and `context.md`, nothing else. A `p4_`
+ * token with `read` works here too, so a config can move to the new token before it moves to
+ * the new URL. Removed, together with `WhiteboardToken`, one release later (mcp-plan.md T11).
  */
 export async function POST(request: NextRequest) {
-  const denied = await guardAgent(request)
-  if (denied) return denied
-
-  const response = await mcpHandler(withAcceptBoth(request))
-  return noStore(await sseToJson(response))
-}
-
-function methodNotAllowed() {
-  const res = wbJson(
-    {
-      jsonrpc: '2.0',
-      error: { code: -32000, message: 'Method not allowed.' },
-      id: null,
-    },
-    { status: 405 }
-  )
-  res.headers.set('Allow', 'POST')
-  return res
+  const guard = await guardAgent(request, { accept: ['agent', 'legacy'] })
+  if (!guard.ok) return guard.response
+  return handleMcpRequest(request, guard.token, WHITEBOARD_ALIAS_SERVER)
 }
 
 export async function GET() {

@@ -1,0 +1,184 @@
+import { expect, test, type APIRequestContext } from '@playwright/test'
+
+import { STORAGE_STATE } from './global-setup'
+
+/**
+ * `/admin/agents` in a real browser, against a production build (mcp-plan.md T3).
+ *
+ * ```
+ *   create (read + write ticked, publish + pii not) ──▶ p4_ shown once ──▶ first MCP call ──▶ Connected
+ *   reload ──▶ the plaintext is gone, the row stays with its scopes
+ *   revoke ──▶ row greyed, the next agent call is a 401
+ *   legacy wbt_ ──▶ listed under "Legacy whiteboard tokens", revoke only
+ *   an out-of-scope call ──▶ a refused row in Activity (R1)
+ * ```
+ *
+ * Runs only against a disposable database (global-setup refuses anything else).
+ */
+test.use({ storageState: STORAGE_STATE })
+test.describe.configure({ mode: 'serial' })
+
+const MCP_HEADERS = { accept: 'application/json, text/event-stream' }
+
+async function agentCall(
+  agent: APIRequestContext,
+  path: string,
+  token: string,
+  body: unknown
+) {
+  return agent.post(path, {
+    headers: { ...MCP_HEADERS, authorization: `Bearer ${token}` },
+    data: body,
+  })
+}
+
+test('(1) a new token is shown once, with read and write on by default, and flips to Connected', async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  await page.goto('/admin/agents')
+  const form = page.getByTestId('agents-create-form')
+  await expect(form.getByRole('checkbox', { name: /Read/ })).toBeChecked()
+  await expect(form.getByRole('checkbox', { name: /Write/ })).toBeChecked()
+  await expect(
+    form.getByRole('checkbox', { name: /Publish/ })
+  ).not.toBeChecked()
+  await expect(
+    form.getByRole('checkbox', { name: /Order lookup/ })
+  ).not.toBeChecked()
+
+  const name = `e2e agent ${Date.now()}`
+  await form.getByRole('textbox', { name: 'Name' }).fill(name)
+  await form.getByRole('button', { name: 'Create token' }).click()
+
+  const fresh = page.getByTestId('agents-fresh-token')
+  await expect(fresh).toContainText("won't be shown again")
+  await expect(fresh).toContainText(
+    "--header 'Authorization: Bearer ${PORT4LIO_MCP_TOKEN}'"
+  )
+  await expect(fresh).toContainText('/api/mcp')
+  const token = (await fresh.locator('pre').first().textContent())?.trim() ?? ''
+  expect(token).toMatch(/^p4_[A-Za-z0-9_-]{43}$/)
+
+  // An agent, with the token and nothing else - no owner cookie.
+  const agent = await playwright.request.newContext({ baseURL })
+  const res = await agentCall(agent, '/api/mcp', token, {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/list',
+  })
+  expect(res.status()).toBe(200)
+  const tools = ((await res.json()).result.tools as { name: string }[]).map(
+    tool => tool.name
+  )
+  expect(tools).toContain('get_profile')
+  expect(tools).not.toContain('publish_post')
+  await agent.dispose()
+
+  await expect(fresh.getByTestId('agents-connected')).toHaveText(
+    /Connected - first call just now/,
+    { timeout: 15_000 }
+  )
+
+  // Reload: the plaintext is gone for good, the row stays.
+  await page.reload()
+  await expect(page.getByTestId('agents-fresh-token')).toHaveCount(0)
+  await expect(page.getByText(token)).toHaveCount(0)
+  const row = page.getByTestId('agent-token-row').filter({ hasText: name })
+  await expect(row).toContainText('read, write')
+})
+
+test('(2) revoking a token greys it out and the next agent call is a 401', async ({
+  page,
+  request,
+  playwright,
+  baseURL,
+}) => {
+  const name = `e2e revoke ${Date.now()}`
+  const created = await request.post('/api/admin/agents/tokens', {
+    data: { name, scopes: ['read'] },
+  })
+  expect(created.ok()).toBe(true)
+  const { token } = await created.json()
+
+  await page.goto('/admin/agents')
+  const row = page.getByTestId('agent-token-row').filter({ hasText: name })
+  await row.getByRole('button', { name: `Revoke ${name}` }).click()
+  await row.getByRole('button', { name: 'Revoke now' }).click()
+  await expect(row).toContainText('revoked')
+
+  const agent = await playwright.request.newContext({ baseURL })
+  const res = await agentCall(agent, '/api/mcp', token, {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'ping',
+  })
+  expect(res.status()).toBe(401)
+  await agent.dispose()
+})
+
+test('(3) legacy wbt_ tokens are listed and can be revoked, and never open /api/mcp', async ({
+  page,
+  request,
+  playwright,
+  baseURL,
+}) => {
+  const name = `e2e legacy ${Date.now()}`
+  const created = await request.post('/api/admin/whiteboard/tokens', {
+    data: { name },
+  })
+  expect(created.ok()).toBe(true)
+  const { token } = await created.json()
+
+  const agent = await playwright.request.newContext({ baseURL })
+  const ping = { jsonrpc: '2.0', id: 1, method: 'ping' }
+  expect((await agentCall(agent, '/api/mcp', token, ping)).status()).toBe(401)
+  expect(
+    (await agentCall(agent, '/api/whiteboard/mcp', token, ping)).status()
+  ).toBe(200)
+
+  await page.goto('/admin/agents')
+  const row = page.getByTestId('legacy-token-row').filter({ hasText: name })
+  await row.getByRole('button', { name: `Revoke ${name}` }).click()
+  await row.getByRole('button', { name: 'Revoke now' }).click()
+  await expect(row).toContainText('revoked')
+
+  expect(
+    (await agentCall(agent, '/api/whiteboard/mcp', token, ping)).status()
+  ).toBe(401)
+  await agent.dispose()
+})
+
+test('(4) a call outside the token lands in Activity as refused (R1)', async ({
+  page,
+  request,
+  playwright,
+  baseURL,
+}) => {
+  const name = `e2e blind ${Date.now()}`
+  const { token } = await (
+    await request.post('/api/admin/agents/tokens', {
+      data: { name, scopes: ['write'] },
+    })
+  ).json()
+
+  const agent = await playwright.request.newContext({ baseURL })
+  const res = await agentCall(agent, '/api/mcp', token, {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/call',
+    params: { name: 'get_profile', arguments: { section: 'identity' } },
+  })
+  expect(res.status()).toBe(200)
+  expect((await res.json()).result.isError).toBe(true)
+  await agent.dispose()
+
+  await page.goto('/admin/agents')
+  const action = page
+    .getByTestId('agent-action-row')
+    .filter({ hasText: name })
+    .first()
+  await expect(action).toContainText('get_profile')
+  await expect(action).toContainText('refused (scope)')
+})

@@ -1,6 +1,6 @@
 import type { SaveOp, SendResult } from '@/components/whiteboard/save-queue'
 import type { ClientBoard } from '@/lib/whiteboard/data'
-import type { ClientToken, RestoreBatchResult } from '@/lib/whiteboard/types'
+import type { RestoreBatchResult } from '@/lib/whiteboard/types'
 
 /**
  * Fetch wrappers for `/api/admin/whiteboard/*`, all `no-store` (owner data, always fresh).
@@ -165,31 +165,5 @@ export async function patchBoardApi(
 
 export async function deleteBoardApi(id: string): Promise<void> {
   const res = await call(`${API}/boards/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(await errorMessage(res))
-}
-
-export async function getTokensApi(): Promise<ClientToken[]> {
-  const res = await call(`${API}/tokens`)
-  if (!res.ok) throw new Error(await errorMessage(res))
-  return (await res.json()).tokens
-}
-
-export async function createTokenApi(
-  name: string
-): Promise<{ token: string; record: ClientToken }> {
-  const res = await call(`${API}/tokens`, { method: 'POST', json: { name } })
-  if (!res.ok) throw new Error(await errorMessage(res))
-  return res.json()
-}
-
-export async function revokeTokenApi(id: string): Promise<ClientToken> {
-  const res = await call(`${API}/tokens/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(await errorMessage(res))
-  return (await res.json()).record
-}
-
-/** Removes a revoked token from the list for good; the server refuses an active one (409). */
-export async function deleteTokenForeverApi(id: string): Promise<void> {
-  const res = await call(`${API}/tokens/${id}?forever=1`, { method: 'DELETE' })
   if (!res.ok) throw new Error(await errorMessage(res))
 }
