@@ -10,7 +10,7 @@ import { STORAGE_STATE } from './global-setup'
  *   reload ──▶ the plaintext is off the page, the row stays; its Copy puts the same token on
  *              the clipboard (sealed copy, token-vault.ts)
  *   revoke ──▶ row greyed, the next agent call is a 401 ──▶ Delete permanently ──▶ row gone
- *   Scopes ──▶ tick write ──▶ Save ──▶ the same token lists create_draft on its next call
+ *   Edit ──▶ tick write ──▶ Save ──▶ the same token lists create_draft on its next call
  *   legacy wbt_ ──▶ listed under "Legacy whiteboard tokens", revoke, then delete
  *   an out-of-scope call ──▶ a refused row in Activity (R1)
  * ```
@@ -41,6 +41,9 @@ test('(1) a new token, read and write on by default, flips to Connected and can 
   baseURL,
 }) => {
   await page.goto('/admin/agents')
+  // Collapsed until asked for.
+  await expect(page.getByTestId('agents-create-form')).toHaveCount(0)
+  await page.getByTestId('agents-add-token').click()
   const form = page.getByTestId('agents-create-form')
   await expect(form.getByRole('checkbox', { name: /Read/ })).toBeChecked()
   await expect(form.getByRole('checkbox', { name: /Write/ })).toBeChecked()
@@ -56,6 +59,7 @@ test('(1) a new token, read and write on by default, flips to Connected and can 
   await form.getByRole('button', { name: 'Create token' }).click()
 
   const fresh = page.getByTestId('agents-fresh-token')
+  await expect(form).toHaveCount(0)
   await expect(fresh).toContainText('you can copy it again any time')
   await expect(fresh).toContainText(
     "--header 'Authorization: Bearer ${PORT4LIO_MCP_TOKEN}'"
@@ -166,8 +170,14 @@ test("(2b) changing a token's scopes applies to the same token on its next call"
 
   await page.goto('/admin/agents')
   const row = page.getByTestId('agent-token-row').filter({ hasText: name })
-  await row.getByRole('button', { name: `Edit scopes of ${name}` }).click()
+  await row.getByRole('button', { name: `Edit ${name}` }).click()
   const editor = row.getByTestId('agent-scope-editor')
+  // The connect guide comes with it, with a placeholder instead of the plaintext.
+  await expect(editor).toContainText('<paste the copied token>')
+  await expect(editor).toContainText(
+    "--header 'Authorization: Bearer ${PORT4LIO_MCP_TOKEN}'"
+  )
+  await expect(editor.getByText(token)).toHaveCount(0)
   await editor.getByRole('checkbox', { name: /Write/ }).check()
   await editor.getByRole('button', { name: 'Save scopes' }).click()
   await expect(editor).toHaveCount(0)

@@ -9,10 +9,12 @@ import {
   KeyRound,
   Pencil,
   Plug,
+  Plus,
   RotateCw,
   ShieldX,
   Trash2,
   TriangleAlert,
+  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -49,8 +51,9 @@ import {
  * delete legacy `wbt_` ones, connect Claude Code or Codex, and read what agents did.
  *
  * ```
+ *   Add token ──▶ the form opens (collapsed by default, Cancel closes it)
  *   Create (name + scope checkboxes: read, write on; publish, pii off)
- *     ──▶ p4_... shown with the connect steps (Copy)
+ *     ──▶ form closes, p4_... shown with the connect steps (Copy), Done dismisses
  *     1 export PORT4LIO_MCP_TOKEN=p4_...          in the shell profile, not typed inline
  *     2 claude mcp add --scope user ... 'Authorization: Bearer ${PORT4LIO_MCP_TOKEN}'
  *       (Codex tab: bearer_token_env_var)
@@ -58,7 +61,9 @@ import {
  *   Copy (any live row) ──▶ POST .../<id>/reveal ──▶ clipboard   (sealed copy, token-vault.ts)
  *     created before sealing ──▶ no Copy, "create a new one to copy it"
  *     clipboard refused ──▶ the token shown under the row, selectable
- *   Scopes ──▶ the same checkboxes inline ──▶ Save ──▶ applies from the token's next call
+ *   Edit ──▶ the same checkboxes inline + the connect steps ──▶ Save ──▶ applies from the
+ *     token's next call. The steps never carry the plaintext: the export line is a
+ *     placeholder and the row's Copy fills it, so a reload keeps the token off the page
  *   Revoke ──▶ Revoke now ──▶ row greyed out, 401 from the next call
  *   revoked row: Delete ──▶ Delete permanently ──▶ row gone (Activity keeps its name)
  *   Legacy whiteboard tokens: revoke, then delete (they die with the alias, mcp-plan.md T11)
@@ -192,7 +197,12 @@ function Code({ text, label }: { text: string; label: string }) {
   )
 }
 
-function ConnectSteps({ token }: { token: string }) {
+/**
+ * `token` is the plaintext only right after create. For an existing token (Edit) the export
+ * line is a placeholder for what the row's Copy puts on the clipboard, so opening Edit never
+ * writes the token into the DOM.
+ */
+function ConnectSteps({ token }: { token?: string }) {
   const [tab, setTab] = useState<'claude' | 'codex'>('claude')
   const mcpUrl = `${window.location.origin}/api/mcp`
   const claudeCommand = `claude mcp add --scope user --transport http port4lio ${mcpUrl} \\\n  --header 'Authorization: Bearer \${${MCP_TOKEN_ENV}}'`
@@ -203,12 +213,19 @@ function ConnectSteps({ token }: { token: string }) {
     <ol className="space-y-3 text-[13px] text-pp-text">
       <li>
         <p className="mb-1">
-          <b>1.</b> Put it in your shell profile (~/.zshrc), not typed inline:
+          <b>1.</b>{' '}
+          {token
+            ? 'Put it in your shell profile (~/.zshrc), not typed inline:'
+            : 'Copy the token from this row, then put it in your shell profile (~/.zshrc):'}
         </p>
         <Code
-          text={`export ${MCP_TOKEN_ENV}=${token}`}
+          text={`export ${MCP_TOKEN_ENV}=${token ?? '<paste the copied token>'}`}
           label="Copy export line"
         />
+        <p className={cn(helpTextCls, 'mt-1.5')}>
+          Open a new terminal (or restart the editor) afterwards - one started
+          before the export does not see it, and the server answers 401.
+        </p>
       </li>
       <li>
         <div className="mb-1 flex items-center justify-between gap-2">
@@ -340,6 +357,7 @@ export default function AgentsBoard({ className }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<McpScope[]>([...DEFAULT_SCOPES])
+  const [showCreate, setShowCreate] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [fresh, setFresh] = useState<{ token: string; id: string } | null>(null)
@@ -411,6 +429,7 @@ export default function AgentsBoard({ className }: Props) {
       )
       setName('')
       setScopes([...DEFAULT_SCOPES])
+      setShowCreate(false)
     } catch (error) {
       setCreateError(
         error instanceof Error ? error.message : 'Could not create a token'
@@ -546,96 +565,129 @@ export default function AgentsBoard({ className }: Props) {
         </p>
       </header>
 
-      <section
-        aria-labelledby="agents-create"
-        className={itemCardCls}
-      >
-        <h2
-          id="agents-create"
-          className="font-display text-lg font-semibold text-pp-text"
+      {showCreate || fresh ? (
+        <section
+          aria-labelledby="agents-create"
+          className={itemCardCls}
         >
-          New token
-        </h2>
-        <form
-          data-testid="agents-create-form"
-          className="mt-4 space-y-4"
-          onSubmit={event => {
-            event.preventDefault()
-            void create()
-          }}
-        >
-          <div>
-            <label
-              htmlFor="agent-token-name"
-              className={labelCls}
-            >
-              Name
-            </label>
-            <input
-              id="agent-token-name"
-              placeholder="e.g. Laptop - Claude Code"
-              value={name}
-              maxLength={80}
-              onChange={event =>
-                setName(event.target.value.replace(/[\r\n]+/g, ' '))
-              }
-              className={inputCls}
-            />
-          </div>
-          <fieldset>
-            <legend className={labelCls}>Scopes</legend>
-            <ScopeChecks
-              value={scopes}
-              onToggle={toggleScope}
-            />
-          </fieldset>
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={creating || scopes.length === 0}
-              className={primaryBtnCls}
-            >
-              {creating ? <Spinner size={14} /> : 'Create token'}
-            </button>
-            {scopes.length === 0 ? (
-              <p className={helpTextCls}>Pick at least one scope.</p>
-            ) : null}
-            {createError ? (
-              <p className="text-[12px] text-pp-ink-rose">{createError}</p>
-            ) : null}
-          </div>
-        </form>
-
-        {fresh ? (
-          <div
-            data-testid="agents-fresh-token"
-            className="mt-5 space-y-3 rounded-2xl border border-pp-line bg-white/80 p-4"
+          <h2
+            id="agents-create"
+            className="font-display text-lg font-semibold text-pp-text"
           >
-            {connected ? (
-              <p
-                data-testid="agents-connected"
-                className="flex items-center gap-2 text-[13px] font-semibold text-pp-ink-green"
-              >
-                <Plug size={14} /> Connected - first call just now
-              </p>
-            ) : (
-              <p className="flex items-center gap-2 text-[12px] text-pp-muted">
-                <Spinner size={12} /> Waiting for the first call...
-              </p>
-            )}
-            <div>
-              <p className={labelCls}>
-                Your token - you can copy it again any time from the list below
-              </p>
-              <Code
-                text={fresh.token}
-                label="Copy token"
-              />
+            New token
+          </h2>
+          {showCreate ? (
+            <form
+              data-testid="agents-create-form"
+              className="mt-4 space-y-4"
+              onSubmit={event => {
+                event.preventDefault()
+                void create()
+              }}
+            >
+              <div>
+                <label
+                  htmlFor="agent-token-name"
+                  className={labelCls}
+                >
+                  Name
+                </label>
+                <input
+                  id="agent-token-name"
+                  placeholder="e.g. Laptop - Claude Code"
+                  value={name}
+                  maxLength={80}
+                  onChange={event =>
+                    setName(event.target.value.replace(/[\r\n]+/g, ' '))
+                  }
+                  className={inputCls}
+                />
+              </div>
+              <fieldset>
+                <legend className={labelCls}>Scopes</legend>
+                <ScopeChecks
+                  value={scopes}
+                  onToggle={toggleScope}
+                />
+              </fieldset>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={creating || scopes.length === 0}
+                  className={primaryBtnCls}
+                >
+                  {creating ? <Spinner size={14} /> : 'Create token'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreate(false)
+                    setCreateError(null)
+                  }}
+                  className={secondaryBtnCls}
+                >
+                  Cancel
+                </button>
+                {scopes.length === 0 ? (
+                  <p className={helpTextCls}>Pick at least one scope.</p>
+                ) : null}
+                {createError ? (
+                  <p className="text-[12px] text-pp-ink-rose">{createError}</p>
+                ) : null}
+              </div>
+            </form>
+          ) : null}
+
+          {fresh ? (
+            <div
+              data-testid="agents-fresh-token"
+              className="mt-5 space-y-3 rounded-2xl border border-pp-line bg-white/80 p-4"
+            >
+              <div className="flex items-center justify-between gap-2">
+                {connected ? (
+                  <p
+                    data-testid="agents-connected"
+                    className="flex items-center gap-2 text-[13px] font-semibold text-pp-ink-green"
+                  >
+                    <Plug size={14} /> Connected - first call just now
+                  </p>
+                ) : (
+                  <p className="flex items-center gap-2 text-[12px] text-pp-muted">
+                    <Spinner size={12} /> Waiting for the first call...
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setFresh(null)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-pp-muted hover:text-pp-text"
+                >
+                  <X size={12} /> Done
+                </button>
+              </div>
+              <div>
+                <p className={labelCls}>
+                  Your token - you can copy it again any time from the list
+                  below
+                </p>
+                <Code
+                  text={fresh.token}
+                  label="Copy token"
+                />
+              </div>
+              <ConnectSteps token={fresh.token} />
             </div>
-            <ConnectSteps token={fresh.token} />
-          </div>
-        ) : null}
-      </section>
+          ) : null}
+        </section>
+      ) : (
+        <button
+          type="button"
+          data-testid="agents-add-token"
+          onClick={() => setShowCreate(true)}
+          className={cn(primaryBtnCls, 'gap-1.5')}
+        >
+          <Plus size={14} /> Add token
+        </button>
+      )}
 
       {rowError ? (
         <p
@@ -744,7 +796,7 @@ export default function AgentsBoard({ className }: Props) {
                             {edit ? null : (
                               <button
                                 type="button"
-                                aria-label={`Edit scopes of ${token.name}`}
+                                aria-label={`Edit ${token.name}`}
                                 onClick={() => {
                                   setConfirm(null)
                                   setEditing({
@@ -754,7 +806,7 @@ export default function AgentsBoard({ className }: Props) {
                                 }}
                                 className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-pp-muted hover:text-pp-text"
                               >
-                                <Pencil size={12} /> Scopes
+                                <Pencil size={12} /> Edit
                               </button>
                             )}
                             {confirmButton(token.id, token.name, 'revoke')}
@@ -820,6 +872,9 @@ export default function AgentsBoard({ className }: Props) {
                                 ? 'Pick at least one scope.'
                                 : "Applies from the token's next call. The token itself stays the same."}
                             </p>
+                          </div>
+                          <div className="rounded-2xl border border-pp-line bg-white/80 p-4">
+                            <ConnectSteps />
                           </div>
                         </form>
                       ) : null}
