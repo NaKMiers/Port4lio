@@ -25,7 +25,9 @@ import type { Profile } from '@/types/profile'
  *                            keys   ──▶ exactly the section's fields, or refused
  *                            version ≠ hash of the stored section ──▶ refused, re-read   (R6)
  *                            normalizeProfile ──▶ $set IF updatedAt is still what was read
- *   both ──▶ revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')     after the write succeeds
+ *   after the write succeeds:
+ *     replaceProfile      ──▶ revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')        stale once, then fresh
+ *     patchProfileSection ──▶ revalidateTag(PUBLIC_PROFILE_CACHE_TAG, { expire: 0 }) fresh on the next load
  * ```
  *
  * ## Why the resume is never agent-written (R8)
@@ -42,6 +44,15 @@ import type { Profile } from '@/types/profile'
  * section in `/admin/settings` meanwhile - is refused rather than silently overwritten, and
  * the write itself is conditional on the `updatedAt` read alongside it, so a save landing
  * between the check and the write is refused too.
+ *
+ * ## Why the agent's write expires the cache and the editor's only marks it stale
+ *
+ * `'max'` is stale-while-revalidate: the first load after the write still serves the old
+ * profile and refreshes it in the background. Measured in the acceptance walk (ask 6): an
+ * agent fixed the headline, and `/` showed the typo once more. The owner in the editor sees
+ * their own save in the form, but an agent's owner only sees the site, so `update_profile`
+ * expires the entry outright (`{ expire: 0 }`, a blocking re-read on the next request).
+ * The editor path keeps `'max'`, which `tests/api/profile-route.test.ts` pins (R10).
  *
  * `replaceProfile` is the settings editor's save exactly as `POST /api/profile` did it, which
  * `tests/api/profile-route.test.ts` pins field by field (R10).
@@ -152,7 +163,7 @@ export async function patchProfileSection(
       error: `The profile was saved by someone else a moment ago. Call get_profile again and retry. Nothing was changed.`,
     }
 
-  revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')
+  revalidateTag(PUBLIC_PROFILE_CACHE_TAG, { expire: 0 })
 
   const saved = pickSection(normalizeProfile(updated), section)
   return { ok: true, section, version: sectionVersion(saved), value: saved }

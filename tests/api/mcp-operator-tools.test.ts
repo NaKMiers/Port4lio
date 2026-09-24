@@ -25,7 +25,8 @@ import { mcpClient, type RouteHandler } from './mcp-helpers'
  *
  * ```
  *   update_profile   whole section + version · stale version refused · resume refused, unchanged
- *                    · revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max') inside the service
+ *                    · revalidateTag(PUBLIC_PROFILE_CACHE_TAG, { expire: 0 }) inside the service
+ *   get_me / resume  never written ──▶ the seed /cv prints, not null
  *   archive_post     archive a live post (revalidates) · unarchive: never public ──▶ draft,
  *                    once public ──▶ refused, pointing at publish_post (C11)
  *   ccaf             status ids · log a mock of 42 correct, once per clientRef · confidence
@@ -163,7 +164,10 @@ describe('update_profile (R6, R8)', () => {
       aboutMe: 'Hello',
       fullName: 'Ada',
     })
-    expect(cache.revalidateTag).toHaveBeenCalledWith('public-profile', 'max')
+    // Expired, not marked stale: the next load of `/` must show the fix (acceptance ask 6).
+    expect(cache.revalidateTag).toHaveBeenCalledWith('public-profile', {
+      expire: 0,
+    })
     await flushAfter()
     expect(
       await AgentActionModel.find({}, { tool: 1, outcome: 1, _id: 0 }).lean()
@@ -341,6 +345,20 @@ describe('CCA-F', () => {
     expect(scaled.isError).toBe(true)
     expect(scaled.text).toMatch(/logMock\.correct/)
     expect(await CcafProgressModel.countDocuments()).toBe(0)
+  })
+})
+
+describe('the CV an agent reads', () => {
+  it('with no resume ever written, get_me and get_profile return the seed /cv prints', async () => {
+    const { RESUME_SEED } = await import('@/lib/resume-seed')
+    await ProfileModel.create({ _id: DOC_ID, fullName: 'Ada' })
+    const t = await token(['read'])
+    const me = JSON.parse((await client.callTool(t, 'get_me', {})).text)
+    expect(me.cv).toEqual(RESUME_SEED)
+    const section = JSON.parse(
+      (await client.callTool(t, 'get_profile', { section: 'resume' })).text
+    )
+    expect(section.value.resume).toEqual(RESUME_SEED)
   })
 })
 

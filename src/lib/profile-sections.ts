@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 
 import { connectDatabase } from '@/lib/mongodb'
 import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
+import { deriveResume } from '@/lib/resume-view-model'
 import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
 import type { Profile } from '@/types/profile'
 
@@ -20,6 +21,7 @@ import type { Profile } from '@/types/profile'
  *   resume    resume                   the private /cv block, the owner's contact details included
  *
  *   read:  one indexed findById, projected to the section's fields ──▶ normalizeProfile ──▶ pick
+ *          resume: deriveResume, so a never-written block reads as the seed /cv prints
  *   version = sha256(stable JSON of exactly what was returned), 16 hex chars
  * ```
  *
@@ -30,6 +32,13 @@ import type { Profile } from '@/types/profile'
  * contact details are inside the `read` scope because `/cv` already publishes them (premise
  * 5). See the `loadPublicResume` comment in `profile-data.ts` for why this token-gated read is
  * the one machine-readable exception.
+ *
+ * ## Why `resume` is derived, not raw
+ *
+ * A profile that never had a CV block written has no `resume` field, and `/cv` then prints
+ * the transcribed seed (`deriveResume`). The raw read returned `null` there, so `get_me` said
+ * "no CV" about a page that shows one - found in the acceptance walk, ask 4. The resume is
+ * never agent-written (R8), so its version guards nothing and deriving it costs nothing.
  */
 
 export const PROFILE_SECTIONS = {
@@ -103,6 +112,9 @@ export async function readProfileSection(section: ProfileSection): Promise<{
     .select(PROFILE_SECTIONS[section].join(' '))
     .lean()
   const profile = doc ? normalizeProfile(doc) : makeEmptyProfile()
-  const value = pickSection(profile, section)
+  const value =
+    section === 'resume'
+      ? { resume: deriveResume(profile) }
+      : pickSection(profile, section)
   return { value, version: sectionVersion(value) }
 }
