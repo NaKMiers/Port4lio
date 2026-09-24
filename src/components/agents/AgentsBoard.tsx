@@ -38,6 +38,7 @@ import {
   createAgentTokenApi,
   deleteAgentTokenApi,
   getAgentsApi,
+  revealAgentTokenApi,
   revokeAgentTokenApi,
   updateAgentTokenScopesApi,
   type AgentsSnapshot,
@@ -49,11 +50,14 @@ import {
  *
  * ```
  *   Create (name + scope checkboxes: read, write on; publish, pii off)
- *     ──▶ p4_... shown ONCE (Copy, "won't be shown again")
+ *     ──▶ p4_... shown with the connect steps (Copy)
  *     1 export PORT4LIO_MCP_TOKEN=p4_...          in the shell profile, not typed inline
  *     2 claude mcp add --scope user ... 'Authorization: Bearer ${PORT4LIO_MCP_TOKEN}'
  *       (Codex tab: bearer_token_env_var)
  *   while the fresh token has lastUsedAt null: GET every 5 s ──▶ "Connected - first call just now"
+ *   Copy (any live row) ──▶ POST .../<id>/reveal ──▶ clipboard   (sealed copy, token-vault.ts)
+ *     created before sealing ──▶ no Copy, "create a new one to copy it"
+ *     clipboard refused ──▶ the token shown under the row, selectable
  *   Scopes ──▶ the same checkboxes inline ──▶ Save ──▶ applies from the token's next call
  *   Revoke ──▶ Revoke now ──▶ row greyed out, 401 from the next call
  *   revoked row: Delete ──▶ Delete permanently ──▶ row gone (Activity keeps its name)
@@ -77,6 +81,13 @@ import {
  * `publish` changes what the public sees and `pii` reads a customer's order. Both are one
  * deliberate click away rather than on by default, so the everyday token - the one most
  * likely to sit in a laptop's shell profile - cannot do either (mcp.md "Scopes").
+ *
+ * ## Why Copy hands the clipboard a promise
+ *
+ * Safari only lets a page write the clipboard inside the click that asked, and the token is
+ * one request away. `ClipboardItem` accepts a promise for its contents, so the write is
+ * started in the click and filled when the reveal answers; `writeText` after the await is the
+ * fallback for browsers without it, and a selectable copy under the row is the last resort.
  *
  * ## Why delete only appears on a revoked row
  *
@@ -124,6 +135,47 @@ function CopyButton({ text, label }: { text: string; label: string }) {
       {done ? <Check size={14} /> : <Copy size={14} />}
     </button>
   )
+}
+
+/**
+ * Copy text that is still on its way. Resolves 'copied', or 'manual' when the browser refused
+ * the clipboard (the caller shows the text to select). Rejects only if `load` did - the
+ * server's answer, which the caller reports.
+ */
+async function copyWhenLoaded(
+  load: Promise<string>
+): Promise<{ result: 'copied' } | { result: 'manual'; text: string }> {
+  // Settled once, so the clipboard attempts below never see a rejection twice.
+  const text = load.then(
+    value => ({ ok: true as const, value }),
+    error => ({ ok: false as const, error })
+  )
+  const value = async () => {
+    const settled = await text
+    if (!settled.ok) throw settled.error
+    return settled.value
+  }
+  try {
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': value().then(
+            v => new Blob([v], { type: 'text/plain' })
+          ),
+        }),
+      ])
+      return { result: 'copied' }
+    }
+  } catch {
+    // Fall through to writeText, or to the manual copy.
+  }
+  const plain = await value()
+  try {
+    await navigator.clipboard.writeText(plain)
+    return { result: 'copied' }
+  } catch {
+    return { result: 'manual', text: plain }
+  }
 }
 
 function Code({ text, label }: { text: string; label: string }) {
@@ -303,6 +355,15 @@ export default function AgentsBoard({ className }: Props) {
     scopes: McpScope[]
   } | null>(null)
   const [savingScopes, setSavingScopes] = useState(false)
+  // The row whose Copy is running or just finished, and a token the clipboard refused.
+  const [copying, setCopying] = useState<{
+    id: string
+    state: 'busy' | 'done'
+  } | null>(null)
+  const [manualCopy, setManualCopy] = useState<{
+    id: string
+    token: string
+  } | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -417,6 +478,28 @@ export default function AgentsBoard({ className }: Props) {
       await refresh()
     } finally {
       setSavingScopes(false)
+    }
+  }
+
+  const copyToken = async (id: string) => {
+    setRowError(null)
+    setManualCopy(null)
+    setCopying({ id, state: 'busy' })
+    try {
+      const copied = await copyWhenLoaded(revealAgentTokenApi(id))
+      if (copied.result === 'manual') {
+        setManualCopy({ id, token: copied.text })
+        setCopying(null)
+        return
+      }
+      setCopying({ id, state: 'done' })
+      setTimeout(
+        () => setCopying(prev => (prev?.id === id ? null : prev)),
+        1500
+      )
+    } catch (error) {
+      setCopying(null)
+      setRowError(`Could not copy the token. ${errorText(error)}`.trim())
     }
   }
 
@@ -542,7 +625,7 @@ export default function AgentsBoard({ className }: Props) {
             )}
             <div>
               <p className={labelCls}>
-                Your token - it won&apos;t be shown again
+                Your token - you can copy it again any time from the list below
               </p>
               <Code
                 text={fresh.token}
@@ -628,6 +711,36 @@ export default function AgentsBoard({ className }: Props) {
                           confirmButton(token.id, token.name, 'delete')
                         ) : (
                           <>
+                            {token.copyable ? (
+                              <button
+                                type="button"
+                                data-testid="agent-token-copy"
+                                aria-label={`Copy token ${token.name}`}
+                                disabled={copying?.id === token.id}
+                                onClick={() => void copyToken(token.id)}
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-pp-muted hover:text-pp-text disabled:opacity-60"
+                              >
+                                {copying?.id === token.id &&
+                                copying.state === 'busy' ? (
+                                  <Spinner size={12} />
+                                ) : copying?.id === token.id ? (
+                                  <Check size={12} />
+                                ) : (
+                                  <Copy size={12} />
+                                )}
+                                {copying?.id === token.id &&
+                                copying.state === 'done'
+                                  ? 'Copied'
+                                  : 'Copy'}
+                              </button>
+                            ) : (
+                              <span
+                                title="Created before tokens were kept for copying. Create a new token to be able to copy it."
+                                className="hidden shrink-0 text-[11px] text-pp-muted sm:inline"
+                              >
+                                Not copyable
+                              </span>
+                            )}
                             {edit ? null : (
                               <button
                                 type="button"
@@ -648,6 +761,18 @@ export default function AgentsBoard({ className }: Props) {
                           </>
                         )}
                       </div>
+                      {manualCopy?.id === token.id && !token.revokedAt ? (
+                        <div className="mt-2 pl-[26px]">
+                          <p className={helpTextCls}>
+                            The browser blocked the clipboard - select the token
+                            to copy it:
+                          </p>
+                          <Code
+                            text={manualCopy.token}
+                            label="Copy token"
+                          />
+                        </div>
+                      ) : null}
                       {edit ? (
                         <form
                           data-testid="agent-scope-editor"

@@ -61,6 +61,8 @@ export interface ClientAgentToken {
   createdAt: string
   lastUsedAt: string | null
   revokedAt: string | null
+  /** The owner can copy it again (it was sealed at create; older tokens were not). */
+  copyable: boolean
 }
 
 export type AgentActionOutcome = 'ok' | 'refused' | 'error' | 'pending'

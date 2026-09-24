@@ -14,8 +14,11 @@ browser owner session.
 2. Give the token a recognisable name, such as `claude-laptop` or
    `codex-workstation`.
 3. Choose the smallest useful set of scopes, then create the token.
-4. Copy the `p4_...` value immediately. It is shown once and only its hash is
-   retained by the site.
+4. Copy the `p4_...` value. You can copy it again later from the token's row
+   (**Copy**) while it is not revoked. The site verifies tokens by their hash and
+   keeps only an encrypted copy for that button; revoking a token deletes the
+   copy. Tokens created before this existed show "Not copyable" - create a new
+   one if you need to copy it again.
 
 | Scope     | Grants                                                                       | Use it for                         |
 | --------- | ---------------------------------------------------------------------------- | ---------------------------------- |

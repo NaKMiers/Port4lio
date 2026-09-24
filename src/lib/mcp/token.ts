@@ -12,6 +12,7 @@ import {
   type McpScope,
   type TokenScope,
 } from '@/lib/mcp/scopes'
+import { openToken, sealToken } from '@/lib/mcp/token-vault'
 import { agentError, noStore } from '@/lib/mcp/transport'
 import { connectDatabase } from '@/lib/mongodb'
 import { MCP_AGENT_LIMIT, checkRateLimit, clientIpFrom } from '@/lib/rate-limit'
@@ -24,7 +25,9 @@ import { WhiteboardTokenModel } from '@/models/WhiteboardToken'
  * "last used". The front door of every agent route.
  *
  * ```
- *   create:  p4_ + 32 random bytes (base64url) ──▶ shown ONCE ──▶ only sha256(token) stored
+ *   create:  p4_ + 32 random bytes (base64url) ──▶ sha256(token) for verification
+ *                                              └─▶ sealed copy (token-vault.ts) for the
+ *                                                  owner's Copy button (revealAgentToken)
  *
  *   guardAgent(request, { accept })
  *     1 checkRateLimit(MCP_AGENT_LIMIT, by IP)       ← before anything else: guesses count
@@ -114,6 +117,13 @@ export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
+/**
+ * Every token read loads `sealed` (it is `select: false` on the model) only to answer
+ * `copyable`; the ciphertext itself never leaves this module except through
+ * `revealAgentToken`, opened.
+ */
+const LIST_PROJECTION = '-hash +sealed'
+
 function toClientAgentToken(
   doc: Omit<AgentTokenDocument, 'hash'>
 ): ClientAgentToken {
@@ -125,10 +135,14 @@ function toClientAgentToken(
     createdAt: new Date(doc.createdAt).toISOString(),
     lastUsedAt: doc.lastUsedAt ? new Date(doc.lastUsedAt).toISOString() : null,
     revokedAt: doc.revokedAt ? new Date(doc.revokedAt).toISOString() : null,
+    copyable: Boolean(doc.sealed),
   }
 }
 
-/** The plaintext is returned here and nowhere else, ever. */
+/**
+ * The plaintext is returned here, and again only by `revealAgentToken` - to the owner, from
+ * the sealed copy stored alongside the hash.
+ */
 export async function createAgentToken(
   name: string,
   scopes: readonly McpScope[] = DEFAULT_SCOPES
@@ -139,6 +153,7 @@ export async function createAgentToken(
     name,
     prefix: token.slice(0, 8),
     hash: hashToken(token),
+    sealed: sealToken(token),
     // Canonical order and no duplicates, so two tokens with the same grants read the same.
     scopes: MCP_SCOPES.filter(scope => scopes.includes(scope)),
   })
@@ -148,7 +163,8 @@ export async function createAgentToken(
 /** Never includes the hash. Newest first; revoked tokens stay in the list, greyed out. */
 export async function listAgentTokens(): Promise<ClientAgentToken[]> {
   await connectDatabase()
-  const docs = await AgentTokenModel.find({}, { hash: 0 })
+  const docs = await AgentTokenModel.find({})
+    .select(LIST_PROJECTION)
     .sort({ createdAt: -1 })
     .lean()
   return docs.map(toClientAgentToken)
@@ -161,13 +177,43 @@ export async function revokeAgentToken(
   if (!isObjectIdString(id)) return null
   const doc = await AgentTokenModel.findOneAndUpdate(
     { _id: id, revokedAt: null },
-    { $set: { revokedAt: new Date() } },
-    { returnDocument: 'after', lean: true, projection: { hash: 0 } }
+    // The sealed copy goes with it: a dead key has nothing left worth copying, and a
+    // revoked row keeping a recoverable plaintext would be a secret kept for no one.
+    { $set: { revokedAt: new Date() }, $unset: { sealed: 1 } },
+    { returnDocument: 'after', lean: true, projection: LIST_PROJECTION }
   )
   if (doc) return toClientAgentToken(doc)
   // Already revoked is still a success for the caller; unknown is not.
-  const existing = await AgentTokenModel.findById(id, { hash: 0 }).lean()
+  const existing = await AgentTokenModel.findById(id)
+    .select(LIST_PROJECTION)
+    .lean()
   return existing ? toClientAgentToken(existing) : null
+}
+
+/**
+ * The plaintext of an unrevoked token, for the owner's Copy button.
+ *
+ * ```
+ *   unknown id ──▶ null (404)
+ *   revoked    ──▶ 'revoked' (409)        a dead key is not worth copying
+ *   no sealed  ──▶ 'unavailable' (409)    created before sealing, or AUTH_SECRET rotated,
+ *   bad open   ──▶ 'unavailable'            or the opened value is not this row's token
+ *   else       ──▶ the p4_ token
+ * ```
+ */
+export async function revealAgentToken(
+  id: string
+): Promise<string | 'revoked' | 'unavailable' | null> {
+  await connectDatabase()
+  if (!isObjectIdString(id)) return null
+  const doc = await AgentTokenModel.findById(id)
+    .select('+sealed hash revokedAt')
+    .lean()
+  if (!doc) return null
+  if (doc.revokedAt) return 'revoked'
+  const token = doc.sealed ? openToken(doc.sealed) : null
+  if (!token || hashToken(token) !== doc.hash) return 'unavailable'
+  return token
 }
 
 /**
@@ -190,7 +236,7 @@ export async function updateAgentTokenScopes(
     { _id: id, revokedAt: null },
     // Canonical order and no duplicates, the same as createAgentToken.
     { $set: { scopes: MCP_SCOPES.filter(scope => scopes.includes(scope)) } },
-    { returnDocument: 'after', lean: true, projection: { hash: 0 } }
+    { returnDocument: 'after', lean: true, projection: LIST_PROJECTION }
   )
   if (doc) return toClientAgentToken(doc)
   return (await AgentTokenModel.exists({ _id: id })) ? 'revoked' : null

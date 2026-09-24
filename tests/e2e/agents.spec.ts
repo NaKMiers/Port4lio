@@ -6,8 +6,9 @@ import { STORAGE_STATE } from './global-setup'
  * `/admin/agents` in a real browser, against a production build (mcp-plan.md T3).
  *
  * ```
- *   create (read + write ticked, publish + pii not) ──▶ p4_ shown once ──▶ first MCP call ──▶ Connected
- *   reload ──▶ the plaintext is gone, the row stays with its scopes
+ *   create (read + write ticked, publish + pii not) ──▶ p4_ shown ──▶ first MCP call ──▶ Connected
+ *   reload ──▶ the plaintext is off the page, the row stays; its Copy puts the same token on
+ *              the clipboard (sealed copy, token-vault.ts)
  *   revoke ──▶ row greyed, the next agent call is a 401 ──▶ Delete permanently ──▶ row gone
  *   Scopes ──▶ tick write ──▶ Save ──▶ the same token lists create_draft on its next call
  *   legacy wbt_ ──▶ listed under "Legacy whiteboard tokens", revoke, then delete
@@ -33,8 +34,9 @@ async function agentCall(
   })
 }
 
-test('(1) a new token is shown once, with read and write on by default, and flips to Connected', async ({
+test('(1) a new token, read and write on by default, flips to Connected and can be copied again', async ({
   page,
+  context,
   playwright,
   baseURL,
 }) => {
@@ -54,7 +56,7 @@ test('(1) a new token is shown once, with read and write on by default, and flip
   await form.getByRole('button', { name: 'Create token' }).click()
 
   const fresh = page.getByTestId('agents-fresh-token')
-  await expect(fresh).toContainText("won't be shown again")
+  await expect(fresh).toContainText('you can copy it again any time')
   await expect(fresh).toContainText(
     "--header 'Authorization: Bearer ${PORT4LIO_MCP_TOKEN}'"
   )
@@ -82,12 +84,22 @@ test('(1) a new token is shown once, with read and write on by default, and flip
     { timeout: 15_000 }
   )
 
-  // Reload: the plaintext is gone for good, the row stays.
+  // Reload: the plaintext is off the page, the row stays.
   await page.reload()
   await expect(page.getByTestId('agents-fresh-token')).toHaveCount(0)
   await expect(page.getByText(token)).toHaveCount(0)
   const row = page.getByTestId('agent-token-row').filter({ hasText: name })
   await expect(row).toContainText('read, write')
+
+  // ...and its Copy puts the very same token on the clipboard, whenever it is clicked.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await row.getByRole('button', { name: `Copy token ${name}` }).click()
+  await expect(
+    row.getByRole('button', { name: `Copy token ${name}` })
+  ).toContainText('Copied')
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(token)
+  // Still off the page: the token went to the clipboard, not into the DOM.
+  await expect(page.getByText(token)).toHaveCount(0)
 })
 
 test('(2) revoking a token greys it out and the next agent call is a 401', async ({
@@ -108,6 +120,10 @@ test('(2) revoking a token greys it out and the next agent call is a 401', async
   await row.getByRole('button', { name: `Revoke ${name}` }).click()
   await row.getByRole('button', { name: 'Revoke now' }).click()
   await expect(row).toContainText('revoked')
+  // A revoked token has nothing left to copy.
+  await expect(
+    row.getByRole('button', { name: `Copy token ${name}` })
+  ).toHaveCount(0)
 
   const agent = await playwright.request.newContext({ baseURL })
   const res = await agentCall(agent, '/api/mcp', token, {

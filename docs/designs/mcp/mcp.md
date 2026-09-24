@@ -61,6 +61,7 @@ Agreed in session. Premise 3 was amended by the owner (token prefix). Premise 5 
    - images, persistence, publishing and revalidation
 
    The server-side pipeline (`runGeneration`) is **deferred**: no scene needs it, it would make the server a second author, and it is the only tool that runs close to the 300 s limit.
+
 5. **No customer's personal data leaves the server.** Metrics are aggregates. `find_order` (scope `pii`) looks up one order by its order code and returns that order's status, never the email or the certificate name. Rationale:
    - The MBTI and IQ privacy pages (vi and en) promise "no sharing with third parties" and "That address is used only to send your result".
    - Tool output goes to Anthropic or OpenAI and stays in local transcripts past the 21-day TTL.
@@ -69,6 +70,7 @@ Agreed in session. Premise 3 was amended by the owner (token prefix). Premise 5 
    Lookup by email is deferred until the privacy pages disclose AI-assisted support lookups. The contact inbox and subscriber lists are out.
 
    The owner's **own** contact details (in `resume`) are deliberately inside `read`. `/cv` already publishes them, so a `read` token reveals nothing the public page doesn't show.
+
 6. **Intent-shaped tools.** About 25-30 tools in total, not a CRUD mirror of the admin API. Every answer stays within the ~32,000-character budget (whiteboard D18). Every write goes into an audit log shown in `/admin`.
 7. **Whiteboard migration.**
    - `/api/whiteboard/mcp` becomes a thin alias for one release, then is deleted.
@@ -95,12 +97,15 @@ Adopted: the per-scope handler mechanism, whiteboard-as-memory (as `record_on_wh
 ## Approaches Considered
 
 ### Approach A: Grow the whiteboard server
+
 Rejected. It creates two write paths for posts. Forgetting `revalidatePublishedPost`, the archived-to-draft 409 or the image-host check in the MCP copy would fail silently.
 
 ### Approach B: Service layer + scoped tool registry - CHOSEN
+
 Described below.
 
 ### Approach C: Action catalog (about 5 generic tools + `run_action`)
+
 Rejected. `run_action` would have to be `destructiveHint: true` for everything, so the Claude Code and Codex approval prompts could no longer tell "read metrics" from "publish post".
 
 ## Recommended Approach
@@ -151,12 +156,12 @@ Rejected. `run_action` would have to be `destructiveHint: true` for everything, 
 
 ### Scopes
 
-| Scope     | Grants                                                                              | Default on new token |
-| --------- | ----------------------------------------------------------------------------------- | -------------------- |
-| `read`    | every read tool, `lint_draft`, `get_writing_brief`, `context.md`                    | on                   |
-| `write`   | drafts, images for unpublished posts, whiteboard writes, CCA-F writes               | on                   |
-| `publish` | anything that changes what the public sees: publish, archive, soft delete, any change to a live post (text or images), profile edits (never the `resume`, R8), taxonomy | off |
-| `pii`     | `find_order` only                                                                   | off                  |
+| Scope     | Grants                                                                                                                                                                  | Default on new token |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `read`    | every read tool, `lint_draft`, `get_writing_brief`, `context.md`                                                                                                        | on                   |
+| `write`   | drafts, images for unpublished posts, whiteboard writes, CCA-F writes                                                                                                   | on                   |
+| `publish` | anything that changes what the public sees: publish, archive, soft delete, any change to a live post (text or images), profile edits (never the `resume`, R8), taxonomy | off                  |
+| `pii`     | `find_order` only                                                                                                                                                       | off                  |
 
 `whiteboard:legacy` is internal. It is held only by migrated `wbt_` tokens, it is never grantable, and it disappears with the alias.
 
@@ -164,35 +169,35 @@ Rejected. `run_action` would have to be `destructiveHint: true` for everything, 
 
 ### Tools (27 designed; 23 shipped after the D1 cuts, of which a `read`-only token sees 12)
 
-| Domain     | Tool                       | Scope     | What it does                                                                                                   | Service (new = extracted from a route) |
-| ---------- | -------------------------- | --------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Me         | `get_me`                   | read      | One call for scene 3: public profile summary, CV (resume, including the owner's own contact details, see premise 5), active goals and dreams (visible whiteboard items), 5 most recent posts | profile-data, whiteboard, post-service |
-| Me         | `get_profile`              | read      | One section, returned whole with a `version` hash. Keys (C3): `identity`, `about`, `career`, `offering`, `work`, `cvFile` (the public `cv` field), `resume` (the private CV with contact details) | profile-data |
-| Me         | `update_profile`           | publish   | Replace one section, validated by the existing normalizers; requires that section's `version` (R6). Refuses `resume` and points to `/admin/settings` (R8) | **profile-service (new)** |
-| Blog       | `list_posts`               | read      | Filter by status/kind/series and a `publishedAt` range; text query over title/excerpt/slug; sort by `publishedAt`, `updatedAt` or views; paging. Metrics per row cover the last 180 days (the PostEvent window) and say so | **post-service (new)** |
-| Blog       | `get_post`                 | read      | By id or slug: metadata, unresolved image placeholders, metrics, `illustration { state, remaining, lastError }` (R2), and the markdown in pages of about 24k chars (`offset`, `nextOffset`, `complete`) plus a `version` token | post-service |
-| Blog       | `list_taxonomy`            | read      | Kinds and series with counts                                                                                   | kind-data, series-data                 |
-| Blog       | `get_writing_brief`        | read      | The same voice rules as the `write-post` prompt, as a tool. Works in clients without MCP prompt support       | brief                                  |
-| Blog       | `lint_draft`               | read      | `auditProse` findings, plus a markdown pipeline dry run: dropped raw HTML, refused image hosts, placeholders   | prose-audit, markdown                  |
-| Blog       | `create_draft`             | write     | Title, markdown, excerpt, kind, series, language, optional `slug` and `clientRef`. Never publishes. Returns id, admin link, lint findings | post-service |
-| Blog       | `update_post`              | write*    | Patch text fields and kind/series; *`publish` if live. No `status`. Body changes are `edits: [{ find, replace }]`, each matching exactly once (R6); whole-body replace only for a one-page post, with its `version`. On a live post, a result with an unresolved placeholder is refused (R7) | post-service |
-| Blog       | `generate_image`           | write*    | Takes a prompt, or writes one from the post (`image-prompt`), then Gemini and Cloudinary. Returns the URL, or attaches it as the cover or to one placeholder; *`publish` if the post is live. Synchronous; accepts `clientRef` (R4) | **image-service (new)** |
-| Blog       | `illustrate_post`          | write*    | Start filling every unresolved placeholder and return `{ started, placeholders }` at once; the run continues in `after()` (same 300 s budget and 85% stop) under a per-post lease, patching each image into the current body (R2, R3). **`publish: false`**: it never publishes; *`publish` if the post is live | illustrate-run (+ flag, lease) |
-| Blog       | `publish_post`             | publish   | Draft to published after `publishBlockers`                                                                     | post-service                           |
-| Blog       | `archive_post`             | publish   | Archive or unarchive. Unarchive uses the PATCH route's rules (C11): to `draft` if never published, otherwise refused with a pointer to `publish_post` | post-service |
-| Blog       | `delete_post`              | publish   | **Cut (D1), not registered.** Soft delete only (slug held forever); `destructiveHint: true`                                                 | post-service                           |
-| Blog       | `save_taxonomy`            | publish   | **Cut (D1), not registered.** Create or rename a kind or series. No delete                                                                   | **taxonomy-service (new)**             |
-| Metrics    | `get_briefing`             | read      | Period vs the previous period; details below                                                                   | **metrics/briefing (new)**             |
-| Metrics    | `get_test_metrics`         | read      | **Cut (D1), not registered.** MBTI/IQ funnel detail, type distribution, IQ score bands, abandonment (last 21 days only; attempts expire)      | **metrics/tests (from admin/metrics)** |
-| Metrics    | `find_order`               | pii       | ONE order by order code: product, amount, status, created/paid dates, whether the result email went out. Never the email or the certificate name | **metrics/orders (new)** |
-| Whiteboard | `whiteboard_overview`      | read      | Today's `get_overview`                                                                                         | whiteboard/context                     |
-| Whiteboard | `whiteboard_search`        | read      | Today's `search_context`                                                                                       | whiteboard/context                     |
-| Whiteboard | `whiteboard_get_item`      | read      | Today's `get_item`, plus the item's `updatedAt`                                                                | whiteboard/context                     |
-| Whiteboard | `whiteboard_add_item`      | write     | Text or to-do card with a meaning, on a visible board or inside a visible frame; accepts `clientRef` (R4)     | whiteboard/data (+ agent wrapper)      |
-| Whiteboard | `whiteboard_update_item`   | write     | **Cut (D1), not registered.** Patch the status/body/rows of a VISIBLE item; requires the `updatedAt` it last read                            | whiteboard/data                        |
-| Whiteboard | `whiteboard_link`          | write     | Labelled link between two visible items; accepts `clientRef` (R4)                                              | whiteboard/data                        |
-| CCA-F      | `ccaf_status`              | read      | Progress, readiness, estimated scaled score, days to the exam, weakest domains                                | ccaf/progress-data                     |
-| CCA-F      | `ccaf_update`              | write     | Tick tasks or checks, log a mock score, set domain confidence; accepts `clientRef` (R4)                       | **ccaf/progress-service (from api/ccaf PUT)** |
+| Domain     | Tool                     | Scope   | What it does                                                                                                                                                                                                                                                                                                    | Service (new = extracted from a route)        |
+| ---------- | ------------------------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Me         | `get_me`                 | read    | One call for scene 3: public profile summary, CV (resume, including the owner's own contact details, see premise 5), active goals and dreams (visible whiteboard items), 5 most recent posts                                                                                                                    | profile-data, whiteboard, post-service        |
+| Me         | `get_profile`            | read    | One section, returned whole with a `version` hash. Keys (C3): `identity`, `about`, `career`, `offering`, `work`, `cvFile` (the public `cv` field), `resume` (the private CV with contact details)                                                                                                               | profile-data                                  |
+| Me         | `update_profile`         | publish | Replace one section, validated by the existing normalizers; requires that section's `version` (R6). Refuses `resume` and points to `/admin/settings` (R8)                                                                                                                                                       | **profile-service (new)**                     |
+| Blog       | `list_posts`             | read    | Filter by status/kind/series and a `publishedAt` range; text query over title/excerpt/slug; sort by `publishedAt`, `updatedAt` or views; paging. Metrics per row cover the last 180 days (the PostEvent window) and say so                                                                                      | **post-service (new)**                        |
+| Blog       | `get_post`               | read    | By id or slug: metadata, unresolved image placeholders, metrics, `illustration { state, remaining, lastError }` (R2), and the markdown in pages of about 24k chars (`offset`, `nextOffset`, `complete`) plus a `version` token                                                                                  | post-service                                  |
+| Blog       | `list_taxonomy`          | read    | Kinds and series with counts                                                                                                                                                                                                                                                                                    | kind-data, series-data                        |
+| Blog       | `get_writing_brief`      | read    | The same voice rules as the `write-post` prompt, as a tool. Works in clients without MCP prompt support                                                                                                                                                                                                         | brief                                         |
+| Blog       | `lint_draft`             | read    | `auditProse` findings, plus a markdown pipeline dry run: dropped raw HTML, refused image hosts, placeholders                                                                                                                                                                                                    | prose-audit, markdown                         |
+| Blog       | `create_draft`           | write   | Title, markdown, excerpt, kind, series, language, optional `slug` and `clientRef`. Never publishes. Returns id, admin link, lint findings                                                                                                                                                                       | post-service                                  |
+| Blog       | `update_post`            | write*  | Patch text fields and kind/series; *`publish` if live. No `status`. Body changes are `edits: [{ find, replace }]`, each matching exactly once (R6); whole-body replace only for a one-page post, with its `version`. On a live post, a result with an unresolved placeholder is refused (R7)                    | post-service                                  |
+| Blog       | `generate_image`         | write*  | Takes a prompt, or writes one from the post (`image-prompt`), then Gemini and Cloudinary. Returns the URL, or attaches it as the cover or to one placeholder; *`publish` if the post is live. Synchronous; accepts `clientRef` (R4)                                                                             | **image-service (new)**                       |
+| Blog       | `illustrate_post`        | write*  | Start filling every unresolved placeholder and return `{ started, placeholders }` at once; the run continues in `after()` (same 300 s budget and 85% stop) under a per-post lease, patching each image into the current body (R2, R3). **`publish: false`**: it never publishes; *`publish` if the post is live | illustrate-run (+ flag, lease)                |
+| Blog       | `publish_post`           | publish | Draft to published after `publishBlockers`                                                                                                                                                                                                                                                                      | post-service                                  |
+| Blog       | `archive_post`           | publish | Archive or unarchive. Unarchive uses the PATCH route's rules (C11): to `draft` if never published, otherwise refused with a pointer to `publish_post`                                                                                                                                                           | post-service                                  |
+| Blog       | `delete_post`            | publish | **Cut (D1), not registered.** Soft delete only (slug held forever); `destructiveHint: true`                                                                                                                                                                                                                     | post-service                                  |
+| Blog       | `save_taxonomy`          | publish | **Cut (D1), not registered.** Create or rename a kind or series. No delete                                                                                                                                                                                                                                      | **taxonomy-service (new)**                    |
+| Metrics    | `get_briefing`           | read    | Period vs the previous period; details below                                                                                                                                                                                                                                                                    | **metrics/briefing (new)**                    |
+| Metrics    | `get_test_metrics`       | read    | **Cut (D1), not registered.** MBTI/IQ funnel detail, type distribution, IQ score bands, abandonment (last 21 days only; attempts expire)                                                                                                                                                                        | **metrics/tests (from admin/metrics)**        |
+| Metrics    | `find_order`             | pii     | ONE order by order code: product, amount, status, created/paid dates, whether the result email went out. Never the email or the certificate name                                                                                                                                                                | **metrics/orders (new)**                      |
+| Whiteboard | `whiteboard_overview`    | read    | Today's `get_overview`                                                                                                                                                                                                                                                                                          | whiteboard/context                            |
+| Whiteboard | `whiteboard_search`      | read    | Today's `search_context`                                                                                                                                                                                                                                                                                        | whiteboard/context                            |
+| Whiteboard | `whiteboard_get_item`    | read    | Today's `get_item`, plus the item's `updatedAt`                                                                                                                                                                                                                                                                 | whiteboard/context                            |
+| Whiteboard | `whiteboard_add_item`    | write   | Text or to-do card with a meaning, on a visible board or inside a visible frame; accepts `clientRef` (R4)                                                                                                                                                                                                       | whiteboard/data (+ agent wrapper)             |
+| Whiteboard | `whiteboard_update_item` | write   | **Cut (D1), not registered.** Patch the status/body/rows of a VISIBLE item; requires the `updatedAt` it last read                                                                                                                                                                                               | whiteboard/data                               |
+| Whiteboard | `whiteboard_link`        | write   | Labelled link between two visible items; accepts `clientRef` (R4)                                                                                                                                                                                                                                               | whiteboard/data                               |
+| CCA-F      | `ccaf_status`            | read    | Progress, readiness, estimated scaled score, days to the exam, weakest domains                                                                                                                                                                                                                                  | ccaf/progress-data                            |
+| CCA-F      | `ccaf_update`            | write   | Tick tasks or checks, log a mock score, set domain confidence; accepts `clientRef` (R4)                                                                                                                                                                                                                         | **ccaf/progress-service (from api/ccaf PUT)** |
 
 `record_on_whiteboard` from the cold read is not a separate tool. It is `whiteboard_add_item` plus `whiteboard_link`, which the `weekly-briefing` prompt asks the agent to use.
 
@@ -208,12 +213,12 @@ The counts above are the **starting** registry. The Assignment may cut tools bef
 - **Truncated bodies can't be saved (R6).** `get_post` pages the markdown, and `update_post` changes a body with `edits: [{ find, replace }]`. Each `find` must match the current body exactly once, so text the agent never saw cannot vanish. A whole-body replace is allowed only for a post that fits in one page, with its `version`; the 50% shrink guard stays on that path only.
 - **`get_briefing` windows follow retention.** Every period is compared with the equal period before it.
 
-  | Section | Source | Periods |
-  | --- | --- | --- |
-  | Blog views, shares and attributions per post | document counts in `PostEvent.createdAt` (never `$sum: '$count'`) | up to 90 days, because both windows must fit inside 180 days |
-  | Subscribers | new confirmations from `Subscriber.confirmedAt`, and unsubscribes | any |
-  | Orders and revenue | paid orders from `Payment`/`IqPayment` (`status: 'paid'`, by `paidAt`) | any |
-  | Test funnel and conversion (paid divided by paywall-seen) | `TestEvent` | up to 10 days, because both windows must fit inside the 21-day TTL. For a longer period the section is left out with a one-line reason, never computed over expired data |
+  | Section                                                   | Source                                                                 | Periods                                                                                                                                                                  |
+  | --------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | Blog views, shares and attributions per post              | document counts in `PostEvent.createdAt` (never `$sum: '$count'`)      | up to 90 days, because both windows must fit inside 180 days                                                                                                             |
+  | Subscribers                                               | new confirmations from `Subscriber.confirmedAt`, and unsubscribes      | any                                                                                                                                                                      |
+  | Orders and revenue                                        | paid orders from `Payment`/`IqPayment` (`status: 'paid'`, by `paidAt`) | any                                                                                                                                                                      |
+  | Test funnel and conversion (paid divided by paywall-seen) | `TestEvent`                                                            | up to 10 days, because both windows must fit inside the 21-day TTL. For a longer period the section is left out with a one-line reason, never computed over expired data |
 
   `week` is the default and covers every section.
 
@@ -247,7 +252,8 @@ In Claude Code these show up as slash commands, e.g. `/mcp__port4lio__write-post
 
 - **`AgentToken`** (new, `compileModel`), in its own collection:
   - fields: `name`, `prefix`, `hash` (sha256), `scopes: string[]`, `lastUsedAt`, `revokedAt`, `createdAt`
-  - token format: `p4_` + 32 random bytes in base64url, shown once
+  - token format: `p4_` + 32 random bytes in base64url
+  - _Revised after v1:_ the owner can copy a live token again from its row. Verification still reads only `hash`; the plaintext is also kept sealed (`sealed`, AES-256-GCM, key derived from `AUTH_SECRET` via HKDF, `select: false`), revealed only through the owner-gated `POST /api/admin/agents/tokens/<id>/reveal`, and deleted on revoke. A database dump alone still grants nothing; rotating `AUTH_SECRET` makes old tokens un-copyable, never unusable. See `src/lib/mcp/token-vault.ts`.
 - **`WhiteboardToken`** stays read-only for the alias release:
   - no new `wbt_` tokens can be created
   - `/admin/agents` lists these tokens under "Legacy whiteboard tokens" and can revoke them
@@ -322,6 +328,7 @@ Write logic lives inside these handlers today. Each extraction keeps the admin r
 3. One `claude mcp add`.
 
 **Scopes and visibility (API tests):**
+
 - A `read`-only token's `tools/list` equals exactly the registry's tools marked `read`.
 - Calling any non-`read` tool by name with that token returns `isError`, writes nothing, and leaves one `refused` AgentAction row.
 - With a `write` token lacking `publish`:
@@ -331,6 +338,7 @@ Write logic lives inside these handlers today. Each extraction keeps the admin r
 - A `wbt_` token gets 401 from `/api/mcp` and keeps working on `/api/whiteboard/mcp` and `/api/whiteboard/context.md`.
 
 **Audit, retries and truncation (API tests):**
+
 - Every audited tool call leaves exactly one AgentAction row, whatever the outcome: ok, refused (scope, invalid, rate) or error. The collection has its `expireAt` TTL index (retention test).
 - Two `create_draft` calls with the same `clientRef` create one post.
 - `update_post` edits: an unmatched or double-matched `find` fails the whole call; a two-page post edited by `find` keeps its tail; a whole-body replace on a two-page post is refused (R6).
@@ -339,6 +347,7 @@ Write logic lives inside these handlers today. Each extraction keeps the admin r
 **Personal data (API test):** no tool's output ever contains a seeded customer email or certificate name, `find_order` included.
 
 **One service per behaviour:**
+
 - The existing admin blog, kinds and series route tests, plus the new profile, ccaf and metrics route tests (written first, R10), pass unchanged after extraction.
 - An e2e test under `next start` shows every mutating blog tool refreshing `/blog/<slug>`.
 
@@ -447,6 +456,7 @@ Before any code, write `docs/designs/mcp/first-week-asks.md`: the first 10 thing
   The section itself is generated by the spec review and is left unedited.
 
 <!-- gstack:office-hours:concerns:start -->
+
 ## Reviewer Concerns
 
 Disposition: CONCERNS_RECORDED
@@ -668,4 +678,5 @@ Stop: CONVERGENCE
 **R1-14 → R2-2 (persisting)**
 
 > The obligation that `update_post` refuse a body built from a truncated read is still unmet: `version` comes with every page, and the 50% shrink guard passes a page-1-only body for posts of about 24k to 48k characters. `update_profile` has no guard for paged sections.
+
 <!-- gstack:office-hours:concerns:end -->

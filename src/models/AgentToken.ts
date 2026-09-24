@@ -6,10 +6,14 @@ import { compileModel } from '@/lib/mongoose-model'
 /**
  * A revocable, scoped agent token for the site-wide MCP (Claude Code, Codex).
  *
- * Only the sha256 of the token is stored. The plaintext `p4_...` is shown once, in the
- * response that created it, and never again, so a database dump does not hand anyone agent
- * access. `prefix` is the first 8 characters, enough to tell two tokens apart in the list
- * without being a usable secret.
+ * Verification only ever uses the sha256 of the token (`hash`). The plaintext is also kept
+ * SEALED (`sealed`, AES-256-GCM, lib/mcp/token-vault.ts) so the owner can copy a token again
+ * from `/admin/agents` whenever they need it - a database dump alone still hands nobody agent
+ * access, because the key is derived from AUTH_SECRET and never stored. `select: false`, so
+ * no query carries it unless it asks by name, and the one that does (`revealAgentToken`) is
+ * owner-only. Tokens created before sealing have no `sealed` and cannot be copied again.
+ * `prefix` is the first 8 characters, enough to tell two tokens apart in the list without
+ * being a usable secret.
  *
  * `scopes` decides which tools the token's `tools/list` contains, and `runTool` checks it
  * again on every call - see `lib/mcp/scopes.ts` and `lib/mcp/token.ts`.
@@ -23,6 +27,8 @@ export type AgentTokenDocument = {
   name: string
   prefix: string
   hash: string
+  /** The sealed plaintext, or absent on a token created before sealing. */
+  sealed?: string
   scopes: McpScope[]
   lastUsedAt: Date | null
   revokedAt: Date | null
@@ -34,6 +40,7 @@ const agentTokenSchema = new Schema<AgentTokenDocument>(
     name: { type: String, required: true, maxlength: 80 },
     prefix: { type: String, required: true },
     hash: { type: String, required: true, unique: true },
+    sealed: { type: String, select: false },
     scopes: {
       type: [{ type: String, enum: MCP_SCOPES }],
       default: [],

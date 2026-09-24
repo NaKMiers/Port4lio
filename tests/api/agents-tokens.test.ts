@@ -25,11 +25,12 @@ import { agentRequest, freshIp, type RouteHandler } from './mcp-helpers'
  *
  * ```
  *   every verb ──▶ requireOwner (401 without the cookie)
- *   POST  one-line name, 1+ known scopes ──▶ p4_ plaintext ONCE, only sha256 stored
+ *   POST  one-line name, 1+ known scopes ──▶ p4_ plaintext; sha256 + a SEALED copy stored
  *   GET   { tokens, legacy, actions }     never a hash, never a plaintext, never resultPreview
  *   DELETE p4_ or legacy wbt_             ──▶ revoked, and the token 401s from the next call
  *   DELETE ?forever=1, revoked only       ──▶ record gone; an active token is a 409
  *   PATCH { scopes }, unrevoked p4_ only  ──▶ the next call sees the new tools
+ *   POST <id>/reveal, unrevoked sealed p4_ ──▶ the same plaintext again (Copy on each row)
  * ```
  */
 
@@ -52,6 +53,7 @@ type IdHandler = (
 ) => Promise<Response>
 let revoke: IdHandler
 let patch: IdHandler
+let reveal: IdHandler
 let mcpPost: RouteHandler
 let createLegacy: typeof import('@/lib/whiteboard/token').createToken
 let hashToken: typeof import('@/lib/mcp/token').hashToken
@@ -69,6 +71,8 @@ beforeAll(async () => {
   const idRoute = await import('@/app/api/admin/agents/tokens/[id]/route')
   revoke = idRoute.DELETE as IdHandler
   patch = idRoute.PATCH as IdHandler
+  reveal = (await import('@/app/api/admin/agents/tokens/[id]/reveal/route'))
+    .POST as IdHandler
   mcpPost = (await import('@/app/api/mcp/route')).POST as RouteHandler
   ;({ createToken: createLegacy } = await import('@/lib/whiteboard/token'))
   ;({ hashToken } = await import('@/lib/mcp/token'))
@@ -113,6 +117,11 @@ const deleteForever = (id: string) =>
     params: Promise.resolve({ id }),
   })
 
+const revealId = (id: string) =>
+  reveal(owner('POST', undefined, `${URL}/${id}/reveal`), {
+    params: Promise.resolve({ id }),
+  })
+
 const patchScopes = (id: string, body: unknown) =>
   patch(owner('PATCH', body, `${URL}/${id}`), {
     params: Promise.resolve({ id }),
@@ -153,6 +162,11 @@ describe('the owner gate', () => {
         }),
       }),
       await patch(anon('PATCH'), {
+        params: Promise.resolve({
+          id: new mongoose.Types.ObjectId().toHexString(),
+        }),
+      }),
+      await reveal(anon('POST'), {
         params: Promise.resolve({
           id: new mongoose.Types.ObjectId().toHexString(),
         }),
@@ -247,8 +261,13 @@ describe('list', () => {
     ])
       expect(text).not.toContain(secret)
 
+    const sealed = await AgentTokenModel.findOne({}).select('+sealed').lean()
+    expect(sealed?.sealed).toBeTruthy()
+    expect(text).not.toContain(sealed!.sealed!)
+
     const body = JSON.parse(text)
     expect(body.tokens.map((t: { name: string }) => t.name)).toEqual(['New'])
+    expect(body.tokens[0].copyable).toBe(true)
     expect(body.legacy.map((t: { name: string }) => t.name)).toEqual([
       'Old laptop',
     ])
@@ -431,5 +450,99 @@ describe('change scopes', () => {
       'nope',
     ])
       expect((await patchScopes(id, { scopes: ['read'] })).status, id).toBe(404)
+  })
+})
+
+describe('reveal (Copy on each row)', () => {
+  it('gives the owner the same token again, any number of times, and it still works', async () => {
+    const { token, record } = await (
+      await create(owner('POST', { name: 'Laptop', scopes: ['read'] }))
+    ).json()
+    for (let i = 0; i < 2; i++) {
+      const res = await revealId(record.id)
+      expect(res.status).toBe(200)
+      expect(res.headers.get('cache-control')).toBe('no-store, private')
+      expect((await res.json()).token).toBe(token)
+    }
+    expect(await ping(token)).toBe(200)
+  })
+
+  it('stores the copy sealed: not the plaintext, and useless under another AUTH_SECRET', async () => {
+    const { token, record } = await (
+      await create(owner('POST', { name: 'Laptop', scopes: ['read'] }))
+    ).json()
+    const stored = await AgentTokenModel.findById(record.id)
+      .select('+sealed')
+      .lean()
+    expect(stored?.sealed).toMatch(/^v1\./)
+    expect(stored?.sealed).not.toContain(token)
+
+    const secret = process.env.AUTH_SECRET
+    process.env.AUTH_SECRET = 'a-rotated-secret'
+    try {
+      const { openToken } = await import('@/lib/mcp/token-vault')
+      expect(openToken(stored!.sealed!)).toBeNull()
+    } finally {
+      process.env.AUTH_SECRET = secret
+    }
+    // Verification never depended on the key: the token still works after a rotation.
+    expect(await ping(token)).toBe(200)
+  })
+
+  it('refuses a revoked token with 409, and revoking drops the sealed copy', async () => {
+    const { record } = await (
+      await create(owner('POST', { name: 'Laptop', scopes: ['read'] }))
+    ).json()
+    await revokeId(record.id)
+    const res = await revealId(record.id)
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/revoked/)
+    const stored = await AgentTokenModel.findById(record.id)
+      .select('+sealed')
+      .lean()
+    expect(stored?.sealed).toBeUndefined()
+    const listed = await (await list(owner('GET'))).json()
+    expect(listed.tokens[0].copyable).toBe(false)
+  })
+
+  it('a token from before sealing is listed as not copyable and answers 409', async () => {
+    const legacyStyle = await AgentTokenModel.create({
+      name: 'Old',
+      prefix: 'p4_abcde',
+      hash: hashToken('p4_made-before-sealing-existed-000000000000'),
+      scopes: ['read'],
+    })
+    const listed = await (await list(owner('GET'))).json()
+    expect(listed.tokens[0].copyable).toBe(false)
+    const res = await revealId(String(legacyStyle._id))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/Create a new one/)
+  })
+
+  it('refuses a sealed value that opens to some other token', async () => {
+    const a = await (
+      await create(owner('POST', { name: 'A', scopes: ['read'] }))
+    ).json()
+    const b = await (
+      await create(owner('POST', { name: 'B', scopes: ['read'] }))
+    ).json()
+    const bSealed = await AgentTokenModel.findById(b.record.id)
+      .select('+sealed')
+      .lean()
+    await AgentTokenModel.updateOne(
+      { _id: a.record.id },
+      { $set: { sealed: bSealed!.sealed } }
+    )
+    expect((await revealId(a.record.id)).status).toBe(409)
+  })
+
+  it('unknown and malformed ids are 404, and a legacy wbt_ token is not revealable', async () => {
+    const { record } = await createLegacy('Old laptop')
+    for (const id of [
+      record.id,
+      new mongoose.Types.ObjectId().toHexString(),
+      'nope',
+    ])
+      expect((await revealId(id)).status, id).toBe(404)
   })
 })

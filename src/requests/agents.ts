@@ -84,3 +84,13 @@ export async function deleteAgentTokenApi(
   if (!res.ok) return failed(res)
   return res.json()
 }
+
+/** The plaintext of an unrevoked, sealed token (the row's Copy button). */
+export async function revealAgentTokenApi(id: string): Promise<string> {
+  const res = await fetch(`${API}/${id}/reveal`, {
+    method: 'POST',
+    cache: 'no-store',
+  })
+  if (!res.ok) return failed(res)
+  return ((await res.json()) as { token: string }).token
+}
