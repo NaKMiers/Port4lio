@@ -20,6 +20,15 @@
 .wb-flow .react-flow__node-shape {
   cursor: grab;
 }
+/* Space held (Canvas.tsx): the whole board is a grab handle, cards included. */
+.wb-flow[data-panning] .react-flow__pane,
+.wb-flow[data-panning] .react-flow__node {
+  cursor: grab;
+}
+.wb-flow[data-panning] .react-flow__pane:active,
+.wb-flow[data-panning] .react-flow__node:active {
+  cursor: grabbing;
+}
 
 .wb-handle.react-flow__handle {
   width: 9px;
@@ -71,6 +80,32 @@
   cursor: ew-resize;
 }
 
+/*
+  A finger has no hover and is ~9mm wide, so on touch the link handles of a selected item
+  show without hovering and every grab point is big enough to hit. The visible dot stays
+  small-ish; the box React Flow hit-tests is the element itself, so the element grows.
+*/
+@media (pointer: coarse) {
+  .wb-handle.react-flow__handle {
+    width: 16px;
+    height: 16px;
+  }
+  .wb-flow[data-tool='arrow'] .wb-handle {
+    width: 22px;
+    height: 22px;
+  }
+  .wb-resize-handle.react-flow__resize-control.handle {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+  }
+  .wb-resize-x.react-flow__resize-control {
+    width: 14px;
+    height: 36px;
+    right: -8px;
+  }
+}
+
 /* The "4 hidden" chip pulses hidden outlines once (DR3). */
 @keyframes wb-pulse {
   0% {
@@ -91,13 +126,6 @@
   .wb-handle.react-flow__handle {
     transition: none;
   }
-}
-
-/* React Flow's attribution stays visible (MIT, and they ask); kept small and out of the way. */
-.wb-flow .react-flow__attribution {
-  background: transparent;
-  font-size: 9px;
-  opacity: 0.6;
 }
 
 /* Link labels read above the cards they pass behind. */

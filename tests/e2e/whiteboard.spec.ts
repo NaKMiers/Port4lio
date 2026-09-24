@@ -4,6 +4,7 @@ import {
   expect,
   test,
   type APIRequestContext,
+  type Locator,
   type Page,
 } from '@playwright/test'
 
@@ -82,6 +83,8 @@ test('(1) a card drawn in the page survives autosave and a reload', async ({
 }) => {
   await openBoard(page)
   await expect(page.getByText('Put down one true thing.')).toBeVisible()
+  // Hidden on purpose (proOptions.hideAttribution in Canvas.tsx).
+  await expect(page.locator('.react-flow__attribution')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Text card T', exact: true }).click()
   const title = page.getByRole('textbox', { name: 'Title' }).first()
@@ -652,4 +655,378 @@ test('(13) a legacy token can be deleted forever only once revoked', async ({
   ).toBe(200)
   const { tokens } = await (await request.get(`${API}/tokens`)).json()
   expect(tokens.some((t: { id: string }) => t.id === record.id)).toBe(false)
+})
+
+async function centreOf(locator: Locator) {
+  const box = (await locator.boundingBox())!
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+}
+
+async function itemOnServer(request: APIRequestContext, id: string) {
+  return (await boardLines(request)).find(
+    line => line.t === 'item' && line.item._id === id
+  )?.item
+}
+
+test('(14) dragging a card moves it without selecting it; a click selects it', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Drag me', x: 0, y: 0 },
+  })
+  await openBoard(page)
+  const inspector = page.getByRole('complementary')
+  await expect(page.getByText('Nothing selected')).toBeVisible()
+
+  const from = await centreOf(page.getByTestId('wb-card'))
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 160, from.y + 90, { steps: 12 })
+  await page.mouse.up()
+
+  // Moved and saved, and the inspector never switched to it.
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  await expect
+    .poll(async () => (await itemOnServer(request, card))?.x)
+    .not.toBe(0)
+  await expect(page.getByText('Nothing selected')).toBeVisible()
+  await expect(inspector.locator('#wb-title')).toHaveCount(0)
+
+  await page.getByText('Drag me').click()
+  await expect(inspector.locator('#wb-title')).toHaveValue('Drag me')
+})
+
+test('(19) a new card opens its own title editor, not the inspector', async ({
+  page,
+  request,
+}) => {
+  await request.post(on('/items'), {
+    data: { _id: objectId(), form: 'text', title: 'Already here', x: 0, y: 0 },
+  })
+  await openBoard(page)
+  await page.getByText('Already here').click()
+  const inspector = page.getByRole('complementary')
+  await expect(inspector.locator('#wb-title')).toHaveValue('Already here')
+
+  await page.getByRole('button', { name: 'Text card, T' }).click()
+  const pane = await centreOf(page.locator('.react-flow__pane'))
+  await page.mouse.click(pane.x, pane.y + 200)
+  // Typing goes into the new card on the canvas; the inspector let go of the old one.
+  await expect(
+    page.getByTestId('wb-card').getByRole('textbox', { name: 'Title' })
+  ).toBeFocused()
+  await expect(page.getByText('Nothing selected')).toBeVisible()
+  await expect(inspector.locator('#wb-title')).toHaveCount(0)
+})
+
+test('(20) with auto-save off, undoing every change brings the pill back to Saved', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Keep me', x: 0, y: 0 },
+  })
+  await openBoard(page)
+  await page.getByRole('switch', { name: 'Auto-save' }).click()
+  const pill = page.getByTestId('wb-save-pill')
+
+  // An edit, undone.
+  await page.getByText('Keep me').click()
+  await page
+    .getByRole('complementary')
+    .locator('#wb-title')
+    .fill('Changed my mind')
+  await expect(pill).toHaveText(/1 unsaved/)
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('ControlOrMeta+KeyZ')
+  await expect(page.getByTestId('wb-card')).toContainText('Keep me')
+  await expect(pill).toHaveText(/Saved/)
+
+  // A move, undone.
+  const from = await centreOf(page.getByTestId('wb-card'))
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 120, from.y + 60, { steps: 10 })
+  await page.mouse.up()
+  await expect(pill).toHaveText(/1 unsaved/)
+  await page.keyboard.press('ControlOrMeta+KeyZ')
+  await expect(pill).toHaveText(/Saved/)
+
+  // A delete, undone: the same card comes back, not a copy.
+  await page.getByText('Keep me').click()
+  await page.keyboard.press('Delete')
+  await expect(pill).toHaveText(/1 unsaved/)
+  await page.keyboard.press('ControlOrMeta+KeyZ')
+  await expect(page.getByTestId('wb-card')).toHaveAttribute(
+    'data-item-id',
+    card
+  )
+  await expect(pill).toHaveText(/Saved/)
+
+  // Nothing ever reached the server, and there is nothing to leave behind.
+  const items = (await boardLines(request)).filter(l => l.t === 'item')
+  expect(items).toHaveLength(1)
+  expect(items[0].item).toMatchObject({
+    _id: card,
+    title: 'Keep me',
+    x: 0,
+    y: 0,
+  })
+  await page.getByRole('link', { name: 'All boards' }).click()
+  await expect(page).toHaveURL(/\/admin\/whiteboard$/)
+})
+
+test('(21) holding Space, a drag that starts on a card pans the board and leaves the card', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Stay put', x: 0, y: 0 },
+  })
+  await openBoard(page)
+  const viewport = page.locator('.react-flow__viewport')
+  const before = await viewport.getAttribute('style')
+  // Focus on the canvas, not a field: Space typed into a title is a space.
+  await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } })
+
+  const from = await centreOf(page.getByTestId('wb-card'))
+  await page.keyboard.down('Space')
+  await page.mouse.move(from.x, from.y)
+  await page.mouse.down()
+  await page.mouse.move(from.x + 150, from.y + 80, { steps: 10 })
+  await page.mouse.up()
+  await page.keyboard.up('Space')
+
+  await expect.poll(() => viewport.getAttribute('style')).not.toBe(before)
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  expect((await itemOnServer(request, card))?.x).toBe(0)
+
+  // Space up: the card drags again.
+  const now = await centreOf(page.getByTestId('wb-card'))
+  await page.mouse.move(now.x, now.y)
+  await page.mouse.down()
+  await page.mouse.move(now.x + 100, now.y, { steps: 10 })
+  await page.mouse.up()
+  await expect
+    .poll(async () => (await itemOnServer(request, card))?.x)
+    .not.toBe(0)
+})
+
+test('(22) Manage meanings: add one, give it to a card, and it cannot be deleted while used', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Needs a meaning', x: 0, y: 0 },
+  })
+  await openBoard(page)
+  await page.getByText('Needs a meaning').click()
+  await page.getByRole('button', { name: 'Manage meanings' }).click()
+
+  const dialog = page.getByTestId('wb-vocab-dialog')
+  await expect(dialog.getByRole('tab', { name: 'Meanings' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  )
+  const label = `Idea ${Date.now() % 100000}`
+  const key = `idea-${Date.now() % 100000}`
+  // Every row starts collapsed: a chip and a count, no fields.
+  await expect(dialog.getByTestId('wb-vocab-row')).toHaveCount(5)
+  await expect(dialog.getByRole('radio')).toHaveCount(0)
+
+  await dialog.getByRole('button', { name: 'New meaning' }).click()
+  await dialog.getByLabel('Label', { exact: true }).fill(label)
+  await expect(dialog.getByLabel('Key', { exact: true })).toHaveValue(key)
+  await dialog.getByRole('radio', { name: 'Green' }).click()
+  await dialog.getByRole('button', { name: 'Add meaning' }).click()
+  const row = dialog.getByTestId('wb-vocab-row').last()
+  await expect(row).toContainText(label)
+  await expect(row).toContainText('0 cards')
+  // Added and folded away again.
+  await expect(dialog.getByRole('radio')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toHaveCount(0)
+
+  // The new meaning is an option at once, and the card's chip shows it.
+  await page.locator('#wb-meaning').click()
+  await page.getByRole('option', { name: label }).click()
+  await expect(page.getByTestId('wb-card')).toContainText(label)
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  expect((await itemOnServer(request, card))?.meaning).toBe(key)
+
+  // In use: the delete is refused, and says why.
+  await page.getByRole('button', { name: 'Manage meanings' }).click()
+  await expect(row).toContainText('1 card')
+  await row.getByRole('button', { name: new RegExp(label, 'i') }).click()
+  await expect(row.getByText(`key: ${key}`)).toBeVisible()
+  await dialog.getByRole('button', { name: `Delete ${label}` }).click()
+  await expect(dialog.getByRole('alert')).toContainText('1 card still uses')
+
+  // Clean up the shared list: free the key, then delete it.
+  await request.patch(on(`/items/${card}`), { data: { meaning: null } })
+  const gone = await request.delete(`${API}/vocab/meaning/${key}`)
+  expect(gone.ok()).toBe(true)
+})
+
+test.describe('on a phone, with a finger', () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  })
+
+  /** A real one-finger gesture (touch + pointer events), not a mouse in disguise. */
+  async function fingerDrag(
+    page: Page,
+    from: { x: number; y: number },
+    to: { x: number; y: number }
+  ) {
+    const cdp = await page.context().newCDPSession(page)
+    const at = (t: number) => ({
+      x: from.x + (to.x - from.x) * t,
+      y: from.y + (to.y - from.y) * t,
+    })
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [from],
+    })
+    for (let step = 1; step <= 12; step++)
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [at(step / 12)],
+      })
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    })
+    await cdp.detach()
+  }
+
+  const sheet = (page: Page) => page.getByRole('dialog', { name: 'Inspector' })
+
+  async function seedTwo(request: APIRequestContext) {
+    const ids = [objectId(), objectId()]
+    await request.post(on('/items'), {
+      data: { _id: ids[0], form: 'text', title: 'Left card', x: 0, y: 0 },
+    })
+    await request.post(on('/items'), {
+      data: { _id: ids[1], form: 'text', title: 'Right card', x: 0, y: 260 },
+    })
+    return ids
+  }
+
+  test('(15) every tool is on the rail, and a tapped tool draws where the finger lands', async ({
+    page,
+    request,
+  }) => {
+    await seedTwo(request)
+    await openBoard(page)
+    const rail = page.getByTestId('wb-tool-rail')
+    await expect(rail).toBeVisible()
+    for (const name of [
+      'Select, V',
+      'Select box',
+      'Text card, T',
+      'To-do card, L',
+      'Rectangle, R',
+      'Ellipse, O',
+      'Diamond, D',
+      'Frame, F',
+      'Arrow, A',
+      'Pen, P',
+      'Eraser (ink only), E',
+    ])
+      await expect(rail.getByRole('button', { name, exact: true })).toHaveCount(
+        1
+      )
+    await expect(page.getByText('Drawing needs a larger screen')).toHaveCount(0)
+
+    await rail.getByRole('button', { name: 'Rectangle, R' }).tap()
+    await page.touchscreen.tap(200, 700)
+    await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+    // A new item is not selected, so the inspector sheet stays shut.
+    await expect(sheet(page)).toHaveCount(0)
+    await expect
+      .poll(async () =>
+        (await boardLines(request)).some(
+          line => line.t === 'item' && line.item.form === 'shape'
+        )
+      )
+      .toBe(true)
+  })
+
+  test('(16) the pen draws with a finger', async ({ page, request }) => {
+    await seedTwo(request)
+    await openBoard(page)
+    await page.getByRole('button', { name: 'Pen, P' }).tap()
+    await fingerDrag(page, { x: 120, y: 620 }, { x: 300, y: 700 })
+    await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+    await expect
+      .poll(async () =>
+        (await boardLines(request)).some(
+          line => line.t === 'item' && line.item.form === 'ink'
+        )
+      )
+      .toBe(true)
+  })
+
+  test('(17) a finger drag moves a card and leaves the sheet shut; a tap opens it', async ({
+    page,
+    request,
+  }) => {
+    const [left] = await seedTwo(request)
+    await openBoard(page)
+    const from = await centreOf(
+      page.getByTestId('wb-card').filter({ hasText: 'Left card' })
+    )
+    await fingerDrag(page, from, { x: from.x + 40, y: from.y + 120 })
+    await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+    await expect
+      .poll(async () => (await itemOnServer(request, left))?.y)
+      .not.toBe(0)
+    await expect(sheet(page)).toHaveCount(0)
+
+    await page.getByText('Right card').tap()
+    await expect(sheet(page).locator('#wb-title')).toHaveValue('Right card')
+  })
+
+  test('(18) one finger pans the board; Select box picks several cards, once', async ({
+    page,
+    request,
+  }) => {
+    await seedTwo(request)
+    await openBoard(page)
+    const viewport = page.locator('.react-flow__viewport')
+    const before = await viewport.getAttribute('style')
+    // Empty canvas below the cards.
+    await fingerDrag(page, { x: 200, y: 720 }, { x: 260, y: 640 })
+    await expect.poll(() => viewport.getAttribute('style')).not.toBe(before)
+    await expect(sheet(page)).toHaveCount(0)
+
+    const boxButton = page.getByRole('button', { name: 'Select box' })
+    await boxButton.tap()
+    await expect(boxButton).toHaveAttribute('aria-pressed', 'true')
+    const cards = page.getByTestId('wb-card')
+    const a = (await cards.nth(0).boundingBox())!
+    const b = (await cards.nth(1).boundingBox())!
+    await fingerDrag(
+      page,
+      {
+        x: Math.min(a.x, b.x) - 12,
+        y: Math.min(a.y, b.y) - 12,
+      },
+      {
+        x: Math.max(a.x + a.width, b.x + b.width) + 12,
+        y: Math.max(a.y + a.height, b.y + b.height) + 12,
+      }
+    )
+    await expect(sheet(page)).toContainText('2 items selected')
+    // One box, then the finger pans again.
+    await expect(boxButton).toHaveAttribute('aria-pressed', 'false')
+  })
 })

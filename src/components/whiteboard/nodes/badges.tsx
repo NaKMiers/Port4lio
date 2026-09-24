@@ -1,6 +1,7 @@
 import { EyeOff, TriangleAlert } from 'lucide-react'
 
 import { meaningStyle } from '@/components/whiteboard/meaning-style'
+import { useVocab } from '@/components/whiteboard/vocab-context'
 import { cn } from '@/lib/utils'
 import type { Meaning } from '@/lib/whiteboard/limits'
 
@@ -14,7 +15,7 @@ export function MeaningChip({
   count?: number
   className?: string
 }) {
-  const style = meaningStyle(meaning)
+  const style = meaningStyle(useVocab().vocab, meaning)
   const Icon = style.Icon
   return (
     <span

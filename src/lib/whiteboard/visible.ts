@@ -11,6 +11,7 @@ import type {
   ClientLink,
   ExportScope,
 } from '@/lib/whiteboard/types'
+import type { Vocab } from '@/lib/whiteboard/vocab'
 
 /**
  * The Export sheet's privacy filter, in memory: one board the browser already holds in, the
@@ -225,11 +226,15 @@ export interface ExportPreview {
 
 export function buildExportPreview(
   board: Parameters<typeof selectExportInput>[0],
-  scope: ExportScope
+  scope: ExportScope,
+  /** The owner's meanings, for headings and order - the same list `context.md` renders with. */
+  vocab?: Vocab
 ): ExportPreview {
   const { input, excludedCount, scopeHidden } = selectExportInput(board, scope)
-  const { markdown, totalCount, renderedCount, truncated } =
-    renderContext(input)
+  const { markdown, totalCount, renderedCount, truncated } = renderContext({
+    ...input,
+    vocab,
+  })
   return {
     markdown,
     excludedCount,

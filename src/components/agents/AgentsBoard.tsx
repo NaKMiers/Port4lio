@@ -7,9 +7,11 @@ import {
   Copy,
   Hourglass,
   KeyRound,
+  Pencil,
   Plug,
   RotateCw,
   ShieldX,
+  Trash2,
   TriangleAlert,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -34,14 +36,16 @@ import {
 import { cn } from '@/lib/utils'
 import {
   createAgentTokenApi,
+  deleteAgentTokenApi,
   getAgentsApi,
   revokeAgentTokenApi,
+  updateAgentTokenScopesApi,
   type AgentsSnapshot,
 } from '@/requests/agents'
 
 /**
- * `/admin/agents`: create, list and revoke scoped `p4_` tokens, revoke legacy `wbt_` ones,
- * connect Claude Code or Codex, and read what agents did.
+ * `/admin/agents`: create, list, re-scope, revoke and delete scoped `p4_` tokens, revoke and
+ * delete legacy `wbt_` ones, connect Claude Code or Codex, and read what agents did.
  *
  * ```
  *   Create (name + scope checkboxes: read, write on; publish, pii off)
@@ -50,8 +54,10 @@ import {
  *     2 claude mcp add --scope user ... 'Authorization: Bearer ${PORT4LIO_MCP_TOKEN}'
  *       (Codex tab: bearer_token_env_var)
  *   while the fresh token has lastUsedAt null: GET every 5 s ──▶ "Connected - first call just now"
+ *   Scopes ──▶ the same checkboxes inline ──▶ Save ──▶ applies from the token's next call
  *   Revoke ──▶ Revoke now ──▶ row greyed out, 401 from the next call
- *   Legacy whiteboard tokens: revoke only (they die with the alias, mcp-plan.md T11)
+ *   revoked row: Delete ──▶ Delete permanently ──▶ row gone (Activity keeps its name)
+ *   Legacy whiteboard tokens: revoke, then delete (they die with the alias, mcp-plan.md T11)
  *   Activity: the last 50 AgentAction rows - writes, refusals, find_order lookups
  * ```
  *
@@ -71,6 +77,12 @@ import {
  * `publish` changes what the public sees and `pii` reads a customer's order. Both are one
  * deliberate click away rather than on by default, so the everyday token - the one most
  * likely to sit in a laptop's shell profile - cannot do either (mcp.md "Scopes").
+ *
+ * ## Why delete only appears on a revoked row
+ *
+ * Revoke is the step that kills a key, and it has its own confirm. Delete only tidies the
+ * list afterwards, so it is never offered for a live token and the server refuses one with a
+ * 409 anyway - one click can never skip the revoke.
  */
 
 function ago(iso: string | null) {
@@ -209,6 +221,50 @@ function ConnectSteps({ token }: { token: string }) {
   )
 }
 
+function ScopeChecks({
+  value,
+  onToggle,
+}: {
+  value: McpScope[]
+  onToggle: (scope: McpScope) => void
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {MCP_SCOPES.map(scope => (
+        <label
+          key={scope}
+          className="flex cursor-pointer items-start gap-3 rounded-2xl border border-pp-line bg-white/70 p-3"
+        >
+          <input
+            type="checkbox"
+            checked={value.includes(scope)}
+            onChange={() => onToggle(scope)}
+            className="mt-0.5 h-4 w-4 accent-pp-text"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-pp-text">
+              {SCOPE_INFO[scope].label}{' '}
+              <span className="font-mono text-[11px] font-normal text-pp-muted">
+                {scope}
+              </span>
+            </span>
+            <span className={helpTextCls}>{SCOPE_INFO[scope].grants}</span>
+          </span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function toggled(list: McpScope[], scope: McpScope) {
+  return list.includes(scope)
+    ? list.filter(entry => entry !== scope)
+    : [...list, scope]
+}
+
+const sameScopes = (a: McpScope[], b: McpScope[]) =>
+  a.length === b.length && a.every(scope => b.includes(scope))
+
 const OUTCOME_ICON: Record<ClientAgentAction['outcome'], typeof CircleCheck> = {
   ok: CircleCheck,
   refused: ShieldX,
@@ -235,9 +291,18 @@ export default function AgentsBoard({ className }: Props) {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [fresh, setFresh] = useState<{ token: string; id: string } | null>(null)
-  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null)
+  // One pending confirm at a time, so "Revoke now" and "Delete permanently" never both show.
+  const [confirm, setConfirm] = useState<{
+    id: string
+    action: 'revoke' | 'delete'
+  } | null>(null)
   // Revoke is how a leaked credential dies, so a failed one says so - never a silent reset.
-  const [revokeError, setRevokeError] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<{
+    id: string
+    scopes: McpScope[]
+  } | null>(null)
+  const [savingScopes, setSavingScopes] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -269,11 +334,7 @@ export default function AgentsBoard({ className }: Props) {
   }, [connected, fresh, refresh])
 
   const toggleScope = (scope: McpScope) =>
-    setScopes(prev =>
-      prev.includes(scope)
-        ? prev.filter(entry => entry !== scope)
-        : [...prev, scope]
-    )
+    setScopes(prev => toggled(prev, scope))
 
   const create = async () => {
     setCreating(true)
@@ -298,40 +359,93 @@ export default function AgentsBoard({ className }: Props) {
     }
   }
 
+  const errorText = (error: unknown) =>
+    error instanceof Error ? error.message : ''
+
   const revoke = async (id: string) => {
-    setRevokeError(null)
+    setRowError(null)
     try {
       await revokeAgentTokenApi(id)
       if (fresh?.id === id) setFresh(null)
+      if (editing?.id === id) setEditing(null)
     } catch (error) {
-      setRevokeError(
-        `Could not revoke - the token still works. ${error instanceof Error ? error.message : ''}`.trim()
+      setRowError(
+        `Could not revoke - the token still works. ${errorText(error)}`.trim()
       )
     } finally {
-      setConfirmRevoke(null)
+      setConfirm(null)
       await refresh()
     }
   }
 
-  const revokeButton = (id: string, label: string) =>
-    confirmRevoke === id ? (
+  const remove = async (id: string) => {
+    setRowError(null)
+    try {
+      await deleteAgentTokenApi(id)
+    } catch (error) {
+      setRowError(`Could not delete the token. ${errorText(error)}`.trim())
+    } finally {
+      setConfirm(null)
+      await refresh()
+    }
+  }
+
+  const saveScopes = async () => {
+    if (!editing) return
+    setSavingScopes(true)
+    setRowError(null)
+    try {
+      const { record } = await updateAgentTokenScopesApi(
+        editing.id,
+        editing.scopes
+      )
+      setData(prev =>
+        prev
+          ? {
+              ...prev,
+              tokens: prev.tokens.map(token =>
+                token.id === record.id ? record : token
+              ),
+            }
+          : prev
+      )
+      setEditing(null)
+    } catch (error) {
+      setRowError(
+        `Could not change the scopes - the old ones still apply. ${errorText(error)}`.trim()
+      )
+      await refresh()
+    } finally {
+      setSavingScopes(false)
+    }
+  }
+
+  const confirmButton = (
+    id: string,
+    label: string,
+    action: 'revoke' | 'delete'
+  ) => {
+    const verb = action === 'revoke' ? 'Revoke' : 'Delete'
+    return confirm?.id === id && confirm.action === action ? (
       <button
         type="button"
-        onClick={() => void revoke(id)}
+        onClick={() => void (action === 'revoke' ? revoke(id) : remove(id))}
         className="shrink-0 rounded-full border border-red-300 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700"
       >
-        Revoke now
+        {action === 'revoke' ? 'Revoke now' : 'Delete permanently'}
       </button>
     ) : (
       <button
         type="button"
-        aria-label={`Revoke ${label}`}
-        onClick={() => setConfirmRevoke(id)}
-        className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-pp-muted hover:text-pp-ink-rose"
+        aria-label={`${verb} ${label}`}
+        onClick={() => setConfirm({ id, action })}
+        className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-pp-muted hover:text-pp-ink-rose"
       >
-        Revoke
+        {action === 'delete' ? <Trash2 size={12} /> : null}
+        {verb}
       </button>
     )
+  }
 
   return (
     <div className={cn('space-y-8', className)}>
@@ -387,32 +501,10 @@ export default function AgentsBoard({ className }: Props) {
           </div>
           <fieldset>
             <legend className={labelCls}>Scopes</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {MCP_SCOPES.map(scope => (
-                <label
-                  key={scope}
-                  className="flex cursor-pointer items-start gap-3 rounded-2xl border border-pp-line bg-white/70 p-3"
-                >
-                  <input
-                    type="checkbox"
-                    checked={scopes.includes(scope)}
-                    onChange={() => toggleScope(scope)}
-                    className="mt-0.5 h-4 w-4 accent-pp-text"
-                  />
-                  <span>
-                    <span className="block text-sm font-semibold text-pp-text">
-                      {SCOPE_INFO[scope].label}{' '}
-                      <span className="font-mono text-[11px] font-normal text-pp-muted">
-                        {scope}
-                      </span>
-                    </span>
-                    <span className={helpTextCls}>
-                      {SCOPE_INFO[scope].grants}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
+            <ScopeChecks
+              value={scopes}
+              onToggle={toggleScope}
+            />
           </fieldset>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -462,13 +554,13 @@ export default function AgentsBoard({ className }: Props) {
         ) : null}
       </section>
 
-      {revokeError ? (
+      {rowError ? (
         <p
           role="alert"
-          data-testid="agents-revoke-error"
+          data-testid="agents-row-error"
           className="flex items-center gap-2 text-[12px] font-semibold text-pp-ink-rose"
         >
-          <TriangleAlert size={14} /> {revokeError}
+          <TriangleAlert size={14} /> {rowError}
         </p>
       ) : null}
       {loadError && !data ? (
@@ -501,37 +593,114 @@ export default function AgentsBoard({ className }: Props) {
               </p>
             ) : (
               <ul className="mt-3 divide-y divide-pp-line border-y border-pp-line">
-                {data.tokens.map(token => (
-                  <li
-                    key={token.id}
-                    data-testid="agent-token-row"
-                    className="flex items-center gap-3 py-2.5 text-[13px]"
-                  >
-                    <KeyRound
-                      aria-hidden
-                      size={14}
-                      className="shrink-0 text-pp-muted"
-                    />
-                    <div
-                      className={cn(
-                        'min-w-0 flex-1',
-                        token.revokedAt && 'opacity-50'
-                      )}
+                {data.tokens.map(token => {
+                  const edit = editing?.id === token.id ? editing : null
+                  return (
+                    <li
+                      key={token.id}
+                      data-testid="agent-token-row"
+                      className="py-2.5 text-[13px]"
                     >
-                      <p className="truncate font-semibold text-pp-text">
-                        {token.name}
-                      </p>
-                      <p className="text-[11.5px] text-pp-muted">
-                        <span className="font-mono">{token.prefix}...</span> ·{' '}
-                        {token.scopes.join(', ')} ·{' '}
-                        {token.revokedAt ? 'revoked' : ago(token.lastUsedAt)}
-                      </p>
-                    </div>
-                    {token.revokedAt
-                      ? null
-                      : revokeButton(token.id, token.name)}
-                  </li>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <KeyRound
+                          aria-hidden
+                          size={14}
+                          className="shrink-0 text-pp-muted"
+                        />
+                        <div
+                          className={cn(
+                            'min-w-0 flex-1',
+                            token.revokedAt && 'opacity-50'
+                          )}
+                        >
+                          <p className="truncate font-semibold text-pp-text">
+                            {token.name}
+                          </p>
+                          <p className="text-[11.5px] text-pp-muted">
+                            <span className="font-mono">{token.prefix}...</span>{' '}
+                            · {token.scopes.join(', ')} ·{' '}
+                            {token.revokedAt
+                              ? 'revoked'
+                              : ago(token.lastUsedAt)}
+                          </p>
+                        </div>
+                        {token.revokedAt ? (
+                          confirmButton(token.id, token.name, 'delete')
+                        ) : (
+                          <>
+                            {edit ? null : (
+                              <button
+                                type="button"
+                                aria-label={`Edit scopes of ${token.name}`}
+                                onClick={() => {
+                                  setConfirm(null)
+                                  setEditing({
+                                    id: token.id,
+                                    scopes: [...token.scopes],
+                                  })
+                                }}
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-pp-muted hover:text-pp-text"
+                              >
+                                <Pencil size={12} /> Scopes
+                              </button>
+                            )}
+                            {confirmButton(token.id, token.name, 'revoke')}
+                          </>
+                        )}
+                      </div>
+                      {edit ? (
+                        <form
+                          data-testid="agent-scope-editor"
+                          aria-label={`Scopes of ${token.name}`}
+                          className="mt-3 space-y-3 pl-[26px]"
+                          onSubmit={event => {
+                            event.preventDefault()
+                            void saveScopes()
+                          }}
+                        >
+                          <ScopeChecks
+                            value={edit.scopes}
+                            onToggle={scope =>
+                              setEditing({
+                                ...edit,
+                                scopes: toggled(edit.scopes, scope),
+                              })
+                            }
+                          />
+                          <div className="flex flex-wrap items-center gap-3">
+                            <button
+                              type="submit"
+                              disabled={
+                                savingScopes ||
+                                edit.scopes.length === 0 ||
+                                sameScopes(edit.scopes, token.scopes)
+                              }
+                              className={primaryBtnCls}
+                            >
+                              {savingScopes ? (
+                                <Spinner size={14} />
+                              ) : (
+                                'Save scopes'
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditing(null)}
+                              className={secondaryBtnCls}
+                            >
+                              Cancel
+                            </button>
+                            <p className={helpTextCls}>
+                              {edit.scopes.length === 0
+                                ? 'Pick at least one scope.'
+                                : "Applies from the token's next call. The token itself stays the same."}
+                            </p>
+                          </div>
+                        </form>
+                      ) : null}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
@@ -571,9 +740,11 @@ export default function AgentsBoard({ className }: Props) {
                         {token.revokedAt ? 'revoked' : ago(token.lastUsedAt)}
                       </p>
                     </div>
-                    {token.revokedAt
-                      ? null
-                      : revokeButton(token.id, token.name)}
+                    {confirmButton(
+                      token.id,
+                      token.name,
+                      token.revokedAt ? 'delete' : 'revoke'
+                    )}
                   </li>
                 ))}
               </ul>

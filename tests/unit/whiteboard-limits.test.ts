@@ -15,6 +15,7 @@ import {
   validateLink,
   validateLinkPatch,
 } from '@/lib/whiteboard/limits'
+import { DEFAULT_VOCAB, normalizeStatus } from '@/lib/whiteboard/vocab'
 
 /**
  * The caps the inspector, the routes and the restore pre-check all share. If one of these
@@ -182,21 +183,26 @@ describe('item shape rules', () => {
     expect(validateItem({ _id: ID, form: 'ink' }).ok).toBe(false)
   })
 
-  it('stores status only next to a dream or goal', () => {
-    const note = validateItem({
+  it('checks a meaning and status for shape only; the list decides the rest (vocab.ts)', () => {
+    // Any well-formed key passes here - whether it exists is data.ts's question.
+    const custom = validateItem({
       _id: ID,
       form: 'text',
-      meaning: 'note',
-      status: 'active',
+      meaning: 'side-project',
+      status: 'blocked',
     })
-    expect(note.ok && note.value.status).toBe(null)
-    const goal = validateItem({
-      _id: ID,
-      form: 'text',
-      meaning: 'goal',
-      status: 'active',
+    expect(custom.ok && custom.value).toMatchObject({
+      meaning: 'side-project',
+      status: 'blocked',
     })
-    expect(goal.ok && goal.value.status).toBe('active')
+    for (const meaning of ['Goal', '1goal', 'a b', 'x'.repeat(33), 7])
+      expect(
+        validateItem({ _id: ID, form: 'text', meaning }).ok,
+        String(meaning)
+      ).toBe(false)
+    // Status next to a meaning without one is dropped - by the list's rule.
+    expect(normalizeStatus(DEFAULT_VOCAB, 'note', 'active')).toBeNull()
+    expect(normalizeStatus(DEFAULT_VOCAB, 'goal', 'active')).toBe('active')
   })
 
   it('defaults includeInAi to true', () => {

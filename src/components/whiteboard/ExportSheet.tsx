@@ -9,11 +9,12 @@ import {
   labelCls,
   primaryBtnCls,
 } from '@/components/settings/settings-utils'
-import { MEANING_STYLE } from '@/components/whiteboard/meaning-style'
+import { meaningStyle } from '@/components/whiteboard/meaning-style'
 import type { Board } from '@/components/whiteboard/useBoard'
 import { useReducedMotion } from '@/components/whiteboard/useTier'
+import { useVocab } from '@/components/whiteboard/vocab-context'
 import { cn } from '@/lib/utils'
-import { MEANINGS, type Meaning } from '@/lib/whiteboard/limits'
+import type { Meaning } from '@/lib/whiteboard/limits'
 import type { ExportScope } from '@/lib/whiteboard/types'
 import { buildExportPreview } from '@/lib/whiteboard/visible'
 
@@ -77,6 +78,7 @@ export default function ExportSheet({
   const reduced = useReducedMotion()
   const [scopeKey, setScopeKey] = useState<ScopeKey>(initialScope)
   const [meanings, setMeanings] = useState<Meaning[]>([])
+  const { vocab } = useVocab()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [copied, setCopied] = useState(false)
@@ -117,9 +119,10 @@ export default function ExportSheet({
           links: Object.values(data.links),
           visible: boardVisible,
         },
-        scope
+        scope,
+        vocab
       ),
-    [board.boardId, boardVisible, data, scope]
+    [board.boardId, boardVisible, data, scope, vocab]
   )
   // The deferred board lags a keystroke behind while it catches up.
   const stale = data !== board.data
@@ -246,9 +249,9 @@ export default function ExportSheet({
         {scopeKey === 'filter' ? (
           <div className="space-y-2.5">
             <div className="flex flex-wrap gap-1.5">
-              {MEANINGS.map(meaning => {
+              {vocab.meanings.map(({ key: meaning }) => {
                 const on = meanings.includes(meaning)
-                const style = MEANING_STYLE[meaning]
+                const style = meaningStyle(vocab, meaning)
                 return (
                   <button
                     key={meaning}

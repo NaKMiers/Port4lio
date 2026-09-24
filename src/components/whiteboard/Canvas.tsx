@@ -10,6 +10,7 @@ import {
   MarkerType,
   ReactFlow,
   SelectionMode,
+  useKeyPress,
   useReactFlow,
   type Edge,
   type EdgeChange,
@@ -39,7 +40,6 @@ import {
   isEffectivelyHidden,
   type Board,
 } from '@/components/whiteboard/useBoard'
-import type { Tier } from '@/components/whiteboard/useTier'
 import type { ClientItem } from '@/lib/whiteboard/types'
 
 /**
@@ -61,6 +61,46 @@ import type { ClientItem } from '@/lib/whiteboard/types'
  *
  * React's default Backspace/Delete removal is off: Delete goes through the board's own
  * confirm (R3-7).
+ *
+ * ## A drag moves, a click selects
+ *
+ * ```
+ *   press ── moves > CLICK_SLOP px? ── yes ──▶ drag: the item moves, the selection stays as it was
+ *                                    └─ no  ──▶ click: select it ──▶ inspector (the sheet below lg)
+ * ```
+ *
+ * React Flow's default, `selectNodesOnDrag`, selects an item the moment a drag starts. Every
+ * selection opens the inspector, so moving a card threw its inspector - a bottom sheet over
+ * 60% of a phone - in the way of the drag it was part of. Selection is on click only now. A
+ * few pixels of slop on both thresholds, so a tap whose finger wobbles is still a tap rather
+ * than a 2px drag, and a drag never also counts as the click that follows it. Dragging an item
+ * that is part of a selection still moves the whole selection.
+ *
+ * ## Space held: the board moves, never a card
+ *
+ * ```
+ *   Space down ──▶ every node draggable: false ──▶ React Flow drops its `nopan` class
+ *              ──▶ a drag that starts ON a card pans the board, like one on empty canvas
+ *   Space up   ──▶ draggable again
+ * ```
+ *
+ * `panActivationKeyCode` alone only covered the empty canvas: a draggable node carries
+ * `nopan`, so Space + drag on a card still moved the card - the one thing the owner holding
+ * Space is trying not to do. `useKeyPress` ignores a Space typed into a field, so a title
+ * with a space in it never freezes the cards.
+ *
+ * ## A finger or a mouse (`coarse`)
+ *
+ * ```
+ *                    one finger / left drag on the pane     two fingers / wheel
+ *   mouse, Select    selection box                          pan (scroll), middle/right drag
+ *   finger, Select   pan                                    pinch zoom
+ *   finger, box on   selection box (once, then pan again)   -
+ *   any other tool   pan                                    pinch zoom / scroll
+ * ```
+ *
+ * One finger cannot both pan and draw a box, and a board you cannot move around on a phone is
+ * the worse loss, so a finger pans and "Select box" in the rail lends it a box for one gesture.
  */
 
 const nodeTypes = {
@@ -70,6 +110,9 @@ const nodeTypes = {
   ink: InkNode,
 }
 const edgeTypes = { link: LabelledEdge }
+
+/** How far a press may move and still be a click, in screen px. */
+const CLICK_SLOP = 5
 
 const CREATE_TOOLS: Partial<Record<Tool, true>> = {
   text: true,
@@ -106,7 +149,11 @@ export interface CanvasProps {
   board: Board
   tool: Tool
   readOnly: boolean
-  tier: Tier
+  /** A finger rather than a mouse (useCoarsePointer). */
+  coarse: boolean
+  /** Touch only: the next one-finger drag on the pane draws a selection box. */
+  boxSelect: boolean
+  onBoxSelectDone: () => void
   pulse: number
   nodeState: TransientMap
   setNodeState: (update: (prev: TransientMap) => TransientMap) => void
@@ -125,7 +172,9 @@ export default function Canvas({
   board,
   tool,
   readOnly,
-  tier,
+  coarse,
+  boxSelect,
+  onBoxSelectDone,
   pulse,
   nodeState,
   setNodeState,
@@ -139,6 +188,8 @@ export default function Canvas({
 }: CanvasProps) {
   const flow = useReactFlow()
   const { data, errors, actions } = board
+  const spaceHeld = useKeyPress('Space')
+  const draggable = !readOnly && tool === 'select' && !spaceHeld
 
   // MARK: Derived nodes and edges
 
@@ -182,7 +233,7 @@ export default function Canvas({
         width: item.form === 'ink' ? Math.max(item.width, 1) : item.width,
         height: fixedHeight ? item.height : undefined,
         zIndex: item.form === 'frame' ? 0 : 1,
-        draggable: !readOnly && tool === 'select',
+        draggable,
         selectable:
           !readOnly &&
           (tool === 'select' || tool === 'arrow' || tool === 'eraser'),
@@ -191,7 +242,7 @@ export default function Canvas({
       }
       return node
     })
-  }, [data.items, errors, pulse, readOnly, tool])
+  }, [data.items, draggable, errors, pulse, readOnly, tool])
 
   const baseEdges = useMemo(
     () =>
@@ -344,12 +395,14 @@ export default function Canvas({
     )
   }, [board.load.phase, flow])
 
-  const touch = tier === 'sm'
+  const select = tool === 'select'
+  const boxing = coarse ? select && boxSelect : select
 
   return (
     <ReactFlow
       className="wb-flow"
       data-tool={tool}
+      data-panning={spaceHeld || undefined}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
@@ -370,11 +423,16 @@ export default function Canvas({
       deleteKeyCode={null}
       disableKeyboardA11y
       onlyRenderVisibleElements
-      selectionOnDrag={!touch && tool === 'select'}
+      selectNodesOnDrag={false}
+      nodeDragThreshold={CLICK_SLOP}
+      nodeClickDistance={CLICK_SLOP}
+      paneClickDistance={CLICK_SLOP}
+      selectionOnDrag={boxing}
       selectionMode={SelectionMode.Partial}
-      panOnDrag={touch || tool !== 'select' ? true : [1, 2]}
+      onSelectionEnd={coarse && boxSelect ? onBoxSelectDone : undefined}
+      panOnDrag={coarse ? !boxing : select ? [1, 2] : true}
       panActivationKeyCode="Space"
-      panOnScroll={!touch}
+      panOnScroll={!coarse}
       zoomOnPinch
       zoomOnScroll={false}
       zoomOnDoubleClick={false}
@@ -382,7 +440,10 @@ export default function Canvas({
       maxZoom={2.5}
       elementsSelectable={!readOnly}
       nodesConnectable={!readOnly}
-      nodesDraggable={!readOnly && tool === 'select'}
+      nodesDraggable={draggable}
+      // The owner's call: no "React Flow" link in the corner. MIT allows it, and this is
+      // React Flow's own switch for it, not a CSS hide that a class rename would undo.
+      proOptions={{ hideAttribution: true }}
     >
       <Background
         variant={BackgroundVariant.Dots}

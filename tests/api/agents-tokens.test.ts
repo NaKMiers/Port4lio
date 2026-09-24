@@ -28,6 +28,8 @@ import { agentRequest, freshIp, type RouteHandler } from './mcp-helpers'
  *   POST  one-line name, 1+ known scopes ──▶ p4_ plaintext ONCE, only sha256 stored
  *   GET   { tokens, legacy, actions }     never a hash, never a plaintext, never resultPreview
  *   DELETE p4_ or legacy wbt_             ──▶ revoked, and the token 401s from the next call
+ *   DELETE ?forever=1, revoked only       ──▶ record gone; an active token is a 409
+ *   PATCH { scopes }, unrevoked p4_ only  ──▶ the next call sees the new tools
  * ```
  */
 
@@ -44,10 +46,12 @@ const URL = 'http://localhost/api/admin/agents/tokens'
 let memory: MongoMemoryServer
 let list: RouteHandler
 let create: RouteHandler
-let revoke: (
+type IdHandler = (
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> }
 ) => Promise<Response>
+let revoke: IdHandler
+let patch: IdHandler
 let mcpPost: RouteHandler
 let createLegacy: typeof import('@/lib/whiteboard/token').createToken
 let hashToken: typeof import('@/lib/mcp/token').hashToken
@@ -62,8 +66,9 @@ beforeAll(async () => {
   const route = await import('@/app/api/admin/agents/tokens/route')
   list = route.GET as RouteHandler
   create = route.POST as RouteHandler
-  revoke = (await import('@/app/api/admin/agents/tokens/[id]/route'))
-    .DELETE as typeof revoke
+  const idRoute = await import('@/app/api/admin/agents/tokens/[id]/route')
+  revoke = idRoute.DELETE as IdHandler
+  patch = idRoute.PATCH as IdHandler
   mcpPost = (await import('@/app/api/mcp/route')).POST as RouteHandler
   ;({ createToken: createLegacy } = await import('@/lib/whiteboard/token'))
   ;({ hashToken } = await import('@/lib/mcp/token'))
@@ -103,6 +108,28 @@ const revokeId = (id: string) =>
     params: Promise.resolve({ id }),
   })
 
+const deleteForever = (id: string) =>
+  revoke(owner('DELETE', undefined, `${URL}/${id}?forever=1`), {
+    params: Promise.resolve({ id }),
+  })
+
+const patchScopes = (id: string, body: unknown) =>
+  patch(owner('PATCH', body, `${URL}/${id}`), {
+    params: Promise.resolve({ id }),
+  })
+
+async function toolNames(token: string) {
+  const res = await mcpPost(
+    agentRequest('http://localhost/api/mcp', {
+      token,
+      ip: freshIp(),
+      body: { jsonrpc: '2.0', id: 1, method: 'tools/list' },
+    })
+  )
+  const body = await res.json()
+  return (body.result.tools as { name: string }[]).map(tool => tool.name)
+}
+
 async function ping(token: string) {
   const res = await mcpPost(
     agentRequest('http://localhost/api/mcp', {
@@ -121,6 +148,11 @@ describe('the owner gate', () => {
       await list(anon('GET')),
       await create(anon('POST')),
       await revoke(anon('DELETE'), {
+        params: Promise.resolve({
+          id: new mongoose.Types.ObjectId().toHexString(),
+        }),
+      }),
+      await patch(anon('PATCH'), {
         params: Promise.resolve({
           id: new mongoose.Types.ObjectId().toHexString(),
         }),
@@ -266,5 +298,138 @@ describe('revoke', () => {
       (await revokeId(new mongoose.Types.ObjectId().toHexString())).status
     ).toBe(404)
     expect((await revokeId('nope')).status).toBe(404)
+  })
+})
+
+describe('delete forever', () => {
+  it('an active p4_ token is a 409 and keeps working; once revoked it is gone', async () => {
+    const { token, record } = await (
+      await create(owner('POST', { name: 'Laptop', scopes: ['read'] }))
+    ).json()
+
+    const refused = await deleteForever(record.id)
+    expect(refused.status).toBe(409)
+    expect(await AgentTokenModel.countDocuments()).toBe(1)
+    expect(await ping(token)).toBe(200)
+
+    await revokeId(record.id)
+    const res = await deleteForever(record.id)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ deleted: true, kind: 'agent' })
+    expect(await AgentTokenModel.countDocuments()).toBe(0)
+    expect(await ping(token)).toBe(401)
+    // Gone means gone: a second delete is a 404, not a success.
+    expect((await deleteForever(record.id)).status).toBe(404)
+  })
+
+  it('the Activity feed still names a deleted token', async () => {
+    const { record } = await (
+      await create(owner('POST', { name: 'Old laptop', scopes: ['read'] }))
+    ).json()
+    const now = new Date()
+    await AgentActionModel.create({
+      tokenId: record.id,
+      tokenName: 'Old laptop',
+      tool: 'create_draft',
+      clientRef: 'r-deleted',
+      outcome: 'ok',
+      reason: null,
+      target: null,
+      argsPreview: '{}',
+      at: now,
+      expireAt: agentActionExpiryFrom(now),
+    })
+    await revokeId(record.id)
+    await deleteForever(record.id)
+
+    const body = await (await list(owner('GET'))).json()
+    expect(body.tokens).toEqual([])
+    expect(body.actions.map((a: { tokenName: string }) => a.tokenName)).toEqual(
+      ['Old laptop']
+    )
+  })
+
+  it('a legacy wbt_ token: 409 while active, deleted once revoked', async () => {
+    const { record } = await createLegacy('Old laptop')
+    expect((await deleteForever(record.id)).status).toBe(409)
+    await revokeId(record.id)
+    const res = await deleteForever(record.id)
+    expect(res.status).toBe(200)
+    expect((await res.json()).kind).toBe('legacy')
+    expect(await WhiteboardTokenModel.countDocuments()).toBe(0)
+  })
+
+  it('unknown and malformed ids are 404', async () => {
+    expect(
+      (await deleteForever(new mongoose.Types.ObjectId().toHexString())).status
+    ).toBe(404)
+    expect((await deleteForever('nope')).status).toBe(404)
+  })
+})
+
+describe('change scopes', () => {
+  it('the same token gets the new tools from its next call, in canonical order', async () => {
+    const { token, record } = await (
+      await create(owner('POST', { name: 'Laptop', scopes: ['read'] }))
+    ).json()
+    expect(await toolNames(token)).not.toContain('create_draft')
+
+    const res = await patchScopes(record.id, {
+      scopes: ['write', 'read', 'write'],
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('no-store, private')
+    const body = await res.json()
+    expect(body.record).toMatchObject({
+      id: record.id,
+      scopes: ['read', 'write'],
+    })
+    expect(JSON.stringify(body)).not.toContain(token)
+    expect(await toolNames(token)).toContain('create_draft')
+
+    // Narrowing works the same way.
+    await patchScopes(record.id, { scopes: ['write'] })
+    expect(await toolNames(token)).not.toContain('get_post')
+  })
+
+  it('refuses an empty, unknown or legacy scope list and changes nothing', async () => {
+    const { record } = await (
+      await create(owner('POST', { name: 'Laptop', scopes: ['read'] }))
+    ).json()
+    for (const body of [
+      { scopes: [] },
+      { scopes: ['admin'] },
+      { scopes: ['whiteboard:legacy'] },
+      {},
+    ]) {
+      const res = await patchScopes(record.id, body)
+      expect(res.status, JSON.stringify(body)).toBe(400)
+    }
+    expect((await AgentTokenModel.findById(record.id).lean())?.scopes).toEqual([
+      'read',
+    ])
+  })
+
+  it('a revoked token is a 409 and stays revoked with its old scopes', async () => {
+    const { token, record } = await (
+      await create(owner('POST', { name: 'Laptop', scopes: ['read'] }))
+    ).json()
+    await revokeId(record.id)
+    const res = await patchScopes(record.id, { scopes: ['read', 'publish'] })
+    expect(res.status).toBe(409)
+    const stored = await AgentTokenModel.findById(record.id).lean()
+    expect(stored?.scopes).toEqual(['read'])
+    expect(stored?.revokedAt).toBeInstanceOf(Date)
+    expect(await ping(token)).toBe(401)
+  })
+
+  it('a legacy wbt_ token, an unknown id and a malformed id are 404', async () => {
+    const { record } = await createLegacy('Old laptop')
+    for (const id of [
+      record.id,
+      new mongoose.Types.ObjectId().toHexString(),
+      'nope',
+    ])
+      expect((await patchScopes(id, { scopes: ['read'] })).status, id).toBe(404)
   })
 })

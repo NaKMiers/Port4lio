@@ -3,9 +3,7 @@ import mongoose, { Schema, type Types } from 'mongoose'
 import { compileModel } from '@/lib/mongoose-model'
 import {
   FORMS,
-  MEANINGS,
   SHAPES,
-  STATUSES,
   type Form,
   type InkBBox,
   type InkPoint,
@@ -20,8 +18,10 @@ import {
  *
  * ```
  *   form     text | todo | shape | frame | ink     what it IS on the canvas (fixed at create)
- *   meaning  dream | goal | failure | draft | note  what it SAYS about the owner (or null)
- *   status   active | someday | done | dropped      only next to dream / goal, else null
+ *   meaning  a vocabulary key (dream, goal, ...)     what it SAYS about the owner (or null)
+ *   status   a vocabulary key (active, done, ...)   only next to a meaning that tracks one
+ *            both owner-editable lists (lib/whiteboard/vocab.ts); data.ts checks the key
+ *            exists on every write, so no enum here would stay in step with the list
  *   parentId a frame's _id, or null                 x/y are RELATIVE to that frame when set
  * ```
  *
@@ -102,8 +102,8 @@ const whiteboardItemSchema = new Schema<WhiteboardItemDocument>(
     _id: { type: Schema.Types.ObjectId, required: true },
     boardId: { type: Schema.Types.ObjectId, required: true },
     form: { type: String, enum: FORMS, required: true },
-    meaning: { type: String, enum: [...MEANINGS, null], default: null },
-    status: { type: String, enum: [...STATUSES, null], default: null },
+    meaning: { type: String, default: null },
+    status: { type: String, default: null },
     title: { type: String, default: '' },
     body: { type: String, default: '' },
     todos: { type: [todoSchema], default: [] },

@@ -95,7 +95,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 /** Only the fields that differ (R3-1: a patch never carries a field it did not change). */
-function fieldDiff(
+export function fieldDiff(
   live: ClientItem,
   wanted: ClientItem
 ): Partial<ClientItem> | null {

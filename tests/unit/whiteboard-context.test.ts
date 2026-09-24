@@ -61,16 +61,17 @@ describe('grouping', () => {
     expect(headings).toEqual(['## Orbit 2030', '## Garden', '## Unframed'])
   })
 
-  it('groups by meaning inside a frame, in the fixed order', () => {
+  it("groups by meaning inside a frame, in the list's order, headed by its labels", () => {
     const orbit = section(markdown, '## Orbit 2030')
     const meanings = orbit.match(/^### .+$/gm)
-    expect(meanings).toEqual(['### Goals', '### Failures'])
+    expect(meanings).toEqual(['### Goal', '### Failure'])
   })
 
   it('puts unclassified items under ### Unclassified', () => {
     const unframed = section(markdown, '## Unframed')
     expect(unframed).toContain('### Unclassified')
-    expect(unframed.indexOf('### Dreams')).toBeLessThan(
+    expect(unframed).toContain('### Dream')
+    expect(unframed.indexOf('### Dream')).toBeLessThan(
       unframed.indexOf('### Unclassified')
     )
   })

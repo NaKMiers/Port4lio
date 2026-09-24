@@ -890,3 +890,87 @@ describe('manual save (D31)', () => {
     expect(h.queue.status()).toMatchObject({ online: true, holding: true })
   })
 })
+
+describe('undo takes writes back out', () => {
+  it('dropUnsentEdits: a held patch and a bulk entry go, and the pill has nothing left', async () => {
+    const { queue, sent, advance } = harness()
+    queue.markPersisted([A, B])
+    queue.setPaused(true)
+    queue.patchItem(A, { x: 40 })
+    queue.bulkMove([
+      { id: A, x: 50, y: 0, parentId: null },
+      { id: B, x: 60, y: 0, parentId: null },
+    ])
+    expect(queue.status().pending).toBe(2)
+
+    queue.dropUnsentEdits(A)
+    // B's entry is still a real change; A's writes are gone.
+    expect(queue.status().pending).toBe(1)
+    queue.dropUnsentEdits(B)
+    expect(queue.status()).toMatchObject({ pending: 0, holding: false })
+    queue.saveNow()
+    await advance(1_000)
+    expect(sent).toEqual([])
+  })
+
+  it('dropUnsentEdits leaves an item alone while a write for it is in flight', async () => {
+    const { queue, sent, advance } = harness()
+    queue.markPersisted([A])
+    queue.patchItem(A, { x: 40 })
+    await advance(600)
+    expect(sent).toHaveLength(1)
+    // The in-flight write will move the server copy; the edit putting it back must go.
+    queue.patchItem(A, { x: 0 })
+    queue.dropUnsentEdits(A)
+    expect(queue.status().pending).toBe(2)
+  })
+
+  it('reviveUnsent: a DELETE that never left is dropped and the id is live again', async () => {
+    const { queue, sent, advance } = harness()
+    queue.markPersisted([A])
+    queue.setPaused(true)
+    queue.deleteItem(A)
+    expect(queue.isDeleted(A)).toBe(true)
+
+    expect(queue.reviveUnsent(A, true)).toBe(true)
+    expect(queue.isDeleted(A)).toBe(false)
+    expect(queue.status().pending).toBe(0)
+    queue.patchItem(A, { title: 'still here' })
+    queue.saveNow()
+    await advance(1_000)
+    expect(sent).toEqual([
+      { type: 'patchItem', id: A, patch: { title: 'still here' } },
+    ])
+  })
+
+  it('reviveUnsent: a card deleted before its create ever left comes back', () => {
+    const { queue } = harness()
+    queue.setPaused(true)
+    queue.createItem(A, { form: 'text' })
+    queue.deleteItem(A)
+    expect(queue.status().pending).toBe(0)
+    expect(queue.reviveUnsent(A, false)).toBe(true)
+    expect(queue.isDeleted(A)).toBe(false)
+  })
+
+  it('reviveUnsent refuses once the DELETE was sent, or for an entity the server may not have', async () => {
+    const sentDelete = harness()
+    sentDelete.queue.markPersisted([A])
+    sentDelete.queue.deleteItem(A)
+    await sentDelete.flush()
+    expect(sentDelete.sent).toEqual([{ type: 'deleteItem', id: A }])
+    expect(sentDelete.queue.reviveUnsent(A, true)).toBe(false)
+    await sentDelete.resolveNext()
+    // Done on the server: dead for the session (R3-6).
+    expect(sentDelete.queue.reviveUnsent(A, true)).toBe(false)
+    expect(sentDelete.queue.isDeleted(A)).toBe(true)
+
+    // Queued DELETE, but the caller's server copy has no such card: not revived.
+    const unknown = harness()
+    unknown.queue.setPaused(true)
+    unknown.queue.markPersisted([B])
+    unknown.queue.deleteItem(B)
+    expect(unknown.queue.reviveUnsent(B, false)).toBe(false)
+    expect(unknown.queue.isDeleted(B)).toBe(true)
+  })
+})

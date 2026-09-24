@@ -14,12 +14,10 @@ import {
 } from '@/lib/whiteboard/context'
 import {
   BACKUP_VERSION,
-  MEANINGS,
   type BoardFields,
   checkMergedItem,
   deriveInkBBox,
   isObjectIdString,
-  normalizeStatus,
   validateItem,
   validateLink,
   type BulkPositionUpdate,
@@ -37,6 +35,12 @@ import type {
   ExportScope,
   RestoreBatchResult,
 } from '@/lib/whiteboard/types'
+import {
+  PRIORITY_STATUS,
+  checkVocab,
+  normalizeStatus,
+} from '@/lib/whiteboard/vocab'
+import { getVocab } from '@/lib/whiteboard/vocab-service'
 import type { ExportLoad } from '@/lib/whiteboard/visible'
 import {
   WhiteboardBoardModel,
@@ -586,8 +590,14 @@ export async function loadAgentVisible(
       return loadItem(scope.id, visible)
     case 'overview':
       return loadOverview(visible)
-    default:
-      return loadExport(scope, visible, options.board)
+    default: {
+      // The export groups and orders by the owner's list, so it rides along with the input.
+      const [load, vocab] = await Promise.all([
+        loadExport(scope, visible, options.board),
+        getVocab(),
+      ])
+      return { ...load, input: { ...load.input, vocab } }
+    }
   }
 }
 
@@ -757,7 +767,13 @@ async function loadItem(id: string, visible: VisibleScope): Promise<ItemLoad> {
 }
 
 async function loadOverview(visible: VisibleScope): Promise<OverviewInput> {
-  const frames = await loadVisibleFrames(visible)
+  const [frames, vocab] = await Promise.all([
+    loadVisibleFrames(visible),
+    getVocab(),
+  ])
+  const statusMeanings = vocab.meanings
+    .filter(meaning => meaning.tracksStatus)
+    .map(meaning => meaning.key)
   const members = visibleAnd(visible, { form: { $ne: 'frame' } })
 
   const [childCounts, meaningGroups, totalVisible, active, recent] =
@@ -775,8 +791,8 @@ async function loadOverview(visible: VisibleScope): Promise<OverviewInput> {
       WhiteboardItemModel.countDocuments(members),
       WhiteboardItemModel.find(
         visibleAnd(visible, {
-          meaning: { $in: ['dream', 'goal'] },
-          status: 'active',
+          meaning: { $in: statusMeanings },
+          status: PRIORITY_STATUS,
         }),
         { ...AGENT_PROJECTION, body: 0 }
       )
@@ -790,17 +806,20 @@ async function loadOverview(visible: VisibleScope): Promise<OverviewInput> {
     ])
 
   const counts = new Map(childCounts.map(c => [String(c._id), c.n]))
-  const meaningCounts = Object.fromEntries(
-    [...MEANINGS, 'none'].map(m => [m, 0])
-  ) as OverviewInput['meaningCounts']
-  for (const group of meaningGroups)
-    meaningCounts[group._id ?? 'none'] += group.n
+  const meaningCounts: OverviewInput['meaningCounts'] = Object.fromEntries(
+    [...vocab.meanings.map(m => m.key), 'none'].map(m => [m, 0])
+  )
+  for (const group of meaningGroups) {
+    const key = group._id ?? 'none'
+    meaningCounts[key] = (meaningCounts[key] ?? 0) + group.n
+  }
 
   return {
     frames: [...frames]
       .sort((a, b) => a.y - b.y || a.x - b.x)
       .map(item => ({ item, visibleCount: counts.get(item.id) ?? 0 })),
     meaningCounts,
+    vocab,
     totalVisible,
     active: active.map(doc => toContextItem({ ...doc, body: '' })),
     recent: recent.map(doc => toContextItem({ ...doc, body: '' })),
@@ -910,6 +929,13 @@ export async function createItem(
   if (!(await boardExists(board))) return failure(404, 'Board not found.')
   if (fields.parentId && !(await findFrame(board, fields.parentId)))
     return failure(400, 'parentId must be an existing frame.')
+  const vocab = await getVocab()
+  const unknown = checkVocab(vocab, fields.meaning, fields.status)
+  if (unknown) return failure(400, unknown)
+  fields = {
+    ...fields,
+    status: normalizeStatus(vocab, fields.meaning, fields.status),
+  }
 
   await WhiteboardItemModel.updateOne(
     { _id: oid(fields._id) },
@@ -979,9 +1005,19 @@ export async function patchItem(
 
   const $set: Record<string, unknown> = { ...patch }
 
-  // Status survives only next to a dream or a goal, whichever side of the pair changed.
-  if ('meaning' in patch || 'status' in patch)
-    $set.status = normalizeStatus(merged.meaning, merged.status)
+  // Status survives only next to a meaning that tracks one, whichever side of the pair
+  // changed. Only the keys this patch names are checked, so a card whose meaning was
+  // written before a list change can still be moved or retitled.
+  if ('meaning' in patch || 'status' in patch) {
+    const vocab = await getVocab()
+    const unknown = checkVocab(
+      vocab,
+      'meaning' in patch ? merged.meaning : null,
+      'status' in patch ? merged.status : null
+    )
+    if (unknown) return failure(400, unknown)
+    $set.status = normalizeStatus(vocab, merged.meaning, merged.status)
+  }
 
   if ('ink' in patch)
     $set.ink = patch.ink
@@ -1477,14 +1513,28 @@ export async function restoreBatch(
   if (!(await boardExists(board))) return failure(404, 'Board not found.')
   const boardId = oid(board)
 
+  const vocab = await getVocab()
   const items: (ItemFields & { createdAt?: Date; updatedAt?: Date })[] = []
   for (const [index, entry] of batch.items.entries()) {
     const checked = validateItem(entry)
     if (!checked.ok)
       return failure(400, `items[${index}]: ${checked.error}`, { index })
+    // A backup names meanings by key; one the list no longer has is refused by name, so
+    // the owner can re-create it (Manage meanings) rather than lose it without a word.
+    const unknown = checkVocab(
+      vocab,
+      checked.value.meaning,
+      checked.value.status
+    )
+    if (unknown) return failure(400, `items[${index}]: ${unknown}`, { index })
     const raw = entry as { createdAt?: unknown; updatedAt?: unknown }
     items.push({
       ...checked.value,
+      status: normalizeStatus(
+        vocab,
+        checked.value.meaning,
+        checked.value.status
+      ),
       createdAt: parseInstant(raw.createdAt),
       updatedAt: parseInstant(raw.updatedAt),
     })

@@ -16,20 +16,20 @@ import {
   readableChildren,
   skipsBulkAiOn,
 } from '@/components/whiteboard/frame-geometry'
-import { MEANING_STYLE } from '@/components/whiteboard/meaning-style'
 import { MeaningChip } from '@/components/whiteboard/nodes/badges'
 import { ShortcutList } from '@/components/whiteboard/ShortcutsHelp'
 import type { Board } from '@/components/whiteboard/useBoard'
 import { cn } from '@/lib/utils'
-import {
-  LIMITS,
-  MEANINGS,
-  STATUSES,
-  STATUS_MEANINGS,
-  type Meaning,
-  type Status,
-} from '@/lib/whiteboard/limits'
+import { LIMITS, type Meaning, type Status } from '@/lib/whiteboard/limits'
 import type { ClientItem } from '@/lib/whiteboard/types'
+import {
+  findMeaning,
+  findStatus,
+  tracksStatus,
+  type Vocab,
+  type VocabKind,
+} from '@/lib/whiteboard/vocab'
+import { useVocab } from '@/components/whiteboard/vocab-context'
 
 /**
  * The 320px inspector (a bottom sheet below lg): nothing selected, one item, several items,
@@ -62,6 +62,8 @@ export interface InspectorProps {
   onSelect: (ids: string[]) => void
   onExportSelection: () => void
   onUnhideFrame: (frame: ClientItem, readableChildren: number) => void
+  /** Open "Manage meanings / statuses" (VocabDialog). */
+  onManageVocab: (kind: VocabKind) => void
   /** The board is still loading (or failed): nothing here may write (DR4). */
   readOnly?: boolean
   className?: string
@@ -75,14 +77,62 @@ const FORM_LABEL = {
   ink: 'Sketch',
 } as const
 
-const MEANING_OPTIONS = [
-  { value: '', label: MEANING_STYLE.none.label },
-  ...MEANINGS.map(m => ({ value: m, label: MEANING_STYLE[m].label })),
-]
-const STATUS_OPTIONS = [
-  { value: '', label: 'None' },
-  ...STATUSES.map(s => ({ value: s, label: s[0].toUpperCase() + s.slice(1) })),
-]
+/**
+ * The owner's list as select options. A key a card still carries after it left the list is
+ * kept as an option, marked, so the select shows the truth instead of snapping to the first
+ * entry - and choosing anything else is how the owner moves the card off it.
+ */
+function meaningOptions(vocab: Vocab, current: string | null = null) {
+  const options = [
+    { value: '', label: 'Unclassified' },
+    ...vocab.meanings.map(m => ({ value: m.key, label: m.label })),
+  ]
+  if (current && !findMeaning(vocab, current))
+    options.push({ value: current, label: `${current} (not in the list)` })
+  return options
+}
+
+function statusOptions(vocab: Vocab, current: string | null) {
+  const options = [
+    { value: '', label: 'None' },
+    ...vocab.statuses.map(s => ({ value: s.key, label: s.label })),
+  ]
+  if (current && !findStatus(vocab, current))
+    options.push({ value: current, label: `${current} (not in the list)` })
+  return options
+}
+
+/** "Meaning" / "Status" with a Manage button beside it, like the blog editor's Kind. */
+function ManagedLabel({
+  htmlFor,
+  label,
+  kind,
+  onManage,
+}: {
+  htmlFor: string
+  label: string
+  kind: VocabKind
+  onManage: (kind: VocabKind) => void
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <label
+        htmlFor={htmlFor}
+        className={labelCls}
+      >
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => onManage(kind)}
+        aria-label={kind === 'meaning' ? 'Manage meanings' : 'Manage statuses'}
+        className="font-display text-[10.5px] font-semibold uppercase tracking-[0.12em] text-pp-muted hover:text-pp-text"
+      >
+        Manage
+      </button>
+    </div>
+  )
+}
 
 const deleteCls =
   'inline-flex items-center gap-2 self-start font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-ink-rose hover:underline'
@@ -150,15 +200,15 @@ function ItemPanel({
   onDelete,
   onSelect,
   onUnhideFrame,
+  onManageVocab,
 }: InspectorProps & { item: ClientItem }) {
   const { data, errors, actions } = board
+  const { vocab } = useVocab()
   const id = item._id
   const parent = item.parentId ? data.items[item.parentId] : undefined
   const hiddenByFrame =
     Boolean(item.parentId) && (!parent || !parent.includeInAi)
-  const statusEnabled = Boolean(
-    item.meaning && STATUS_MEANINGS.includes(item.meaning)
-  )
+  const statusEnabled = tracksStatus(vocab, item.meaning)
 
   const outgoing = Object.values(data.links).filter(l => l.from === id)
   const incoming = Object.values(data.links).filter(l => l.to === id)
@@ -224,16 +274,16 @@ function ItemPanel({
 
       <div className="grid grid-cols-2 gap-2.5">
         <div>
-          <label
+          <ManagedLabel
             htmlFor="wb-meaning"
-            className={labelCls}
-          >
-            Meaning
-          </label>
+            label="Meaning"
+            kind="meaning"
+            onManage={onManageVocab}
+          />
           <SelectField
             id="wb-meaning"
             value={item.meaning ?? ''}
-            options={MEANING_OPTIONS}
+            options={meaningOptions(vocab, item.meaning)}
             onChange={value =>
               actions.updateItem(
                 id,
@@ -244,19 +294,21 @@ function ItemPanel({
           />
         </div>
         <div>
-          <label
+          <ManagedLabel
             htmlFor="wb-status"
-            className={labelCls}
-          >
-            Status
-          </label>
+            label="Status"
+            kind="status"
+            onManage={onManageVocab}
+          />
           <SelectField
             id="wb-status"
             value={item.status ?? ''}
-            options={STATUS_OPTIONS}
+            options={statusOptions(vocab, item.status)}
             disabled={!statusEnabled}
             ariaLabel={
-              statusEnabled ? undefined : 'Status (dreams and goals only)'
+              statusEnabled
+                ? undefined
+                : 'Status (only for a meaning that has one - see Manage meanings)'
             }
             onChange={value =>
               actions.updateItem(
@@ -524,6 +576,7 @@ function MultiPanel({
   onExportSelection,
 }: InspectorProps & { items: ClientItem[] }) {
   const { data, actions, queue } = board
+  const { vocab } = useVocab()
   const counts = new Map<Meaning | null, number>()
   for (const item of items)
     counts.set(item.meaning, (counts.get(item.meaning) ?? 0) + 1)
@@ -579,7 +632,7 @@ function MultiPanel({
           value={mixed ? '__mixed' : (meanings[0] ?? '')}
           options={[
             ...(mixed ? [{ value: '__mixed', label: 'Mixed' }] : []),
-            ...MEANING_OPTIONS,
+            ...meaningOptions(vocab, mixed ? null : (meanings[0] ?? null)),
           ]}
           onChange={value => {
             if (value === '__mixed') return

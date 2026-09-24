@@ -20,8 +20,8 @@ import { AgentTokenModel, type AgentTokenDocument } from '@/models/AgentToken'
 import { WhiteboardTokenModel } from '@/models/WhiteboardToken'
 
 /**
- * Agent tokens: verify, create, revoke, and a throttled "last used". The front door of every
- * agent route.
+ * Agent tokens: verify, create, change scopes, revoke, delete once revoked, and a throttled
+ * "last used". The front door of every agent route.
  *
  * ```
  *   create:  p4_ + 32 random bytes (base64url) ──▶ shown ONCE ──▶ only sha256(token) stored
@@ -168,6 +168,53 @@ export async function revokeAgentToken(
   // Already revoked is still a success for the caller; unknown is not.
   const existing = await AgentTokenModel.findById(id, { hash: 0 }).lean()
   return existing ? toClientAgentToken(existing) : null
+}
+
+/**
+ * Change what an unrevoked token may do. `verifyBearer` reads the scopes on every request, so
+ * the change applies from the token's next call - `tools/list` included - with no new token
+ * to copy into a shell profile.
+ *
+ * A revoked token answers 'revoked' rather than taking the change: it is dead, and quietly
+ * editing it would suggest otherwise. The one thing that does NOT see a narrower grant is an
+ * `illustrate_post` run already drawing, which decided at its start whether it may touch a
+ * live post - revoke, not a scope change, is what stops a run (`isTokenLive`).
+ */
+export async function updateAgentTokenScopes(
+  id: string,
+  scopes: readonly McpScope[]
+): Promise<ClientAgentToken | 'revoked' | null> {
+  await connectDatabase()
+  if (!isObjectIdString(id)) return null
+  const doc = await AgentTokenModel.findOneAndUpdate(
+    { _id: id, revokedAt: null },
+    // Canonical order and no duplicates, the same as createAgentToken.
+    { $set: { scopes: MCP_SCOPES.filter(scope => scopes.includes(scope)) } },
+    { returnDocument: 'after', lean: true, projection: { hash: 0 } }
+  )
+  if (doc) return toClientAgentToken(doc)
+  return (await AgentTokenModel.exists({ _id: id })) ? 'revoked' : null
+}
+
+/**
+ * Delete a revoked token's record for good, so it leaves the list - the `p4_` twin of the
+ * whiteboard's `deleteRevokedToken`. Only a revoked one: the filter carries
+ * `revokedAt: { $ne: null }`, so revoking stays the one way a live key dies, and a single
+ * click can never skip it. Nothing an agent can observe changes, because `verifyBearer`
+ * already answers a revoked hash exactly like an unknown one. The Activity feed keeps naming
+ * the token: every AgentAction row carries its own `tokenName`.
+ */
+export async function deleteRevokedAgentToken(
+  id: string
+): Promise<'deleted' | 'active' | 'missing'> {
+  await connectDatabase()
+  if (!isObjectIdString(id)) return 'missing'
+  const { deletedCount } = await AgentTokenModel.deleteOne({
+    _id: id,
+    revokedAt: { $ne: null },
+  })
+  if (deletedCount) return 'deleted'
+  return (await AgentTokenModel.exists({ _id: id })) ? 'active' : 'missing'
 }
 
 export type VerifyResult =

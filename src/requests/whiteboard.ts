@@ -1,6 +1,7 @@
 import type { SaveOp, SendResult } from '@/components/whiteboard/save-queue'
 import type { ClientBoard } from '@/lib/whiteboard/data'
 import type { RestoreBatchResult } from '@/lib/whiteboard/types'
+import type { Vocab, VocabKind } from '@/lib/whiteboard/vocab'
 
 /**
  * Fetch wrappers for `/api/admin/whiteboard/*`, all `no-store` (owner data, always fresh).
@@ -167,3 +168,43 @@ export async function deleteBoardApi(id: string): Promise<void> {
   const res = await call(`${API}/boards/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(await errorMessage(res))
 }
+
+// MARK: Meanings and statuses
+
+export interface VocabSnapshot {
+  vocab: Vocab
+  /** Cards (every board) carrying each key. */
+  usage: { meanings: Record<string, number>; statuses: Record<string, number> }
+}
+
+async function vocabCall(
+  url: string,
+  init: RequestInit & { json?: unknown } = {}
+): Promise<VocabSnapshot> {
+  const res = await call(url, init)
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return res.json()
+}
+
+export const getVocabApi = () => vocabCall(`${API}/vocab`)
+
+export const createVocabApi = (
+  kind: VocabKind,
+  entry: Record<string, unknown>
+) => vocabCall(`${API}/vocab`, { method: 'POST', json: { ...entry, kind } })
+
+/** Field changes, or `{ to }` to move the entry to that index. */
+export const updateVocabApi = (
+  kind: VocabKind,
+  key: string,
+  changes: Record<string, unknown>
+) =>
+  vocabCall(`${API}/vocab/${kind}/${encodeURIComponent(key)}`, {
+    method: 'PATCH',
+    json: changes,
+  })
+
+export const deleteVocabApi = (kind: VocabKind, key: string) =>
+  vocabCall(`${API}/vocab/${kind}/${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+  })

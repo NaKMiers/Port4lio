@@ -13,7 +13,11 @@ import {
   type Placeable,
 } from '@/components/whiteboard/frame-geometry'
 import { deletePlan, deletedText } from '@/components/whiteboard/delete-plan'
-import { MEANING_STYLE } from '@/components/whiteboard/meaning-style'
+import {
+  ICONS,
+  TONE_CLS,
+  meaningStyle,
+} from '@/components/whiteboard/meaning-style'
 import { mockBoard } from '@/components/whiteboard/mock-data'
 import { newObjectId } from '@/components/whiteboard/object-id'
 import {
@@ -23,12 +27,12 @@ import {
   shortcutFor,
 } from '@/components/whiteboard/shortcuts'
 import {
-  MEANINGS,
   validateBoard,
   validateBoardPatch,
   validateItem,
 } from '@/lib/whiteboard/limits'
 import type { BoardLine, ClientItem, ClientLink } from '@/lib/whiteboard/types'
+import { DEFAULT_VOCAB, VOCAB_ICONS, VOCAB_TONES } from '@/lib/whiteboard/vocab'
 
 describe('frame membership and coordinates', () => {
   const frame: Placeable = {
@@ -400,15 +404,24 @@ describe('shortcut guard (DR9)', () => {
   })
 })
 
-describe('MEANING_STYLE (DR7)', () => {
-  it('covers every meaning and none, each with a label and chip classes', () => {
-    expect(Object.keys(MEANING_STYLE).sort()).toEqual(
-      [...MEANINGS, 'none'].sort()
-    )
-    for (const style of Object.values(MEANING_STYLE)) {
-      expect(style.label).toBeTruthy()
-      expect(style.chipCls).toMatch(/text-pp-(ink-|muted)/)
+describe('meaning styles (DR7)', () => {
+  it('has classes for every tone and a component for every icon the list may name', () => {
+    expect(Object.keys(TONE_CLS).sort()).toEqual([...VOCAB_TONES].sort())
+    expect(Object.keys(ICONS).sort()).toEqual([...VOCAB_ICONS].sort())
+    for (const cls of Object.values(TONE_CLS)) expect(cls).toMatch(/text-pp-/)
+  })
+
+  it('styles every default meaning, none, and a key the list does not have', () => {
+    for (const { key, label } of DEFAULT_VOCAB.meanings) {
+      const style = meaningStyle(DEFAULT_VOCAB, key)
+      expect(style.label).toBe(label)
+      expect(style.Icon).not.toBeNull()
     }
+    expect(meaningStyle(DEFAULT_VOCAB, null).label).toBe('Unclassified')
+    // Never a borrowed colour for a key that is not in the list.
+    const gone = meaningStyle(DEFAULT_VOCAB, 'retired')
+    expect(gone.label).toBe('retired')
+    expect(gone.chipCls).toBe(meaningStyle(DEFAULT_VOCAB, null).chipCls)
   })
 })
 

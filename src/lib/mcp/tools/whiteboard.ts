@@ -15,7 +15,8 @@ import {
   createAgentLink,
   loadAgentVisible,
 } from '@/lib/whiteboard/data'
-import { LIMITS, MEANINGS, STATUSES } from '@/lib/whiteboard/limits'
+import { LIMITS } from '@/lib/whiteboard/limits'
+import { VOCAB_KEY_PATTERN } from '@/lib/whiteboard/vocab'
 
 /**
  * The whiteboard read tools, all through `loadAgentVisible` (the only agent read path).
@@ -60,6 +61,14 @@ const day = z
   .refine(isDayParam, 'must be a calendar day, YYYY-MM-DD')
   .optional()
 
+/**
+ * A meaning or status key. The list is the owner's (vocab.ts), so only the shape is checked
+ * here; a key the list does not have comes back from the data layer naming the valid ones.
+ */
+const vocabKey = z
+  .string()
+  .regex(VOCAB_KEY_PATTERN, 'must be a meaning or status key, e.g. goal')
+
 export function whiteboardReadTools(
   names: WhiteboardToolNames,
   scopes: readonly TokenScope[]
@@ -68,7 +77,7 @@ export function whiteboardReadTools(
   const overview = defineTool({
     name: names.overview,
     title: 'Whiteboard overview',
-    description: `Summary of the owner's whiteboards: frames with item counts, counts by meaning (dream, goal, failure, draft, note), active dreams and goals, and recently updated items. Titles and metadata only - call ${names.item} for a full card. Start here for questions like 'what are my active goals?'.`,
+    description: `Summary of the owner's whiteboards: frames with item counts, counts by meaning, the owner's list of meanings and statuses (the keys the other tools take), active items, and recently updated items. Titles and metadata only - call ${names.item} for a full card. Start here for questions like 'what are my active goals?'.`,
     scopes,
     input: z.object({}),
     annotations: { readOnlyHint: true, openWorldHint: false },
@@ -88,8 +97,8 @@ export function whiteboardReadTools(
     scopes,
     input: z.object({
       query: z.string().max(LIMITS.searchQuery).default(''),
-      meanings: z.array(z.enum(MEANINGS)).optional(),
-      status: z.array(z.enum(STATUSES)).optional(),
+      meanings: z.array(vocabKey).optional(),
+      status: z.array(vocabKey).optional(),
       frameId: z.string().max(64).optional(),
       from: day,
       to: day,
@@ -151,7 +160,7 @@ export function whiteboardWriteTools() {
     name: 'whiteboard_add_item',
     title: 'Add a whiteboard card',
     description:
-      "Add a text or to-do card to the owner's whiteboard: on a board they share with agents (boardId, needed only when several are shared) or inside a visible frame (frameId from whiteboard_overview). Give it a meaning (dream, goal, failure, draft, note) and, for a dream or goal, a status. The card is tagged 'agent' and is visible to you afterwards; link it with whiteboard_link. The owner sees it on the next load of the board. Pass a clientRef so a retry does not add it twice.",
+      "Add a text or to-do card to the owner's whiteboard: on a board they share with agents (boardId, needed only when several are shared) or inside a visible frame (frameId from whiteboard_overview). Give it a meaning key and, for a meaning that has a status, a status key - both from the lists in whiteboard_overview (by default: dream, goal, failure, draft, note; statuses active, someday, done, dropped for a dream or goal). The card is tagged 'agent' and is visible to you afterwards; link it with whiteboard_link. The owner sees it on the next load of the board. Pass a clientRef so a retry does not add it twice.",
     scopes: ['write'],
     keyed: true,
     input: z.object({
@@ -160,8 +169,8 @@ export function whiteboardWriteTools() {
       form: z.enum(['text', 'todo']).default('text'),
       title: z.string().min(1).max(LIMITS.title),
       body: z.string().max(LIMITS.body).optional(),
-      meaning: z.enum(MEANINGS).optional(),
-      status: z.enum(STATUSES).optional(),
+      meaning: vocabKey.optional(),
+      status: vocabKey.optional(),
       todos: z
         .array(
           z.object({

@@ -1,6 +1,5 @@
 import { MCP_BUDGET_CHARS } from '@/lib/mcp/budget'
 import {
-  MEANINGS,
   WHITEBOARD_TIMEZONE,
   type Form,
   type InkBBox,
@@ -8,6 +7,12 @@ import {
   type Status,
   type TodoRow,
 } from '@/lib/whiteboard/limits'
+import {
+  DEFAULT_VOCAB,
+  PRIORITY_STATUS,
+  findMeaning,
+  type Vocab,
+} from '@/lib/whiteboard/vocab'
 
 /**
  * The one serializer: visible items and links in, markdown out.
@@ -24,7 +29,8 @@ import {
  *   renderItemDetail ───────▶ MCP get_item         (full body, neighbour titles)
  *
  *   ## <Frame title>              one per frame, then ## Unframed
- *   ### <Meaning>                 dream, goal, failure, draft, note, then Unclassified
+ *   ### <Meaning>                 the owner's meanings in their list order (vocab.ts), then
+ *                                 any key the list no longer has, then Unclassified
  *   #### <title>                  one per item
  *   id … · goal · active · when 2025-03-14 · target by 2027-06-30 · `tag`
  *   > body, one prefix per line
@@ -130,6 +136,8 @@ export interface ContextInput {
    * search path passes every visible item, loaded bbox-only (D27).
    */
   inkPeers?: ContextItem[]
+  /** The owner's meanings and statuses. Defaults to the original list (vocab.ts). */
+  vocab?: Vocab
 }
 
 // MARK: Budgets
@@ -141,12 +149,18 @@ export const SEARCH_BODY_CLIP = 1_200
 export const INK_NEAR_PX = 200
 export const INK_NEAR_MAX = 3
 
-const MEANING_LABEL: Record<Meaning, string> = {
-  dream: 'Dreams',
-  goal: 'Goals',
-  failure: 'Failures',
-  draft: 'Drafts',
-  note: 'Notes',
+/** Meaning keys in heading order: the list's order, then keys it no longer has, A-Z. */
+function meaningOrder(vocab: Vocab, present: Iterable<Meaning | null>) {
+  const listed = vocab.meanings.map(meaning => meaning.key)
+  const extra = [...new Set(present)]
+    .filter((key): key is Meaning => key !== null && !listed.includes(key))
+    .sort()
+  return [...listed, ...extra, null]
+}
+
+function meaningHeading(vocab: Vocab, key: Meaning | null) {
+  if (!key) return 'Unclassified'
+  return escapeInline(findMeaning(vocab, key)?.label ?? key)
 }
 
 // MARK: Escaping
@@ -558,17 +572,23 @@ function buildEntryContext(
 
 // MARK: Full export
 
-export function isPriority(item: ContextItem) {
+/** Active, on a meaning that tracks a status (dreams and goals, by default). */
+export function isPriority(item: ContextItem, vocab: Vocab = DEFAULT_VOCAB) {
   return (
-    item.status === 'active' &&
-    (item.meaning === 'dream' || item.meaning === 'goal')
+    item.status === PRIORITY_STATUS &&
+    Boolean(findMeaning(vocab, item.meaning)?.tracksStatus)
   )
 }
 
 /** Active dreams and goals first, then everything by `updatedAt` desc (the truncation order). */
-export function priorityOrder(items: readonly ContextItem[]): ContextItem[] {
+export function priorityOrder(
+  items: readonly ContextItem[],
+  vocab: Vocab = DEFAULT_VOCAB
+): ContextItem[] {
   return [...items].sort(
-    (a, b) => Number(isPriority(b)) - Number(isPriority(a)) || byRecency(a, b)
+    (a, b) =>
+      Number(isPriority(b, vocab)) - Number(isPriority(a, vocab)) ||
+      byRecency(a, b)
   )
 }
 
@@ -592,7 +612,8 @@ function renderGrouped(
   picked: readonly ContextItem[],
   ctx: EntryContext,
   /** Heading level for a frame. Meanings sit one below it. */
-  level = 2
+  level = 2,
+  vocab: Vocab = DEFAULT_VOCAB
 ): string {
   const frameHash = '#'.repeat(level)
   const meaningHash = '#'.repeat(level + 1)
@@ -617,12 +638,10 @@ function renderGrouped(
         ...(byMeaning.get(item.meaning) ?? []),
         item,
       ])
-    for (const meaning of [...MEANINGS, null] as const) {
+    for (const meaning of meaningOrder(vocab, byMeaning.keys())) {
       const group = byMeaning.get(meaning)
       if (!group?.length) continue
-      blocks.push(
-        `${meaningHash} ${meaning ? MEANING_LABEL[meaning] : 'Unclassified'}`
-      )
+      blocks.push(`${meaningHash} ${meaningHeading(vocab, meaning)}`)
       for (const item of [...group].sort(byRecency))
         blocks.push(renderEntry(item, ctx))
     }
@@ -655,7 +674,7 @@ function renderGrouped(
 const EXPORT_HEADER = [
   '# Whiteboard',
   '',
-  "The owner's own notes: dreams, goals, failures, drafts and notes, grouped by frame and meaning. Every item has an id; links name the other item's title and id.",
+  "The owner's own notes, grouped by frame and meaning. Every item has an id; links name the other item's title and id.",
 ].join('\n')
 
 /**
@@ -666,15 +685,16 @@ const EXPORT_HEADER = [
 function renderBody(
   picked: readonly ContextItem[],
   ctx: EntryContext,
-  boards: ContextBoard[] | undefined
+  boards: ContextBoard[] | undefined,
+  vocab: Vocab
 ): string {
-  if (!boards || boards.length < 2) return renderGrouped(picked, ctx)
+  if (!boards || boards.length < 2) return renderGrouped(picked, ctx, 2, vocab)
   const blocks: string[] = []
   for (const board of boards) {
     const mine = picked.filter(item => item.boardId === board.id)
     if (!mine.length) continue
     blocks.push(`## ${escapeInline(board.title) || 'Untitled board'}`)
-    blocks.push(renderGrouped(mine, ctx, 3))
+    blocks.push(renderGrouped(mine, ctx, 3, vocab))
   }
   // A picked item whose board is not listed cannot happen through `loadAgentVisible`, but
   // rendering nothing for it would be a silent drop, so it lands in its own section.
@@ -683,7 +703,7 @@ function renderBody(
   )
   if (orphans.length) {
     blocks.push('## Other')
-    blocks.push(renderGrouped(orphans, ctx, 3))
+    blocks.push(renderGrouped(orphans, ctx, 3, vocab))
   }
   return blocks.join('\n\n')
 }
@@ -699,12 +719,13 @@ export function renderContext(
   const total = input.items.length
   if (total === 0)
     return { markdown: '', totalCount: 0, renderedCount: 0, truncated: false }
+  const vocab = input.vocab ?? DEFAULT_VOCAB
 
   const scopeIds = new Set(input.items.map(item => item.id))
   const full = buildEntryContext(input, id =>
     scopeIds.has(id) ? 'in' : 'outside'
   )
-  const whole = `${EXPORT_HEADER}\n\n${renderBody(input.items, full, input.boards)}\n`
+  const whole = `${EXPORT_HEADER}\n\n${renderBody(input.items, full, input.boards, vocab)}\n`
   if (byteLength(whole) <= maxBytes)
     return {
       markdown: whole,
@@ -724,7 +745,7 @@ export function renderContext(
 
   const picked: ContextItem[] = []
   let used = reserve
-  for (const item of priorityOrder(input.items)) {
+  for (const item of priorityOrder(input.items, vocab)) {
     const cost = byteLength(renderEntry(item, pessimistic)) + 160
     if (used + cost > maxBytes) break
     picked.push(item)
@@ -736,7 +757,7 @@ export function renderContext(
     const ctx = buildEntryContext(input, id =>
       chosenIds.has(id) ? 'in' : scopeIds.has(id) ? 'truncated' : 'outside'
     )
-    return `${EXPORT_HEADER}\n\n${renderBody(chosen, ctx, input.boards)}\n\n${footer(chosen.length)}\n`
+    return `${EXPORT_HEADER}\n\n${renderBody(chosen, ctx, input.boards, vocab)}\n\n${footer(chosen.length)}\n`
   }
 
   let markdown = render(picked)
@@ -809,9 +830,12 @@ export function renderSearchResults(
 
 export interface OverviewInput {
   frames: { item: ContextItem; visibleCount: number }[]
-  meaningCounts: Record<Meaning | 'none', number>
+  /** By meaning key, plus `none`. */
+  meaningCounts: Record<string, number>
+  /** The owner's list, so an agent knows which keys it may write. */
+  vocab?: Vocab
   totalVisible: number
-  /** Active dreams and goals, newest first, max 20. */
+  /** Active items of a meaning that tracks a status, newest first, max 20. */
   active: ContextItem[]
   /** The 10 most recently updated visible items. */
   recent: ContextItem[]
@@ -829,12 +853,26 @@ export function renderOverview(
   const line = (item: ContextItem) =>
     `- ${displayTitle(item)} - ${metaLine(item, input.framesById, true)}`
 
-  const counts = [...MEANINGS, 'none' as const]
-    .map(m => `${m === 'none' ? 'unclassified' : m} ${input.meaningCounts[m]}`)
+  const vocab = input.vocab ?? DEFAULT_VOCAB
+  const counts = [
+    ...meaningOrder(
+      vocab,
+      Object.keys(input.meaningCounts).filter(key => key !== 'none')
+    ).filter((key): key is string => key !== null),
+    'none',
+  ]
+    .map(
+      m => `${m === 'none' ? 'unclassified' : m} ${input.meaningCounts[m] ?? 0}`
+    )
     .join(', ')
+  const tracked = vocab.meanings.filter(m => m.tracksStatus).map(m => m.key)
+  const vocabulary = [
+    `Meanings: ${vocab.meanings.map(m => `${m.key} (${escapeInline(m.label)}${m.tracksStatus ? ', has a status' : ''})`).join(', ') || '(none)'}.`,
+    `Statuses: ${vocab.statuses.map(s => `${s.key} (${escapeInline(s.label)})`).join(', ') || '(none)'}.`,
+  ].join('\n')
 
   const blocks = [
-    `# Whiteboard overview\n\n${input.totalVisible} visible items (${counts}).`,
+    `# Whiteboard overview\n\n${input.totalVisible} visible items (${counts}).\n\n${vocabulary}`,
     input.frames.length
       ? `## Frames\n${input.frames
           .map(
@@ -843,7 +881,7 @@ export function renderOverview(
           )
           .join('\n')}`
       : '## Frames\n(none)',
-    `## Active dreams and goals\n${
+    `## Active (${tracked.join(', ') || 'no meaning has a status'})\n${
       input.active.length ? input.active.map(line).join('\n') : '(none)'
     }`,
     `## Recently updated\n${

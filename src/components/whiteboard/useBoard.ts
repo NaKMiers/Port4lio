@@ -10,6 +10,7 @@ import {
   type Placeable,
 } from '@/components/whiteboard/frame-geometry'
 import {
+  fieldDiff,
   isNoOp,
   planRestore,
   remapSnapshot,
@@ -24,7 +25,6 @@ import type {
 } from '@/components/whiteboard/save-queue'
 import { useSaveQueue } from '@/components/whiteboard/useSaveQueue'
 import {
-  STATUS_MEANINGS,
   deriveInkBBox,
   type Form,
   type InkPoint,
@@ -32,6 +32,12 @@ import {
   type Shape,
 } from '@/lib/whiteboard/limits'
 import type { ClientItem, ClientLink } from '@/lib/whiteboard/types'
+import {
+  findMeaning,
+  findStatus,
+  tracksStatus,
+  type Vocab,
+} from '@/lib/whiteboard/vocab'
 import { getBoardStreamApi } from '@/requests/whiteboard'
 
 /**
@@ -204,7 +210,12 @@ function framesOf(items: Record<string, ClientItem>): Placeable[] {
     }))
 }
 
-export function useBoard(boardId: string) {
+export function useBoard(boardId: string, vocab: Vocab) {
+  // Read by the actions below, which must not change identity when the list does.
+  const vocabRef = useRef(vocab)
+  useEffect(() => {
+    vocabRef.current = vocab
+  }, [vocab])
   const [data, setData] = useState<BoardData>(EMPTY)
   const dataRef = useRef<BoardData>(EMPTY)
   const [load, setLoad] = useState<LoadState>({
@@ -446,16 +457,40 @@ export function useBoard(boardId: string) {
   /**
    * Put the board back to `target` and send the difference. Records nothing itself - the
    * caller moves the entry between the two stacks, which is what makes redo the undo of undo.
+   *
+   * ```
+   *   planRestore ── isDead(id)? ── a DELETE that never left: reviveUnsent, same id back
+   *                              └─ otherwise dead: a copy under a new id (R3-6)
+   *   revived and still on the server ──▶ a patch of what differs from the server copy,
+   *                                       never a create (a create is `$setOnInsert`)
+   *   afterwards, per touched entity: equal to the server copy? ──▶ dropUnsentEdits
+   * ```
+   *
+   * The last step is what brings the pill back to "Saved" when every change since the last
+   * save is undone: the writes left in the queue would all put back what the server has.
    */
   const applyBoard = useCallback(
     (target: BoardData): RestorePlan => {
       const plan = planRestore(dataRef.current, target, {
-        isDead: id => queue.isDeleted(id),
+        // Asked only for ids the plan is about to bring back, so reviving here is safe.
+        isDead: id =>
+          queue.isDeleted(id) &&
+          !queue.reviveUnsent(
+            id,
+            serverItems.current.has(id) || serverLinks.current.has(id)
+          ),
         newId: newObjectId,
       })
       commit(() => plan.next)
-      for (const item of plan.createItems)
-        queue.createItem(item._id, createBody(item))
+      for (const item of plan.createItems) {
+        const server = serverItems.current.get(item._id)
+        if (!server) {
+          queue.createItem(item._id, createBody(item))
+          continue
+        }
+        const patch = fieldDiff(server, item)
+        if (patch) queue.patchItem(item._id, patchBody(patch), { delay: 0 })
+      }
       for (const { id, patch } of plan.patchItems) {
         clearError(id)
         queue.patchItem(id, patchBody(patch), { delay: 0 })
@@ -467,7 +502,12 @@ export function useBoard(boardId: string) {
         clearError(id)
         queue.deleteItem(id)
       }
-      for (const link of plan.createLinks) queue.createLink(link)
+      for (const link of plan.createLinks) {
+        const server = serverLinks.current.get(link._id)
+        if (!server) queue.createLink(link)
+        else if (server.label !== link.label)
+          queue.patchLink(link._id, link.label, { delay: 0 })
+      }
       for (const { id, label } of plan.patchLinks) {
         clearError(id)
         queue.patchLink(id, label, { delay: 0 })
@@ -475,6 +515,21 @@ export function useBoard(boardId: string) {
       for (const id of plan.deleteLinks) {
         clearError(id)
         queue.deleteLink(id)
+      }
+      for (const item of [
+        ...plan.createItems,
+        ...plan.patchItems.map(({ id }) => plan.next.items[id]),
+      ]) {
+        const server = item && serverItems.current.get(item._id)
+        if (server && !fieldDiff(server, item)) queue.dropUnsentEdits(item._id)
+      }
+      for (const link of [
+        ...plan.createLinks,
+        ...plan.patchLinks.map(({ id }) => plan.next.links[id]),
+      ]) {
+        const server = link && serverLinks.current.get(link._id)
+        if (server && server.label === link.label)
+          queue.dropUnsentEdits(link._id)
       }
       if (plan.remap.size) {
         const rewrite = (entry: HistoryEntry) => ({
@@ -592,12 +647,16 @@ export function useBoard(boardId: string) {
       const current = dataRef.current.items[id]
       if (!current) return
       const next = { ...patch }
-      // Status lives only next to a dream or goal (limits.ts); mirror it so the UI is honest.
-      const meaning = (
-        next.meaning !== undefined ? next.meaning : current.meaning
-      ) as Meaning | null
-      if (!meaning || !STATUS_MEANINGS.includes(meaning))
-        if (current.status !== null || next.status) next.status = null
+      // Status lives only next to a meaning that tracks one (vocab.ts); mirror the server so
+      // the UI is honest. Only when this edit touches the pair, as the server does: a title
+      // edit must never clear a status because the list here is stale or not loaded yet.
+      if ('meaning' in next || 'status' in next) {
+        const meaning = (
+          next.meaning !== undefined ? next.meaning : current.meaning
+        ) as Meaning | null
+        if (!tracksStatus(vocabRef.current, meaning))
+          if (current.status !== null || next.status) next.status = null
+      }
 
       if (next.ink)
         next.ink = { ...next.ink, bbox: deriveInkBBox(next.ink.points) }
@@ -927,8 +986,18 @@ export function useBoard(boardId: string) {
         const item: ClientItem = {
           _id: id,
           form: spec.form,
-          meaning: spec.meaning ?? null,
-          status: spec.status ?? null,
+          // The sample names the original meanings; one the owner has since deleted is left
+          // off rather than sent for the server to refuse.
+          meaning:
+            spec.meaning && findMeaning(vocabRef.current, spec.meaning)
+              ? spec.meaning
+              : null,
+          status:
+            spec.status &&
+            findStatus(vocabRef.current, spec.status) &&
+            tracksStatus(vocabRef.current, spec.meaning ?? null)
+              ? spec.status
+              : null,
           title: spec.title,
           body: spec.body ?? '',
           todos: (spec.todos ?? []).map((row, index) => ({

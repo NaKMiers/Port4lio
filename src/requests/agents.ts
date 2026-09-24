@@ -58,3 +58,29 @@ export async function revokeAgentTokenApi(
   if (!res.ok) return failed(res)
   return res.json()
 }
+
+export async function updateAgentTokenScopesApi(
+  id: string,
+  scopes: McpScope[]
+): Promise<{ record: ClientAgentToken }> {
+  const res = await fetch(`${API}/${id}`, {
+    method: 'PATCH',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scopes }),
+  })
+  if (!res.ok) return failed(res)
+  return res.json()
+}
+
+/** Only a revoked token can be deleted; an active one is a 409 from the server. */
+export async function deleteAgentTokenApi(
+  id: string
+): Promise<{ deleted: true; kind: 'agent' | 'legacy' }> {
+  const res = await fetch(`${API}/${id}?forever=1`, {
+    method: 'DELETE',
+    cache: 'no-store',
+  })
+  if (!res.ok) return failed(res)
+  return res.json()
+}

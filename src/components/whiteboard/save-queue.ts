@@ -52,6 +52,22 @@ import { LIMITS, type BulkPositionUpdate } from '@/lib/whiteboard/limits'
  * from backup" (`revive`). Without that, every edit to a restored card was dropped in
  * silence for the rest of the session, which is exactly the recovery path D20 exists for.
  *
+ * ## Undo takes writes back out (`dropUnsentEdits`, `reviveUnsent`)
+ *
+ * ```
+ *   edit ──▶ patch queued ──▶ undo ──▶ item equals the server copy again?
+ *                                        yes, and nothing for it sent or in flight
+ *                                          ──▶ drop its queued patches (and bulk entries)
+ *   delete ──▶ DELETE queued, unsent ──▶ undo ──▶ reviveUnsent: drop the DELETE, id live again
+ *                                                 (the server never heard of the delete)
+ * ```
+ *
+ * Without these, undo only ever ADDED writes: a moved-then-undone card left "2 unsaved" on
+ * the pill for a board identical to the server's, and an undone delete came back as a copy
+ * under a new id - a real create and a real delete - for a card that never left. Both only
+ * touch writes that never left the browser. Anything sent or in flight may already be on the
+ * server, so it stays, and so does the R3-6 rule for every id whose DELETE went out.
+ *
  * ## Manual save (D31)
  *
  * With auto-save off the queue is PAUSED: every rule above still applies - coalescing,
@@ -162,6 +178,8 @@ export class SaveQueue {
   private seq = 0
   private persisted = new Set<string>()
   private deleted = new Set<string>()
+  /** Deleted before their create was ever sent: the server never saw them (`reviveUnsent`). */
+  private ghosts = new Set<string>()
   /** Fields of a 4xx PATCH, kept until the next edit of the item re-sends them. */
   private rejectedPatches = new Map<string, Record<string, unknown>>()
   private online = true
@@ -335,6 +353,7 @@ export class SaveQueue {
         (job.op.body.from === id || job.op.body.to === id)
       ) {
         this.deleted.add(job.op.id)
+        if (!job.sent) this.ghosts.add(job.op.id)
         this.drop(job, 'skipped')
       }
     }
@@ -343,6 +362,7 @@ export class SaveQueue {
       j => j.inFlight && j.op.type === 'createItem' && j.op.id === id
     )
     if (createNeverSent && !inFlightCreate && !this.persisted.has(id)) {
+      this.ghosts.add(id)
       // Nothing to undo on the server: in a multi-delete this one is simply done.
       this.groups.get(group ?? '')?.result.ok.push(id)
       this.emitStatus()
@@ -473,6 +493,7 @@ export class SaveQueue {
       this.drop(job, 'skipped')
     }
     if (createNeverSent && !createInFlight) {
+      this.ghosts.add(id)
       this.emitStatus()
       return
     }
@@ -546,6 +567,75 @@ export class SaveQueue {
     }
     this.pump()
     return droppedLinks
+  }
+
+  /**
+   * Undo put this entity back exactly as the server has it (the caller compared), so its
+   * queued edits are no-ops: drop them, and its entries in queued bulk moves. Only when
+   * nothing for it was sent or is in flight - such a write may land and change the server
+   * copy, and then the edit after it is the one that puts the value back.
+   */
+  dropUnsentEdits(id: string) {
+    const keys = [itemKey(id), linkKey(id)]
+    const mine = this.jobs.filter(job => job.keys.some(k => keys.includes(k)))
+    if (mine.some(job => job.inFlight || job.sent)) return
+    this.rejectedPatches.delete(id)
+    for (const job of mine)
+      if (job.op.type === 'bulkMove') this.shrinkBulk(job, e => e.id !== id)
+      else if (job.op.type === 'patchItem' || job.op.type === 'patchLink') {
+        // It is saved in effect: the server already holds what it would have written.
+        this.remove(job)
+        this.settle(job, 'ok')
+      }
+    this.pump()
+  }
+
+  /**
+   * Undo is bringing back an id this session deleted. When that delete never left the
+   * browser, the id is not dead after all: the queued DELETE is dropped and the id is live
+   * again, so the card comes back as itself rather than as a copy (history.ts). Returns
+   * whether it did.
+   *
+   * ```
+   *   a DELETE queued, never sent, the server has the entity (`onServer`)  ──▶ revived
+   *   deleted before its create was ever sent (a ghost)                      ──▶ revived
+   *   the DELETE was sent, or anything for it is in flight                   ──▶ dead (R3-6)
+   * ```
+   *
+   * `onServer` comes from the caller's copy of the server state: the queue only knows which
+   * items were created, and a DELETE queued for something the server does not have (a create
+   * that was sent but never confirmed) is exactly the race R3-6 exists to stop.
+   */
+  reviveUnsent(id: string, onServer: boolean): boolean {
+    if (!this.deleted.has(id)) return false
+    const keys = [itemKey(id), linkKey(id)]
+    const mine = this.jobs.filter(job => job.keys.some(k => keys.includes(k)))
+    if (this.ghosts.has(id)) {
+      if (mine.length) return false
+    } else {
+      const unsentDelete =
+        onServer &&
+        mine.length > 0 &&
+        mine.every(
+          job =>
+            !job.inFlight &&
+            !job.sent &&
+            (job.op.type === 'deleteItem' || job.op.type === 'deleteLink')
+        )
+      if (!unsentDelete) return false
+      for (const job of mine) {
+        this.remove(job)
+        // Out of its delete group quietly: it was not deleted, and it did not fail.
+        for (const groupId of job.groups) {
+          this.groups.get(groupId)?.ids.delete(id)
+          this.settleGroupIfDone(groupId)
+        }
+      }
+    }
+    this.ghosts.delete(id)
+    this.deleted.delete(id)
+    this.pump()
+    return true
   }
 
   /** "N not saved - retry": everything waiting on backoff goes now. */

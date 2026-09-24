@@ -31,17 +31,19 @@
 export const FORMS = ['text', 'todo', 'shape', 'frame', 'ink'] as const
 export type Form = (typeof FORMS)[number]
 
-export const MEANINGS = ['dream', 'goal', 'failure', 'draft', 'note'] as const
-export type Meaning = (typeof MEANINGS)[number]
+/**
+ * A meaning or a status is a KEY into the owner-editable vocabulary (`vocab.ts`). Here it is
+ * only checked for shape; whether the key exists is a database question, answered in
+ * `data.ts` like "parentId is a frame".
+ */
+export type Meaning = string
+export type Status = string
 
-export const STATUSES = ['active', 'someday', 'done', 'dropped'] as const
-export type Status = (typeof STATUSES)[number]
+/** Lowercase, a letter first, then letters, digits and hyphens (up to 32). What an item stores. */
+export const VOCAB_KEY_PATTERN = /^[a-z][a-z0-9-]{0,31}$/
 
 export const SHAPES = ['rect', 'ellipse', 'diamond'] as const
 export type Shape = (typeof SHAPES)[number]
-
-/** Status is only meaningful on these. Anywhere else it is stored as `null`. */
-export const STATUS_MEANINGS: readonly Meaning[] = ['dream', 'goal']
 
 /**
  * The owner's timezone, for the `createdAt` fallback of the date rule (D22).
@@ -344,9 +346,14 @@ function validateField(
   | { ok: false; error: string; status?: 400 | 413 } {
   switch (key) {
     case 'meaning':
-      return oneOf('meaning', value, MEANINGS, true)
     case 'status':
-      return oneOf('status', value, STATUSES, true)
+      if (value === null) return { ok: true, value: null }
+      if (typeof value === 'string' && VOCAB_KEY_PATTERN.test(value))
+        return { ok: true, value }
+      return {
+        ok: false,
+        error: `${key} must be a key (a-z, 0-9, hyphens) or null.`,
+      }
     case 'shape':
       return oneOf('shape', value, SHAPES, true)
     case 'title':
@@ -432,14 +439,6 @@ const ITEM_DEFAULTS: Omit<ItemFields, '_id' | 'form'> = {
   includeInAi: true,
 }
 
-/** `status` survives only next to a dream or a goal. */
-export function normalizeStatus(
-  meaning: Meaning | null,
-  status: Status | null
-): Status | null {
-  return meaning && STATUS_MEANINGS.includes(meaning) ? status : null
-}
-
 /** Form-specific rules that only make sense on a whole item. */
 function checkFormRules(item: ItemFields): string | null {
   if (item.form === 'frame' && item.parentId)
@@ -488,7 +487,8 @@ export function validateItem(input: unknown): Verdict<ItemFields> {
   // Only the ink-bearing field can carry a pressure-less point, so normalise once here.
   if (item.ink) item.ink = { points: item.ink.points }
 
-  item.status = normalizeStatus(item.meaning, item.status)
+  // Status next to a meaning that does not track one is dropped by `data.ts`, which has the
+  // vocabulary (vocab.ts `normalizeStatus`); the shape is all this module can check.
   const rule = checkFormRules(item)
   if (rule) return fail(rule)
 

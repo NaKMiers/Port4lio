@@ -8,8 +8,9 @@ import { STORAGE_STATE } from './global-setup'
  * ```
  *   create (read + write ticked, publish + pii not) ──▶ p4_ shown once ──▶ first MCP call ──▶ Connected
  *   reload ──▶ the plaintext is gone, the row stays with its scopes
- *   revoke ──▶ row greyed, the next agent call is a 401
- *   legacy wbt_ ──▶ listed under "Legacy whiteboard tokens", revoke only
+ *   revoke ──▶ row greyed, the next agent call is a 401 ──▶ Delete permanently ──▶ row gone
+ *   Scopes ──▶ tick write ──▶ Save ──▶ the same token lists create_draft on its next call
+ *   legacy wbt_ ──▶ listed under "Legacy whiteboard tokens", revoke, then delete
  *   an out-of-scope call ──▶ a refused row in Activity (R1)
  * ```
  *
@@ -116,6 +117,48 @@ test('(2) revoking a token greys it out and the next agent call is a 401', async
   })
   expect(res.status()).toBe(401)
   await agent.dispose()
+
+  await row.getByRole('button', { name: `Delete ${name}` }).click()
+  await row.getByRole('button', { name: 'Delete permanently' }).click()
+  await expect(row).toHaveCount(0)
+})
+
+test("(2b) changing a token's scopes applies to the same token on its next call", async ({
+  page,
+  request,
+  playwright,
+  baseURL,
+}) => {
+  const name = `e2e rescope ${Date.now()}`
+  const created = await request.post('/api/admin/agents/tokens', {
+    data: { name, scopes: ['read'] },
+  })
+  expect(created.ok()).toBe(true)
+  const { token } = await created.json()
+
+  const agent = await playwright.request.newContext({ baseURL })
+  const tools = async () => {
+    const res = await agentCall(agent, '/api/mcp', token, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+    })
+    const body = await res.json()
+    return (body.result.tools as { name: string }[]).map(tool => tool.name)
+  }
+  expect(await tools()).not.toContain('create_draft')
+
+  await page.goto('/admin/agents')
+  const row = page.getByTestId('agent-token-row').filter({ hasText: name })
+  await row.getByRole('button', { name: `Edit scopes of ${name}` }).click()
+  const editor = row.getByTestId('agent-scope-editor')
+  await editor.getByRole('checkbox', { name: /Write/ }).check()
+  await editor.getByRole('button', { name: 'Save scopes' }).click()
+  await expect(editor).toHaveCount(0)
+  await expect(row).toContainText('read, write')
+
+  expect(await tools()).toContain('create_draft')
+  await agent.dispose()
 })
 
 test('(3) legacy wbt_ tokens are listed and can be revoked, and never open /api/mcp', async ({
@@ -148,6 +191,10 @@ test('(3) legacy wbt_ tokens are listed and can be revoked, and never open /api/
     (await agentCall(agent, '/api/whiteboard/mcp', token, ping)).status()
   ).toBe(401)
   await agent.dispose()
+
+  await row.getByRole('button', { name: `Delete ${name}` }).click()
+  await row.getByRole('button', { name: 'Delete permanently' }).click()
+  await expect(row).toHaveCount(0)
 })
 
 test('(4) a call outside the token lands in Activity as refused (R1)', async ({

@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
-import { Pencil, Undo2 } from 'lucide-react'
+import { Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
@@ -31,14 +31,24 @@ import {
   type Tool,
 } from '@/components/whiteboard/shortcuts'
 import ToolRail from '@/components/whiteboard/ToolRail'
+import VocabDialog from '@/components/whiteboard/VocabDialog'
+import {
+  VocabProvider,
+  useVocabState,
+} from '@/components/whiteboard/vocab-context'
 import TopBar from '@/components/whiteboard/TopBar'
 import { useBoard } from '@/components/whiteboard/useBoard'
 import { useBoards } from '@/components/whiteboard/useBoards'
-import { useReducedMotion, useTier } from '@/components/whiteboard/useTier'
+import {
+  useCoarsePointer,
+  useReducedMotion,
+  useTier,
+} from '@/components/whiteboard/useTier'
 import ZoomControls from '@/components/whiteboard/ZoomControls'
 import { cn } from '@/lib/utils'
 import type { Form, Shape } from '@/lib/whiteboard/limits'
 import type { ClientItem } from '@/lib/whiteboard/types'
+import type { VocabKind } from '@/lib/whiteboard/vocab'
 
 /**
  * `/admin/whiteboard` - the canvas app, client-only (React Flow measures the DOM).
@@ -50,7 +60,8 @@ import type { ClientItem } from '@/lib/whiteboard/types'
  *   │ ToolRail   Canvas (React Flow, dot grid)                   │ Inspector    │
  *   │ Zoom                                    Export sheet (DR3) │ 320px (lg)   │
  *   └────────────────────────────────────────────────────────────┴──────────────┘
- *     md: inspector becomes a bottom sheet    sm: no drawing, view + edit (DR8)
+ *     md: inspector becomes a bottom sheet    sm: + the rail lies along the top (DR8)
+ *     every tier has every tool; a finger (not the width) changes the gestures (Canvas.tsx)
  * ```
  *
  * ## Keyboard (DR9)
@@ -98,15 +109,19 @@ export default function WhiteboardApp({ boardId }: { boardId: string }) {
 }
 
 function WhiteboardShell({ boardId }: { boardId: string }) {
-  const board = useBoard(boardId)
+  const vocabState = useVocabState()
+  const board = useBoard(boardId, vocabState.vocab)
   const boards = useBoards()
   const current = boards.boards.find(entry => entry._id === boardId) ?? null
   const { data, load, actions } = board
   const tier = useTier()
+  const coarse = useCoarsePointer()
   const reducedMotion = useReducedMotion()
   const flow = useReactFlow()
 
   const [tool, setToolState] = useState<Tool>('select')
+  // Touch only (Canvas.tsx): the next one-finger drag on the pane draws a selection box.
+  const [boxSelect, setBoxSelect] = useState(false)
   const [nodeState, setNodeState] = useState<TransientMap>({})
   const [edgeSelection, setEdgeSelection] = useState<ReadonlySet<string>>(
     () => new Set()
@@ -124,6 +139,8 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null)
   const [surface, setSurface] = useState<null | 'export' | 'backup'>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [vocabKind, setVocabKind] = useState<VocabKind | null>(null)
+  const closeVocab = useCallback(() => setVocabKind(null), [])
   const [pulse, setPulse] = useState(0)
   const [exportScope, setExportScope] = useState<'all' | 'selection'>('all')
   const [restoreFile, setRestoreFile] = useState<File | null>(null)
@@ -135,13 +152,15 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
 
   const readOnly = load.phase !== 'ready'
   const empty = load.phase === 'ready' && Object.keys(data.items).length === 0
-  const drawingAllowed = tier !== 'sm'
-
-  const setTool = useCallback(
-    (next: Tool) =>
-      setToolState(drawingAllowed || next === 'select' ? next : 'select'),
-    [drawingAllowed]
-  )
+  const setTool = useCallback((next: Tool) => {
+    setBoxSelect(false)
+    setToolState(next)
+  }, [])
+  const toggleBoxSelect = useCallback(() => {
+    setToolState('select')
+    setBoxSelect(on => !on)
+  }, [])
+  const endBoxSelect = useCallback(() => setBoxSelect(false), [])
 
   const selectOnly = useCallback((ids: string[]) => {
     setNodeState(prev => selectOnlyIn(prev, ids))
@@ -165,7 +184,10 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
         spec.form === 'shape' && spec.shape
           ? actions.addShape(spec.shape, topLeft)
           : actions.createItem(spec.form, topLeft)
-      selectOnly([id])
+      // Not selected: a selection opens the inspector (the bottom sheet below lg), and a new
+      // card goes straight into its own title editor instead. A click selects it, as with
+      // any other card. Whatever was selected before lets go, so no stale inspector lingers.
+      selectOnly([])
       setToolState('select')
       setEditingId(id)
     },
@@ -271,7 +293,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
     const onKeyDown = (event: KeyboardEvent) => {
       // A dialog owns the keyboard while it is open, Esc included (its own handler).
       const action = shortcutFor(event, {
-        modalOpen: Boolean(helpOpen || unhide || restoreFile),
+        modalOpen: Boolean(helpOpen || unhide || restoreFile || vocabKind),
       })
       if (!action) return
       switch (action.type) {
@@ -323,7 +345,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
             surfaceOpen: surface !== null,
             hasSelection: selection.nodes.length + selection.edges.length > 0,
           })
-          if (layer === 'tool') setToolState('select')
+          if (layer === 'tool') setTool('select')
           if (layer === 'surface') setSurface(null)
           if (layer === 'selection') clearSelection()
           return
@@ -362,6 +384,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
     surface,
     tool,
     unhide,
+    vocabKind,
   ])
 
   // An Undo toast takes itself away: its offer expires with the next edit anyway (useBoard
@@ -421,6 +444,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
       onSelect={selectOnly}
       onExportSelection={() => openExport('selection')}
       onUnhideFrame={(frame, readable) => setUnhide({ frame, readable })}
+      onManageVocab={setVocabKind}
       readOnly={readOnly}
     />
   )
@@ -451,272 +475,280 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
   )
 
   return (
-    <BoardUiContext.Provider value={ui}>
-      <div
-        className={cn(
-          'relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-panel border border-pp-line bg-[rgba(251,248,244,0.97)] shadow-panel backdrop-blur-md',
-          tier === 'lg' ? 'grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-1'
-        )}
-      >
-        <TopBar
-          onLeave={onLeave}
-          className="col-span-full"
-          pill={
-            <SavePill
-              load={load}
-              status={board.status}
-              rejected={Object.keys(board.errors).length}
-              onRetry={actions.retryAll}
-            />
-          }
-          saveControls={
-            <SaveControls
-              autoSave={board.autoSave}
-              onAutoSave={board.setAutoSave}
-              onSave={board.saveNow}
-              pending={board.status.pending}
-              disabled={readOnly}
-            />
-          }
-          hiddenCount={
-            // A board agents cannot read hides everything on it, so the chip says so rather
-            // than counting the cards that happen to carry their own switch (D32).
-            current && !current.includeInAi
-              ? Object.keys(data.items).length
-              : board.hiddenCount
-          }
-          boardHidden={current ? !current.includeInAi : false}
-          onHiddenClick={showHidden}
-          boardSwitcher={
-            <BoardSwitcher
-              boards={boards.boards}
-              currentId={boardId}
-              title={current?.title || 'Whiteboard'}
-              onCreate={async () => {
-                const made = await boards.create('New board').catch(() => null)
-                return made?._id ?? null
-              }}
-              onRename={next => boards.rename(boardId, next)}
-              onIncludeInAi={on => boards.setIncludeInAi(boardId, on)}
-              onLeave={onLeave}
-            />
-          }
-          backup={
-            <BackupMenu
-              boardId={boardId}
-              open={surface === 'backup'}
-              onToggle={open => setSurface(open ? 'backup' : null)}
-              onRestore={pickRestoreFile}
-              onMock={addMock}
-              mockDisabled={readOnly}
-              beforeDownload={() => board.queue.flush()}
-              heldWrites={board.status.holding ? board.status.pending : 0}
-            />
-          }
-          exportDisabled={readOnly || empty}
-          exportOpen={surface === 'export'}
-          onExport={() =>
-            surface === 'export' ? setSurface(null) : openExport('all')
-          }
-        />
-
-        <section
-          aria-label="Canvas"
-          className="relative col-start-1 row-start-2 min-h-0 min-w-0"
+    <VocabProvider value={vocabState}>
+      <BoardUiContext.Provider value={ui}>
+        <div
+          className={cn(
+            'relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-panel border border-pp-line bg-[rgba(251,248,244,0.97)] shadow-panel backdrop-blur-md',
+            tier === 'lg' ? 'grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-1'
+          )}
         >
-          {/* Before the canvas in the DOM so Tab reaches the tools first (DR9). */}
-          {drawingAllowed ? (
+          <TopBar
+            onLeave={onLeave}
+            className="col-span-full"
+            pill={
+              <SavePill
+                load={load}
+                status={board.status}
+                rejected={Object.keys(board.errors).length}
+                onRetry={actions.retryAll}
+              />
+            }
+            saveControls={
+              <SaveControls
+                autoSave={board.autoSave}
+                onAutoSave={board.setAutoSave}
+                onSave={board.saveNow}
+                pending={board.status.pending}
+                disabled={readOnly}
+              />
+            }
+            hiddenCount={
+              // A board agents cannot read hides everything on it, so the chip says so rather
+              // than counting the cards that happen to carry their own switch (D32).
+              current && !current.includeInAi
+                ? Object.keys(data.items).length
+                : board.hiddenCount
+            }
+            boardHidden={current ? !current.includeInAi : false}
+            onHiddenClick={showHidden}
+            boardSwitcher={
+              <BoardSwitcher
+                boards={boards.boards}
+                currentId={boardId}
+                title={current?.title || 'Whiteboard'}
+                onCreate={async () => {
+                  const made = await boards
+                    .create('New board')
+                    .catch(() => null)
+                  return made?._id ?? null
+                }}
+                onRename={next => boards.rename(boardId, next)}
+                onIncludeInAi={on => boards.setIncludeInAi(boardId, on)}
+                onLeave={onLeave}
+              />
+            }
+            backup={
+              <BackupMenu
+                boardId={boardId}
+                open={surface === 'backup'}
+                onToggle={open => setSurface(open ? 'backup' : null)}
+                onRestore={pickRestoreFile}
+                onMock={addMock}
+                mockDisabled={readOnly}
+                beforeDownload={() => board.queue.flush()}
+                heldWrites={board.status.holding ? board.status.pending : 0}
+              />
+            }
+            exportDisabled={readOnly || empty}
+            exportOpen={surface === 'export'}
+            onExport={() =>
+              surface === 'export' ? setSurface(null) : openExport('all')
+            }
+          />
+
+          <section
+            aria-label="Canvas"
+            className="relative col-start-1 row-start-2 min-h-0 min-w-0"
+          >
+            {/* Before the canvas in the DOM so Tab reaches the tools first (DR9). */}
             <ToolRail
               tool={tool}
               onTool={setTool}
               disabled={readOnly}
-              large={tier !== 'lg'}
+              large={tier !== 'lg' || coarse}
+              horizontal={tier === 'sm'}
+              boxSelect={
+                coarse
+                  ? { on: boxSelect, onToggle: toggleBoxSelect }
+                  : undefined
+              }
             />
-          ) : (
-            <p className="absolute left-3 top-3 z-10 flex items-center gap-2 rounded-full border border-pp-line bg-white/90 px-3 py-2 text-[12px] text-pp-muted">
-              <Pencil
-                aria-hidden
-                size={13}
-              />
-              Drawing needs a larger screen
-            </p>
-          )}
 
-          <Canvas
-            board={board}
-            tool={tool}
-            readOnly={readOnly}
-            tier={tier}
-            pulse={pulse}
-            nodeState={nodeState}
-            setNodeState={setNodeState}
-            edgeSelection={edgeSelection}
-            setEdgeSelection={setEdgeSelection}
-            onEditItem={setEditingId}
-            onEditEdge={setEditingEdgeId}
-            onCreate={create}
-            onErase={erase}
-          >
-            <ZoomControls />
-          </Canvas>
-
-          {tool === 'pen' && !readOnly ? (
-            <InkLayer
-              onStroke={(points, origin) => actions.addInk(points, origin)}
-            />
-          ) : null}
-
-          {empty ? (
-            <EmptyBoard
-              onText={() => createAtCentre('text')}
-              onFrame={() => createAtCentre('frame')}
-              onMock={addMock}
-              onRestore={pickRestoreFile}
-            />
-          ) : null}
-          {load.phase === 'error' ? (
-            <BoardLoadFailed
-              message={load.message}
-              onRetry={board.retryLoad}
-            />
-          ) : null}
-          {board.notice ? (
-            <div
-              role="status"
-              data-testid="wb-notice"
-              className="absolute bottom-3.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-pp-line bg-pp-panel-strong px-4 py-2 text-[12.5px] text-pp-text shadow-panel"
+            <Canvas
+              board={board}
+              tool={tool}
+              readOnly={readOnly}
+              coarse={coarse}
+              boxSelect={boxSelect}
+              onBoxSelectDone={endBoxSelect}
+              pulse={pulse}
+              nodeState={nodeState}
+              setNodeState={setNodeState}
+              edgeSelection={edgeSelection}
+              setEdgeSelection={setEdgeSelection}
+              onEditItem={setEditingId}
+              onEditEdge={setEditingEdgeId}
+              onCreate={create}
+              onErase={erase}
             >
-              {board.notice.text}
-              {board.notice.undo ? (
+              <ZoomControls />
+            </Canvas>
+
+            {tool === 'pen' && !readOnly ? (
+              <InkLayer
+                onStroke={(points, origin) => actions.addInk(points, origin)}
+              />
+            ) : null}
+
+            {empty ? (
+              <EmptyBoard
+                onText={() => createAtCentre('text')}
+                onFrame={() => createAtCentre('frame')}
+                onMock={addMock}
+                onRestore={pickRestoreFile}
+              />
+            ) : null}
+            {load.phase === 'error' ? (
+              <BoardLoadFailed
+                message={load.message}
+                onRetry={board.retryLoad}
+              />
+            ) : null}
+            {board.notice ? (
+              <div
+                role="status"
+                data-testid="wb-notice"
+                className="absolute bottom-3.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-pp-line bg-pp-panel-strong px-4 py-2 text-[12.5px] text-pp-text shadow-panel"
+              >
+                {board.notice.text}
+                {board.notice.undo ? (
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 font-semibold text-pp-text hover:text-pp-blue"
+                    onClick={board.notice.undo}
+                  >
+                    <Undo2
+                      aria-hidden
+                      size={13}
+                    />
+                    Undo
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 font-semibold text-pp-text hover:text-pp-blue"
-                  onClick={board.notice.undo}
+                  className="font-semibold text-pp-muted hover:text-pp-text"
+                  onClick={() => board.setNotice(null)}
                 >
-                  <Undo2
-                    aria-hidden
-                    size={13}
-                  />
-                  Undo
+                  Dismiss
                 </button>
-              ) : null}
-              <button
-                type="button"
-                className="font-semibold text-pp-muted hover:text-pp-text"
-                onClick={() => board.setNotice(null)}
-              >
-                Dismiss
-              </button>
+              </div>
+            ) : null}
+          </section>
+
+          {tier === 'lg' ? (
+            <div className="col-start-2 row-start-2 min-h-0 overflow-y-auto border-l border-pp-line bg-white/70">
+              {inspector}
+            </div>
+          ) : hasSelection ? (
+            <div
+              className="absolute inset-x-0 bottom-0 z-30 max-h-[60dvh] overflow-y-auto rounded-t-[1.4rem] border-t border-pp-line bg-pp-panel-strong pb-[env(safe-area-inset-bottom)] shadow-panel"
+              role="dialog"
+              aria-label="Inspector"
+            >
+              {inspector}
             </div>
           ) : null}
-        </section>
 
-        {tier === 'lg' ? (
-          <div className="col-start-2 row-start-2 min-h-0 overflow-y-auto border-l border-pp-line bg-white/70">
-            {inspector}
-          </div>
-        ) : hasSelection ? (
-          <div
-            className="absolute inset-x-0 bottom-0 z-30 max-h-[60dvh] overflow-y-auto rounded-t-[1.4rem] border-t border-pp-line bg-pp-panel-strong pb-[env(safe-area-inset-bottom)] shadow-panel"
-            role="dialog"
-            aria-label="Inspector"
-          >
-            {inspector}
-          </div>
-        ) : null}
+          {surface === 'export' ? (
+            <ExportSheet
+              key={exportScope}
+              board={board}
+              boardVisible={current?.includeInAi ?? true}
+              unsavedCount={unsavedCount}
+              selectionIds={selection.nodes}
+              initialScope={exportScope}
+              onClose={() => setSurface(null)}
+            />
+          ) : null}
+        </div>
 
-        {surface === 'export' ? (
-          <ExportSheet
-            key={exportScope}
-            board={board}
-            boardVisible={current?.includeInAi ?? true}
-            unsavedCount={unsavedCount}
-            selectionIds={selection.nodes}
-            initialScope={exportScope}
-            onClose={() => setSurface(null)}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          aria-hidden
+          tabIndex={-1}
+          onChange={event => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (file) setRestoreFile(file)
+          }}
+        />
+        {restoreFile ? (
+          <RestoreDialog
+            boardId={boardId}
+            file={restoreFile}
+            pendingSaves={board.status.pending}
+            onClose={() => setRestoreFile(null)}
+            onRestored={board.retryLoad}
           />
         ) : null}
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/json,.json"
-        className="hidden"
-        aria-hidden
-        tabIndex={-1}
-        onChange={event => {
-          const file = event.target.files?.[0]
-          event.target.value = ''
-          if (file) setRestoreFile(file)
-        }}
-      />
-      {restoreFile ? (
-        <RestoreDialog
-          boardId={boardId}
-          file={restoreFile}
-          pendingSaves={board.status.pending}
-          onClose={() => setRestoreFile(null)}
-          onRestored={board.retryLoad}
+        <ConfirmDialog
+          open={unhide !== null}
+          title={`Make "${unhide?.frame.title || 'Untitled frame'}" readable?`}
+          message={
+            <p>
+              {unhide?.readable} item{unhide?.readable === 1 ? '' : 's'} inside
+              become{unhide?.readable === 1 ? 's' : ''} agent-readable.
+            </p>
+          }
+          destructive={false}
+          secondaryLabel="Keep items private"
+          onSecondary={() => {
+            if (unhide)
+              actions.updateItem(
+                unhide.frame._id,
+                { includeInAi: true },
+                { delay: 0, keepChildrenPrivate: true }
+              )
+            setUnhide(null)
+          }}
+          confirmLabel="Make all readable"
+          onConfirm={() => {
+            if (unhide)
+              actions.updateItem(
+                unhide.frame._id,
+                { includeInAi: true },
+                { delay: 0 }
+              )
+            setUnhide(null)
+          }}
+          onCancel={() => setUnhide(null)}
         />
-      ) : null}
-      <ConfirmDialog
-        open={unhide !== null}
-        title={`Make "${unhide?.frame.title || 'Untitled frame'}" readable?`}
-        message={
-          <p>
-            {unhide?.readable} item{unhide?.readable === 1 ? '' : 's'} inside
-            become{unhide?.readable === 1 ? 's' : ''} agent-readable.
-          </p>
-        }
-        destructive={false}
-        secondaryLabel="Keep items private"
-        onSecondary={() => {
-          if (unhide)
-            actions.updateItem(
-              unhide.frame._id,
-              { includeInAi: true },
-              { delay: 0, keepChildrenPrivate: true }
-            )
-          setUnhide(null)
-        }}
-        confirmLabel="Make all readable"
-        onConfirm={() => {
-          if (unhide)
-            actions.updateItem(
-              unhide.frame._id,
-              { includeInAi: true },
-              { delay: 0 }
-            )
-          setUnhide(null)
-        }}
-        onCancel={() => setUnhide(null)}
-      />
 
-      <ConfirmDialog
-        open={leaving !== null}
-        title="Leave with unsaved changes?"
-        message={
-          <p>
-            {unsavedCount === 1
-              ? '1 change has not been written to the server'
-              : `${unsavedCount} changes have not been written to the server`}
-            . Leaving loses them. Save first, or download a backup.
-          </p>
-        }
-        confirmLabel="Leave without saving"
-        onConfirm={() => {
-          const go = leaving?.go
-          setLeaving(null)
-          go?.()
-        }}
-        onCancel={() => setLeaving(null)}
-      />
+        <ConfirmDialog
+          open={leaving !== null}
+          title="Leave with unsaved changes?"
+          message={
+            <p>
+              {unsavedCount === 1
+                ? '1 change has not been written to the server'
+                : `${unsavedCount} changes have not been written to the server`}
+              . Leaving loses them. Save first, or download a backup.
+            </p>
+          }
+          confirmLabel="Leave without saving"
+          onConfirm={() => {
+            const go = leaving?.go
+            setLeaving(null)
+            go?.()
+          }}
+          onCancel={() => setLeaving(null)}
+        />
 
-      <ShortcutsHelp
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
-      />
-    </BoardUiContext.Provider>
+        <ShortcutsHelp
+          open={helpOpen}
+          onClose={() => setHelpOpen(false)}
+        />
+        <VocabDialog
+          // A fresh dialog per open, on the tab it was opened from.
+          key={vocabKind ?? 'closed'}
+          kind={vocabKind}
+          onClose={closeVocab}
+        />
+      </BoardUiContext.Provider>
+    </VocabProvider>
   )
 }

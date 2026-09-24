@@ -289,12 +289,12 @@ Write logic lives inside these handlers today. Each extraction keeps the admin r
 - `POST /api/mcp`: the one server, `p4_` only. GET and DELETE return 405, as today. `maxDuration = 300` for the background `illustrate_post` run, which already has its own budget stop at 85%.
 - `POST /api/whiteboard/mcp`: an alias for one release. It serves the three old tool names (`get_overview`, `search_context`, `get_item`) bound to the same functions, and accepts `wbt_` or a `p4_` token with `read`, so existing `claude mcp add` configs keep working.
 - `GET /api/whiteboard/context.md`: kept. It accepts a `p4_` token with `read`, and `wbt_` during the alias release. It is not removed.
-- `/admin/agents` (new page) plus `api/admin/agents/tokens` (GET, POST, DELETE by id, `requireOwner`):
+- `/admin/agents` (new page) plus `api/admin/agents/tokens` (GET, POST; PATCH and DELETE by id, `requireOwner`):
   - create a token with a name and scope checkboxes; `publish` and `pii` are off by default
   - show the token once
   - connect instructions for Claude Code and Codex with `PORT4LIO_MCP_TOKEN`, keeping the single-quoted header and the "user scope, never project scope" rationale from `AgentsPopover.tsx`
-  - token list with scopes and last-used time; revoke
-  - the legacy `wbt_` tokens (revoke only)
+  - token list with scopes and last-used time; change an unrevoked token's scopes (D11); revoke; delete once revoked (D11)
+  - the legacy `wbt_` tokens (revoke, then delete)
   - the recent AgentAction feed, refusals and `find_order` lookups included
 - The whiteboard's Agents popover becomes a link to `/admin/agents`.
 
@@ -423,6 +423,7 @@ Before any code, write `docs/designs/mcp/first-week-asks.md`: the first 10 thing
   - D8: a publishing (cron) illustration run locks agent writes out
   - D9: `ccaf_update` is a conditional write
   - D10: the /review follow-ups (batch refusal, live re-checks at save time, a fenced lease, conditional publish, the settings stale-tab guard, profile URL rules, briefing top posts and funnel days)
+  - D11: change a token's scopes in place; delete a revoked token
 - **Reviewer Concerns below (R2-1 to R2-21), all resolved:**
   - R2-1 → R1
   - R2-2 → R6
