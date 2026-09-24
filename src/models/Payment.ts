@@ -48,6 +48,13 @@ export type PaymentDocument = {
   transferDescription?: string
   reference?: string
   paidAt?: Date | null
+  /**
+   * When the result email was handed to the mail server, stamped by the fulfilment path after
+   * `deliver` succeeds (acceptance.md D2). `null` on a paid order means it was not sent - or
+   * that the order was paid before this field existed, which `find_order` reports as "not
+   * recorded". Never the address itself.
+   */
+  resultEmailedAt?: Date | null
   createdAt: Date
   /**
    * When the PayOS payment link stops being payable. Drives the countdown in the checkout
@@ -95,6 +102,7 @@ const paymentSchema = new Schema(
     // Filled in on fulfilment.
     reference: { type: String },
     paidAt: { type: Date, default: null },
+    resultEmailedAt: { type: Date, default: null },
 
     linkExpiresAt: { type: Date, required: true },
     createdAt: { type: Date, default: Date.now },
@@ -116,6 +124,12 @@ const paymentSchema = new Schema(
  * pay?" six months later is how a refund dispute becomes unresolvable.
  */
 paymentSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
+
+/**
+ * Paid orders by date, for the briefing's orders and revenue (mcp-plan.md R11). Paid rows are
+ * kept forever, so without this "paid between two dates" scans every payment ever made.
+ */
+paymentSchema.index({ status: 1, paidAt: -1 })
 
 /**
  * Index builds report failures through an event rather than a rejected promise, so without

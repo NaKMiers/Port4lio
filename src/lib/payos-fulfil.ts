@@ -17,6 +17,8 @@ import { PaymentModel, type PaymentDocument } from '@/models/Payment'
  *                    Attempt.paid = true, expireAt = null
  *                                 ▼
  *                          send result email
+ *                                 ▼  sent
+ *                Payment.resultEmailedAt = now     (for find_order; a failed stamp only logs)
  * ```
  */
 
@@ -169,6 +171,22 @@ export async function fulfilMbtiPayment(
         error instanceof Error
           ? error.message
           : 'Unknown error sending the result email'
+    }
+
+  // D2: record that the email went out, so a support lookup (`find_order`) can answer "did
+  // they get it?" without reading an address. Guarded on its own: the email HAS gone, so a
+  // failed stamp is a log line, never a delivery failure and never an exception.
+  if (!failure)
+    try {
+      await PaymentModel.findOneAndUpdate(
+        { orderCode, status: 'paid' },
+        { $set: { resultEmailedAt: new Date() } }
+      )
+    } catch (error) {
+      console.error(
+        `[PayOS Fulfil] Could not record the result email for ${orderCode}:`,
+        error
+      )
     }
 
   if (failure) {

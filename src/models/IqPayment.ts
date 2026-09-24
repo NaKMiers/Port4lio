@@ -65,6 +65,13 @@ export type IqPaymentDocument = {
 
   reference?: string
   paidAt?: Date | null
+  /**
+   * When the result email was handed to the mail server, stamped by the fulfilment path after
+   * `deliver` succeeds (acceptance.md D2). `null` on a paid order means it was not sent - or
+   * that the order was paid before this field existed, which `find_order` reports as "not
+   * recorded". Never the address itself.
+   */
+  resultEmailedAt?: Date | null
   createdAt: Date
   /**
    * When the PayOS link stops being payable. Drives the countdown in the checkout panel.
@@ -109,6 +116,7 @@ const iqPaymentSchema = new Schema(
 
     reference: { type: String },
     paidAt: { type: Date, default: null },
+    resultEmailedAt: { type: Date, default: null },
 
     linkExpiresAt: { type: Date, required: true },
     createdAt: { type: Date, default: Date.now },
@@ -130,6 +138,12 @@ const iqPaymentSchema = new Schema(
  * "did this person pay?" six months later is how a refund dispute becomes unresolvable.
  */
 iqPaymentSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
+
+/**
+ * Paid orders by date, for the briefing's orders and revenue (mcp-plan.md R11). Paid rows are
+ * kept forever, so without this "paid between two dates" scans every payment ever made.
+ */
+iqPaymentSchema.index({ status: 1, paidAt: -1 })
 
 iqPaymentSchema.on('index', (error: unknown) => {
   if (error)

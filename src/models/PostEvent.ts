@@ -106,6 +106,13 @@ const postEventSchema = new Schema<PostEventDocument>(
 /** The admin aggregation: every event for one slug, newest first. */
 postEventSchema.index({ slug: 1, kind: 1, createdAt: -1 })
 
+/**
+ * The briefing's window query: every view (or share) across all posts between two dates
+ * (mcp-plan.md R11). The index above leads with `slug`, so that question scanned the whole
+ * collection - 180 days of one document per reader per post.
+ */
+postEventSchema.index({ kind: 1, createdAt: -1 })
+
 postEventSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 })
 
 /**

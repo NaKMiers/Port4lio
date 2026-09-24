@@ -39,4 +39,34 @@ export const writePostPrompt: PromptDefinition = {
   },
 }
 
-export const PROMPTS: PromptDefinition[] = [writePostPrompt]
+export const weeklyBriefingPrompt: PromptDefinition = {
+  name: 'weekly-briefing',
+  title: 'How did the week go?',
+  description:
+    'Call get_briefing and write a short review of the period against the one before: blog, subscribers, orders and revenue, the test funnel.',
+  scopes: ['read'],
+  args: z.object({ period: z.string().optional() }),
+  render(args, tools) {
+    const period =
+      args.period === 'month' || args.period === 'quarter'
+        ? args.period
+        : 'week'
+    return [
+      `Call get_briefing with period "${period}". Then write the owner a short review of this ${period} against the one before, in plain sentences:`,
+      '- what moved, by how much, and the one or two changes that matter most;',
+      '- the top posts, and whether new subscribers or paid orders followed them;',
+      '- conversion (paid divided by paywall-seen) per product, only where the section is included.',
+      'Report only numbers get_briefing returned. If a section is left out, give its reason in one line instead of estimating it.',
+      tools.has('whiteboard_add_item')
+        ? 'Then record it: whiteboard_add_item a dated note card titled "Briefing <date>" with the three most important numbers, and whiteboard_link it to any goal card whose numbers moved (whiteboard_search to find them).'
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n')
+  },
+}
+
+export const PROMPTS: PromptDefinition[] = [
+  writePostPrompt,
+  weeklyBriefingPrompt,
+]

@@ -17,6 +17,7 @@ import { LEGACY_SCOPE, type TokenScope } from '@/lib/mcp/scopes'
 import type { AgentContext } from '@/lib/mcp/token'
 import { BLOG_TOOLS } from '@/lib/mcp/tools/blog'
 import { getMeTool, getProfileTool } from '@/lib/mcp/tools/me'
+import { METRICS_TOOLS } from '@/lib/mcp/tools/metrics'
 import { PROMPTS } from '@/lib/mcp/tools/prompts'
 import {
   ALIAS_WHITEBOARD_NAMES,
@@ -156,6 +157,7 @@ export const SITE_SERVER: ServerSpec = {
     getMeTool,
     getProfileTool,
     ...BLOG_TOOLS,
+    ...METRICS_TOOLS,
     ...whiteboardReadTools(SITE_WHITEBOARD_NAMES, ['read']),
   ]),
   prompts: compilePrompts(PROMPTS),

@@ -14,6 +14,8 @@ import { IqPaymentModel, type IqPaymentDocument } from '@/models/IqPayment'
  *              IqAttempt.paid = true, email, certificateId, certificateName
  *                                 ▼
  *                          send result email
+ *                                 ▼  sent
+ *              IqPayment.resultEmailedAt = now     (for find_order; a failed stamp only logs)
  * ```
  *
  * A deliberate mirror of `payos-fulfil.ts`, step for step, because both products now sell
@@ -204,6 +206,21 @@ export async function fulfilIqPayment(
         error instanceof Error
           ? error.message
           : 'Unknown error sending the result email'
+    }
+
+  // D2: record that the email went out, for `find_order`. Guarded on its own, as on MBTI: the
+  // email HAS gone, so a failed stamp is a log line and never a delivery failure.
+  if (!failure)
+    try {
+      await IqPaymentModel.findOneAndUpdate(
+        { orderCode, status: 'paid' },
+        { $set: { resultEmailedAt: new Date() } }
+      )
+    } catch (error) {
+      console.error(
+        `[IQ Fulfil] Could not record the result email for ${orderCode}:`,
+        error
+      )
     }
 
   if (failure) {

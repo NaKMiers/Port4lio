@@ -138,6 +138,7 @@ const contextOf = async (token: string) => {
 
 /** The registry's read tools, grown phase by phase (acceptance.md "Tool coverage"). */
 const READ_TOOLS = [
+  'get_briefing',
   'get_me',
   'get_post',
   'get_profile',

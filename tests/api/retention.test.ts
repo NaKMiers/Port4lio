@@ -9,6 +9,8 @@ import {
 import { ATTEMPT_TTL_DAYS, AttemptModel } from '@/models/Attempt'
 import { IqAttemptModel } from '@/models/IqAttempt'
 import { IqPaymentModel } from '@/models/IqPayment'
+import { PaymentModel } from '@/models/Payment'
+import { PostEventModel } from '@/models/PostEvent'
 import { TestEventModel, testEventExpiryFrom } from '@/models/TestEvent'
 
 import { builtIndexes, startMongo, stopMongo } from './setup-mongo'
@@ -174,6 +176,39 @@ describe('AgentAction (the MCP audit log)', () => {
     expect(claim?.partialFilterExpression).toEqual({
       clientRef: { $type: 'string' },
     })
+  })
+})
+
+describe('the briefing date indexes (mcp-plan.md R11)', () => {
+  function hasIndex(
+    indexes: Record<string, unknown>[],
+    wanted: Record<string, number>
+  ) {
+    return indexes.some(index => {
+      const key = index.key as Record<string, number> | undefined
+      return JSON.stringify(key) === JSON.stringify(wanted)
+    })
+  }
+
+  it('PostEvent builds { kind, createdAt } for window queries across all posts', async () => {
+    expect(
+      hasIndex(await builtIndexes(PostEventModel as never), {
+        kind: 1,
+        createdAt: -1,
+      }),
+      'PostEvent is missing the { kind: 1, createdAt: -1 } index - the briefing scans 180 days'
+    ).toBe(true)
+  })
+
+  it('Payment and IqPayment build { status, paidAt } for paid-by-date queries', async () => {
+    for (const [name, model] of [
+      ['Payment', PaymentModel],
+      ['IqPayment', IqPaymentModel],
+    ] as const)
+      expect(
+        hasIndex(await builtIndexes(model as never), { status: 1, paidAt: -1 }),
+        `${name} is missing the { status: 1, paidAt: -1 } index - paid rows are kept forever`
+      ).toBe(true)
   })
 })
 
