@@ -1,10 +1,9 @@
-import mongoose from 'mongoose'
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { jsonError } from '@/lib/api-response'
+import { jsonError, serviceErrorResponse } from '@/lib/api-response'
 import { IMAGE_MODEL_OPTIONS } from '@/lib/blog/generation-fields'
-import { drawImageAsset } from '@/lib/blog/image-asset'
 import { ImageGenError } from '@/lib/blog/image-gen'
+import { generateImageUrl } from '@/lib/blog/image-service'
 import { connectDatabase } from '@/lib/mongodb'
 import {
   BLOG_GENERATE_IMAGE_LIMIT,
@@ -13,7 +12,6 @@ import {
 } from '@/lib/rate-limit'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
-import { PostModel } from '@/models/Post'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,11 +37,9 @@ const ALLOWED_MODELS = new Set<string>(
  *   { model }                         ← IMAGE_MODEL_OPTIONS only, never a free-text model id
  *            │
  *            ▼
- *   requireOwner · rate limit · load post (status only)
+ *   requireOwner · rate limit · input checks
  *            │
- *   generateImage(prompt, model)  ──▶ base64 bytes
- *            │
- *   uploadToCloudinary            ──▶ a res.cloudinary.com URL
+ *   image-service.generateImageUrl   post exists, not deleted ──▶ Gemini ──▶ Cloudinary
  *            │
  *            ▼
  *   { url, model }                    NOT written to the post - see below
@@ -64,7 +60,8 @@ const ALLOWED_MODELS = new Set<string>(
  * A generated image is the same kind of value by the same door, so it gets the same treatment:
  * the client patches local state with the URL this route returns, and Save is what commits it.
  * Writing it here as a side effect would make Generate the one field in the editor that saves
- * itself, silently, the moment the button is pressed.
+ * itself, silently, the moment the button is pressed. (The site MCP's `generate_image` has an
+ * explicit attach mode for that instead - `patchImageIntoPost` in the same service.)
  */
 export async function POST(
   request: NextRequest,
@@ -117,28 +114,18 @@ export async function POST(
 
   try {
     const { id } = await params
-    if (!mongoose.Types.ObjectId.isValid(id))
-      return jsonError('Post not found.', 404)
-
-    const post = await PostModel.findById(id).select('slug status')
-    if (!post) return jsonError('Post not found.', 404)
-
-    // Same refusal `image-prompt/route.ts` makes on a deleted target - a soft-deleted post is
-    // one the author has already thrown away, so spending a model call on it buys a field
-    // nothing will ever render.
-    if (post.status === 'deleted')
-      return jsonError(
-        'That post is deleted. Restore it before generating a cover.',
-        409
-      )
-
-    const drawn = await drawImageAsset({
+    const result = await generateImageUrl({
+      postId: id,
       prompt,
       model,
-      name: `${post.slug}-cover`,
+      name: 'cover',
     })
+    if (!result.ok) return serviceErrorResponse(result)
 
-    return NextResponse.json({ url: drawn.url, model: drawn.model })
+    return NextResponse.json({
+      url: result.value.url,
+      model: result.value.model,
+    })
   } catch (error) {
     if (error instanceof ImageGenError)
       return jsonError(error.message, error.status === 429 ? 429 : 502)

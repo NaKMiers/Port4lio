@@ -136,8 +136,15 @@ const contextOf = async (token: string) => {
   }
 }
 
+/** The registry's read tools, grown phase by phase (acceptance.md "Tool coverage"). */
 const READ_TOOLS = [
+  'get_me',
+  'get_post',
   'get_profile',
+  'get_writing_brief',
+  'lint_draft',
+  'list_posts',
+  'list_taxonomy',
   'whiteboard_get_item',
   'whiteboard_overview',
   'whiteboard_search',

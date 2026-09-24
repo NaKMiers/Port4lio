@@ -122,8 +122,27 @@ export type PostDocument = {
   publishedAt: Date | null
   /** NOT `updatedAt`. Bumped only on real content change. */
   contentUpdatedAt: Date
+  /**
+   * The background image run's lease and status (mcp-plan.md R2, R3). Absent until a run
+   * starts; absent reads as idle. See `lib/blog/illustrate-run.ts`.
+   */
+  illustration?: PostIllustration
   createdAt: Date
   updatedAt: Date
+}
+
+export type IllustrationState = 'idle' | 'running' | 'failed'
+
+export type PostIllustration = {
+  state: IllustrationState
+  /** A run holding the lease past this instant was killed; the next start takes over. */
+  leaseUntil: Date | null
+  /** Images the run still had to draw when it last reported. */
+  remaining: number
+  /** The last failure inside a run, in words. Never only in a log (R2). */
+  lastError: string | null
+  startedAt: Date | null
+  finishedAt: Date | null
 }
 
 const postSchema = new Schema<PostDocument>(
@@ -264,6 +283,30 @@ const postSchema = new Schema<PostDocument>(
     },
     publishedAt: { type: Date, default: null },
     contentUpdatedAt: { type: Date, default: Date.now },
+    /*
+      `default: undefined`, so a post that has never been illustrated carries no subdocument
+      and every existing read, test and editor payload is unchanged. The lease lives beside
+      the status on purpose (R3): "is a run live" and "what did the last run say" are one
+      atomic read for `get_post` and one atomic claim for `illustrate_post`.
+    */
+    illustration: {
+      type: new Schema(
+        {
+          state: {
+            type: String,
+            enum: ['idle', 'running', 'failed'],
+            default: 'idle',
+          },
+          leaseUntil: { type: Date, default: null },
+          remaining: { type: Number, default: 0 },
+          lastError: { type: String, default: null, maxlength: 1000 },
+          startedAt: { type: Date, default: null },
+          finishedAt: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
   },
   {
     collection: 'posts',

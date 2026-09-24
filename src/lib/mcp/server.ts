@@ -15,7 +15,9 @@ import {
 } from '@/lib/mcp/run-tool'
 import { LEGACY_SCOPE, type TokenScope } from '@/lib/mcp/scopes'
 import type { AgentContext } from '@/lib/mcp/token'
-import { getProfileTool } from '@/lib/mcp/tools/me'
+import { BLOG_TOOLS } from '@/lib/mcp/tools/blog'
+import { getMeTool, getProfileTool } from '@/lib/mcp/tools/me'
+import { PROMPTS } from '@/lib/mcp/tools/prompts'
 import {
   ALIAS_WHITEBOARD_NAMES,
   SITE_WHITEBOARD_NAMES,
@@ -151,15 +153,21 @@ export const SITE_SERVER: ServerSpec = {
   name: 'port4lio',
   version: '2.0.0',
   tools: compileTools([
+    getMeTool,
     getProfileTool,
+    ...BLOG_TOOLS,
     ...whiteboardReadTools(SITE_WHITEBOARD_NAMES, ['read']),
   ]),
-  prompts: compilePrompts([]),
+  prompts: compilePrompts(PROMPTS),
   instructions: tools =>
     [
       "The owner's own site, Port4lio: portfolio profile and CV, blog, metrics, a private whiteboard and a certificate study tracker.",
       'Your tool list is exactly what this token allows; a tool you do not see is not available to you.',
       'Errors come back as tool results that say how to fix the call.',
+      tools.has('get_me') ? 'For "who am I", call get_me first.' : '',
+      tools.has('create_draft')
+        ? 'To write a post, read get_writing_brief (or use the write-post prompt) and follow its loop; drafts never publish themselves.'
+        : '',
       tools.has('whiteboard_overview')
         ? 'For the whiteboard, start with whiteboard_overview, then whiteboard_search, then whiteboard_get_item. Cite item ids.'
         : '',

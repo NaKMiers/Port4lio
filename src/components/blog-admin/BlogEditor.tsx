@@ -27,6 +27,7 @@ import Section from '@/components/settings/Section'
 import { SectionOpenProvider } from '@/components/settings/SectionOpenContext'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoading from '@/components/settings/SettingLoading'
+import StaleSaveBanner from '@/components/blog-admin/StaleSaveBanner'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -162,6 +163,7 @@ type EditorPost = {
   language: 'vi' | 'en'
   status: 'draft' | 'published' | 'archived' | 'deleted'
   publishedAt: string | null
+  updatedAt?: string
 }
 
 /**
@@ -291,6 +293,17 @@ export default function BlogEditor({ id }: { id: string }) {
    */
   const [dirty, setDirty] = useState(false)
   /**
+   * The server refused Save because the post changed after this tab loaded it (R9).
+   *
+   * `baseUpdatedAt` is the `updatedAt` this tab last knew the server had: set on load, moved
+   * forward by every save this tab makes, and re-read after the two writes that bump it
+   * behind the editor's back (a prompt rewrite, an overwrite). Save sends it; a PATCH that
+   * finds the post newer answers 409 `stale` instead of writing an old copy over an agent's
+   * edit. A ref, not state: it never renders, and a save must read the latest value.
+   */
+  const [stale, setStale] = useState(false)
+  const baseUpdatedAt = useRef<string | null>(null)
+  /**
    * The series dropdown's options, fetched rather than imported.
    *
    * It used to be `POST_SERIES.map(...)` at module scope, which worked while the list was a
@@ -395,11 +408,26 @@ export default function BlogEditor({ id }: { id: string }) {
       }
       const data = (await res.json()) as { post?: EditorPost; error?: string }
       if (!res.ok) throw new Error(data.error ?? 'Could not load the post')
-      if (data.post) setPost(data.post)
+      if (data.post) {
+        setPost(data.post)
+        baseUpdatedAt.current = data.post.updatedAt ?? null
+      }
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : 'Could not load the post'
       )
+    }
+  }, [id])
+
+  /** Re-read only the server's `updatedAt`, after a write this tab did not make through `flush`. */
+  const refreshBase = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/blog/${id}`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = (await res.json()) as { post?: { updatedAt?: string } }
+      baseUpdatedAt.current = data.post?.updatedAt ?? baseUpdatedAt.current
+    } catch {
+      // The next Save then reports stale, which is the safe direction to be wrong in.
     }
   }, [id])
 
@@ -475,7 +503,7 @@ export default function BlogEditor({ id }: { id: string }) {
    * author was told a placeholder had vanished and never learned the save had failed.
    */
   const flush = useCallback(
-    async (next: EditorPost): Promise<boolean> => {
+    async (next: EditorPost, overwrite = false): Promise<boolean> => {
       // Whatever the debounce below was about to fetch, this is about to fetch too, from
       // definitely-current text - so the pending one is now wasted work, not a second answer.
       if (previewTimer.current) {
@@ -515,10 +543,25 @@ export default function BlogEditor({ id }: { id: string }) {
             tags: next.tags,
             relatedSlugs: next.relatedSlugs,
             language: next.language,
+            // R9. Left off on Overwrite anyway, which is the whole difference.
+            ...(!overwrite && baseUpdatedAt.current
+              ? { baseUpdatedAt: baseUpdatedAt.current }
+              : {}),
           }),
         })
-        const data = (await res.json()) as { error?: string }
+        const data = (await res.json()) as {
+          error?: string
+          code?: string
+          updatedAt?: string
+        }
+        if (res.status === 409 && data.code === 'stale') {
+          setStale(true)
+          return false
+        }
         if (!res.ok) throw new Error(data.error ?? 'Save failed')
+        setStale(false)
+        if (data.updatedAt) baseUpdatedAt.current = data.updatedAt
+        else await refreshBase()
         setSavedAt(new Date())
         setDirty(false)
 
@@ -534,7 +577,7 @@ export default function BlogEditor({ id }: { id: string }) {
         setSaving(false)
       }
     },
-    [id, refreshPreview]
+    [id, refreshPreview, refreshBase]
   )
 
   /**
@@ -744,6 +787,8 @@ export default function BlogEditor({ id }: { id: string }) {
         throw new Error(data.error ?? 'Could not write a prompt')
 
       const prompt = data.prompt
+      // The route saved the prompt, which moved the post's updatedAt past this tab's base.
+      await refreshBase()
       setPost(current => {
         if (!current) return current
         if (!key) return { ...current, coverImagePrompt: prompt }
@@ -980,6 +1025,20 @@ export default function BlogEditor({ id }: { id: string }) {
         />
 
         <SettingErrorBanner message={error} />
+        {stale ? (
+          <StaleSaveBanner
+            busy={saving}
+            onReload={() => {
+              setStale(false)
+              setDirty(false)
+              void load()
+            }}
+            onOverwrite={() => {
+              setStale(false)
+              if (post) void flush(post, true)
+            }}
+          />
+        ) : null}
 
         <SectionOpenProvider>
           {/* The rail track is a variable so `RailResizeHandle` can drive it without this

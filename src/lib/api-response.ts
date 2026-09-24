@@ -10,3 +10,19 @@ import { NextResponse } from 'next/server'
 export function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status })
 }
+
+/**
+ * A service's refusal as the route's JSON error. `extra` rides beside `error` when a route
+ * has always sent more than the message (a count the client shows, a conflict code).
+ */
+export function serviceErrorResponse(failure: {
+  status: number
+  error: string
+  extra?: Record<string, unknown>
+}) {
+  if (!failure.extra) return jsonError(failure.error, failure.status)
+  return NextResponse.json(
+    { error: failure.error, ...failure.extra },
+    { status: failure.status }
+  )
+}
