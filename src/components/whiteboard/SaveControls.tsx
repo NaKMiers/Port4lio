@@ -32,7 +32,6 @@ function SaveControls({
   onSave,
   pending,
   disabled,
-  compact,
   className,
 }: {
   autoSave: boolean
@@ -42,18 +41,16 @@ function SaveControls({
   pending: number
   /** The board is not ready (DR4): nothing to save, nothing to set. */
   disabled: boolean
-  /** Below md: the label goes, the switch and the button stay. */
-  compact: boolean
   className?: string
 }) {
   return (
-    <div className={cn('flex shrink-0 items-center gap-2', className)}>
+    <div
+      className={cn('flex shrink-0 items-center gap-1.5 sm:gap-2', className)}
+    >
       <span
         id="wb-autosave-label"
-        className={cn(
-          'font-display text-[10.5px] font-semibold uppercase tracking-[0.13em] text-pp-muted',
-          compact && 'sr-only'
-        )}
+        // Still in the DOM below xl: it names the switch (`aria-labelledby`).
+        className="sr-only font-display text-[10.5px] font-semibold uppercase tracking-[0.13em] text-pp-muted xl:not-sr-only"
       >
         Auto-save
       </span>
@@ -70,13 +67,16 @@ function SaveControls({
           disabled={disabled || pending === 0}
           title="Save now (Ctrl/Cmd+S)"
           data-testid="wb-save-now"
-          className="inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-pp-line bg-white/85 px-3 text-[12px] font-semibold text-pp-text transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Save${pending > 0 ? ` ${pending}` : ''}`}
+          className="inline-flex min-h-[32px] items-center gap-1.5 whitespace-nowrap rounded-full border border-pp-line bg-white/85 px-3 text-[12px] font-semibold text-pp-text transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Save
             aria-hidden
             size={14}
           />
-          Save{pending > 0 ? ` ${pending}` : ''}
+          {/* Icon and count only on a phone (TopBar's second row). */}
+          <span className="hidden md:inline">Save</span>
+          {pending > 0 ? <span>{pending}</span> : null}
         </button>
       )}
     </div>

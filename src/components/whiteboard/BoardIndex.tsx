@@ -1,18 +1,13 @@
 'use client'
 
-import { EyeOff, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { EyeOff, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
 import ToggleSwitch from '@/components/blog-admin/ToggleSwitch'
 import Spinner from '@/components/settings/Spinner'
-import {
-  inputCls,
-  primaryBtnCls,
-  secondaryBtnCls,
-} from '@/components/settings/settings-utils'
+import { inputCls } from '@/components/settings/settings-utils'
 import { useBoards } from '@/components/whiteboard/useBoards'
 import type { ClientBoard } from '@/lib/whiteboard/data'
 import { cn } from '@/lib/utils'
@@ -21,20 +16,30 @@ import { cn } from '@/lib/utils'
  * `/admin/whiteboard` - the boards (D32).
  *
  * ```
- *   ┌ 2026 planning ──────────┐ ┌ Scratch ────────────────┐ ┌ + New board ┐
- *   │ 24 items                │ │ 3 items       EyeOff    │ └─────────────┘
- *   │ Agents can read  [ON ]  │ │ Agents can read  [off]  │
- *   │ rename in place    Trash│ │                    Trash│
- *   └─────────────────────────┘ └─────────────────────────┘
+ *   ┌ 2026 planning ──────────────┐ ┌ Scratch ────────────────────┐ ┌ + New board ┐
+ *   │ 24 items                    │ │ 3 items  EyeOff hidden      │ └─────────────┘
+ *   │ ┌ Agents can read [ON ] ┐ ⌫ │ │ ┌ Agents can read [off] ┐ ⌫ │
+ *   └─────────────────────────────┘ └─────────────────────────────┘
+ *     the whole card opens the board; the name, the switch and the trash sit above that link
  * ```
  *
- * ## Why the AI switch and the delete are here and not in the canvas
+ * "New board" stays here and adds a card with its name selected, so the first thing typed
+ * names it - the canvas is one click away on the card, not a navigation forced on the owner.
  *
- * Both are about a board rather than about anything on it, and both are rare and
- * consequential - "nothing on this board reaches an agent" and "all of this is gone". The
- * canvas is where fifty small reversible edits a minute happen; putting either of these in
- * the top bar next to them makes a slip cheap. The switcher says which boards are hidden so
- * the state is never invisible, but changing it is a trip to this page.
+ * ## Why the card is a stretched link and not an `<a>` round everything
+ *
+ * The card holds an input, a switch and a button, and interactive content inside an `<a>` is
+ * invalid HTML: browsers and screen readers disagree about which one a click or Enter means.
+ * So the link is an empty, absolutely positioned layer over the card, named for the board,
+ * and each control is lifted above it with `relative z-10`. A click on the count or on the
+ * card's padding opens the board; a click on a control only works the control.
+ *
+ * ## Why the delete is here and not in the canvas
+ *
+ * It is about a board rather than about anything on it, and it is rare and final. The canvas
+ * is where fifty small reversible edits a minute happen; putting "all of this is gone" in the
+ * top bar next to them makes a slip cheap. The agent switch and the name are in both places
+ * (the canvas has them in the switcher): they are one click to put back.
  *
  * A board delete is the one destructive act on the whiteboard that undo cannot answer for -
  * the history lives in the canvas and dies with it - so this is also the one place that
@@ -43,8 +48,9 @@ import { cn } from '@/lib/utils'
 export default function BoardIndex() {
   const { boards, loading, error, create, rename, setIncludeInAi, remove } =
     useBoards()
-  const router = useRouter()
   const [creating, setCreating] = useState(false)
+  // The card just made, whose name field takes focus so the first keystrokes name it.
+  const [fresh, setFresh] = useState<string | null>(null)
   const [doomed, setDoomed] = useState<ClientBoard | null>(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
@@ -54,9 +60,10 @@ export default function BoardIndex() {
     setFailed(null)
     try {
       const board = await create('New board')
-      router.push(`/admin/whiteboard/${board._id}`)
+      setFresh(board._id)
     } catch (e) {
       setFailed(e instanceof Error ? e.message : 'Could not create the board.')
+    } finally {
       setCreating(false)
     }
   }
@@ -99,6 +106,7 @@ export default function BoardIndex() {
               onIncludeInAi={on => setIncludeInAi(board._id, on)}
               onDelete={() => setDoomed(board)}
               soleBoard={boards.length === 1}
+              autoFocus={board._id === fresh}
             />
           ))}
 
@@ -153,25 +161,41 @@ function BoardCard({
   onIncludeInAi,
   onDelete,
   soleBoard,
+  autoFocus,
 }: {
   board: ClientBoard
   onRename: (title: string) => Promise<void>
   onIncludeInAi: (on: boolean) => Promise<void>
   onDelete: () => void
   soleBoard: boolean
+  autoFocus: boolean
 }) {
   const [title, setTitle] = useState(board.title)
   const [saving, setSaving] = useState(false)
 
   return (
-    <div className="flex flex-col rounded-panel border border-pp-line bg-pp-panel p-6 shadow-panel backdrop-blur-md">
-      <div className="flex items-start justify-between gap-3">
+    <div className="group relative flex flex-col rounded-panel border border-pp-line bg-pp-panel p-6 shadow-panel backdrop-blur-md transition focus-within:border-pp-text/30 hover:border-pp-text/30">
+      <Link
+        href={`/admin/whiteboard/${board._id}`}
+        aria-label={`Open ${board.title || 'Untitled board'}`}
+        data-testid="wb-board-card"
+        className="absolute inset-0 rounded-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pp-blue"
+      />
+
+      <div className="relative z-10 flex items-start justify-between gap-3">
         <input
           value={title}
           aria-label="Board name"
           placeholder="Untitled board"
           maxLength={200}
+          autoFocus={autoFocus}
+          onFocus={event => {
+            if (autoFocus) event.target.select()
+          }}
           onChange={event => setTitle(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') event.currentTarget.blur()
+          }}
           onBlur={async () => {
             if (title === board.title) return
             setSaving(true)
@@ -196,53 +220,39 @@ function BoardCard({
         )}
       </p>
 
-      <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-pp-line bg-white/80 px-3.5 py-3">
-        <div>
-          <p
-            id={`wb-board-ai-${board._id}-label`}
-            className="text-[13px] font-semibold text-pp-text"
-          >
-            Agents can read this board
-          </p>
-          <p className="text-[11.5px] text-pp-muted">
-            {board.includeInAi
-              ? 'Its cards follow their own privacy switches.'
-              : 'Nothing on it reaches an export or an MCP call.'}
-          </p>
-        </div>
-        <ToggleSwitch
-          id={`wb-board-ai-${board._id}`}
-          checked={board.includeInAi}
-          onChange={on => void onIncludeInAi(on)}
-        />
-      </div>
-
-      <div className="mt-5 flex items-center gap-2">
-        <Link
-          href={`/admin/whiteboard/${board._id}`}
-          className={cn(primaryBtnCls, 'gap-2 px-4 py-2 no-underline')}
-        >
-          <Sparkles
-            aria-hidden
-            size={14}
+      <div className="relative z-10 mt-4 flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-2xl border border-pp-line bg-white/80 px-3.5 py-3">
+          <div className="min-w-0">
+            <p
+              id={`wb-board-ai-${board._id}-label`}
+              className="text-[13px] font-semibold text-pp-text"
+            >
+              Agents can read this board
+            </p>
+            <p className="text-[11.5px] text-pp-muted">
+              {board.includeInAi
+                ? 'Its cards follow their own privacy switches.'
+                : 'Nothing on it reaches an export or an MCP call.'}
+            </p>
+          </div>
+          <ToggleSwitch
+            id={`wb-board-ai-${board._id}`}
+            checked={board.includeInAi}
+            onChange={on => void onIncludeInAi(on)}
           />
-          Open
-        </Link>
+        </div>
         <button
           type="button"
           onClick={onDelete}
           disabled={soleBoard}
+          aria-label="Delete board"
           title={soleBoard ? 'This is your only board.' : 'Delete this board'}
-          className={cn(
-            secondaryBtnCls,
-            'gap-2 px-3 py-2 text-pp-ink-rose disabled:cursor-not-allowed disabled:opacity-40'
-          )}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-pp-line bg-white/80 text-pp-muted transition hover:border-pp-ink-rose/40 hover:text-pp-ink-rose disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-pp-line disabled:hover:text-pp-muted"
         >
           <Trash2
             aria-hidden
-            size={14}
+            size={16}
           />
-          Delete
         </button>
       </div>
     </div>

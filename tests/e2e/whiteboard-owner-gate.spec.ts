@@ -71,14 +71,6 @@ test('DELETE /links/[id] is 401', async ({ request }) => {
   await expect401(await request.delete(`${API}/links/${FAKE_ID}`))
 })
 
-test('POST /context is 401 - it renders the private board', async ({
-  request,
-}) => {
-  await expect401(
-    await request.post(`${API}/context`, { data: { scope: { kind: 'all' } } })
-  )
-})
-
 test('GET /backup is 401 - it includes hidden items', async ({ request }) => {
   await expect401(await request.get(`${API}/backup`))
 })
@@ -101,6 +93,10 @@ test('POST /tokens is 401 - it mints agent access', async ({ request }) => {
 
 test('DELETE /tokens/[id] is 401', async ({ request }) => {
   await expect401(await request.delete(`${API}/tokens/${FAKE_ID}`))
+})
+
+test('DELETE /tokens/[id]?forever=1 is 401', async ({ request }) => {
+  await expect401(await request.delete(`${API}/tokens/${FAKE_ID}?forever=1`))
 })
 
 /*

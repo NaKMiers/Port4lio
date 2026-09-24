@@ -220,7 +220,19 @@ test('(3) a hidden card is left out of the export, and the sheet says so (D25)',
   const preview = sheet.getByTestId('wb-export-preview')
   await expect(preview).toContainText('Visible goal')
   await expect(preview).not.toContainText('Secret card')
-  await expect(sheet.getByRole('button', { name: 'Copy' })).toBeEnabled()
+
+  // The preview is the markdown rendered for reading, not its source...
+  await expect(
+    preview.getByRole('heading', { name: 'Visible goal' })
+  ).toBeVisible()
+  await expect(preview).not.toContainText('####')
+
+  // ...and Copy still hands over the markdown.
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await sheet.getByRole('button', { name: 'Copy' }).click()
+  await expect(sheet.getByRole('button', { name: /Copied/ })).toBeVisible()
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  expect(copied).toContain('#### Visible goal')
 })
 
 test('(4) a failed load shows Retry, and nothing can be written', async ({
@@ -510,16 +522,41 @@ test('(11) many boards: the index makes one, and nothing crosses between them (D
     },
   })
 
-  // The index lists what exists and makes a new board, landing on its canvas.
+  // The index lists what exists and makes a new board, staying put with its name selected;
+  // clicking the card is what opens it.
   await page.goto('/admin/whiteboard')
   await expect(page.getByRole('heading', { name: 'Whiteboards' })).toBeVisible()
   await page.getByRole('button', { name: 'New board' }).click()
+  await expect(page.getByTestId('wb-board-card')).toHaveCount(2)
+  await expect(page).toHaveURL(/\/admin\/whiteboard$/)
+  await page.keyboard.type('Second board')
+  await page.keyboard.press('Enter')
+  await page.getByRole('link', { name: 'Open Second board' }).click()
   await expect(page).toHaveURL(/\/admin\/whiteboard\/[0-9a-f]{24}$/)
   await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/, {
     timeout: 30_000,
   })
   const second = page.url().split('/').pop()!
   expect(second).not.toBe(BOARD)
+
+  // The switcher renames the board on screen and flips its agent switch, without the index.
+  await page.getByTestId('wb-board-switcher').click()
+  const name = page.getByTestId('wb-board-panel').getByLabel('Board name')
+  await expect(name).toHaveValue('Second board')
+  await name.fill('Renamed on the canvas')
+  await name.press('Enter')
+  await page.getByRole('switch', { name: 'Agents can read this board' }).click()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('wb-board-switcher')).toHaveText(
+    /Renamed on the canvas/
+  )
+  await expect
+    .poll(async () => {
+      const { boards } = await (await request.get(`${API}/boards`)).json()
+      const mine = boards.find((b: { _id: string }) => b._id === second)
+      return { title: mine?.title, includeInAi: mine?.includeInAi }
+    })
+    .toEqual({ title: 'Renamed on the canvas', includeInAi: false })
 
   // A fresh board is empty: the first board's card is not on it.
   await expect(page.getByText('On the first board')).toHaveCount(0)
@@ -559,4 +596,94 @@ test('(11) many boards: the index makes one, and nothing crosses between them (D
 
   // Clean up, so the next run starts from one board again.
   expect((await request.delete(`${API}/boards/${second}`)).ok()).toBe(true)
+})
+
+test('(12) the export preview is built in the browser: live, unsaved edits and the board switch included', async ({
+  page,
+  request,
+}) => {
+  // The preview used to be a POST /context per edit. Nothing may call the server for it now.
+  const exportCalls: string[] = []
+  page.on('request', req => {
+    if (req.url().includes('/api/admin/whiteboard/context'))
+      exportCalls.push(req.url())
+  })
+
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Before the edit', x: 0, y: 0 },
+  })
+  await openBoard(page)
+  await page.getByRole('switch', { name: 'Auto-save' }).click()
+
+  await page.getByText('Before the edit').click()
+  await page
+    .getByRole('textbox', { name: 'Title' })
+    .fill('Typed, not saved yet')
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/1 unsaved/)
+
+  // The sheet shows the canvas, not the database - and says the two differ.
+  await page.getByRole('button', { name: 'Export to AI' }).click()
+  const sheet = page.getByTestId('wb-export-sheet')
+  const preview = sheet.getByTestId('wb-export-preview')
+  await expect(preview).toContainText('Typed, not saved yet')
+  await expect(sheet).toContainText('1 unsaved change is in this preview')
+  const saved = (await boardLines(request)).filter(l => l.t === 'item')
+  expect(saved[0].item.title).toBe('Before the edit')
+
+  // Saving clears the notice; the text stays.
+  await page.getByTestId('wb-save-now').click()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  await expect(sheet).not.toContainText('unsaved change')
+  await expect(preview).toContainText('Typed, not saved yet')
+
+  // The board's own switch, flipped from the board menu, empties the sheet at once.
+  try {
+    await page.getByTestId('wb-board-switcher').click()
+    await page
+      .getByRole('switch', { name: 'Agents can read this board' })
+      .click()
+    await page.keyboard.press('Escape')
+    await expect(sheet).toContainText('This board is hidden from agents')
+    await expect(sheet.getByRole('button', { name: 'Copy' })).toBeDisabled()
+  } finally {
+    // Every other test assumes a readable board.
+    await request.patch(`${API}/boards/${BOARD}`, {
+      data: { includeInAi: true },
+    })
+  }
+
+  expect(exportCalls).toEqual([])
+})
+
+test('(13) a revoked agent token can be deleted forever; an active one only revoked', async ({
+  page,
+  request,
+}) => {
+  const name = `e2e forever ${Date.now()}`
+  const created = await request.post(`${API}/tokens`, { data: { name } })
+  expect(created.ok()).toBe(true)
+  const { record } = await created.json()
+
+  // The server refuses to delete a live key: revoking is the one way it dies.
+  const early = await request.delete(`${API}/tokens/${record.id}?forever=1`)
+  expect(early.status()).toBe(409)
+
+  await openBoard(page)
+  await page.getByRole('button', { name: /^Agents/ }).click()
+  const panel = page.getByTestId('wb-agents-popover')
+  const row = panel.getByTestId('wb-token-row').filter({ hasText: name })
+
+  // Active rows offer Revoke only.
+  await expect(row.getByRole('button', { name: /forever/ })).toHaveCount(0)
+  await row.getByRole('button', { name: 'Revoke' }).click()
+  await row.getByRole('button', { name: 'Revoke now' }).click()
+  await expect(row).toContainText('revoked')
+
+  // Revoked: two clicks, and the row and the record are gone.
+  await row.getByRole('button', { name: `Delete ${name} forever` }).click()
+  await row.getByRole('button', { name: 'Delete now' }).click()
+  await expect(row).toHaveCount(0)
+  const { tokens } = await (await request.get(`${API}/tokens`)).json()
+  expect(tokens.some((t: { id: string }) => t.id === record.id)).toBe(false)
 })

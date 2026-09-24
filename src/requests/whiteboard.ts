@@ -1,11 +1,6 @@
 import type { SaveOp, SendResult } from '@/components/whiteboard/save-queue'
 import type { ClientBoard } from '@/lib/whiteboard/data'
-import type {
-  ClientToken,
-  ContextResponse,
-  ExportScope,
-  RestoreBatchResult,
-} from '@/lib/whiteboard/types'
+import type { ClientToken, RestoreBatchResult } from '@/lib/whiteboard/types'
 
 /**
  * Fetch wrappers for `/api/admin/whiteboard/*`, all `no-store` (owner data, always fresh).
@@ -119,20 +114,6 @@ export async function getBoardStreamApi(board: string, signal?: AbortSignal) {
   return res.body
 }
 
-export async function getContextApi(
-  board: string,
-  scope: ExportScope,
-  signal?: AbortSignal
-): Promise<ContextResponse> {
-  const res = await call(on('/context', board), {
-    method: 'POST',
-    json: { scope },
-    signal,
-  })
-  if (!res.ok) throw new Error(await errorMessage(res))
-  return res.json()
-}
-
 export async function getBackupApi(board: string): Promise<Blob> {
   const res = await call(on('/backup', board))
   if (!res.ok) throw new Error(await errorMessage(res))
@@ -205,4 +186,10 @@ export async function revokeTokenApi(id: string): Promise<ClientToken> {
   const res = await call(`${API}/tokens/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(await errorMessage(res))
   return (await res.json()).record
+}
+
+/** Removes a revoked token from the list for good; the server refuses an active one (409). */
+export async function deleteTokenForeverApi(id: string): Promise<void> {
+  const res = await call(`${API}/tokens/${id}?forever=1`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await errorMessage(res))
 }

@@ -270,7 +270,6 @@ export function BackupMenu({
   mockDisabled,
   beforeDownload,
   heldWrites,
-  compact,
   className,
 }: {
   boardId: string
@@ -289,7 +288,6 @@ export function BackupMenu({
    * writes is what they asked for.
    */
   heldWrites: number
-  compact: boolean
   className?: string
 }) {
   const [busy, setBusy] = useState(false)
@@ -332,7 +330,9 @@ export function BackupMenu({
   return (
     <div
       ref={rootRef}
-      className={cn('relative', className)}
+      // Below md the popover anchors to the header (TopBar), not to this button: on a phone the
+      // button sits mid-row, and a panel hung off its right edge ran past the left of the screen.
+      className={cn('md:relative', className)}
     >
       <button
         type="button"
@@ -340,23 +340,24 @@ export function BackupMenu({
         aria-expanded={open}
         aria-label="Backup"
         onClick={() => onToggle(!open)}
-        className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-pp-line bg-white/85 px-3 font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-text sm:px-3.5"
+        className="inline-flex min-h-[40px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-pp-line bg-white/85 px-3 font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-text sm:px-3.5"
       >
         <Archive
           aria-hidden
           size={14}
         />
-        <span className={cn(compact && 'sr-only')}>Backup</span>
+        {/* Labelled from xl; below it the icon, with `aria-label` naming it (TopBar). */}
+        <span className="hidden xl:inline">Backup</span>
         <ChevronDown
           aria-hidden
           size={12}
-          className={cn(compact && 'hidden')}
+          className="hidden xl:block"
         />
       </button>
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+8px)] z-40 w-64 rounded-2xl border border-pp-line bg-pp-panel-strong p-1.5 shadow-panel"
+          className="absolute right-0 top-[calc(100%+8px)] z-40 w-64 rounded-2xl border border-pp-line bg-pp-panel-strong p-1.5 shadow-panel max-md:right-2"
         >
           {heldWrites > 0 ? (
             <p className="px-3 py-1.5 text-[12px] text-pp-ink-amber">

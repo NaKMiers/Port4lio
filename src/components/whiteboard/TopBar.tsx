@@ -8,9 +8,32 @@ import { memo, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 /**
- * The 56px top bar (DR2): the way back to the hub, the title, the save pill and the
- * auto-save controls, then the hidden chip, Backup, Agents and the one primary action,
- * Export to AI.
+ * The top bar (DR2): the way back to the hub, the title, the save pill and the auto-save
+ * controls, then the hidden chip, Backup, Agents and the one primary action, Export to AI.
+ *
+ * ## Responsive: two rows on a phone, one 56px row from md
+ *
+ * ```
+ *   < md     [grid] [Title that truncates.......▾] [• SAVED]
+ *            [OFF|ON] [Save 3]              [Archive] [Key 2] [Sparkles]
+ *
+ *   md-lg    [grid] [Title....▾] [• SAVED] [OFF|ON] [Save 3]  [Eye 3] [Archive] [Key 2] [Spark]
+ *   lg       ...same, and "Export to AI" gets its label back (the primary action)
+ *   xl       ...every label: AUTO-SAVE, "3 hidden", BACKUP ▾, AGENTS
+ * ```
+ *
+ * Nine controls do not fit one row at 360px - measured at 146px over with auto-save off - and
+ * every one of them is used on a phone, so the bar folds into two rows there rather than
+ * hiding any of them. The two row wrappers are `md:contents`: from md they stop being boxes
+ * and their children become the header's own flex items, so one DOM order serves both
+ * layouts and the spacer does the same job in either.
+ *
+ * The title is the ONLY thing that shrinks: `flex-1` on its row below md, `min-w-0` inside
+ * the switcher, and `shrink-0` + `whitespace-nowrap` on everything else. It used to carry a
+ * fixed `max-w-[16rem]` with no `min-w-0`, so as the bar narrowed it could not give way and
+ * was painted over by the pill - and on top of the Auto-save switch, whose clicks it then
+ * swallowed. Labels step in by breakpoint (CSS, not the JS tier) so each width has one
+ * source of truth.
  *
  * ## Leaving with work that has not been written
  *
@@ -35,7 +58,6 @@ function TopBar({
   exportDisabled,
   exportOpen,
   onExport,
-  compact,
   onLeave,
   className,
 }: {
@@ -51,8 +73,6 @@ function TopBar({
   exportDisabled: boolean
   exportOpen: boolean
   onExport: () => void
-  /** Below md: icons only for the secondary buttons. */
-  compact: boolean
   /**
    * Runs a navigation off the board, asking first if anything would be lost by it (see the
    * header). Every exit goes through it, here and in the switcher.
@@ -65,70 +85,84 @@ function TopBar({
   return (
     <header
       className={cn(
-        'relative z-20 flex h-14 items-center gap-2 border-b border-pp-line bg-white/70 px-3 sm:gap-3 sm:px-4',
+        'relative z-20 flex flex-col gap-2 border-b border-pp-line bg-white/70 px-3 py-2 md:h-14 md:flex-row md:items-center md:gap-2 md:px-4 md:py-0 lg:gap-3',
         className
       )}
     >
-      <Link
-        href="/admin/whiteboard"
-        aria-label="All boards"
-        title="All boards"
-        onClick={event => {
-          // Still a Link, so it can be opened in a new tab or copied; the guard only takes
-          // over the plain click, which is the one that unmounts this canvas.
-          event.preventDefault()
-          onLeave(() => router.push('/admin/whiteboard'))
-        }}
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-pp-line bg-white/85 text-pp-muted no-underline hover:text-pp-text lg:h-9 lg:w-9"
-      >
-        <LayoutGrid
-          aria-hidden
-          size={16}
-        />
-      </Link>
-      {boardSwitcher}
-      {pill}
-      {saveControls}
-      <div className="flex-1" />
-      {hiddenCount > 0 ? (
+      <div className="flex min-w-0 items-center gap-2 md:contents">
+        <Link
+          href="/admin/whiteboard"
+          aria-label="All boards"
+          title="All boards"
+          onClick={event => {
+            // Still a Link, so it can be opened in a new tab or copied; the guard only takes
+            // over the plain click, which is the one that unmounts this canvas.
+            event.preventDefault()
+            onLeave(() => router.push('/admin/whiteboard'))
+          }}
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-pp-line bg-white/85 text-pp-muted no-underline hover:text-pp-text lg:h-9 lg:w-9"
+        >
+          <LayoutGrid
+            aria-hidden
+            size={16}
+          />
+        </Link>
+        <div className="flex min-w-0 flex-1 md:flex-initial">
+          {boardSwitcher}
+        </div>
+        <div className="shrink-0">{pill}</div>
+      </div>
+      <div className="flex items-center gap-1.5 sm:gap-2 md:contents">
+        {saveControls}
+        <div className="flex-1" />
+        {hiddenCount > 0 ? (
+          <button
+            type="button"
+            onClick={onHiddenClick}
+            title={
+              boardHidden
+                ? 'This whole board is hidden from agents. Click to show what is on it.'
+                : 'Items agents cannot read. Click to show them.'
+            }
+            aria-label={
+              boardHidden
+                ? 'Board hidden from AI'
+                : `${hiddenCount} hidden from AI`
+            }
+            className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-pp-line bg-white/80 px-2.5 py-1 font-display text-[10.5px] font-semibold uppercase tracking-[0.13em] text-pp-muted hover:text-pp-text md:inline-flex"
+          >
+            <EyeOff
+              aria-hidden
+              size={13}
+            />
+            {boardHidden ? (
+              <span className="hidden xl:inline">Board hidden</span>
+            ) : (
+              <>
+                {hiddenCount}
+                <span className="hidden xl:inline">hidden</span>
+              </>
+            )}
+          </button>
+        ) : null}
+        {backup}
+        {agents}
         <button
           type="button"
-          onClick={onHiddenClick}
-          title={
-            boardHidden
-              ? 'This whole board is hidden from agents. Click to show what is on it.'
-              : 'Items agents cannot read. Click to show them.'
-          }
-          aria-label={
-            boardHidden
-              ? 'Board hidden from AI'
-              : `${hiddenCount} hidden from AI`
-          }
-          className="hidden items-center gap-1.5 rounded-full border border-pp-line bg-white/80 px-2.5 py-1 font-display text-[10.5px] font-semibold uppercase tracking-[0.13em] text-pp-muted hover:text-pp-text md:inline-flex"
+          disabled={exportDisabled}
+          aria-expanded={exportOpen}
+          onClick={onExport}
+          title="Export to AI (Ctrl/Cmd+E)"
+          aria-label="Export to AI"
+          className="inline-flex min-h-[40px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-pp-text px-3 text-[12.5px] font-semibold text-white shadow-[0_18px_34px_rgba(17,17,17,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-4"
         >
-          <EyeOff
+          <Sparkles
             aria-hidden
-            size={13}
+            size={15}
           />
-          {boardHidden ? 'Board hidden' : `${hiddenCount} hidden`}
+          <span className="hidden lg:inline">Export to AI</span>
         </button>
-      ) : null}
-      {backup}
-      {agents}
-      <button
-        type="button"
-        disabled={exportDisabled}
-        aria-expanded={exportOpen}
-        onClick={onExport}
-        title="Export to AI (Ctrl/Cmd+E)"
-        className="inline-flex min-h-[40px] items-center gap-2 rounded-full bg-pp-text px-3 text-[12.5px] font-semibold text-white shadow-[0_18px_34px_rgba(17,17,17,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-4"
-      >
-        <Sparkles
-          aria-hidden
-          size={15}
-        />
-        <span className={cn(compact && 'sr-only')}>Export to AI</span>
-      </button>
+      </div>
     </header>
   )
 }

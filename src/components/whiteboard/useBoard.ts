@@ -603,7 +603,14 @@ export function useBoard(boardId: string) {
         next.ink = { ...next.ink, bbox: deriveInkBBox(next.ink.points) }
       commit(
         prev => {
-          const items = { ...prev.items, [id]: { ...current, ...next } }
+          // Stamped here as well as by the server, so the live export preview orders an
+          // edited card as the saved board will (context.ts sorts by recency). `patchBody`
+          // never sends it, and the server's answer replaces it (`mergeServerItem`).
+          const updatedAt = new Date().toISOString()
+          const items = {
+            ...prev.items,
+            [id]: { ...current, ...next, updatedAt },
+          }
           // Mirror the server (children first, then the frame) so no badge lies meanwhile.
           if (keepChildrenPrivate)
             for (const child of Object.values(prev.items))
@@ -687,6 +694,8 @@ export function useBoard(boardId: string) {
           x: membership.x,
           y: membership.y,
           parentId: membership.parentId,
+          // As in `updateItem`: a move is a write, and the server stamps it too.
+          updatedAt: new Date().toISOString(),
           ...(leftHidden ? { includeInAi: false } : {}),
         }
         updates.push({

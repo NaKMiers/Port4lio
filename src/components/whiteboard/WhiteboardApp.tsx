@@ -457,7 +457,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
     <BoardUiContext.Provider value={ui}>
       <div
         className={cn(
-          'relative grid h-full min-h-0 grid-rows-[56px_minmax(0,1fr)] overflow-hidden rounded-panel border border-pp-line bg-[rgba(251,248,244,0.97)] shadow-panel backdrop-blur-md',
+          'relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-panel border border-pp-line bg-[rgba(251,248,244,0.97)] shadow-panel backdrop-blur-md',
           tier === 'lg' ? 'grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-1'
         )}
       >
@@ -479,7 +479,6 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
               onSave={board.saveNow}
               pending={board.status.pending}
               disabled={readOnly}
-              compact={tier !== 'lg'}
             />
           }
           hiddenCount={
@@ -500,6 +499,8 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
                 const made = await boards.create('New board').catch(() => null)
                 return made?._id ?? null
               }}
+              onRename={next => boards.rename(boardId, next)}
+              onIncludeInAi={on => boards.setIncludeInAi(boardId, on)}
               onLeave={onLeave}
             />
           }
@@ -513,14 +514,12 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
               mockDisabled={readOnly}
               beforeDownload={() => board.queue.flush()}
               heldWrites={board.status.holding ? board.status.pending : 0}
-              compact={tier !== 'lg'}
             />
           }
           agents={
             <AgentsButton
               open={surface === 'agents'}
               onToggle={open => setSurface(open ? 'agents' : null)}
-              compact={tier !== 'lg'}
             />
           }
           exportDisabled={readOnly || empty}
@@ -528,7 +527,6 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
           onExport={() =>
             surface === 'export' ? setSurface(null) : openExport('all')
           }
-          compact={tier === 'sm'}
         />
 
         <section
@@ -640,6 +638,8 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
           <ExportSheet
             key={exportScope}
             board={board}
+            boardVisible={current?.includeInAi ?? true}
+            unsavedCount={unsavedCount}
             selectionIds={selection.nodes}
             initialScope={exportScope}
             onClose={() => setSurface(null)}

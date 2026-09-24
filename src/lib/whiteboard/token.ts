@@ -114,6 +114,26 @@ export async function revokeToken(id: string): Promise<ClientToken | null> {
   return existing ? toClientToken(existing) : null
 }
 
+/**
+ * Delete a revoked token's record for good, so it leaves the list. Only a revoked one: the
+ * filter carries `revokedAt: { $ne: null }`, so an active token cannot be removed this way -
+ * revoking is the one way a live key dies, and it is the step that shows up greyed out in the
+ * list first. Deleting after that changes nothing an agent can observe: `verifyBearer` already
+ * answers a revoked hash exactly like an unknown one.
+ */
+export async function deleteRevokedToken(
+  id: string
+): Promise<'deleted' | 'active' | 'missing'> {
+  await connectDatabase()
+  if (!isObjectIdString(id)) return 'missing'
+  const { deletedCount } = await WhiteboardTokenModel.deleteOne({
+    _id: id,
+    revokedAt: { $ne: null },
+  })
+  if (deletedCount) return 'deleted'
+  return (await WhiteboardTokenModel.exists({ _id: id })) ? 'active' : 'missing'
+}
+
 export type VerifyResult =
   { ok: true; tokenId: string } | { ok: false; status: 401 | 503 }
 

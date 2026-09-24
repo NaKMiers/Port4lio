@@ -71,18 +71,6 @@ export type ExportScope =
       targetTo?: string
     }
 
-/** `POST /api/admin/whiteboard/context` (D25). */
-export interface ContextResponse {
-  markdown: string
-  /** In-scope items the privacy filter dropped. */
-  excludedCount: number
-  /** The frame scope names a frame that is itself hidden. */
-  scopeHidden: boolean
-  totalCount: number
-  renderedCount: number
-  truncated: boolean
-}
-
 export interface ClientToken {
   id: string
   name: string

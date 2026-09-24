@@ -37,6 +37,7 @@ import type {
   ExportScope,
   RestoreBatchResult,
 } from '@/lib/whiteboard/types'
+import type { ExportLoad } from '@/lib/whiteboard/visible'
 import {
   WhiteboardBoardModel,
   type WhiteboardBoardDocument,
@@ -524,11 +525,7 @@ export type AgentScope =
   | { kind: 'item'; id: string }
   | { kind: 'overview' }
 
-export interface ExportLoad {
-  input: ContextInput
-  excludedCount: number
-  scopeHidden: boolean
-}
+export type { ExportLoad }
 
 export interface SearchLoad {
   results: ContextItem[]
@@ -545,8 +542,10 @@ export interface ItemLoad {
  * on `visibleFilter`, all without ink points.
  */
 /**
- * `board` is the owner's export preview, which is about the board they are looking at. An
- * agent read passes nothing and gets every board it is allowed to see (D32).
+ * `board` narrows the read to one board, the shape of the owner's Export sheet. The sheet
+ * itself filters in the browser now (`visible.ts`); this option is what lets
+ * `tests/api/whiteboard-export-parity.test.ts` hold the two to the same answer. An agent read
+ * passes nothing and gets every board it is allowed to see (D32).
  */
 export interface AgentReadOptions {
   board?: string

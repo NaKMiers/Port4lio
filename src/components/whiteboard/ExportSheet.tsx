@@ -1,37 +1,48 @@
 'use client'
 
-import { Check, Copy, EyeOff, RotateCw, TriangleAlert, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, CloudOff, Copy, EyeOff, TriangleAlert, X } from 'lucide-react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import SelectField from '@/components/settings/SelectField'
 import {
   inputCls,
   labelCls,
   primaryBtnCls,
-  secondaryBtnCls,
 } from '@/components/settings/settings-utils'
 import { MEANING_STYLE } from '@/components/whiteboard/meaning-style'
 import type { Board } from '@/components/whiteboard/useBoard'
 import { useReducedMotion } from '@/components/whiteboard/useTier'
 import { cn } from '@/lib/utils'
 import { MEANINGS, type Meaning } from '@/lib/whiteboard/limits'
-import type { ContextResponse, ExportScope } from '@/lib/whiteboard/types'
-import { getContextApi } from '@/requests/whiteboard'
+import type { ExportScope } from '@/lib/whiteboard/types'
+import { buildExportPreview } from '@/lib/whiteboard/visible'
 
 /**
  * Export to AI: a 480px NON-modal sheet over the inspector (DR3).
  *
  * ```
- *   scope (all / selection / a frame / filter) ──400 ms──▶ POST /context ──▶ preview
- *                                                             │
- *                                  { markdown, excludedCount, scopeHidden } (D25)
+ *   board.data (every keystroke) ─┐
+ *   board's agent switch ─────────┼─▶ buildExportPreview (visible.ts, in the browser) ─▶ preview
+ *   scope (all / selection / ...) ┘        │
+ *                                 { markdown, excludedCount, scopeHidden } (D25)
  * ```
  *
  * Non-modal on purpose: the canvas stays live, so the Selection scope follows whatever is
- * selected right now. The preview is rendered by the SERVER through `loadAgentVisible`, the
- * same path `context.md` and MCP use, so what is copied here is exactly what an agent would
- * read - and the notices say what the privacy filter left out, so a pasted export is never
- * silently missing cards. Copy is disabled whenever there is nothing to copy.
+ * selected right now, and the preview follows every edit as it is typed - unsaved ones
+ * included, which the "unsaved" notice says, because an agent reads the saved board.
+ *
+ * Built in the browser from the board already on screen: no request, no debounce, nothing to
+ * fail. It is the same text an agent gets for the same saved board - `visible.ts` mirrors
+ * `loadAgentVisible` and a parity test holds the two together (see its header). The notices
+ * say what the privacy filter left out, so a pasted export is never silently missing cards.
+ * Copy is disabled whenever there is nothing to copy.
+ *
+ * `useDeferredValue` is what keeps typing on a big board smooth: the render of up to 1 MB of
+ * markdown happens at low priority, behind the keystroke that caused it.
+ *
+ * The preview shows that markdown RENDERED (`export-html.ts`, styled like the blog editor's
+ * preview) rather than as source, because it is read to check what an agent will see.
+ * Copy, and the manual-copy fallback, always carry the markdown itself.
  */
 
 type ScopeKey = 'all' | 'selection' | 'filter' | `frame:${string}`
@@ -45,12 +56,18 @@ function estimateTokens(chars: number) {
 
 export default function ExportSheet({
   board,
+  boardVisible,
+  unsavedCount,
   selectionIds,
   initialScope,
   onClose,
   className,
 }: {
   board: Board
+  /** The board's own agent switch (D32), live from the switcher. */
+  boardVisible: boolean
+  /** Writes an agent cannot see yet: held (D31), failing, or refused. */
+  unsavedCount: number
   selectionIds: string[]
   initialScope: 'all' | 'selection'
   onClose: () => void
@@ -62,10 +79,6 @@ export default function ExportSheet({
   const [meanings, setMeanings] = useState<Meaning[]>([])
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [result, setResult] = useState<ContextResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [failed, setFailed] = useState(false)
-  const [nonce, setNonce] = useState(0)
   const [copied, setCopied] = useState(false)
   const [manualCopy, setManualCopy] = useState(false)
 
@@ -93,41 +106,52 @@ export default function ExportSheet({
       return { kind: 'frame', id: scopeKey.slice(6) }
     return { kind: 'all' }
   }, [from, meanings, scopeKey, selectionIds, to])
-  const scopeJson = JSON.stringify(scope)
 
-  // The preview follows every edit on the board too: `updatedAt` stamps change on save.
-  const boardVersion = board.status.pending === 0 ? board.data : null
+  const data = useDeferredValue(board.data)
+  const result = useMemo(
+    () =>
+      buildExportPreview(
+        {
+          boardId: board.boardId,
+          items: Object.values(data.items),
+          links: Object.values(data.links),
+          visible: boardVisible,
+        },
+        scope
+      ),
+    [board.boardId, boardVisible, data, scope]
+  )
+  // The deferred board lags a keystroke behind while it catches up.
+  const stale = data !== board.data
 
-  useEffect(() => {
-    const controller = new AbortController()
-    const timer = setTimeout(async () => {
-      setLoading(true)
-      setFailed(false)
-      try {
-        const next = await getContextApi(
-          board.boardId,
-          JSON.parse(scopeJson),
-          controller.signal
-        )
-        setResult(next)
-      } catch {
-        if (!controller.signal.aborted) {
-          setFailed(true)
-          setResult(null)
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }, 400)
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-  }, [board.boardId, scopeJson, nonce, boardVersion])
-
-  const markdown = result?.markdown ?? ''
+  const markdown = result.markdown
   const empty = !markdown
-  const copyDisabled = loading || failed || empty
+
+  // The preview is the markdown rendered for reading (export-html.ts); Copy still copies the
+  // markdown. The renderer is imported on first use, and a render that finishes after a newer
+  // one started is dropped, so a slow keystroke can never overwrite a later one.
+  const [rendered, setRendered] = useState<{
+    markdown: string
+    html: string | null
+  } | null>(null)
+  useEffect(() => {
+    if (!markdown) return
+    let cancelled = false
+    import('@/components/whiteboard/export-html')
+      .then(({ renderExportHtml }) => renderExportHtml(markdown))
+      .then(html => {
+        if (!cancelled) setRendered({ markdown, html })
+      })
+      .catch(() => {
+        // A chunk that failed to load falls back to the plain text, never to nothing.
+        if (!cancelled) setRendered({ markdown, html: null })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [markdown])
+  const rendering = stale || rendered?.markdown !== markdown
+  const copyDisabled = empty
 
   const copy = async () => {
     try {
@@ -151,13 +175,15 @@ export default function ExportSheet({
   ]
 
   let notice: React.ReactNode = null
-  if (result?.scopeHidden)
+  if (result.scopeHidden)
     notice = (
       <Notice icon={<EyeOff size={14} />}>
-        This frame is hidden from AI - nothing to export.
+        {boardVisible
+          ? 'This frame is hidden from AI - nothing to export.'
+          : 'This board is hidden from agents - nothing to export. Turn it on from the board name.'}
       </Notice>
     )
-  else if (result && result.excludedCount > 0)
+  else if (result.excludedCount > 0)
     notice = (
       <Notice icon={<EyeOff size={14} />}>
         {result.excludedCount}{' '}
@@ -264,7 +290,14 @@ export default function ExportSheet({
           </div>
         ) : null}
         {notice}
-        {result?.truncated ? (
+        {unsavedCount > 0 && !empty ? (
+          <Notice icon={<CloudOff size={14} />}>
+            {unsavedCount} unsaved{' '}
+            {unsavedCount === 1 ? 'change is' : 'changes are'} in this preview.
+            Agents read the board once it is saved.
+          </Notice>
+        ) : null}
+        {result.truncated ? (
           <p className="flex items-start gap-2 text-[12px] text-pp-ink-amber">
             <TriangleAlert
               aria-hidden
@@ -278,37 +311,12 @@ export default function ExportSheet({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        {loading && !result ? (
-          <div
-            aria-label="Loading preview"
-            className="space-y-2"
-          >
-            {[70, 90, 55, 80, 40].map((w, i) => (
-              <div
-                key={i}
-                className="h-3 animate-pulse rounded bg-pp-text/10 motion-reduce:animate-none"
-                style={{ width: `${w}%` }}
-              />
-            ))}
-          </div>
-        ) : failed ? (
-          <div role="alert">
-            <p className="text-sm font-semibold text-pp-ink-rose">
-              Preview failed
-            </p>
-            <button
-              type="button"
-              onClick={() => setNonce(n => n + 1)}
-              className={cn(secondaryBtnCls, 'mt-2 gap-2')}
-            >
-              <RotateCw size={13} />
-              Retry
-            </button>
-          </div>
-        ) : empty ? (
+        {empty ? (
           <p className="text-sm text-pp-muted">
-            {result?.scopeHidden
-              ? 'This frame is hidden from AI.'
+            {result.scopeHidden
+              ? boardVisible
+                ? 'This frame is hidden from AI.'
+                : 'This board is hidden from AI.'
               : 'Nothing to export.'}
           </p>
         ) : manualCopy ? (
@@ -321,15 +329,12 @@ export default function ExportSheet({
             className="h-full min-h-[300px] w-full resize-none rounded-xl border border-pp-line bg-white p-3 font-mono text-[11.5px]"
           />
         ) : (
-          <pre
-            data-testid="wb-export-preview"
-            className={cn(
-              'whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-pp-text',
-              loading && 'opacity-60'
-            )}
-          >
-            {markdown}
-          </pre>
+          <PreviewBody
+            html={rendered?.html}
+            markdown={rendered?.markdown ?? markdown}
+            first={rendered === null}
+            rendering={rendering}
+          />
         )}
       </div>
 
@@ -348,6 +353,57 @@ export default function ExportSheet({
         </button>
       </footer>
     </section>
+  )
+}
+
+function PreviewBody({
+  html,
+  markdown,
+  first,
+  rendering,
+}: {
+  /** `null` when the renderer failed to load: the markdown is shown as text instead. */
+  html: string | null | undefined
+  markdown: string
+  /** Nothing has rendered yet, so there is nothing older to show meanwhile. */
+  first: boolean
+  rendering: boolean
+}) {
+  if (first)
+    return (
+      <div
+        aria-label="Loading preview"
+        className="space-y-2"
+      >
+        {[70, 90, 55, 80, 40].map((w, i) => (
+          <div
+            key={i}
+            className="h-3 animate-pulse rounded bg-pp-text/10 motion-reduce:animate-none"
+            style={{ width: `${w}%` }}
+          />
+        ))}
+      </div>
+    )
+  const cls = cn(rendering && 'opacity-60')
+  if (html === null)
+    return (
+      <pre
+        data-testid="wb-export-preview"
+        className={cn(
+          'whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-pp-text',
+          cls
+        )}
+      >
+        {markdown}
+      </pre>
+    )
+  return (
+    <div
+      data-testid="wb-export-preview"
+      className={cn('blog-prose wb-export-prose', cls)}
+      // Sanitized in export-html.ts: raw HTML dropped at remark-rehype, then rehype-sanitize.
+      dangerouslySetInnerHTML={{ __html: html ?? '' }}
+    />
   )
 }
 

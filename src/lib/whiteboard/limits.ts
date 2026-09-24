@@ -65,8 +65,6 @@ export const LIMITS = {
   linkLabel: 80,
   /** Bulk `PATCH /items` entries per request. */
   bulkUpdates: 500,
-  /** `{ kind: 'selection', ids }` in the export scope. */
-  selectionIds: 500,
   /** `search_context` query length. */
   searchQuery: 200,
   /** Canvas coordinates. Generous; only here so `Infinity` and 1e308 are refused. */

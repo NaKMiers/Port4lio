@@ -127,3 +127,70 @@
     opacity: 1;
   }
 }
+
+/*
+  The Export preview (export-html.ts): the blog's reading typography, `.blog-prose`, sized
+  down for a 480px sheet. Every rule here is `.blog-prose.wb-export-prose ...`, one class
+  more specific than the blog rule it adjusts, so it wins on specificity, not file order.
+
+  The export has a fixed shape (context.ts): `#` board, `##` frame, `###` meaning, `####`
+  card, then one meta line (`id ... · goal · active · ...`) as a paragraph, a blockquoted
+  body and a list of links or to-do rows. The meta line is the one thing styled by position
+  rather than tag - `h4 + p` and `h2 + p` - because it is data to scan, not prose to read.
+*/
+.blog-prose.wb-export-prose {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.blog-prose.wb-export-prose > * + * {
+  margin-top: 0.75em;
+}
+.blog-prose.wb-export-prose h1 {
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.blog-prose.wb-export-prose h2 {
+  font-size: 1.05rem;
+  margin-top: 1.7em;
+}
+.blog-prose.wb-export-prose h3 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 1.4em;
+}
+.blog-prose.wb-export-prose h4 {
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 1.1em;
+}
+.blog-prose.wb-export-prose :is(h2, h4) + p {
+  margin-top: 0.3em;
+  font-size: 0.72rem;
+  color: var(--pp-muted);
+}
+.blog-prose.wb-export-prose blockquote {
+  padding: 0.45em 0.8em;
+}
+.blog-prose.wb-export-prose li + li {
+  margin-top: 0.2em;
+}
+/* To-do rows: the checkbox is the marker. */
+.blog-prose.wb-export-prose ul.contains-task-list {
+  list-style: none;
+  padding-left: 0.2em;
+}
+/*
+  A card body is the owner's own lines, not paragraphs: markdown folds a single newline into a
+  space, which would run "Agents read it.\nOne per context." together. The newline is still in
+  the text node (remark keeps soft breaks as "\n"), so `pre-line` is enough to show it.
+*/
+.blog-prose.wb-export-prose blockquote p {
+  white-space: pre-line;
+}

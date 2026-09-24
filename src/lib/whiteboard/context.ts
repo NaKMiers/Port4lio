@@ -12,7 +12,9 @@ import {
  * The one serializer: visible items and links in, markdown out.
  *
  * ```
- *   loadAgentVisible(scope)          (data.ts - the ONLY privacy path)
+ *   loadAgentVisible(scope)          (data.ts - the privacy filter, as Mongo queries)
+ *   selectExportInput(scope)         (visible.ts - the same filter in the browser, for the
+ *        │                            Export sheet; a parity test holds the two together)
  *        │  items in scope, visible frames, visible neighbours, visible links
  *        ▼
  *   renderContext ──────────▶ Export sheet, GET /api/whiteboard/context.md
@@ -33,10 +35,12 @@ import {
  *
  * The export the owner pastes and the answer an agent gets must be the same text, so there
  * is exactly one renderer. It must also never be the thing deciding what is private: a
- * serializer that filters is a second privacy path, and two paths drift. Everything that
- * reaches these functions has already been through `loadAgentVisible`. A hidden item is not
- * something this module skips - it is something it never receives. That is also why a
- * hidden link target simply cannot appear: the link that would name it was dropped upstream.
+ * serializer that filters is one more privacy path to keep in step. Everything that reaches
+ * these functions has already been through `loadAgentVisible` or its in-browser twin
+ * `selectExportInput`, which `tests/api/whiteboard-export-parity.test.ts` holds to the same
+ * answer. A hidden item is not something this module skips - it is something it never
+ * receives. That is also why a hidden link target simply cannot appear: the link that would
+ * name it was dropped upstream.
  *
  * ## Escaping, and why bodies are blockquotes
  *

@@ -4,6 +4,8 @@ import { NextRequest } from 'next/server'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import { getAuthCookieName, makeAuthToken } from '@/lib/auth'
+import { renderContext } from '@/lib/whiteboard/context'
+import { loadAgentVisible } from '@/lib/whiteboard/data'
 import type { BoardLine } from '@/lib/whiteboard/types'
 import { WhiteboardBoardModel } from '@/models/WhiteboardBoard'
 import { WhiteboardItemModel } from '@/models/WhiteboardItem'
@@ -49,8 +51,6 @@ beforeAll(async () => {
     (await import('@/app/api/admin/whiteboard/links/route')) as never
   routes.link =
     (await import('@/app/api/admin/whiteboard/links/[id]/route')) as never
-  routes.context =
-    (await import('@/app/api/admin/whiteboard/context/route')) as never
   routes.backup =
     (await import('@/app/api/admin/whiteboard/backup/route')) as never
   routes.restore =
@@ -126,7 +126,6 @@ const ENDPOINTS: [string, string, string][] = [
   ['POST /links', 'links', 'POST'],
   ['PATCH /links/[id]', 'link', 'PATCH'],
   ['DELETE /links/[id]', 'link', 'DELETE'],
-  ['POST /context', 'context', 'POST'],
   ['GET /backup', 'backup', 'GET'],
   ['POST /restore', 'restore', 'POST'],
 ]
@@ -308,44 +307,6 @@ describe('GET /api/admin/whiteboard (streamed NDJSON)', () => {
   })
 })
 
-describe('POST /context', () => {
-  it('returns markdown, excludedCount and scopeHidden (D25)', async () => {
-    const hidden = await createCard({ form: 'frame', includeInAi: false })
-    await createCard({ parentId: hidden._id, title: 'Secret' })
-    const shown = await createCard({ title: 'Shown' })
-    const off = await createCard({ title: 'Off', includeInAi: false })
-
-    const selection = await call('context', 'POST', {
-      body: { scope: { kind: 'selection', ids: [shown._id, off._id] } },
-    })
-    const sel = await selection.json()
-    expect(sel.excludedCount).toBe(1)
-    expect(sel.scopeHidden).toBe(false)
-    expect(sel.markdown).toContain('Shown')
-    expect(sel.markdown).not.toContain('Off')
-
-    const frame = await call('context', 'POST', {
-      body: { scope: { kind: 'frame', id: hidden._id } },
-    })
-    expect(await frame.json()).toMatchObject({
-      scopeHidden: true,
-      markdown: '',
-    })
-  })
-
-  it('rejects a bad scope', async () => {
-    for (const scope of [
-      { kind: 'nope' },
-      { kind: 'filter', from: '2025-13-01' },
-      { kind: 'selection', ids: ['x'] },
-      { kind: 'selection', ids: Array.from({ length: 501 }, newId) },
-    ])
-      expect((await call('context', 'POST', { body: { scope } })).status).toBe(
-        400
-      )
-  })
-})
-
 describe('backup and restore routes', () => {
   it('backs up as a download and restores through batches', async () => {
     const frame = await createCard({ form: 'frame', title: 'F' })
@@ -441,10 +402,9 @@ describe('bulk "Include in AI: on" (DR11)', () => {
           .status
       ).toBe(200)
 
-    const res = await call('context', 'POST', {
-      body: { scope: { kind: 'all' } },
-    })
-    const { markdown } = await res.json()
+    const { markdown } = renderContext(
+      (await loadAgentVisible({ kind: 'all' }, { board: BOARD })).input
+    )
     expect(markdown).toContain('Outside')
     expect(markdown).not.toContain('Inside')
   })
@@ -465,7 +425,6 @@ describe('boards (D32)', () => {
       ['links', 'POST'],
       ['link', 'PATCH'],
       ['link', 'DELETE'],
-      ['context', 'POST'],
       ['backup', 'GET'],
       ['restore', 'POST'],
     ] as const) {

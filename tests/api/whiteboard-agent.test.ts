@@ -228,6 +228,35 @@ describe('token routes (owner)', () => {
     expect((await contextMd(agentRequest(MD_URL, { token }))).status).toBe(401)
   })
 
+  it('delete forever removes a revoked record, and refuses an active one', async () => {
+    const forever = (id: string) =>
+      revokeRoute(
+        new NextRequest(
+          `http://localhost/api/admin/whiteboard/tokens/${id}?forever=1`,
+          { method: 'DELETE', headers: { cookie: ownerCookie() } }
+        ),
+        { params: Promise.resolve({ id }) }
+      )
+    await freshToken()
+    const id = String((await WhiteboardTokenModel.findOne({}).lean())!._id)
+
+    // Active: revoking is the only way a live key dies.
+    const refused = await forever(id)
+    expect(refused.status).toBe(409)
+    expect(await WhiteboardTokenModel.countDocuments({ _id: id })).toBe(1)
+
+    await revokeRoute(ownerRequest('DELETE'), {
+      params: Promise.resolve({ id }),
+    })
+    const gone = await forever(id)
+    expect(gone.status).toBe(200)
+    expect(await WhiteboardTokenModel.countDocuments({ _id: id })).toBe(0)
+
+    // Unknown, already deleted and malformed ids are the same 404.
+    expect((await forever(id)).status).toBe(404)
+    expect((await forever('nope')).status).toBe(404)
+  })
+
   it('token routes are 401 without the owner cookie', async () => {
     const anon = new NextRequest('http://localhost/api/admin/whiteboard/tokens')
     expect((await tokensRoute.GET(anon)).status).toBe(401)

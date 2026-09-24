@@ -6,6 +6,7 @@ import {
   KeyRound,
   Plug,
   RotateCw,
+  Trash2,
   TriangleAlert,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils'
 import type { ClientToken } from '@/lib/whiteboard/types'
 import {
   createTokenApi,
+  deleteTokenForeverApi,
   getTokensApi,
   revokeTokenApi,
 } from '@/requests/whiteboard'
@@ -36,6 +38,8 @@ import {
  *     3 "Now ask Claude: What are my active goals?"
  *   while open and the new token has lastUsedAt null: GET /tokens every 5 s
  *     └ first MCP call writes lastUsedAt (D29) ──▶ "Connected - first call just now"
+ *   Revoke ──▶ Revoke now ──▶ row greyed out, 401 from the next call
+ *     └ Delete forever ──▶ Delete now ──▶ record gone (revoked only; 409 otherwise)
  * ```
  *
  * ## Why the header is single-quoted
@@ -101,12 +105,10 @@ function Code({ text, label }: { text: string; label: string }) {
 export function AgentsButton({
   open,
   onToggle,
-  compact,
   className,
 }: {
   open: boolean
   onToggle: (open: boolean) => void
-  compact: boolean
   className?: string
 }) {
   const [tokens, setTokens] = useState<ClientToken[] | null>(null)
@@ -148,7 +150,9 @@ export function AgentsButton({
   return (
     <div
       ref={rootRef}
-      className={cn('relative', className)}
+      // Below md the popover anchors to the header (TopBar), not to this button: on a phone the
+      // button sits mid-row, and a panel hung off its right edge ran past the left of the screen.
+      className={cn('md:relative', className)}
     >
       <button
         type="button"
@@ -156,13 +160,13 @@ export function AgentsButton({
         aria-expanded={open}
         aria-label={`Agents, ${active} active token${active === 1 ? '' : 's'}`}
         onClick={() => onToggle(!open)}
-        className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-pp-line bg-white/85 px-3 font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-text sm:px-3.5"
+        className="inline-flex min-h-[40px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-pp-line bg-white/85 px-3 font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-text sm:px-3.5"
       >
         <KeyRound
           aria-hidden
           size={14}
         />
-        <span className={cn(compact && 'sr-only')}>Agents</span>
+        <span className="hidden xl:inline">Agents</span>
         <span className="text-pp-muted">{active}</span>
       </button>
       {open ? (
@@ -196,6 +200,7 @@ function AgentsPanel({
   const [fresh, setFresh] = useState<{ token: string; id: string } | null>(null)
   const [tab, setTab] = useState<'claude' | 'codex'>('claude')
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const headingRef = useRef<HTMLHeadingElement | null>(null)
 
   useEffect(() => headingRef.current?.focus(), [])
@@ -240,6 +245,22 @@ function AgentsPanel({
     }
   }
 
+  /**
+   * Revoked tokens only (the server refuses an active one). Two clicks like Revoke, because
+   * the record is the only trace of which machine a key was on - once it is gone, "which
+   * laptop was that?" has no answer. A failure re-reads the list rather than guessing.
+   */
+  const removeForever = async (id: string) => {
+    try {
+      await deleteTokenForeverApi(id)
+      setTokens(prev => prev?.filter(t => t.id !== id) ?? prev)
+    } catch {
+      await refresh()
+    } finally {
+      setConfirmDelete(null)
+    }
+  }
+
   const mcpUrl = `${window.location.origin}/api/whiteboard/mcp`
   const claudeCommand = `claude mcp add --scope user --transport http me ${mcpUrl} \\\n  --header 'Authorization: Bearer \${${ENV}}'`
   const codexCommand = `codex mcp add me --url ${mcpUrl} --bearer-token-env-var ${ENV}`
@@ -250,7 +271,7 @@ function AgentsPanel({
       role="dialog"
       aria-labelledby="wb-agents-title"
       data-testid="wb-agents-popover"
-      className="absolute right-0 top-[calc(100%+8px)] z-40 max-h-[calc(100dvh-110px)] w-[min(420px,calc(100vw-24px))] overflow-y-auto rounded-[1.4rem] border border-pp-line bg-pp-panel-strong p-4 text-left shadow-panel"
+      className="absolute right-0 top-[calc(100%+8px)] z-40 max-h-[calc(100dvh-110px)] w-[min(420px,calc(100vw-24px))] overflow-y-auto rounded-[1.4rem] border border-pp-line bg-pp-panel-strong p-4 text-left shadow-panel max-md:left-2 max-md:right-2 max-md:max-h-[calc(100dvh-140px)] max-md:w-auto"
     >
       <h2
         id="wb-agents-title"
@@ -419,12 +440,15 @@ function AgentsPanel({
               <li
                 key={token.id}
                 data-testid="wb-token-row"
-                className={cn(
-                  'flex items-center gap-2 py-2 text-[12.5px]',
-                  token.revokedAt && 'opacity-50'
-                )}
+                className="flex items-center gap-2 py-2 text-[12.5px]"
               >
-                <div className="min-w-0 flex-1">
+                {/* Faded text, not a faded row: the Delete forever button must stay legible. */}
+                <div
+                  className={cn(
+                    'min-w-0 flex-1',
+                    token.revokedAt && 'opacity-50'
+                  )}
+                >
                   <p className="truncate font-semibold text-pp-text">
                     {token.name}
                   </p>
@@ -433,7 +457,30 @@ function AgentsPanel({
                     {token.revokedAt ? 'revoked' : ago(token.lastUsedAt)}
                   </p>
                 </div>
-                {token.revokedAt ? null : confirmRevoke === token.id ? (
+                {token.revokedAt ? (
+                  confirmDelete === token.id ? (
+                    <button
+                      type="button"
+                      onClick={() => void removeForever(token.id)}
+                      className="shrink-0 rounded-full border border-red-300 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700"
+                    >
+                      Delete now
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(token.id)}
+                      aria-label={`Delete ${token.name} forever`}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-pp-muted hover:text-pp-ink-rose"
+                    >
+                      <Trash2
+                        aria-hidden
+                        size={12}
+                      />
+                      Delete forever
+                    </button>
+                  )
+                ) : confirmRevoke === token.id ? (
                   <button
                     type="button"
                     onClick={() => void revoke(token.id)}
