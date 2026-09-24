@@ -3,14 +3,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { hasOwnerAccess } from '@/lib/admin-gate'
 import { jsonError } from '@/lib/api-response'
 import { getAuthCookieName } from '@/lib/auth'
-import { sanitizeState } from '@/lib/ccaf/progress'
 import { loadCcafState } from '@/lib/ccaf/progress-data'
+import { saveCcafState } from '@/lib/ccaf/progress-service'
 import { connectDatabase } from '@/lib/mongodb'
 import { CCAF_SAVE_LIMIT, checkRateLimit, clientIpFrom } from '@/lib/rate-limit'
-import {
-  CCAF_PROGRESS_DOCUMENT_ID,
-  CcafProgressModel,
-} from '@/models/CcafProgress'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,7 +36,7 @@ export async function GET(request: NextRequest) {
  * [PUT] /api/ccaf
  *
  * ```
- *   size ─▶ connect ─▶ rate limit ─▶ owner cookie ─▶ JSON ─▶ sanitize ─▶ upsert
+ *   size ─▶ connect ─▶ rate limit ─▶ owner cookie ─▶ JSON ─▶ saveCcafState (sanitize, upsert)
  *     │                     │             │            │         │          │
  *    413                   429           401          400       400        200
  * ```
@@ -96,25 +92,18 @@ export async function PUT(request: NextRequest) {
     return jsonError('Invalid JSON body', 400)
   }
 
-  const state = sanitizeState(
-    (body as { state?: unknown } | null)?.state ?? body
-  )
-  if (!state) return jsonError('Invalid progress state', 400)
-
-  const now = new Date()
+  // Sanitise and upsert in `ccaf/progress-service`, the one write path the site MCP's
+  // `ccaf_update` uses too (premise 2).
+  let state
   try {
-    await CcafProgressModel.findOneAndUpdate(
-      { _id: CCAF_PROGRESS_DOCUMENT_ID },
-      {
-        $set: { ...state, updatedAt: now },
-        $setOnInsert: { _id: CCAF_PROGRESS_DOCUMENT_ID, createdAt: now },
-      },
-      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
+    state = await saveCcafState(
+      (body as { state?: unknown } | null)?.state ?? body
     )
   } catch (error) {
     console.error('[ccaf] failed to save progress', error)
     return jsonError('Could not save progress', 500)
   }
+  if (!state) return jsonError('Invalid progress state', 400)
 
   // No `revalidatePath` here any more. The CCA-F pages render under the admin layout's
   // `force-dynamic` - a per-request cookie check cannot share a cached render - so there is

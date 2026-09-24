@@ -1,4 +1,3 @@
-import { revalidateTag } from 'next/cache'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -6,8 +5,8 @@ import { hasOwnerAccess } from '@/lib/admin-gate'
 import { jsonError } from '@/lib/api-response'
 import { getAuthCookieName } from '@/lib/auth'
 import { connectDatabase } from '@/lib/mongodb'
-import { loadPublicProfile, PUBLIC_PROFILE_CACHE_TAG } from '@/lib/profile-data'
-import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
+import { loadPublicProfile } from '@/lib/profile-data'
+import { replaceProfile } from '@/lib/profile-service'
 import { MAX_PROFILE_JSON_BYTES } from '@/lib/upload-limits'
 import type { Profile } from '@/types/profile'
 
@@ -55,25 +54,11 @@ export async function POST(request: NextRequest) {
       )
 
     const parsed = JSON.parse(raw || '{}') as Profile
-    const now = new Date()
-    const updatedDoc = await ProfileModel.findOneAndUpdate(
-      { _id: PROFILE_DOCUMENT_ID },
-      {
-        $set: {
-          ...parsed,
-          updatedAt: now,
-        },
-        $setOnInsert: {
-          _id: PROFILE_DOCUMENT_ID,
-          createdAt: now,
-        },
-      },
-      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
-    )
+    // The write and the cache invalidation live in `profile-service`, shared with the site
+    // MCP's `update_profile` (premise 2, C8).
+    const updatedDoc = await replaceProfile(parsed)
 
     if (!updatedDoc) return jsonError('Failed to load updated profile', 500)
-
-    revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')
 
     return NextResponse.json({
       ok: true,

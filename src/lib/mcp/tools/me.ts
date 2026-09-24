@@ -3,11 +3,13 @@ import 'server-only'
 import { z } from 'zod'
 
 import { listPosts } from '@/lib/blog/post-service'
-import { defineTool, ok } from '@/lib/mcp/run-tool'
+import { defineTool, ok, refuse } from '@/lib/mcp/run-tool'
 import {
   PROFILE_SECTION_KEYS,
   readProfileSection,
+  type ProfileSection,
 } from '@/lib/profile-sections'
+import { patchProfileSection } from '@/lib/profile-service'
 import { loadAgentVisible } from '@/lib/whiteboard/data'
 
 /**
@@ -16,6 +18,8 @@ import { loadAgentVisible } from '@/lib/whiteboard/data'
  *
  * ```
  *   get_profile(section) ──▶ profile-sections: one findById, projected ──▶ { section, version, value }
+ *   update_profile(section, version, value) ──▶ profile-service.patchProfileSection
+ *                            resume refused (R8) · stale version refused (R6) · revalidateTag
  *   get_me ──▶ identity + about (clipped) + resume   (profile-sections)
  *            + active dreams and goals              (loadAgentVisible overview: visible only)
  *            + 5 latest published posts             (post-service listPosts)
@@ -99,6 +103,40 @@ export const getMeTool = defineTool({
             publishedAt: post.publishedAt,
           })),
         },
+        null,
+        2
+      )
+    )
+  },
+})
+
+export const updateProfileTool = defineTool({
+  name: 'update_profile',
+  title: 'Edit one profile section',
+  description:
+    "Replace one section of the owner's public portfolio profile - identity, about, career, offering, work or cvFile - with the version get_profile gave you. Send the WHOLE section value (every field get_profile returned, with your edits); a stale version is refused, so re-read and retry. The resume (the /cv sheet) cannot be written here: it is a fixed A4 page edited only in /admin/settings - give the owner the text instead. Changes the public site immediately.",
+  scopes: ['publish'],
+  audited: true,
+  input: z.object({
+    section: z.enum(
+      PROFILE_SECTION_KEYS as [ProfileSection, ...ProfileSection[]]
+    ),
+    version: z.string().min(1).max(32),
+    value: z.record(z.string(), z.unknown()),
+  }),
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  async run({ section, version, value }, { setTarget }) {
+    setTarget({ kind: 'profile', id: section })
+    const result = await patchProfileSection(section, value, version)
+    if (!result.ok) return refuse(result.error, result.reason)
+    return ok(
+      JSON.stringify(
+        { section, version: result.version, value: result.value },
         null,
         2
       )

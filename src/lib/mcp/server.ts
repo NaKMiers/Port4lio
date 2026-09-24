@@ -16,13 +16,19 @@ import {
 import { LEGACY_SCOPE, type TokenScope } from '@/lib/mcp/scopes'
 import type { AgentContext } from '@/lib/mcp/token'
 import { BLOG_TOOLS } from '@/lib/mcp/tools/blog'
-import { getMeTool, getProfileTool } from '@/lib/mcp/tools/me'
+import { CCAF_TOOLS } from '@/lib/mcp/tools/ccaf'
+import {
+  getMeTool,
+  getProfileTool,
+  updateProfileTool,
+} from '@/lib/mcp/tools/me'
 import { METRICS_TOOLS } from '@/lib/mcp/tools/metrics'
 import { PROMPTS } from '@/lib/mcp/tools/prompts'
 import {
   ALIAS_WHITEBOARD_NAMES,
   SITE_WHITEBOARD_NAMES,
   whiteboardReadTools,
+  whiteboardWriteTools,
 } from '@/lib/mcp/tools/whiteboard'
 import {
   agentJson,
@@ -149,16 +155,22 @@ export interface ServerSpec {
   instructions(tools: ReadonlySet<string>): string
 }
 
-/** The site-wide registry. Grows by phase; the Assignment cut four tools (acceptance.md D1). */
+/**
+ * The site-wide registry: 23 tools, the design's 27 less the four the Assignment cut
+ * (delete_post, save_taxonomy, get_test_metrics, whiteboard_update_item - acceptance.md D1).
+ */
 export const SITE_SERVER: ServerSpec = {
   name: 'port4lio',
   version: '2.0.0',
   tools: compileTools([
     getMeTool,
     getProfileTool,
+    updateProfileTool,
     ...BLOG_TOOLS,
     ...METRICS_TOOLS,
+    ...CCAF_TOOLS,
     ...whiteboardReadTools(SITE_WHITEBOARD_NAMES, ['read']),
+    ...whiteboardWriteTools(),
   ]),
   prompts: compilePrompts(PROMPTS),
   instructions: tools =>

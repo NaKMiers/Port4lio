@@ -1,12 +1,9 @@
-import { revalidatePath } from 'next/cache'
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { jsonError } from '@/lib/api-response'
-import { postsUsingSeries } from '@/lib/blog/series-data'
-import { connectDatabase } from '@/lib/mongodb'
+import { jsonError, serviceErrorResponse } from '@/lib/api-response'
+import { deleteSeries, updateSeries } from '@/lib/blog/taxonomy-service'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
-import { SeriesModel } from '@/models/Series'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,8 +24,11 @@ type RouteContext = { params: Promise<{ id: string }> }
  *        │
  *   DELETE posts still reference it  ──▶ 409 + the list of them
  *        │
- *   revalidatePath('/blog')                    ← the copy is rendered there
+ *   taxonomy-service: save ──▶ revalidatePath('/blog')   ← the copy is rendered there
  * ```
+ *
+ * The rules and the revalidation run inside `lib/blog/taxonomy-service.ts` (C8), so no
+ * front door can relabel without invalidating; this handler is the gate and the response.
  *
  * ## The slug cannot be changed, and refusing is better than silently migrating
  *
@@ -70,46 +70,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     slug?: unknown
   }>(request, { maxBytes: MAX_BODY_BYTES })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
-  const body = parsed.body ?? {}
-
-  if ('slug' in body && body.slug !== undefined)
-    return jsonError(
-      'A series slug cannot be changed - posts reference it. Create the new series, move the posts, then delete the old one.',
-      400
-    )
 
   try {
-    await connectDatabase()
-
     const { id } = await params
-    const series = await SeriesModel.findById(id)
-    if (!series) return jsonError('Series not found.', 404)
-
-    if (typeof body.title === 'string') {
-      const title = body.title.trim()
-      if (!title) return jsonError('A title is required.', 400)
-      series.title = title
-    }
-    if (typeof body.blurb === 'string') series.blurb = body.blurb.trim()
-    if (typeof body.order === 'number' && Number.isFinite(body.order))
-      series.order = Math.round(body.order)
-
-    await series.save()
-    revalidatePath('/blog')
-
-    return NextResponse.json({
-      series: {
-        id: String(series._id),
-        slug: series.slug,
-        title: series.title,
-        blurb: series.blurb,
-        order: series.order,
-      },
-    })
-  } catch (error) {
-    if (error instanceof Error && error.name === 'ValidationError')
-      return jsonError(error.message, 400)
-
+    const result = await updateSeries(id, parsed.body ?? {})
+    if (!result.ok) return serviceErrorResponse(result)
+    return NextResponse.json({ series: result.value })
+  } catch {
     return jsonError('Unable to save the series right now.', 500)
   }
 }
@@ -119,25 +86,9 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   if (denied) return denied
 
   try {
-    await connectDatabase()
-
     const { id } = await params
-    const series = await SeriesModel.findById(id)
-    if (!series) return jsonError('Series not found.', 404)
-
-    const inUse = await postsUsingSeries(series.slug)
-    if (inUse.length > 0)
-      return NextResponse.json(
-        {
-          error: `"${series.title}" is still used by ${inUse.length} post${inUse.length === 1 ? '' : 's'}. Move them to another series first.`,
-          posts: inUse,
-        },
-        { status: 409 }
-      )
-
-    await series.deleteOne()
-    revalidatePath('/blog')
-
+    const result = await deleteSeries(id)
+    if (!result.ok) return serviceErrorResponse(result)
     return NextResponse.json({ ok: true })
   } catch {
     return jsonError('Unable to delete the series right now.', 500)

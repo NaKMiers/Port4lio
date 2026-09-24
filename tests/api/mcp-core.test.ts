@@ -138,6 +138,7 @@ const contextOf = async (token: string) => {
 
 /** The registry's read tools, grown phase by phase (acceptance.md "Tool coverage"). */
 const READ_TOOLS = [
+  'ccaf_status',
   'get_briefing',
   'get_me',
   'get_post',
@@ -364,6 +365,24 @@ describe('per-request registration (C1, C6)', () => {
     const { toolNames } = mcpClient(mcpPost, MCP_URL)
     expect(await toolNames(token)).toEqual(expected)
     expect(expected).toEqual(READ_TOOLS)
+  })
+
+  it('the registry is the 27 designed tools less the four the Assignment cut (D1)', () => {
+    const names = serverLib.SITE_SERVER.tools.map(({ def }) => def.name)
+    expect(names).toHaveLength(23)
+    for (const cut of [
+      'delete_post',
+      'save_taxonomy',
+      'get_test_metrics',
+      'whiteboard_update_item',
+      'generate_post',
+    ])
+      expect(names).not.toContain(cut)
+    expect(serverLib.SITE_SERVER.prompts.map(({ def }) => def.name)).toEqual([
+      'write-post',
+      'weekly-briefing',
+      'tailor-cv',
+    ])
   })
 
   it('every listed tool carries its JSON Schema, built once at module load', async () => {

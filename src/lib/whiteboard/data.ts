@@ -70,6 +70,10 @@ import {
  *
  *   owner writes:  create (idempotent upsert) · PATCH (only changed fields) · bulk move
  *                  delete: links ─▶ un-parent children ─▶ item      (no transaction)
+ *
+ *   agent writes:  createAgentItem ─▶ only on a VISIBLE board, at top level or inside a
+ *                  VISIBLE frame; the card gets includeInAi: true and the tag `agent`
+ *                  createAgentLink ─▶ only between two items loadAgentVisible can see
  * ```
  *
  * ## Boards scope every query (D32)
@@ -1272,6 +1276,167 @@ export async function deleteLink(
   })
   if (!deletedCount) return failure(404, 'Link not found.')
   return { ok: true, value: null }
+}
+
+// MARK: Agent writes (site MCP: whiteboard_add_item, whiteboard_link)
+
+/**
+ * The boards an agent may write to are exactly the boards it may read (rule 1). Listed with
+ * their titles so a refusal can tell the agent which ids it could have used.
+ */
+async function visibleBoards() {
+  return WhiteboardBoardModel.find({ includeInAi: true }, { title: 1 })
+    .sort({ createdAt: 1 })
+    .lean()
+}
+
+/** Is this item visible to an agent: on a visible board, its own switch on, parent visible? */
+async function agentVisibleItem(id: string) {
+  if (!isObjectIdString(id)) return null
+  const boardIds = await visibleBoardIds()
+  const scope = await visibleScope(boardIds)
+  return WhiteboardItemModel.findOne(visibleAnd(scope, { _id: oid(id) }), {
+    boardId: 1,
+    form: 1,
+    x: 1,
+    y: 1,
+    width: 1,
+    height: 1,
+  }).lean()
+}
+
+/** Right of everything already at that level, so an agent card never lands on top of one. */
+async function freePosition(
+  boardId: Types.ObjectId,
+  parentId: Types.ObjectId | null
+) {
+  const siblings = await WhiteboardItemModel.find(
+    { boardId, parentId },
+    { x: 1, y: 1, width: 1, height: 1 }
+  ).lean()
+  if (parentId)
+    // Inside a frame, coordinates are the frame's own: stack below the last card.
+    return {
+      x: 24,
+      y:
+        siblings.reduce(
+          (low, item) => Math.max(low, item.y + item.height),
+          24
+        ) + 24,
+    }
+  if (siblings.length === 0) return { x: 0, y: 0 }
+  return {
+    x: Math.max(...siblings.map(item => item.x + item.width)) + 80,
+    y: Math.min(...siblings.map(item => item.y)),
+  }
+}
+
+export interface AgentItemInput {
+  /** A board id; optional when frameId is given or exactly one board is visible. */
+  boardId?: string
+  /** A visible frame to put the card in. */
+  frameId?: string
+  form: 'text' | 'todo'
+  title: string
+  body?: string
+  meaning?: Meaning | null
+  status?: Status | null
+  todos?: { text: string; done?: boolean }[]
+  tags?: string[]
+  when?: string | null
+  targetBy?: string | null
+}
+
+/**
+ * Create a text or to-do card for an agent, only where an agent can already see (mcp.md
+ * "Whiteboard writes"). The card is agent-visible itself - `includeInAi: true` - so the agent
+ * can read it back and link it, and it carries the existing `agent` tag, which needs no new
+ * schema field and so no change to the backup format, `visible.ts` or the parity test.
+ */
+export async function createAgentItem(
+  input: AgentItemInput
+): Promise<DataResult<ClientItem>> {
+  await connectDatabase()
+  const boards = await visibleBoards()
+  const listBoards = () =>
+    boards.length
+      ? `Visible boards: ${boards.map(board => `${board.title || 'Untitled'} (${String(board._id)})`).join(', ')}.`
+      : 'No board is shared with agents.'
+
+  let boardId: Types.ObjectId | null = null
+  let parentId: Types.ObjectId | null = null
+  if (input.frameId) {
+    const frame = await agentVisibleItem(input.frameId)
+    if (!frame || frame.form !== 'frame')
+      return failure(404, 'No visible frame with that id.')
+    boardId = frame.boardId
+    parentId = frame._id
+    if (input.boardId && String(boardId) !== input.boardId.toLowerCase())
+      return failure(400, 'That frame is on another board.')
+  } else if (input.boardId) {
+    const board = boards.find(
+      entry => String(entry._id) === input.boardId!.toLowerCase()
+    )
+    if (!board)
+      return failure(404, `No visible board with that id. ${listBoards()}`)
+    boardId = board._id
+  } else if (boards.length === 1) boardId = boards[0]._id
+  else
+    return failure(
+      400,
+      `Say which board: pass boardId, or frameId to put the card in a frame. ${listBoards()}`
+    )
+
+  const position = await freePosition(boardId, parentId)
+  const tags = Array.from(new Set(['agent', ...(input.tags ?? [])]))
+  const checked = validateItem({
+    _id: new Types.ObjectId().toHexString(),
+    form: input.form,
+    title: input.title,
+    body: input.body ?? '',
+    meaning: input.meaning ?? null,
+    status: input.status ?? null,
+    todos: (input.todos ?? []).map((row, index) => ({
+      id: `row-${index + 1}`,
+      text: row.text,
+      done: row.done ?? false,
+    })),
+    tags,
+    when: input.when ?? null,
+    targetBy: input.targetBy ?? null,
+    parentId: parentId ? String(parentId) : null,
+    includeInAi: true,
+    ...position,
+  })
+  if (!checked.ok) return failure(checked.status ?? 400, checked.error)
+
+  return createItem(String(boardId), checked.value)
+}
+
+/** A labelled link between two items an agent can see, on the same board. */
+export async function createAgentLink(input: {
+  from: string
+  to: string
+  label: string
+}): Promise<DataResult<ClientLink>> {
+  await connectDatabase()
+  const [from, to] = await Promise.all([
+    agentVisibleItem(input.from),
+    agentVisibleItem(input.to),
+  ])
+  // Hidden, unknown and malformed ids are the same answer (rule 6), for either end.
+  if (!from || !to) return failure(404, 'No visible item with that id.')
+  if (String(from.boardId) !== String(to.boardId))
+    return failure(400, 'A link joins two items on the same board.')
+
+  const checked = validateLink({
+    _id: new Types.ObjectId().toHexString(),
+    from: input.from.toLowerCase(),
+    to: input.to.toLowerCase(),
+    label: input.label,
+  })
+  if (!checked.ok) return failure(checked.status ?? 400, checked.error)
+  return createLink(String(from.boardId), checked.value)
 }
 
 // MARK: Restore (D20, D21)

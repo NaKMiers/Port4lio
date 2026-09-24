@@ -6,7 +6,8 @@ import { buildWritingBrief } from '@/lib/blog/writing-brief'
 import type { PromptDefinition } from '@/lib/mcp/server'
 
 /**
- * The MCP prompts. In Claude Code they appear as slash commands (`/mcp__port4lio__write-post`).
+ * The MCP prompts: write-post, weekly-briefing and tailor-cv. In Claude Code they appear as
+ * slash commands (`/mcp__port4lio__write-post`).
  * Each is rendered per request from the token's tool list (C6), so "call publish_post" only
  * appears for a token that has it. Clients without prompt support get the same text from
  * `get_writing_brief`.
@@ -66,7 +67,29 @@ export const weeklyBriefingPrompt: PromptDefinition = {
   },
 }
 
+export const tailorCvPrompt: PromptDefinition = {
+  name: 'tailor-cv',
+  title: 'Tailor my CV to a job posting',
+  description:
+    "Read the owner's CV and profile with get_me, then return a CV tailored to the posting, as markdown. It never writes the profile: the /cv sheet is edited only in /admin/settings.",
+  scopes: ['read'],
+  args: z.object({ job_posting: z.string() }),
+  render(args) {
+    return [
+      "Tailor the owner's CV to this job posting:",
+      '```',
+      args.job_posting ?? '(the owner will paste it)',
+      '```',
+      "Call get_me first (its cv field is the owner's real CV, contact details included), and get_profile career or work when you need more detail on a project or role.",
+      'Then return the tailored CV as markdown, in the same sections the CV already has: lead with the experience and projects that match the posting, reword bullets toward its language where the facts support it, and drop what does not help.',
+      'Invent nothing: every role, date, number and skill must come from what get_me or get_profile returned. If the posting asks for something the owner does not have, say so in a short note after the CV instead of adding it.',
+      'Do not call update_profile, even if it is in your tool list. The /cv page is a fixed A4 sheet edited only in /admin/settings; the owner pastes what they keep there.',
+    ].join('\n')
+  },
+}
+
 export const PROMPTS: PromptDefinition[] = [
   writePostPrompt,
   weeklyBriefingPrompt,
+  tailorCvPrompt,
 ]

@@ -21,6 +21,7 @@ import { listKindsWithCounts } from '@/lib/blog/kind-data'
 import { lintDraft } from '@/lib/blog/lint-draft'
 import { LlmError } from '@/lib/blog/llm'
 import {
+  archivePost,
   createDraft,
   listPosts,
   publishPost,
@@ -48,7 +49,7 @@ import { PostModel } from '@/models/Post'
  * ```
  *   read     list_posts · get_post · list_taxonomy · get_writing_brief · lint_draft
  *   write    create_draft (keyed) · update_post* · generate_image* (keyed) · illustrate_post*
- *   publish  publish_post
+ *   publish  publish_post · archive_post
  *            * a published target needs publish too - checked here at run time, because the
  *              scope a call needs depends on the post, not on the tool (the live-post rule)
  * ```
@@ -597,6 +598,32 @@ export const publishPostTool = defineTool({
   },
 })
 
+export const archivePostTool = defineTool({
+  name: 'archive_post',
+  title: 'Archive or unarchive a post',
+  description:
+    "action 'archive' takes a published post off the site (it 404s and leaves /blog and the feed; nothing is deleted). action 'unarchive' returns an archived post that was never public to draft; one that was public is refused - use publish_post to make it live again.",
+  scopes: ['publish'],
+  audited: true,
+  cost: () => [BLOG_SAVE_LIMIT],
+  input: z.object({
+    id: objectId,
+    action: z.enum(['archive', 'unarchive']),
+  }),
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: true,
+  },
+  async run({ id, action }, { setTarget }) {
+    const result = await archivePost(id, action)
+    if (!result.ok) return fromFailure(result)
+    setTarget({ kind: 'post', id, slug: result.value.slug })
+    return ok(json({ id, ...result.value }))
+  },
+})
+
 export const BLOG_TOOLS = [
   listPostsTool,
   getPostTool,
@@ -608,4 +635,5 @@ export const BLOG_TOOLS = [
   generateImageTool,
   illustratePostTool,
   publishPostTool,
+  archivePostTool,
 ]

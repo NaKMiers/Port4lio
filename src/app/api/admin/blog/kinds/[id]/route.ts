@@ -1,12 +1,9 @@
-import { revalidatePath } from 'next/cache'
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { jsonError } from '@/lib/api-response'
-import { postsUsingKind } from '@/lib/blog/kind-data'
-import { connectDatabase } from '@/lib/mongodb'
+import { jsonError, serviceErrorResponse } from '@/lib/api-response'
+import { deleteKind, updateKind } from '@/lib/blog/taxonomy-service'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
-import { KindModel } from '@/models/Kind'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,8 +24,11 @@ type RouteContext = { params: Promise<{ id: string }> }
  *   DELETE posts still reference it  ──▶ 409 + the list of them
  *          it is the only kind left  ──▶ 409   ← the rule series does not need
  *        │
- *   revalidatePath('/blog')                    ← `label` prints on the card
+ *   taxonomy-service: save ──▶ revalidatePath('/blog')   ← `label` prints on the card
  * ```
+ *
+ * The rules and the revalidation run inside `lib/blog/taxonomy-service.ts` (C8), so no
+ * front door can relabel without invalidating; this handler is the gate and the response.
  *
  * ## The last-kind guard, which has no series equivalent
  *
@@ -60,46 +60,13 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     slug?: unknown
   }>(request, { maxBytes: MAX_BODY_BYTES })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
-  const body = parsed.body ?? {}
-
-  if ('slug' in body && body.slug !== undefined)
-    return jsonError(
-      'A kind slug cannot be changed - posts reference it. Create the new kind, move the posts, then delete the old one.',
-      400
-    )
 
   try {
-    await connectDatabase()
-
     const { id } = await params
-    const kind = await KindModel.findById(id)
-    if (!kind) return jsonError('Kind not found.', 404)
-
-    if (typeof body.label === 'string') {
-      const label = body.label.trim()
-      if (!label) return jsonError('A label is required.', 400)
-      kind.label = label
-    }
-    if (typeof body.eyebrow === 'boolean') kind.eyebrow = body.eyebrow
-    if (typeof body.order === 'number' && Number.isFinite(body.order))
-      kind.order = Math.round(body.order)
-
-    await kind.save()
-    revalidatePath('/blog')
-
-    return NextResponse.json({
-      kind: {
-        id: String(kind._id),
-        slug: kind.slug,
-        label: kind.label,
-        eyebrow: kind.eyebrow,
-        order: kind.order,
-      },
-    })
-  } catch (error) {
-    if (error instanceof Error && error.name === 'ValidationError')
-      return jsonError(error.message, 400)
-
+    const result = await updateKind(id, parsed.body ?? {})
+    if (!result.ok) return serviceErrorResponse(result)
+    return NextResponse.json({ kind: result.value })
+  } catch {
     return jsonError('Unable to save the kind right now.', 500)
   }
 }
@@ -109,33 +76,9 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   if (denied) return denied
 
   try {
-    await connectDatabase()
-
     const { id } = await params
-    const kind = await KindModel.findById(id)
-    if (!kind) return jsonError('Kind not found.', 404)
-
-    // Checked before the in-use count, because it is the one an owner cannot work around by
-    // moving posts - saying so first avoids sending them to reassign posts pointlessly.
-    if ((await KindModel.countDocuments({})) <= 1)
-      return jsonError(
-        'This is the only kind left. Every post must have one, so create another before deleting this.',
-        409
-      )
-
-    const inUse = await postsUsingKind(kind.slug)
-    if (inUse.length > 0)
-      return NextResponse.json(
-        {
-          error: `"${kind.label}" is still used by ${inUse.length} post${inUse.length === 1 ? '' : 's'}. Move them to another kind first.`,
-          posts: inUse,
-        },
-        { status: 409 }
-      )
-
-    await kind.deleteOne()
-    revalidatePath('/blog')
-
+    const result = await deleteKind(id)
+    if (!result.ok) return serviceErrorResponse(result)
     return NextResponse.json({ ok: true })
   } catch {
     return jsonError('Unable to delete the kind right now.', 500)

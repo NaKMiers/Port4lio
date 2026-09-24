@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { renderContext } from '@/lib/whiteboard/context'
 import {
+  createAgentItem,
+  createAgentLink,
   createItem,
   createLink,
   loadAgentVisible,
@@ -312,6 +314,52 @@ describe('the browser export matches the agent export, scope by scope', () => {
     const client = renderContext(mine.input, { maxBytes: 1_200 })
     expect(server.truncated).toBe(true)
     expect(client).toEqual(server)
+  })
+})
+
+describe('an agent-created card is in both exports (site MCP whiteboard writes)', () => {
+  // Written through the same wrappers `whiteboard_add_item` / `whiteboard_link` use. They add
+  // no schema field - the mark is the existing `agent` tag - so the browser filter and the
+  // Mongo filter must still agree on every scope with these cards on the board.
+  beforeAll(async () => {
+    const top = await createAgentItem({
+      boardId: BOARD,
+      form: 'text',
+      title: 'Agent idea',
+      meaning: 'goal',
+      status: 'active',
+    })
+    const inFrame = await createAgentItem({
+      frameId: ids.Plans,
+      form: 'todo',
+      title: 'Agent steps',
+      todos: [{ text: 'One' }],
+    })
+    if (!top.ok || !inFrame.ok) throw new Error('agent create failed')
+    ids['Agent idea'] = top.value._id
+    ids['Agent steps'] = inFrame.value._id
+    const linked = await createAgentLink({
+      from: ids['Agent idea'],
+      to: ids['Ship it'],
+      label: 'serves',
+    })
+    if (!linked.ok) throw new Error(linked.error)
+  })
+
+  it.each(SCOPES)('%s', async (_name, scope) => {
+    const { server, client } = await both(scope())
+    expect(client).toEqual(server)
+  })
+
+  it('the agent cards are visible, tagged, and linked in the export', async () => {
+    const all = await both({ kind: 'all' })
+    expect(all.client.markdown).toContain('Agent idea')
+    expect(all.client.markdown).toContain('Agent steps')
+    expect(all.client.markdown).toContain('`agent`')
+    expect(all.client.markdown).toContain('serves -> [[Ship it]]')
+
+    const frame = await both({ kind: 'frame', id: ids.Plans })
+    expect(frame.client.markdown).toContain('Agent steps')
   })
 })
 

@@ -1,12 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
-import { jsonError } from '@/lib/api-response'
-import { SERIES_SLUG_PATTERN } from '@/lib/blog/constants'
+import { jsonError, serviceErrorResponse } from '@/lib/api-response'
 import { listSeriesWithCounts } from '@/lib/blog/series-data'
-import { connectDatabase } from '@/lib/mongodb'
+import { createSeries } from '@/lib/blog/taxonomy-service'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
-import { SeriesModel } from '@/models/Series'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -51,47 +49,10 @@ export async function POST(request: NextRequest) {
   }>(request, { maxBytes: MAX_BODY_BYTES })
   if (!parsed.ok) return jsonError(parsed.error, parsed.status)
 
-  const slug =
-    typeof parsed.body?.slug === 'string' ? parsed.body.slug.trim() : ''
-  const title =
-    typeof parsed.body?.title === 'string' ? parsed.body.title.trim() : ''
-  const blurb =
-    typeof parsed.body?.blurb === 'string' ? parsed.body.blurb.trim() : ''
-
-  if (!SERIES_SLUG_PATTERN.test(slug))
-    return jsonError('Series slug must match ^[a-z0-9-]{1,48}$.', 400)
-
-  if (!title) return jsonError('A title is required.', 400)
-
   try {
-    await connectDatabase()
-
-    if (await SeriesModel.exists({ slug }))
-      return jsonError(`The series "${slug}" already exists.`, 409)
-
-    // Appended, not prepended. A new series is the least established one, and the index
-    // order is editorial - putting it first would silently demote the pillar clusters.
-    const last = await SeriesModel.findOne({})
-      .sort({ order: -1 })
-      .select('order')
-      .lean()
-    const created = await SeriesModel.create({
-      slug,
-      title,
-      blurb,
-      order: (last?.order ?? -1) + 1,
-    })
-
-    return NextResponse.json({
-      series: {
-        id: String(created._id),
-        slug: created.slug,
-        title: created.title,
-        blurb: created.blurb,
-        order: created.order,
-        postCount: 0,
-      },
-    })
+    const result = await createSeries(parsed.body ?? {})
+    if (!result.ok) return serviceErrorResponse(result)
+    return NextResponse.json({ series: result.value })
   } catch {
     return jsonError('Unable to create the series right now.', 500)
   }

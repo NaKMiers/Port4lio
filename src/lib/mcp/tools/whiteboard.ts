@@ -10,7 +10,11 @@ import {
   renderOverview,
   renderSearchResults,
 } from '@/lib/whiteboard/context'
-import { loadAgentVisible } from '@/lib/whiteboard/data'
+import {
+  createAgentItem,
+  createAgentLink,
+  loadAgentVisible,
+} from '@/lib/whiteboard/data'
 import { LIMITS, MEANINGS, STATUSES } from '@/lib/whiteboard/limits'
 
 /**
@@ -22,6 +26,8 @@ import { LIMITS, MEANINGS, STATUSES } from '@/lib/whiteboard/limits'
  *   search     whiteboard_search          search_context     ──▶ loadAgentVisible search
  *   item       whiteboard_get_item        get_item           ──▶ loadAgentVisible item
  *                  scopes: read              scopes: read OR whiteboard:legacy (C5)
+ *
+ *   whiteboard_add_item · whiteboard_link   (write, /api/mcp only)   visible-only, keyed (R4)
  * ```
  *
  * One factory, two name sets: the alias keeps the three names existing `claude mcp add`
@@ -131,4 +137,120 @@ export function whiteboardReadTools(
   })
 
   return [overview, search, item]
+}
+
+/**
+ * The two whiteboard writes (site MCP only; the alias stays read-only). Visible-only: a card
+ * lands on a board, or in a frame, an agent can already read, and a link joins two items it
+ * can see - `createAgentItem` / `createAgentLink` in `whiteboard/data.ts` hold those rules.
+ * `whiteboard_update_item` was cut from the registry (acceptance.md D1): no write here can
+ * change an owner-written card.
+ */
+export function whiteboardWriteTools() {
+  const addItem = defineTool({
+    name: 'whiteboard_add_item',
+    title: 'Add a whiteboard card',
+    description:
+      "Add a text or to-do card to the owner's whiteboard: on a board they share with agents (boardId, needed only when several are shared) or inside a visible frame (frameId from whiteboard_overview). Give it a meaning (dream, goal, failure, draft, note) and, for a dream or goal, a status. The card is tagged 'agent' and is visible to you afterwards; link it with whiteboard_link. The owner sees it on the next load of the board. Pass a clientRef so a retry does not add it twice.",
+    scopes: ['write'],
+    keyed: true,
+    input: z.object({
+      boardId: z.string().max(64).optional(),
+      frameId: z.string().max(64).optional(),
+      form: z.enum(['text', 'todo']).default('text'),
+      title: z.string().min(1).max(LIMITS.title),
+      body: z.string().max(LIMITS.body).optional(),
+      meaning: z.enum(MEANINGS).optional(),
+      status: z.enum(STATUSES).optional(),
+      todos: z
+        .array(
+          z.object({
+            text: z.string().min(1).max(LIMITS.todoText),
+            done: z.boolean().optional(),
+          })
+        )
+        .max(LIMITS.todos)
+        .optional(),
+      tags: z
+        .array(z.string().min(1).max(LIMITS.tagLength))
+        .max(LIMITS.tags - 1)
+        .optional(),
+      when: day,
+      targetBy: day,
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    async run(args, { setTarget }) {
+      if (args.form !== 'todo' && args.todos?.length)
+        return refuse("Only a to-do card has todos: pass form 'todo'.")
+      const result = await createAgentItem(args)
+      if (!result.ok)
+        return refuse(
+          result.error,
+          result.status === 404 ? 'not-found' : 'invalid'
+        )
+      setTarget({ kind: 'whiteboard-item', id: result.value._id })
+      return ok(
+        JSON.stringify(
+          {
+            id: result.value._id,
+            title: result.value.title,
+            meaning: result.value.meaning,
+            status: result.value.status,
+            tags: result.value.tags,
+            parentId: result.value.parentId,
+          },
+          null,
+          2
+        )
+      )
+    },
+  })
+
+  const link = defineTool({
+    name: 'whiteboard_link',
+    title: 'Link two whiteboard cards',
+    description:
+      'Draw a labelled arrow from one card to another, both visible to you and on the same board (ids from whiteboard_search or whiteboard_add_item). The label reads from -> to, e.g. "serves", "blocks", "led to". Pass a clientRef so a retry does not draw it twice.',
+    scopes: ['write'],
+    keyed: true,
+    input: z.object({
+      from: z.string().max(64),
+      to: z.string().max(64),
+      label: z.string().max(LIMITS.linkLabel).default(''),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
+    async run(args, { setTarget }) {
+      const result = await createAgentLink(args)
+      if (!result.ok)
+        return refuse(
+          result.error,
+          result.status === 404 ? 'not-found' : 'invalid'
+        )
+      setTarget({ kind: 'whiteboard-link', id: result.value._id })
+      return ok(
+        JSON.stringify(
+          {
+            id: result.value._id,
+            from: result.value.from,
+            to: result.value.to,
+            label: result.value.label,
+          },
+          null,
+          2
+        )
+      )
+    },
+  })
+
+  return [addItem, link]
 }

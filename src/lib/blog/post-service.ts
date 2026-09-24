@@ -1354,3 +1354,41 @@ export async function publishPost(
   if (!result.ok) return result
   return success({ slug: result.value.slug, alreadyPublished: false })
 }
+
+/**
+ * `archive_post`: take a live post off the site, or bring an archived one back (C11).
+ *
+ * Unarchive goes through `patchPost`'s own transition rules, so nothing new is decided here:
+ * a post that was never public (`publishedAt: null`, like every generated post) goes back to
+ * draft; one that was public is refused with the route's own message, and `publish_post` -
+ * which allows archived to published without moving `publishedAt` - is the way back.
+ */
+export async function archivePost(
+  id: string,
+  action: 'archive' | 'unarchive'
+): Promise<ServiceResult<{ slug: string; status: PostStatus }>> {
+  await connectDatabase()
+  const post = await loadPost(id)
+  if (!post || post.status === 'deleted') return failure(404, 'Post not found.')
+
+  if (action === 'archive') {
+    if (post.status === 'archived')
+      return success({ slug: post.slug, status: post.status })
+    const result = await patchPost(id, { status: 'archived' })
+    if (!result.ok) return result
+    return success({ slug: result.value.slug, status: result.value.status })
+  }
+
+  if (post.status !== 'archived')
+    return failure(409, `This post is ${post.status}, not archived.`)
+  const result = await patchPost(id, { status: 'draft' })
+  if (!result.ok)
+    return failure(
+      result.status,
+      `${result.error} Use publish_post to make it live again.`,
+      {
+        reason: 'conflict',
+      }
+    )
+  return success({ slug: result.value.slug, status: result.value.status })
+}
