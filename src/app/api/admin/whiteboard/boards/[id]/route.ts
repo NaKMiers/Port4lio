@@ -12,7 +12,11 @@ export const dynamic = 'force-dynamic'
 type RouteContext = { params: Promise<{ id: string }> }
 
 /**
- * [PATCH]  /api/admin/whiteboard/boards/<id> - `{ title }` and/or `{ includeInAi }` (D32)
+ * [PATCH]  /api/admin/whiteboard/boards/<id> - any of `{ title, includeInAi, share, slug }` (D32)
+ *
+ * `share` is 'off' | 'view' | 'edit' and `slug` names the share link (`null` or '' clears it,
+ * and the link falls back to the id). A slug another board already has is a 409, from the
+ * unique index rather than a read-then-write, so two renames at once cannot both win.
  * [DELETE] /api/admin/whiteboard/boards/<id> - the board and everything on it
  *
  * The delete is hard and is not undoable from the canvas - undo lives inside a board and

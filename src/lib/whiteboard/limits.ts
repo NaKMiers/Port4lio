@@ -74,6 +74,15 @@ export const LIMITS = {
   size: 100_000,
 } as const
 
+/**
+ * Items a board may hold before a share link stops adding to it. The owner is never capped;
+ * this bounds what an edit link can pour into the database. With the per-IP write limit
+ * (WHITEBOARD_SHARE_WRITE_LIMIT) and the item body cap below, a board a stranger fills is
+ * at worst a few hundred MB of mostly ink, and a realistic one a few MB. Counted over the
+ * whole board, the owner's own items included.
+ */
+export const SHARED_BOARD_MAX_ITEMS = 1_000
+
 /** Body caps for `readJsonBody`, per route family. */
 export const ITEM_MAX_BODY_BYTES = 256 * 1024
 export const RESTORE_MAX_BODY_BYTES = 2 * 1024 * 1024
@@ -655,11 +664,43 @@ export function validateBoard(input: unknown): Verdict<BoardFields> {
   }
 }
 
-export function validateBoardPatch(
-  input: unknown
-): Verdict<Partial<BoardFields>> {
+export const SHARE_MODES = ['off', 'view', 'edit'] as const
+export type ShareMode = (typeof SHARE_MODES)[number]
+
+export const SLUG_MIN = 3
+export const SLUG_MAX = 64
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+/**
+ * A board's share slug: lowercase words joined by single hyphens, 3-64 characters.
+ *
+ * Never 24 hex characters: `/whiteboard/<key>` takes a slug OR a board id, and a slug shaped
+ * like an id would make that URL mean two boards at once. Input is trimmed and lowercased
+ * first, so "Q3 Plan" typed with a stray capital is refused for its space, not its case.
+ */
+export function validateSlug(input: unknown): Verdict<string> {
+  if (typeof input !== 'string') return fail('slug must be a string.')
+  const slug = input.trim().toLowerCase()
+  if (slug.length < SLUG_MIN || slug.length > SLUG_MAX)
+    return fail(`The link name must be ${SLUG_MIN}-${SLUG_MAX} characters.`)
+  if (!SLUG_PATTERN.test(slug))
+    return fail(
+      'The link name can use letters, numbers and single hyphens between them.'
+    )
+  if (OBJECT_ID_PATTERN.test(slug))
+    return fail('The link name cannot look like a board id.')
+  return { ok: true, value: slug }
+}
+
+/** A board patch: the fields above, plus how it is shared. `slug: null` clears it. */
+export type BoardPatch = Partial<BoardFields> & {
+  share?: ShareMode
+  slug?: string | null
+}
+
+export function validateBoardPatch(input: unknown): Verdict<BoardPatch> {
   const raw = (input ?? {}) as Record<string, unknown>
-  const patch: Partial<BoardFields> = {}
+  const patch: BoardPatch = {}
   if ('title' in raw) {
     const title = singleLine('title', raw.title, LIMITS.title)
     if (!title.ok) return fail(title.error)
@@ -669,6 +710,23 @@ export function validateBoardPatch(
     if (typeof raw.includeInAi !== 'boolean')
       return fail('includeInAi must be a boolean.')
     patch.includeInAi = raw.includeInAi
+  }
+  if ('share' in raw) {
+    if (!SHARE_MODES.includes(raw.share as ShareMode))
+      return fail('share must be off, view or edit.')
+    patch.share = raw.share as ShareMode
+  }
+  // Empty, blank and null all mean "no slug": the link falls back to the board id.
+  if (
+    'slug' in raw &&
+    (raw.slug === null ||
+      (typeof raw.slug === 'string' && raw.slug.trim() === ''))
+  )
+    patch.slug = null
+  else if ('slug' in raw) {
+    const slug = validateSlug(raw.slug)
+    if (!slug.ok) return slug
+    patch.slug = slug.value
   }
   if (Object.keys(patch).length === 0) return fail('Nothing to update.')
   return { ok: true, value: patch }

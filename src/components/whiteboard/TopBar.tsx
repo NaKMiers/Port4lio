@@ -15,11 +15,11 @@ import { cn } from '@/lib/utils'
  *
  * ```
  *   < md     [grid] [Title that truncates.......▾] [• SAVED]
- *            [OFF|ON] [Save 3]              [Archive] [Sparkles]
+ *            [OFF|ON] [Save 3]       [Link] [Archive] [Sparkles]
  *
- *   md-lg    [grid] [Title....▾] [• SAVED] [OFF|ON] [Save 3]  [Eye 3] [Archive] [Spark]
+ *   md-lg    [grid] [Title....▾] [• SAVED] [OFF|ON] [Save 3]  [Eye 3] [Link] [Archive] [Spark]
  *   lg       ...same, and "Export to AI" gets its label back (the primary action)
- *   xl       ...every label: AUTO-SAVE, "3 hidden", BACKUP ▾
+ *   xl       ...every label: AUTO-SAVE, "3 hidden", SHARE, BACKUP ▾
  * ```
  *
  * Eight controls do not fit one row at 360px - nine were measured at 146px over with auto-save
@@ -59,6 +59,7 @@ function TopBar({
   boardHidden,
   onHiddenClick,
   backup,
+  share,
   exportDisabled,
   exportOpen,
   onExport,
@@ -72,16 +73,21 @@ function TopBar({
   /** The whole board is hidden from agents, which the chip says instead of a count. */
   boardHidden: boolean
   onHiddenClick: () => void
-  backup: ReactNode
-  exportDisabled: boolean
-  exportOpen: boolean
-  onExport: () => void
+  /** Owner only. */
+  backup?: ReactNode
+  /** The owner's Share menu, or a visitor's Copy link. */
+  share: ReactNode
+  exportDisabled?: boolean
+  exportOpen?: boolean
+  /** Owner only: no button without it. */
+  onExport?: () => void
   /**
    * Runs a navigation off the board, asking first if anything would be lost by it (see the
-   * header). Every exit goes through it, here and in the switcher.
+   * header). Every exit goes through it, here and in the switcher. Owner only: without it
+   * there is no way back to the hub, because a visitor has no hub.
    */
-  onLeave: (go: () => void) => void
-  saveControls: ReactNode
+  onLeave?: (go: () => void) => void
+  saveControls?: ReactNode
   className?: string
 }) {
   const router = useRouter()
@@ -93,23 +99,25 @@ function TopBar({
       )}
     >
       <div className="flex min-w-0 items-center gap-2 md:contents">
-        <Link
-          href="/admin/whiteboard"
-          aria-label="All boards"
-          title="All boards"
-          onClick={event => {
-            // Still a Link, so it can be opened in a new tab or copied; the guard only takes
-            // over the plain click, which is the one that unmounts this canvas.
-            event.preventDefault()
-            onLeave(() => router.push('/admin/whiteboard'))
-          }}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-pp-line bg-white/85 text-pp-muted no-underline hover:text-pp-text lg:h-9 lg:w-9"
-        >
-          <LayoutGrid
-            aria-hidden
-            size={16}
-          />
-        </Link>
+        {onLeave ? (
+          <Link
+            href="/admin/whiteboard"
+            aria-label="All boards"
+            title="All boards"
+            onClick={event => {
+              // Still a Link, so it can be opened in a new tab or copied; the guard only takes
+              // over the plain click, which is the one that unmounts this canvas.
+              event.preventDefault()
+              onLeave(() => router.push('/admin/whiteboard'))
+            }}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-pp-line bg-white/85 text-pp-muted no-underline hover:text-pp-text lg:h-9 lg:w-9"
+          >
+            <LayoutGrid
+              aria-hidden
+              size={16}
+            />
+          </Link>
+        ) : null}
         <div className="flex min-w-0 flex-1 md:flex-initial">
           {boardSwitcher}
         </div>
@@ -148,22 +156,25 @@ function TopBar({
             )}
           </button>
         ) : null}
+        {share}
         {backup}
-        <button
-          type="button"
-          disabled={exportDisabled}
-          aria-expanded={exportOpen}
-          onClick={onExport}
-          title="Export to AI (Ctrl/Cmd+E)"
-          aria-label="Export to AI"
-          className="inline-flex min-h-[40px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-pp-text px-3 text-[12.5px] font-semibold text-white shadow-[0_18px_34px_rgba(17,17,17,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-4"
-        >
-          <Sparkles
-            aria-hidden
-            size={15}
-          />
-          <span className="hidden lg:inline">Export to AI</span>
-        </button>
+        {onExport ? (
+          <button
+            type="button"
+            disabled={exportDisabled}
+            aria-expanded={exportOpen}
+            onClick={onExport}
+            title="Export to AI (Ctrl/Cmd+E)"
+            aria-label="Export to AI"
+            className="inline-flex min-h-[40px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-pp-text px-3 text-[12.5px] font-semibold text-white shadow-[0_18px_34px_rgba(17,17,17,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:px-4"
+          >
+            <Sparkles
+              aria-hidden
+              size={15}
+            />
+            <span className="hidden lg:inline">Export to AI</span>
+          </button>
+        ) : null}
       </div>
     </header>
   )

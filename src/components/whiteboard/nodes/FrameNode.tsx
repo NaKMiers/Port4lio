@@ -26,7 +26,9 @@ type FrameNode = Node<ItemNodeData, 'frame'>
 
 function FrameNodeView({ id, data, selected }: NodeProps<FrameNode>) {
   const { item, error, childCount } = data
-  const hidden = !item.includeInAi
+  // From the canvas, not `!item.includeInAi`, so a share link can switch the styling off
+  // (Canvas `aiStyling`). A frame has no parent, so for it the two are the same flag.
+  const hidden = data.hidden
   const ui = useBoardUi()
   const editing = ui.editingId === id
 

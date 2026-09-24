@@ -9,11 +9,13 @@ import {
   isSingleLine,
   parseDay,
   validateBackupFile,
+  validateBoardPatch,
   validateBulkUpdates,
   validateItem,
   validateItemPatch,
   validateLink,
   validateLinkPatch,
+  validateSlug,
 } from '@/lib/whiteboard/limits'
 import { DEFAULT_VOCAB, normalizeStatus } from '@/lib/whiteboard/vocab'
 
@@ -243,6 +245,68 @@ describe('patch', () => {
 
   it('refuses an empty patch', () => {
     expect(validateItemPatch({}).ok).toBe(false)
+  })
+})
+
+describe('share link (board patch)', () => {
+  it('accepts the three share modes and nothing else', () => {
+    for (const share of ['off', 'view', 'edit'])
+      expect(validateBoardPatch({ share })).toEqual({
+        ok: true,
+        value: { share },
+      })
+    for (const share of ['public', '', null, true])
+      expect(validateBoardPatch({ share }).ok).toBe(false)
+  })
+
+  it('trims and lowercases a slug before checking it', () => {
+    expect(validateSlug('  Q3-Plan ')).toEqual({ ok: true, value: 'q3-plan' })
+  })
+
+  it('refuses a slug with spaces, stray hyphens, symbols or the wrong length', () => {
+    for (const slug of [
+      'q3 plan',
+      '-plan',
+      'plan-',
+      'q3--plan',
+      'plan/../x',
+      'ab',
+      'a'.repeat(65),
+      'ké-hoạch',
+    ])
+      expect(validateSlug(slug).ok, slug).toBe(false)
+    expect(validateSlug('a'.repeat(64)).ok).toBe(true)
+    expect(validateSlug(3).ok).toBe(false)
+  })
+
+  it('refuses a slug that looks like a board id, so /whiteboard/<key> means one board', () => {
+    expect(validateSlug(ID).ok).toBe(false)
+    expect(validateSlug(ID.toUpperCase()).ok).toBe(false)
+    // One character off is not an id, so it is a fine name.
+    expect(validateSlug(`${ID}a`).ok).toBe(true)
+  })
+
+  it('reads null and an empty string as "clear the slug"', () => {
+    expect(validateBoardPatch({ slug: null })).toEqual({
+      ok: true,
+      value: { slug: null },
+    })
+    expect(validateBoardPatch({ slug: '' })).toEqual({
+      ok: true,
+      value: { slug: null },
+    })
+    expect(validateBoardPatch({ slug: '   ' })).toEqual({
+      ok: true,
+      value: { slug: null },
+    })
+  })
+
+  it('combines share and slug in one patch, and still refuses an empty one', () => {
+    expect(validateBoardPatch({ share: 'view', slug: 'Roadmap' })).toEqual({
+      ok: true,
+      value: { share: 'view', slug: 'roadmap' },
+    })
+    expect(validateBoardPatch({}).ok).toBe(false)
   })
 })
 

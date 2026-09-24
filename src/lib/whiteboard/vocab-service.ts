@@ -97,6 +97,18 @@ export async function getVocab(): Promise<Vocab> {
   return doc ? toVocab(doc) : DEFAULT_VOCAB
 }
 
+/**
+ * Read WITHOUT seeding, for anonymous callers (a share link's vocab route). `getVocab`
+ * upserts the singleton on its first call, which is harmless for the owner but would let a
+ * visitor who never signed in cause a database write. An unseeded list reads as the default,
+ * which is exactly what the seed would have written.
+ */
+export async function peekVocab(): Promise<Vocab> {
+  await connectDatabase()
+  const doc = await WhiteboardVocabModel.findById(VOCAB_DOC_ID).lean()
+  return doc ? toVocab(doc) : DEFAULT_VOCAB
+}
+
 export async function getVocabUsage(): Promise<VocabUsage> {
   await connectDatabase()
   const [meanings, statuses] = await Promise.all([

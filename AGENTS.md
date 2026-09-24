@@ -127,12 +127,13 @@ Next.js 16 App Router, React 19, TypeScript, Tailwind v3, Mongoose/MongoDB.
 `@/*` maps to `src/*` and is the only import alias. One deployment hosts four
 fairly independent products, split by route group:
 
-| Group      | Routes                                   | What it is                                                            |
-| ---------- | ---------------------------------------- | --------------------------------------------------------------------- |
-| `(me)`     | `/`                                      | The portfolio. English only, rendered from one Mongo profile document |
-| `(blog)`   | `/blog`, `/blog/<slug>`, `/blog/rss.xml` | The blog. Own chrome, own CSP                                         |
-| `(choice)` | `/[lang]/mbti/*`, `/[lang]/iq/*`         | Bilingual (vi/en) paid test products                                  |
-| `(admin)`  | `/admin/*`                               | Owner-only surfaces: blog editor, settings, metrics, CCA-F            |
+| Group          | Routes                                   | What it is                                                            |
+| -------------- | ---------------------------------------- | --------------------------------------------------------------------- |
+| `(me)`         | `/`                                      | The portfolio. English only, rendered from one Mongo profile document |
+| `(blog)`       | `/blog`, `/blog/<slug>`, `/blog/rss.xml` | The blog. Own chrome, own CSP                                         |
+| `(choice)`     | `/[lang]/mbti/*`, `/[lang]/iq/*`         | Bilingual (vi/en) paid test products                                  |
+| `(admin)`      | `/admin/*`                               | Owner-only surfaces: blog editor, settings, metrics, CCA-F            |
+| `(whiteboard)` | `/whiteboard/<slug\|id>`                 | A whiteboard the owner shared by link (view or edit), no owner gate   |
 
 `src/proxy.ts` (Next 16's renamed middleware) 307s bare `/mbti` and `/iq` to a
 locale-prefixed URL. Its `matcher` is a deliberate allowlist of static literals;

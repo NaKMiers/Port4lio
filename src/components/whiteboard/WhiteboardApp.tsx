@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
-import { Undo2 } from 'lucide-react'
+import { Eye, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
@@ -12,7 +12,9 @@ import InkLayer from '@/components/whiteboard/InkLayer'
 import {
   BoardLoadFailed,
   EmptyBoard,
+  SharedEmptyBoard,
 } from '@/components/whiteboard/BoardStates'
+import { OWNER_ACCESS, type BoardAccess } from '@/components/whiteboard/access'
 import { BoardUiContext, type BoardUi } from '@/components/whiteboard/board-ui'
 import Canvas from '@/components/whiteboard/Canvas'
 import {
@@ -22,6 +24,7 @@ import {
 import Inspector from '@/components/whiteboard/Inspector'
 import SaveControls from '@/components/whiteboard/SaveControls'
 import SavePill from '@/components/whiteboard/SavePill'
+import { CopyLinkButton, ShareMenu } from '@/components/whiteboard/ShareMenu'
 import ShortcutsHelp from '@/components/whiteboard/ShortcutsHelp'
 import { deletePlan, deletedText } from '@/components/whiteboard/delete-plan'
 import {
@@ -81,6 +84,20 @@ import type { VocabKind } from '@/lib/whiteboard/vocab'
  * that restores the cards, their links and their frame membership is a better answer to the
  * same danger, so the dialog came out rather than being kept as well: a confirm in front of
  * an undoable action is a click that protects nothing.
+ *
+ * ## One app for the owner and for a share link (access.ts)
+ *
+ * ```
+ *   owner            every control, the owner API
+ *   shared 'edit'    the same canvas and tools, the share API; no switcher, backup, export,
+ *                    vocab editing or AI switches - Share is "Copy link"
+ *   shared 'view'    the same canvas, read-only for good: no rail, no inspector column
+ * ```
+ *
+ * View mode is the `readOnly` the canvas already has for a board that is still loading
+ * (DR4), held on permanently, so it reuses every guard that state already had - nothing
+ * drags, nothing opens an editor, no shortcut writes. The server refuses the writes anyway
+ * (share.ts); this is only the page not offering them.
  */
 
 const CREATE_FORM: Partial<Record<Tool, { form: Form; shape?: Shape }>> = {
@@ -100,18 +117,37 @@ const HALF: Record<Form, { x: number; y: number }> = {
   ink: { x: 0, y: 0 },
 }
 
-export default function WhiteboardApp({ boardId }: { boardId: string }) {
+export default function WhiteboardApp({
+  boardId,
+  access = OWNER_ACCESS,
+}: {
+  boardId: string
+  access?: BoardAccess
+}) {
   return (
     <ReactFlowProvider>
-      <WhiteboardShell boardId={boardId} />
+      <WhiteboardShell
+        boardId={boardId}
+        access={access}
+      />
     </ReactFlowProvider>
   )
 }
 
-function WhiteboardShell({ boardId }: { boardId: string }) {
-  const vocabState = useVocabState()
-  const board = useBoard(boardId, vocabState.vocab)
-  const boards = useBoards()
+function WhiteboardShell({
+  boardId,
+  access,
+}: {
+  boardId: string
+  access: BoardAccess
+}) {
+  const shared = access.kind === 'shared'
+  const isOwner = !shared
+  const viewOnly = access.kind === 'shared' && access.mode === 'view'
+  const scope = useMemo(() => ({ board: boardId, shared }), [boardId, shared])
+  const vocabState = useVocabState(scope)
+  const board = useBoard(scope, vocabState.vocab)
+  const boards = useBoards({ enabled: isOwner })
   const current = boards.boards.find(entry => entry._id === boardId) ?? null
   const { data, load, actions } = board
   const tier = useTier()
@@ -137,7 +173,9 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
   )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null)
-  const [surface, setSurface] = useState<null | 'export' | 'backup'>(null)
+  const [surface, setSurface] = useState<null | 'export' | 'backup' | 'share'>(
+    null
+  )
   const [helpOpen, setHelpOpen] = useState(false)
   const [vocabKind, setVocabKind] = useState<VocabKind | null>(null)
   const closeVocab = useCallback(() => setVocabKind(null), [])
@@ -150,7 +188,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
   } | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
-  const readOnly = load.phase !== 'ready'
+  const readOnly = load.phase !== 'ready' || viewOnly
   const empty = load.phase === 'ready' && Object.keys(data.items).length === 0
   const setTool = useCallback((next: Tool) => {
     setBoxSelect(false)
@@ -210,19 +248,20 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
   )
 
   const openExport = useCallback(
-    (scope: 'all' | 'selection') => {
-      if (readOnly || empty) return
-      setExportScope(scope)
+    (which: 'all' | 'selection') => {
+      // Export to AI feeds the owner's agents; a share link has no export (access.ts).
+      if (readOnly || empty || !isOwner) return
+      setExportScope(which)
       setSurface('export')
     },
-    [empty, readOnly]
+    [empty, isOwner, readOnly]
   )
 
   const pickRestoreFile = useCallback(() => fileInputRef.current?.click(), [])
 
   /** "Add sample data" (D33): a board's worth of cards around the middle of the view. */
   const addMock = useCallback(() => {
-    if (readOnly) return
+    if (readOnly || !isOwner) return
     const ids = actions.addMock(viewCentre())
     setSurface(null)
     selectOnly([])
@@ -234,7 +273,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
         padding: 0.2,
       })
     )
-  }, [actions, flow, readOnly, selectOnly, viewCentre])
+  }, [actions, flow, isOwner, readOnly, selectOnly, viewCentre])
 
   // MARK: Undo / redo (D30)
 
@@ -442,10 +481,11 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
       selection={selection}
       onDelete={deleteSelection}
       onSelect={selectOnly}
-      onExportSelection={() => openExport('selection')}
+      onExportSelection={isOwner ? () => openExport('selection') : undefined}
       onUnhideFrame={(frame, readable) => setUnhide({ frame, readable })}
-      onManageVocab={setVocabKind}
+      onManageVocab={isOwner ? setVocabKind : undefined}
       readOnly={readOnly}
+      aiControls={isOwner}
     />
   )
   const hasSelection = selection.nodes.length + selection.edges.length > 0
@@ -480,70 +520,118 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
         <div
           className={cn(
             'relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-panel border border-pp-line bg-[rgba(251,248,244,0.97)] shadow-panel backdrop-blur-md',
-            tier === 'lg' ? 'grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-1'
+            tier === 'lg' && !viewOnly
+              ? 'grid-cols-[minmax(0,1fr)_320px]'
+              : 'grid-cols-1'
           )}
         >
           <TopBar
-            onLeave={onLeave}
+            onLeave={isOwner ? onLeave : undefined}
             className="col-span-full"
             pill={
-              <SavePill
-                load={load}
-                status={board.status}
-                rejected={Object.keys(board.errors).length}
-                onRetry={actions.retryAll}
-              />
+              // A view link saves nothing, so "Saved" would be a claim about nothing; say
+              // what the page is instead - once it has loaded, so a failed load still shows.
+              viewOnly && load.phase === 'ready' ? (
+                <span
+                  data-testid="wb-view-only"
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-pp-line bg-white/80 px-2.5 py-1 font-display text-[10.5px] font-semibold uppercase tracking-[0.13em] text-pp-muted"
+                >
+                  <Eye
+                    aria-hidden
+                    size={13}
+                  />
+                  View only
+                </span>
+              ) : (
+                <SavePill
+                  load={load}
+                  status={board.status}
+                  rejected={Object.keys(board.errors).length}
+                  onRetry={actions.retryAll}
+                />
+              )
             }
             saveControls={
-              <SaveControls
-                autoSave={board.autoSave}
-                onAutoSave={board.setAutoSave}
-                onSave={board.saveNow}
-                pending={board.status.pending}
-                disabled={readOnly}
-              />
+              viewOnly ? undefined : (
+                <SaveControls
+                  autoSave={board.autoSave}
+                  onAutoSave={board.setAutoSave}
+                  onSave={board.saveNow}
+                  pending={board.status.pending}
+                  disabled={readOnly}
+                />
+              )
             }
             hiddenCount={
-              // A board agents cannot read hides everything on it, so the chip says so rather
-              // than counting the cards that happen to carry their own switch (D32).
-              current && !current.includeInAi
-                ? Object.keys(data.items).length
-                : board.hiddenCount
+              // "Hidden from AI" is the owner's business, not a visitor's (access.ts).
+              shared
+                ? 0
+                : // A board agents cannot read hides everything on it, so the chip says so
+                  // rather than counting the cards that happen to carry their own switch (D32).
+                  current && !current.includeInAi
+                  ? Object.keys(data.items).length
+                  : board.hiddenCount
             }
             boardHidden={current ? !current.includeInAi : false}
             onHiddenClick={showHidden}
             boardSwitcher={
-              <BoardSwitcher
-                boards={boards.boards}
-                currentId={boardId}
-                title={current?.title || 'Whiteboard'}
-                onCreate={async () => {
-                  const made = await boards
-                    .create('New board')
-                    .catch(() => null)
-                  return made?._id ?? null
-                }}
-                onRename={next => boards.rename(boardId, next)}
-                onIncludeInAi={on => boards.setIncludeInAi(boardId, on)}
-                onLeave={onLeave}
-              />
+              access.kind === 'shared' ? (
+                <h1
+                  className="min-w-0 truncate px-1 font-display text-[15px] font-semibold tracking-[-0.01em] text-pp-text"
+                  title={access.title || 'Whiteboard'}
+                >
+                  {access.title || 'Whiteboard'}
+                </h1>
+              ) : (
+                <BoardSwitcher
+                  boards={boards.boards}
+                  currentId={boardId}
+                  title={current?.title || 'Whiteboard'}
+                  onCreate={async () => {
+                    const made = await boards
+                      .create('New board')
+                      .catch(() => null)
+                    return made?._id ?? null
+                  }}
+                  onRename={next => boards.rename(boardId, next)}
+                  onIncludeInAi={on => boards.setIncludeInAi(boardId, on)}
+                  onLeave={onLeave}
+                />
+              )
+            }
+            share={
+              access.kind === 'shared' ? (
+                <CopyLinkButton path={access.path} />
+              ) : (
+                <ShareMenu
+                  board={current}
+                  open={surface === 'share'}
+                  onToggle={open => setSurface(open ? 'share' : null)}
+                  onChange={patch => boards.setSharing(boardId, patch)}
+                />
+              )
             }
             backup={
-              <BackupMenu
-                boardId={boardId}
-                open={surface === 'backup'}
-                onToggle={open => setSurface(open ? 'backup' : null)}
-                onRestore={pickRestoreFile}
-                onMock={addMock}
-                mockDisabled={readOnly}
-                beforeDownload={() => board.queue.flush()}
-                heldWrites={board.status.holding ? board.status.pending : 0}
-              />
+              isOwner ? (
+                <BackupMenu
+                  boardId={boardId}
+                  open={surface === 'backup'}
+                  onToggle={open => setSurface(open ? 'backup' : null)}
+                  onRestore={pickRestoreFile}
+                  onMock={addMock}
+                  mockDisabled={readOnly}
+                  beforeDownload={() => board.queue.flush()}
+                  heldWrites={board.status.holding ? board.status.pending : 0}
+                />
+              ) : undefined
             }
             exportDisabled={readOnly || empty}
             exportOpen={surface === 'export'}
-            onExport={() =>
-              surface === 'export' ? setSurface(null) : openExport('all')
+            onExport={
+              isOwner
+                ? () =>
+                    surface === 'export' ? setSurface(null) : openExport('all')
+                : undefined
             }
           />
 
@@ -551,24 +639,28 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
             aria-label="Canvas"
             className="relative col-start-1 row-start-2 min-h-0 min-w-0"
           >
-            {/* Before the canvas in the DOM so Tab reaches the tools first (DR9). */}
-            <ToolRail
-              tool={tool}
-              onTool={setTool}
-              disabled={readOnly}
-              large={tier !== 'lg' || coarse}
-              horizontal={tier === 'sm'}
-              boxSelect={
-                coarse
-                  ? { on: boxSelect, onToggle: toggleBoxSelect }
-                  : undefined
-              }
-            />
+            {/* Before the canvas in the DOM so Tab reaches the tools first (DR9). A view link
+                has no tools to offer, so no rail rather than a rail of disabled buttons. */}
+            {viewOnly ? null : (
+              <ToolRail
+                tool={tool}
+                onTool={setTool}
+                disabled={readOnly}
+                large={tier !== 'lg' || coarse}
+                horizontal={tier === 'sm'}
+                boxSelect={
+                  coarse
+                    ? { on: boxSelect, onToggle: toggleBoxSelect }
+                    : undefined
+                }
+              />
+            )}
 
             <Canvas
               board={board}
               tool={tool}
               readOnly={readOnly}
+              aiStyling={isOwner}
               coarse={coarse}
               boxSelect={boxSelect}
               onBoxSelectDone={endBoxSelect}
@@ -591,12 +683,18 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
               />
             ) : null}
 
-            {empty ? (
+            {empty && isOwner ? (
               <EmptyBoard
                 onText={() => createAtCentre('text')}
                 onFrame={() => createAtCentre('frame')}
                 onMock={addMock}
                 onRestore={pickRestoreFile}
+              />
+            ) : null}
+            {empty && shared ? (
+              <SharedEmptyBoard
+                onText={viewOnly ? undefined : () => createAtCentre('text')}
+                onFrame={viewOnly ? undefined : () => createAtCentre('frame')}
               />
             ) : null}
             {load.phase === 'error' ? (
@@ -636,7 +734,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
             ) : null}
           </section>
 
-          {tier === 'lg' ? (
+          {viewOnly ? null : tier === 'lg' ? (
             <div className="col-start-2 row-start-2 min-h-0 overflow-y-auto border-l border-pp-line bg-white/70">
               {inspector}
             </div>
@@ -650,7 +748,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
             </div>
           ) : null}
 
-          {surface === 'export' ? (
+          {surface === 'export' && isOwner ? (
             <ExportSheet
               key={exportScope}
               board={board}
@@ -676,7 +774,7 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
             if (file) setRestoreFile(file)
           }}
         />
-        {restoreFile ? (
+        {restoreFile && isOwner ? (
           <RestoreDialog
             boardId={boardId}
             file={restoreFile}
@@ -742,12 +840,14 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
           open={helpOpen}
           onClose={() => setHelpOpen(false)}
         />
-        <VocabDialog
-          // A fresh dialog per open, on the tab it was opened from.
-          key={vocabKind ?? 'closed'}
-          kind={vocabKind}
-          onClose={closeVocab}
-        />
+        {isOwner ? (
+          <VocabDialog
+            // A fresh dialog per open, on the tab it was opened from.
+            key={vocabKind ?? 'closed'}
+            kind={vocabKind}
+            onClose={closeVocab}
+          />
+        ) : null}
       </BoardUiContext.Provider>
     </VocabProvider>
   )

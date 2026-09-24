@@ -60,12 +60,19 @@ export interface InspectorProps {
   selection: { nodes: string[]; edges: string[] }
   onDelete: () => void
   onSelect: (ids: string[]) => void
-  onExportSelection: () => void
+  /** Owner only (the Export sheet): no button without it. */
+  onExportSelection?: () => void
   onUnhideFrame: (frame: ClientItem, readableChildren: number) => void
-  /** Open "Manage meanings / statuses" (VocabDialog). */
-  onManageVocab: (kind: VocabKind) => void
+  /** Open "Manage meanings / statuses" (VocabDialog). Owner only: no Manage without it. */
+  onManageVocab?: (kind: VocabKind) => void
   /** The board is still loading (or failed): nothing here may write (DR4). */
   readOnly?: boolean
+  /**
+   * The "Include in AI export" switches. Off behind a share link: what the owner's agents
+   * read is the owner's call, and the server drops the field from a shared PATCH anyway
+   * (canvas-routes.ts), so a switch here would only ever snap back.
+   */
+  aiControls?: boolean
   className?: string
 }
 
@@ -112,7 +119,7 @@ function ManagedLabel({
   htmlFor: string
   label: string
   kind: VocabKind
-  onManage: (kind: VocabKind) => void
+  onManage?: (kind: VocabKind) => void
 }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
@@ -122,14 +129,18 @@ function ManagedLabel({
       >
         {label}
       </label>
-      <button
-        type="button"
-        onClick={() => onManage(kind)}
-        aria-label={kind === 'meaning' ? 'Manage meanings' : 'Manage statuses'}
-        className="font-display text-[10.5px] font-semibold uppercase tracking-[0.12em] text-pp-muted hover:text-pp-text"
-      >
-        Manage
-      </button>
+      {onManage ? (
+        <button
+          type="button"
+          onClick={() => onManage(kind)}
+          aria-label={
+            kind === 'meaning' ? 'Manage meanings' : 'Manage statuses'
+          }
+          className="font-display text-[10.5px] font-semibold uppercase tracking-[0.12em] text-pp-muted hover:text-pp-text"
+        >
+          Manage
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -201,6 +212,7 @@ function ItemPanel({
   onSelect,
   onUnhideFrame,
   onManageVocab,
+  aiControls = true,
 }: InspectorProps & { item: ClientItem }) {
   const { data, errors, actions } = board
   const { vocab } = useVocab()
@@ -385,33 +397,35 @@ function ItemPanel({
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-pp-line bg-white/80 px-3.5 py-3">
-        <div>
-          <p
-            id="wb-ai-label"
-            className="text-[13px] font-semibold text-pp-text"
-          >
-            Include in AI export
-          </p>
-          <p className="text-[11.5px] text-pp-muted">
-            {hiddenByFrame
-              ? `Hidden by frame ${parent?.title || 'Untitled frame'}`
-              : item.includeInAi
-                ? item.form === 'frame'
-                  ? 'Agents can read this frame and what is inside it.'
-                  : 'Agents can read this card.'
-                : item.form === 'frame'
-                  ? 'Everything inside is hidden from agents.'
-                  : 'Hidden from agents.'}
-          </p>
+      {aiControls ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-pp-line bg-white/80 px-3.5 py-3">
+          <div>
+            <p
+              id="wb-ai-label"
+              className="text-[13px] font-semibold text-pp-text"
+            >
+              Include in AI export
+            </p>
+            <p className="text-[11.5px] text-pp-muted">
+              {hiddenByFrame
+                ? `Hidden by frame ${parent?.title || 'Untitled frame'}`
+                : item.includeInAi
+                  ? item.form === 'frame'
+                    ? 'Agents can read this frame and what is inside it.'
+                    : 'Agents can read this card.'
+                  : item.form === 'frame'
+                    ? 'Everything inside is hidden from agents.'
+                    : 'Hidden from agents.'}
+            </p>
+          </div>
+          <ToggleSwitch
+            id="wb-ai"
+            checked={item.includeInAi && !hiddenByFrame}
+            disabled={hiddenByFrame}
+            onChange={toggleAi}
+          />
         </div>
-        <ToggleSwitch
-          id="wb-ai"
-          checked={item.includeInAi && !hiddenByFrame}
-          disabled={hiddenByFrame}
-          onChange={toggleAi}
-        />
-      </div>
+      ) : null}
 
       <button
         type="button"
@@ -574,6 +588,7 @@ function MultiPanel({
   items,
   onDelete,
   onExportSelection,
+  aiControls = true,
 }: InspectorProps & { items: ClientItem[] }) {
   const { data, actions, queue } = board
   const { vocab } = useVocab()
@@ -614,11 +629,13 @@ function MultiPanel({
           />
         ))}
       </div>
-      <p className="text-[12px] text-pp-muted">
-        {hidden === 0
-          ? `All ${items.length} are readable by agents.`
-          : `${hidden} of ${items.length} are hidden from AI.`}
-      </p>
+      {aiControls ? (
+        <p className="text-[12px] text-pp-muted">
+          {hidden === 0
+            ? `All ${items.length} are readable by agents.`
+            : `${hidden} of ${items.length} are hidden from AI.`}
+        </p>
+      ) : null}
 
       <div>
         <label
@@ -641,43 +658,47 @@ function MultiPanel({
         />
       </div>
 
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-pp-line bg-white/80 px-3.5 py-3">
-        <div>
-          <p
-            id="wb-bulk-ai-label"
-            className="text-[13px] font-semibold text-pp-text"
-          >
-            Include in AI export
-          </p>
-          <p className="text-[11.5px] text-pp-muted">
-            Applies to all {items.length}.
-          </p>
+      {aiControls ? (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-pp-line bg-white/80 px-3.5 py-3">
+          <div>
+            <p
+              id="wb-bulk-ai-label"
+              className="text-[13px] font-semibold text-pp-text"
+            >
+              Include in AI export
+            </p>
+            <p className="text-[11.5px] text-pp-muted">
+              Applies to all {items.length}.
+            </p>
+          </div>
+          <ToggleSwitch
+            id="wb-bulk-ai"
+            checked={allOn}
+            onChange={next =>
+              // Turning AI on skips (and counts) children of hidden frames (rule 1) and
+              // hidden frames themselves, which only un-hide through the D24 confirm.
+              fanOut(
+                { includeInAi: next },
+                next ? item => skipsBulkAiOn(item, data.items) : undefined
+              )
+            }
+          />
         </div>
-        <ToggleSwitch
-          id="wb-bulk-ai"
-          checked={allOn}
-          onChange={next =>
-            // Turning AI on skips (and counts) children of hidden frames (rule 1) and
-            // hidden frames themselves, which only un-hide through the D24 confirm.
-            fanOut(
-              { includeInAi: next },
-              next ? item => skipsBulkAiOn(item, data.items) : undefined
-            )
-          }
-        />
-      </div>
+      ) : null}
 
-      <button
-        type="button"
-        onClick={onExportSelection}
-        className={cn(secondaryBtnCls, 'gap-2')}
-      >
-        <Sparkles
-          aria-hidden
-          size={14}
-        />
-        Export selection
-      </button>
+      {onExportSelection ? (
+        <button
+          type="button"
+          onClick={onExportSelection}
+          className={cn(secondaryBtnCls, 'gap-2')}
+        >
+          <Sparkles
+            aria-hidden
+            size={14}
+          />
+          Export selection
+        </button>
+      ) : null}
 
       <button
         type="button"

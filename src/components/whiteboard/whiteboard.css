@@ -47,6 +47,16 @@
   height: 13px;
   opacity: 1;
 }
+/*
+  Read-only (a view link, or a board still loading): nothing can be linked, so the connection
+  points do not show on hover either - they are an offer the canvas cannot keep. Hidden, not
+  removed: links name the handle they leave from (`sourceHandle`), and React Flow drops an
+  edge whose handle is missing. Last among the handle rules so it wins over hover/selected.
+*/
+.wb-flow[data-readonly] .wb-handle.react-flow__handle {
+  visibility: hidden;
+  pointer-events: none;
+}
 
 .wb-edge {
   stroke: #6d6661;

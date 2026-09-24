@@ -1,9 +1,8 @@
 import type { NextRequest } from 'next/server'
 
-import { connectDatabase } from '@/lib/mongodb'
 import { requireOwner } from '@/lib/require-owner'
-import { streamBoard } from '@/lib/whiteboard/data'
-import { boardParam, noStore, streamText, wbError } from '@/lib/whiteboard/http'
+import { streamCanvas } from '@/lib/whiteboard/canvas-routes'
+import { boardParam, noStore } from '@/lib/whiteboard/http'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,7 +21,8 @@ export const dynamic = 'force-dynamic'
  * Streamed rather than one JSON body because Vercel refuses a non-streamed response over
  * 4.5 MB, and ink points make a board cross that without anyone noticing (D21). The order is
  * fixed by `streamBoard` (D28). Owner-only, and it includes hidden items: this is the owner's
- * own canvas, not an agent read.
+ * own canvas, not an agent read. The body is `streamCanvas`, shared with the share link's
+ * copy of this route (canvas-routes.ts).
  */
 export async function GET(request: NextRequest) {
   const denied = requireOwner(request)
@@ -30,21 +30,5 @@ export async function GET(request: NextRequest) {
 
   const scope = boardParam(request)
   if (!scope.ok) return scope.response
-  const { board } = scope
-
-  try {
-    // Connect before the stream starts, so "database down" is a clean 500 rather than a
-    // stream that dies on its first line.
-    await connectDatabase()
-  } catch {
-    return wbError('Unable to load the whiteboard right now.', 500)
-  }
-
-  async function* lines() {
-    for await (const line of streamBoard(board))
-      yield `${JSON.stringify(line)}\n`
-  }
-  return streamText(lines(), {
-    'Content-Type': 'application/x-ndjson; charset=utf-8',
-  })
+  return streamCanvas(scope.board)
 }

@@ -1,5 +1,3 @@
-import type { NextRequest } from 'next/server'
-
 import { RateLimitModel } from '@/models/RateLimit'
 
 /**
@@ -44,8 +42,13 @@ export type RateLimitOptions = {
  * proxy) the platform overwrites it, and the leftmost entry is the real client. There is
  * no perfect answer here without a trusted-proxy config; an attacker who can forge it can
  * spread across buckets, which is why this is a volume guard and not an auth control.
+ *
+ * Takes anything with `headers.get`, so a server component can pass `{ headers: await
+ * headers() }` - the shared whiteboard page limits itself the same way its API does.
  */
-export function clientIpFrom(request: NextRequest): string | null {
+export function clientIpFrom(request: {
+  headers: Pick<Headers, 'get'>
+}): string | null {
   const forwarded = request.headers.get('x-forwarded-for')
   if (forwarded) {
     const first = forwarded.split(',')[0]?.trim()
@@ -172,6 +175,35 @@ export const IQ_SUBMIT_LIMIT: RateLimitOptions = {
 export const CCAF_SAVE_LIMIT: RateLimitOptions = {
   route: 'ccaf-save',
   limit: 40,
+  windowSeconds: 60,
+}
+
+/**
+ * Writes through a whiteboard edit link (`/api/whiteboard/shared/<key>/*`) - the one canvas
+ * write path with no owner gate in front of it.
+ *
+ * Far looser than the CCA-F save because a canvas is chatty by design: a drag is a bulk
+ * move, every card edit is its own debounced PATCH, and an undo of a big delete replays one
+ * create per card. 300 a minute is well past a person working fast and still stops a script
+ * from filling the board, or the collection, at database speed. Reads have their own, looser
+ * bucket below; the board's size is capped separately (SHARED_BOARD_MAX_ITEMS).
+ */
+export const WHITEBOARD_SHARE_WRITE_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-share-write',
+  limit: 300,
+  windowSeconds: 60,
+}
+
+/**
+ * Reads through a whiteboard share link: the board stream and the vocab list. A page load
+ * is one of each and a reload is two more, so 120 a minute never touches a person. It is
+ * here because unlike a public page these are `force-dynamic` and `no-store` - every hit
+ * streams the whole board out of Mongo, and an ink-heavy board is megabytes - so an
+ * unbounded loop on one link would be a cheap way to load the database.
+ */
+export const WHITEBOARD_SHARE_READ_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-share-read',
+  limit: 120,
   windowSeconds: 60,
 }
 

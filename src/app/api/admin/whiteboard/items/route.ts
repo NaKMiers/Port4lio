@@ -1,20 +1,8 @@
 import type { NextRequest } from 'next/server'
 
-import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
-import { bulkMoveItems, createItem } from '@/lib/whiteboard/data'
-import {
-  boardParam,
-  noStore,
-  wbEntryError,
-  wbError,
-  wbJson,
-} from '@/lib/whiteboard/http'
-import {
-  ITEM_MAX_BODY_BYTES,
-  validateBulkUpdates,
-  validateItem,
-} from '@/lib/whiteboard/limits'
+import { bulkMoveRoute, createItemRoute } from '@/lib/whiteboard/canvas-routes'
+import { boardParam, noStore } from '@/lib/whiteboard/http'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,7 +17,8 @@ export const dynamic = 'force-dynamic'
  *
  * Bulk PATCH is all-or-nothing and names the bad entry (`{ error, id, index }`), so the
  * save queue can mark that one card and re-queue the others (R3-15). Rule 8 is applied to
- * every entry inside the same write (R3-2).
+ * every entry inside the same write (R3-2). Bodies live in canvas-routes.ts, shared with the
+ * share link's routes.
  */
 export async function POST(request: NextRequest) {
   const denied = requireOwner(request)
@@ -37,21 +26,7 @@ export async function POST(request: NextRequest) {
 
   const scope = boardParam(request)
   if (!scope.ok) return scope.response
-
-  const parsed = await readJsonBody(request, { maxBytes: ITEM_MAX_BODY_BYTES })
-  if (!parsed.ok) return wbError(parsed.error, parsed.status)
-
-  const checked = validateItem(parsed.body)
-  if (!checked.ok) return wbError(checked.error, checked.status)
-
-  try {
-    const result = await createItem(scope.board, checked.value)
-    if (!result.ok) return wbError(result.error, result.status)
-    return wbJson({ item: result.value })
-  } catch (error) {
-    console.error('[whiteboard] create failed', error)
-    return wbError('Unable to save the item right now.', 500)
-  }
+  return createItemRoute(request, scope.board)
 }
 
 export async function PATCH(request: NextRequest) {
@@ -60,27 +35,5 @@ export async function PATCH(request: NextRequest) {
 
   const scope = boardParam(request)
   if (!scope.ok) return scope.response
-
-  const parsed = await readJsonBody(request, { maxBytes: ITEM_MAX_BODY_BYTES })
-  if (!parsed.ok) return wbError(parsed.error, parsed.status)
-
-  const checked = validateBulkUpdates(parsed.body)
-  if (!checked.ok)
-    return wbEntryError(checked.error, checked.status, {
-      id: checked.id,
-      index: checked.index,
-    })
-
-  try {
-    const result = await bulkMoveItems(scope.board, checked.value)
-    if (!result.ok)
-      return wbEntryError(result.error, result.status, {
-        id: result.id,
-        index: result.index,
-      })
-    return wbJson({ items: result.value })
-  } catch (error) {
-    console.error('[whiteboard] bulk move failed', error)
-    return wbError('Unable to save the positions right now.', 500)
-  }
+  return bulkMoveRoute(request, scope.board)
 }

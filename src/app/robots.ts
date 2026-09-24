@@ -61,6 +61,8 @@ export default function robots(): MetadataRoute.Robots {
         '/*/iq/certificate/',
         '/*/iq/verify/',
         '/*/iq/test',
+        // Share links (`/whiteboard/<slug|id>`): the URL is the credential, as above.
+        '/whiteboard/',
       ],
     },
     sitemap: `${origin}/sitemap.xml`,

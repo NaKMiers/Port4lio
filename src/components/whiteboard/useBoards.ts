@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { ClientBoard } from '@/lib/whiteboard/data'
+import type { ShareMode } from '@/lib/whiteboard/limits'
 import {
   createBoardApi,
   deleteBoardApi,
@@ -19,6 +20,9 @@ import {
  *
  * Every write updates the local list from the server's answer rather than guessing, so a
  * title the server trimmed is the title on screen.
+ *
+ * `enabled: false` is the shared canvas (a share link): the list is the owner's, the route
+ * behind it is owner-only, and a visitor's page asking for it would be a 401 at best.
  */
 export interface BoardsState {
   boards: ClientBoard[]
@@ -28,18 +32,24 @@ export interface BoardsState {
   create: (title: string) => Promise<ClientBoard>
   rename: (id: string, title: string) => Promise<void>
   setIncludeInAi: (id: string, includeInAi: boolean) => Promise<void>
+  /** Who the link lets in, and/or its readable name (`null` clears it). */
+  setSharing: (
+    id: string,
+    patch: { share?: ShareMode; slug?: string | null }
+  ) => Promise<void>
   remove: (id: string) => Promise<void>
 }
 
-export function useBoards(): BoardsState {
+export function useBoards({ enabled = true } = {}): BoardsState {
   const [boards, setBoards] = useState<ClientBoard[]>([])
   // Starts true and only ever ends: a reload keeps the list on screen rather than blanking
   // it, so renaming a board does not make the page flash back to a spinner.
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     getBoardsApi()
       .then(list => {
@@ -57,7 +67,7 @@ export function useBoards(): BoardsState {
     return () => {
       cancelled = true
     }
-  }, [nonce])
+  }, [enabled, nonce])
 
   const reload = useCallback(() => setNonce(n => n + 1), [])
 
@@ -81,6 +91,13 @@ export function useBoards(): BoardsState {
     []
   )
 
+  const setSharing = useCallback(
+    async (id: string, patch: { share?: ShareMode; slug?: string | null }) => {
+      replace(await patchBoardApi(id, patch))
+    },
+    []
+  )
+
   const remove = useCallback(async (id: string) => {
     await deleteBoardApi(id)
     setBoards(prev => prev.filter(board => board._id !== id))
@@ -94,6 +111,7 @@ export function useBoards(): BoardsState {
     create,
     rename,
     setIncludeInAi,
+    setSharing,
     remove,
   }
 }

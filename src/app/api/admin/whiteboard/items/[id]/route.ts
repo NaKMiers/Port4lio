@@ -1,10 +1,8 @@
 import type { NextRequest } from 'next/server'
 
-import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
-import { deleteItem, patchItem } from '@/lib/whiteboard/data'
-import { boardParam, noStore, wbError, wbJson } from '@/lib/whiteboard/http'
-import { ITEM_MAX_BODY_BYTES, validateItemPatch } from '@/lib/whiteboard/limits'
+import { deleteItemRoute, patchItemRoute } from '@/lib/whiteboard/canvas-routes'
+import { boardParam, noStore } from '@/lib/whiteboard/http'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,6 +19,7 @@ type RouteContext = { params: Promise<{ id: string }> }
  * and the client merges that back so its badge and toggle tell the truth.
  *
  * `keepChildrenPrivate` rides along on a frame un-hide (D24) and is not an item field.
+ * The owner has `aiControls`; the share link's copy of this route does not (canvas-routes.ts).
  */
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const denied = requireOwner(request)
@@ -29,32 +28,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const scope = boardParam(request)
   if (!scope.ok) return scope.response
 
-  const parsed = await readJsonBody<Record<string, unknown>>(request, {
-    maxBytes: ITEM_MAX_BODY_BYTES,
-  })
-  if (!parsed.ok) return wbError(parsed.error, parsed.status)
-
-  const { keepChildrenPrivate, ...fields } = parsed.body ?? {}
-  if (
-    keepChildrenPrivate !== undefined &&
-    typeof keepChildrenPrivate !== 'boolean'
-  )
-    return wbError('keepChildrenPrivate must be a boolean.', 400)
-
-  const checked = validateItemPatch(fields)
-  if (!checked.ok) return wbError(checked.error, checked.status)
-
-  try {
-    const { id } = await params
-    const result = await patchItem(scope.board, id, checked.value, {
-      keepChildrenPrivate: keepChildrenPrivate === true,
-    })
-    if (!result.ok) return wbError(result.error, result.status)
-    return wbJson({ item: result.value })
-  } catch (error) {
-    console.error('[whiteboard] patch failed', error)
-    return wbError('Unable to save the item right now.', 500)
-  }
+  const { id } = await params
+  return patchItemRoute(request, scope.board, id, { aiControls: true })
 }
 
 export async function DELETE(request: NextRequest, { params }: RouteContext) {
@@ -64,13 +39,6 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
   const scope = boardParam(request)
   if (!scope.ok) return scope.response
 
-  try {
-    const { id } = await params
-    const result = await deleteItem(scope.board, id)
-    if (!result.ok) return wbError(result.error, result.status)
-    return wbJson(result.value)
-  } catch (error) {
-    console.error('[whiteboard] delete failed', error)
-    return wbError('Unable to delete the item right now.', 500)
-  }
+  const { id } = await params
+  return deleteItemRoute(scope.board, id)
 }

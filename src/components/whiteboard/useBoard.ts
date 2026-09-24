@@ -38,7 +38,7 @@ import {
   tracksStatus,
   type Vocab,
 } from '@/lib/whiteboard/vocab'
-import { getBoardStreamApi } from '@/requests/whiteboard'
+import { getBoardStreamApi, type CanvasScope } from '@/requests/whiteboard'
 
 /**
  * Board state for the canvas: items, links, per-entity errors, and every action that edits
@@ -210,7 +210,10 @@ function framesOf(items: Record<string, ClientItem>): Placeable[] {
     }))
 }
 
-export function useBoard(boardId: string, vocab: Vocab) {
+export function useBoard(scope: CanvasScope, vocab: Vocab) {
+  // Unpacked so the load below depends on two strings, not on whether the caller happened
+  // to pass the same scope object twice.
+  const { board: boardId, shared } = scope
   // Read by the actions below, which must not change identity when the list does.
   const vocabRef = useRef(vocab)
   useEffect(() => {
@@ -234,7 +237,7 @@ export function useBoard(boardId: string, vocab: Vocab) {
 
   const { queue, status, setStatus, autoSave, setAutoSave, saveNow } =
     useSaveQueue({
-      boardId,
+      scope,
       rejectedCount: Object.keys(errors).length,
     })
 
@@ -396,7 +399,7 @@ export function useBoard(boardId: string, vocab: Vocab) {
       let total = 0
       let loaded = 0
       try {
-        const body = await getBoardStreamApi(boardId, signal)
+        const body = await getBoardStreamApi({ board: boardId, shared }, signal)
         await readBoardStream(body, lines => {
           for (const line of lines) {
             if (line.t === 'start') total = line.items
@@ -432,7 +435,7 @@ export function useBoard(boardId: string, vocab: Vocab) {
         setLoad({ phase: 'error', message: "Couldn't load the board." })
       }
     },
-    [boardId, queue]
+    [boardId, queue, shared]
   )
 
   useEffect(() => {

@@ -119,6 +119,72 @@ export function EmptyBoard({
   )
 }
 
+/**
+ * The empty board behind a share link. The owner's version is about THEIR context store and
+ * THEIR agents, and offers sample data and a backup restore - none of which is a visitor's.
+ * An edit link keeps the two ways to start; a view link has nothing to offer but the fact.
+ */
+export function SharedEmptyBoard({
+  onText,
+  onFrame,
+  className,
+}: {
+  /** Absent on a view link. */
+  onText?: () => void
+  onFrame?: () => void
+  className?: string
+}) {
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute inset-0 z-[5] grid place-items-center p-6',
+        className
+      )}
+    >
+      <div className="pointer-events-auto w-full max-w-[400px] text-center">
+        <h2 className="font-display text-2xl font-semibold tracking-[-0.02em] text-pp-text">
+          This board is empty.
+        </h2>
+        {onText && onFrame ? (
+          <>
+            <p className="mt-2 text-[15px] leading-relaxed text-pp-muted">
+              Anyone with this link can add to it.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                onClick={onText}
+                className={cn(primaryBtnCls, 'gap-2 px-5 py-2.5')}
+              >
+                <Type
+                  aria-hidden
+                  size={15}
+                />
+                Text card
+              </button>
+              <button
+                type="button"
+                onClick={onFrame}
+                className={cn(secondaryBtnCls, 'gap-2 px-4 py-2.5')}
+              >
+                <Hash
+                  aria-hidden
+                  size={14}
+                />
+                Frame
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="mt-2 text-[15px] leading-relaxed text-pp-muted">
+            Nothing has been put on it yet.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function BoardLoadFailed({
   message,
   onRetry,

@@ -109,6 +109,19 @@ export default async function globalSetup() {
       `Minted an owner token but ${baseURL}/api/auth/me rejected it (${res.status}). The server under test is verifying with a different AUTH_SECRET than this process signed with - likely PLAYWRIGHT_USE_EXISTING_SERVER against a server started from a different env.`
     )
 
+  // Make the default whiteboard exist before any worker starts. `ensureBoards` creates it
+  // on the first board-list read, and that read is not atomic (see its comment): on an
+  // empty database, `whiteboard.spec.ts` and `whiteboard-share.spec.ts` reading at the same
+  // moment in two workers made two "Whiteboard" boards, and the spec that clears
+  // `boards[0]` before every test then cleared the other spec's board.
+  const boards = await fetch(`${baseURL}/api/admin/whiteboard/boards`, {
+    headers: { cookie: `${getAuthCookieName()}=${token}` },
+  })
+  if (!boards.ok)
+    throw new Error(
+      `Could not create the default whiteboard (${boards.status}) before the run.`
+    )
+
   const { mkdir, writeFile } = await import('node:fs/promises')
   await mkdir(path.dirname(STORAGE_STATE), { recursive: true })
   await writeFile(

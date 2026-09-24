@@ -15,9 +15,11 @@ import {
 import {
   BACKUP_VERSION,
   type BoardFields,
+  type BoardPatch,
   checkMergedItem,
   deriveInkBBox,
   isObjectIdString,
+  type ShareMode,
   validateItem,
   validateLink,
   type BulkPositionUpdate,
@@ -226,6 +228,10 @@ export interface ClientBoard {
   _id: string
   title: string
   includeInAi: boolean
+  /** Who the link lets in (see WhiteboardBoard.ts). */
+  share: ShareMode
+  /** The readable part of the share link, or null when the link uses the id. */
+  slug: string | null
   /** Items on it, for the index page. */
   items: number
   createdAt: string
@@ -237,6 +243,8 @@ function toClientBoard(doc: WhiteboardBoardDocument, items = 0): ClientBoard {
     _id: String(doc._id),
     title: doc.title ?? '',
     includeInAi: doc.includeInAi,
+    share: doc.share ?? 'off',
+    slug: doc.slug ?? null,
     items,
     createdAt: new Date(doc.createdAt).toISOString(),
     updatedAt: new Date(doc.updatedAt).toISOString(),
@@ -313,15 +321,28 @@ export async function createBoard(
 
 export async function patchBoard(
   id: string,
-  patch: Partial<BoardFields>
+  patch: BoardPatch
 ): Promise<DataResult<ClientBoard>> {
   await connectDatabase()
   if (!isObjectIdString(id)) return failure(404, 'Board not found.')
-  const doc = await WhiteboardBoardModel.findByIdAndUpdate(
-    id,
-    { $set: patch },
-    { returnDocument: 'after', lean: true }
-  )
+  // A cleared slug is removed, not stored as null: the unique index only covers boards that
+  // HAVE a slug (WhiteboardBoard.ts), and a field that is simply absent keeps it that way.
+  const { slug, ...fields } = patch
+  const update: Record<string, unknown> = { $set: { ...fields } }
+  if (slug === null) update.$unset = { slug: 1 }
+  else if (slug !== undefined)
+    (update.$set as Record<string, unknown>).slug = slug
+  let doc: WhiteboardBoardDocument | null
+  try {
+    doc = await WhiteboardBoardModel.findByIdAndUpdate(id, update, {
+      returnDocument: 'after',
+      lean: true,
+    })
+  } catch (error) {
+    if (isDuplicateKey(error))
+      return failure(409, 'Another board already uses that link name.')
+    throw error
+  }
   if (!doc) return failure(404, 'Board not found.')
   // The count comes back with the board because the client replaces its whole list entry
   // with this answer. Leaving it at the default 0 made a rename say "0 items", and the
@@ -329,6 +350,48 @@ export async function patchBoard(
   // undo-proof board delete - say "It is empty." about a board that was not.
   const items = await WhiteboardItemModel.countDocuments({ boardId: doc._id })
   return { ok: true, value: toClientBoard(doc, items) }
+}
+
+/** A board as the share link sees it: enough to render it, nothing about the others. */
+export interface SharedBoard {
+  id: string
+  title: string
+  share: Exclude<ShareMode, 'off'>
+  /** The link's own path, slug first: what "Copy link" hands out. */
+  path: string
+}
+
+/**
+ * The board behind `/whiteboard/<key>`, where the key is a slug or a board id - or null,
+ * for a key that names nothing AND for a board that is not shared. The two are one answer
+ * on purpose: a share link that has been turned off must not confirm the board still
+ * exists, let alone its title.
+ *
+ * ```
+ *   key ──▶ 24 hex? ── yes ──▶ findById
+ *                    └─ no ──▶ findOne({ slug: key.toLowerCase() })
+ *        ──▶ missing, or share 'off' ──▶ null (404)
+ * ```
+ *
+ * A slug can never be 24 hex (`validateSlug`), so the branch cannot pick the wrong board.
+ */
+export async function resolveSharedBoard(
+  key: string
+): Promise<SharedBoard | null> {
+  if (!key || key.length > 64) return null
+  await connectDatabase()
+  // A plain test, not `isObjectIdString`: that guard narrows the other branch to `never`.
+  const doc = /^[0-9a-f]{24}$/i.test(key)
+    ? await WhiteboardBoardModel.findById(key).lean()
+    : await WhiteboardBoardModel.findOne({ slug: key.toLowerCase() }).lean()
+  if (!doc || !doc.share || doc.share === 'off') return null
+  const id = String(doc._id)
+  return {
+    id,
+    title: doc.title ?? '',
+    share: doc.share,
+    path: `/whiteboard/${doc.slug ?? id}`,
+  }
 }
 
 /**
@@ -922,11 +985,25 @@ function withBBox(fields: ItemFields) {
  */
 export async function createItem(
   board: string,
-  fields: ItemFields
+  fields: ItemFields,
+  /** A share link's cap (SHARED_BOARD_MAX_ITEMS); the owner passes none. */
+  { maxItems }: { maxItems?: number } = {}
 ): Promise<DataResult<ClientItem>> {
   await connectDatabase()
 
   if (!(await boardExists(board))) return failure(404, 'Board not found.')
+  // A replay of an id already on the board is still a 200 (R3-4): only a NEW item counts
+  // against the cap, so a retried create never flips to "full" after it landed.
+  if (
+    maxItems !== undefined &&
+    !(await WhiteboardItemModel.exists({
+      _id: oid(fields._id),
+      boardId: oid(board),
+    })) &&
+    (await WhiteboardItemModel.countDocuments({ boardId: oid(board) })) >=
+      maxItems
+  )
+    return failure(409, 'This board is full. Ask its owner to make room.')
   if (fields.parentId && !(await findFrame(board, fields.parentId)))
     return failure(400, 'parentId must be an existing frame.')
   const vocab = await getVocab()

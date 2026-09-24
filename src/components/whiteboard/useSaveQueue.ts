@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { SaveQueue, type QueueStatus } from '@/components/whiteboard/save-queue'
-import { sendSaveOpApi } from '@/requests/whiteboard'
+import { sendSaveOpApi, type CanvasScope } from '@/requests/whiteboard'
 
 /**
  * The React side of the save queue: one `SaveQueue` per board, plus the browser signals it
@@ -13,7 +13,8 @@ import { sendSaveOpApi } from '@/requests/whiteboard'
  *   useBoard actions ──▶ queue.createItem / patchItem / bulkMove / deleteItem / ...
  *                              │           (ordering, debounce, deps, retry: save-queue.ts)
  *                              ▼
- *                        sendSaveOpApi ──▶ /api/admin/whiteboard/*
+ *                        sendSaveOpApi ──▶ /api/admin/whiteboard/*         the owner
+ *                                      └──▶ /api/whiteboard/shared/<id>/*   an edit link
  *
  *   window 'offline' ──▶ queue.setOnline(false)   pill: "Offline - changes kept"
  *   window 'online'  ──▶ queue.setOnline(true)    everything waiting goes now
@@ -55,16 +56,16 @@ function storedAutoSave(): boolean {
 }
 
 export function useSaveQueue({
-  boardId,
+  scope,
   rejectedCount,
 }: {
-  boardId: string
+  scope: CanvasScope
   rejectedCount: number
 }) {
   // Bound to the board it was made for (D32): the page remounts for another board, so a
   // queue never outlives the canvas whose writes it holds.
   const [queue] = useState(
-    () => new SaveQueue({ send: op => sendSaveOpApi(op, boardId) })
+    () => new SaveQueue({ send: op => sendSaveOpApi(op, scope) })
   )
 
   const [status, setStatus] = useState<QueueStatus>(() => queue.status())

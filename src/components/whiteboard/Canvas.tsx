@@ -149,6 +149,12 @@ export interface CanvasProps {
   board: Board
   tool: Tool
   readOnly: boolean
+  /**
+   * Draw the "hidden from AI" states (dimmed cards, EyeOff badges, hatched frames). Off
+   * behind a share link: what the owner's agents read is the owner's business, and to a
+   * visitor the dimming is noise with no explanation (access.ts).
+   */
+  aiStyling: boolean
   /** A finger rather than a mouse (useCoarsePointer). */
   coarse: boolean
   /** Touch only: the next one-finger drag on the pane draws a selection box. */
@@ -172,6 +178,7 @@ export default function Canvas({
   board,
   tool,
   readOnly,
+  aiStyling,
   coarse,
   boxSelect,
   onBoxSelectDone,
@@ -213,9 +220,11 @@ export default function Canvas({
       const parent = item.parentId ? items[item.parentId] : undefined
       const data = nodeData({
         item,
-        hidden: isEffectivelyHidden(item, items),
+        hidden: aiStyling && isEffectivelyHidden(item, items),
         hiddenByFrame:
-          Boolean(item.parentId) && (!parent || !parent.includeInAi),
+          aiStyling &&
+          Boolean(item.parentId) &&
+          (!parent || !parent.includeInAi),
         error: errors[item._id] ?? null,
         childCount: childCount.get(item._id) ?? 0,
         pulse,
@@ -242,7 +251,7 @@ export default function Canvas({
       }
       return node
     })
-  }, [data.items, draggable, errors, pulse, readOnly, tool])
+  }, [aiStyling, data.items, draggable, errors, pulse, readOnly, tool])
 
   const baseEdges = useMemo(
     () =>
@@ -403,6 +412,7 @@ export default function Canvas({
       className="wb-flow"
       data-tool={tool}
       data-panning={spaceHeld || undefined}
+      data-readonly={readOnly || undefined}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}

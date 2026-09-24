@@ -93,7 +93,7 @@ export function whiteboardReadTools(
   const search = defineTool({
     name: names.search,
     title: 'Search the whiteboard',
-    description: `Search the owner's whiteboard cards, across every board they share. Full-text query over titles, bodies, tags and to-do rows (Vietnamese and English), plus optional filters. Dates are calendar days YYYY-MM-DD, both ends inclusive: from/to match the card's date (its 'when', or the day it was created), targetFrom/targetTo match its target-by date. Bodies are clipped; call ${names.item} for the full text.`,
+    description: `Search the owner's whiteboard cards, across every board agents can read (a board's own agent switch - not a share link). Full-text query over titles, bodies, tags and to-do rows (Vietnamese and English), plus optional filters. Dates are calendar days YYYY-MM-DD, both ends inclusive: from/to match the card's date (its 'when', or the day it was created), targetFrom/targetTo match its target-by date. Bodies are clipped; call ${names.item} for the full text.`,
     scopes,
     input: z.object({
       query: z.string().max(LIMITS.searchQuery).default(''),
@@ -160,7 +160,7 @@ export function whiteboardWriteTools() {
     name: 'whiteboard_add_item',
     title: 'Add a whiteboard card',
     description:
-      "Add a text or to-do card to the owner's whiteboard: on a board they share with agents (boardId, needed only when several are shared) or inside a visible frame (frameId from whiteboard_overview). Give it a meaning key and, for a meaning that has a status, a status key - both from the lists in whiteboard_overview (by default: dream, goal, failure, draft, note; statuses active, someday, done, dropped for a dream or goal). The card is tagged 'agent' and is visible to you afterwards; link it with whiteboard_link. The owner sees it on the next load of the board. Pass a clientRef so a retry does not add it twice.",
+      "Add a text or to-do card to the owner's whiteboard: on a board agents can read (boardId, needed only when several are readable) or inside a visible frame (frameId from whiteboard_overview). Give it a meaning key and, for a meaning that has a status, a status key - both from the lists in whiteboard_overview (by default: dream, goal, failure, draft, note; statuses active, someday, done, dropped for a dream or goal). The card is tagged 'agent' and is visible to you afterwards; link it with whiteboard_link. The owner sees it on the next load of the board. Pass a clientRef so a retry does not add it twice.",
     scopes: ['write'],
     keyed: true,
     input: z.object({

@@ -1,10 +1,8 @@
 import type { NextRequest } from 'next/server'
 
-import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
-import { createLink } from '@/lib/whiteboard/data'
-import { boardParam, noStore, wbError, wbJson } from '@/lib/whiteboard/http'
-import { validateLink } from '@/lib/whiteboard/limits'
+import { createLinkRoute } from '@/lib/whiteboard/canvas-routes'
+import { boardParam, noStore } from '@/lib/whiteboard/http'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,19 +20,5 @@ export async function POST(request: NextRequest) {
 
   const scope = boardParam(request)
   if (!scope.ok) return scope.response
-
-  const parsed = await readJsonBody(request)
-  if (!parsed.ok) return wbError(parsed.error, parsed.status)
-
-  const checked = validateLink(parsed.body)
-  if (!checked.ok) return wbError(checked.error, checked.status)
-
-  try {
-    const result = await createLink(scope.board, checked.value)
-    if (!result.ok) return wbError(result.error, result.status)
-    return wbJson({ link: result.value })
-  } catch (error) {
-    console.error('[whiteboard] link create failed', error)
-    return wbError('Unable to save the link right now.', 500)
-  }
+  return createLinkRoute(request, scope.board)
 }

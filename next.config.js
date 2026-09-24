@@ -104,6 +104,18 @@ const nextConfig = {
         source: '/blog/:path*',
         headers: [{ key: 'Content-Security-Policy', value: csp }],
       },
+      // A whiteboard share link (D34) is a credential, and an edit link is a write
+      // credential: another site framing it could clickjack a visitor into deleting cards.
+      // Only framing is locked down here - the canvas needs no other CSP to stay safe, since
+      // the shared canvas renders card text as React text, never HTML. X-Frame-Options for the browsers
+      // that predate frame-ancestors.
+      {
+        source: '/whiteboard/:path*',
+        headers: [
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'X-Frame-Options', value: 'DENY' },
+        ],
+      },
     ]
   },
 

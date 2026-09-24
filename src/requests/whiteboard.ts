@@ -1,5 +1,6 @@
 import type { SaveOp, SendResult } from '@/components/whiteboard/save-queue'
 import type { ClientBoard } from '@/lib/whiteboard/data'
+import type { ShareMode } from '@/lib/whiteboard/limits'
 import type { RestoreBatchResult } from '@/lib/whiteboard/types'
 import type { Vocab, VocabKind } from '@/lib/whiteboard/vocab'
 
@@ -10,12 +11,30 @@ import type { Vocab, VocabKind } from '@/lib/whiteboard/vocab'
  * request without one rather than guessing, so the board travels with the request instead of
  * being a thing the server remembers about the session.
  *
+ * The canvas calls (the stream, the save queue's writes, the vocab read) take a
+ * `CanvasScope` instead, because the same canvas also runs behind a share link:
+ *
+ * ```
+ *   { board, shared: false }  ──▶ /api/admin/whiteboard/items?board=<id>
+ *   { board, shared: true }   ──▶ /api/whiteboard/shared/<id>/items
+ * ```
+ *
+ * The shared form addresses the board by id even when the page was opened by slug, so an
+ * owner renaming the slug does not break a tab that is already open on the old one.
+ *
  * The save queue's `sendSaveOpApi` never throws: a thrown fetch is a network failure, which
  * the queue retries, and the queue must be able to tell it apart from a 4xx, which it never
  * retries. Everything else throws `Error(message)` with the server's own message.
  */
 
 const API = '/api/admin/whiteboard'
+const SHARED_API = '/api/whiteboard/shared'
+
+/** Which door the canvas talks through: the owner's, or a share link's. */
+export interface CanvasScope {
+  board: string
+  shared: boolean
+}
 
 async function errorMessage(res: Response) {
   try {
@@ -44,31 +63,33 @@ async function call(
 
 const on = (path: string, board: string) => `${API}${path}?board=${board}`
 
+/** A canvas endpoint for either door. `path` is '' for the stream, else '/items' etc. */
+const canvasUrl = ({ board, shared }: CanvasScope, path: string) =>
+  shared ? `${SHARED_API}/${board}${path}` : `${API}${path}?board=${board}`
+
 function requestFor(
   op: SaveOp,
-  board: string
+  scope: CanvasScope
 ): [string, RequestInit & { json?: unknown }] {
+  const at = (path: string) => canvasUrl(scope, path)
   switch (op.type) {
     case 'createItem':
-      return [on('/items', board), { method: 'POST', json: op.body }]
+      return [at('/items'), { method: 'POST', json: op.body }]
     case 'patchItem':
-      return [on(`/items/${op.id}`, board), { method: 'PATCH', json: op.patch }]
+      return [at(`/items/${op.id}`), { method: 'PATCH', json: op.patch }]
     case 'deleteItem':
-      return [on(`/items/${op.id}`, board), { method: 'DELETE' }]
+      return [at(`/items/${op.id}`), { method: 'DELETE' }]
     case 'createLink':
-      return [on('/links', board), { method: 'POST', json: op.body }]
+      return [at('/links'), { method: 'POST', json: op.body }]
     case 'patchLink':
       return [
-        on(`/links/${op.id}`, board),
+        at(`/links/${op.id}`),
         { method: 'PATCH', json: { label: op.label } },
       ]
     case 'deleteLink':
-      return [on(`/links/${op.id}`, board), { method: 'DELETE' }]
+      return [at(`/links/${op.id}`), { method: 'DELETE' }]
     case 'bulkMove':
-      return [
-        on('/items', board),
-        { method: 'PATCH', json: { updates: op.entries } },
-      ]
+      return [at('/items'), { method: 'PATCH', json: { updates: op.entries } }]
   }
 }
 
@@ -81,9 +102,9 @@ const SAVE_TIMEOUT_MS = 30_000
 
 export async function sendSaveOpApi(
   op: SaveOp,
-  board: string
+  scope: CanvasScope
 ): Promise<SendResult> {
-  const [url, init] = requestFor(op, board)
+  const [url, init] = requestFor(op, scope)
   const signal = AbortSignal.timeout(SAVE_TIMEOUT_MS)
   let res: Response
   try {
@@ -109,8 +130,11 @@ export async function sendSaveOpApi(
   }
 }
 
-export async function getBoardStreamApi(board: string, signal?: AbortSignal) {
-  const res = await call(`${API}?board=${board}`, { signal })
+export async function getBoardStreamApi(
+  scope: CanvasScope,
+  signal?: AbortSignal
+) {
+  const res = await call(canvasUrl(scope, ''), { signal })
   if (!res.ok || !res.body) throw new Error(await errorMessage(res))
   return res.body
 }
@@ -154,7 +178,13 @@ export async function createBoardApi(title: string): Promise<ClientBoard> {
 
 export async function patchBoardApi(
   id: string,
-  patch: { title?: string; includeInAi?: boolean }
+  patch: {
+    title?: string
+    includeInAi?: boolean
+    share?: ShareMode
+    /** '' or null clears it, and the link falls back to the board id. */
+    slug?: string | null
+  }
 ): Promise<ClientBoard> {
   const res = await call(`${API}/boards/${id}`, {
     method: 'PATCH',
@@ -173,8 +203,8 @@ export async function deleteBoardApi(id: string): Promise<void> {
 
 export interface VocabSnapshot {
   vocab: Vocab
-  /** Cards (every board) carrying each key. */
-  usage: { meanings: Record<string, number>; statuses: Record<string, number> }
+  /** Cards (every board) carrying each key. Owner reads only - a share link gets the list. */
+  usage?: { meanings: Record<string, number>; statuses: Record<string, number> }
 }
 
 async function vocabCall(
@@ -186,7 +216,8 @@ async function vocabCall(
   return res.json()
 }
 
-export const getVocabApi = () => vocabCall(`${API}/vocab`)
+export const getVocabApi = (scope?: CanvasScope) =>
+  vocabCall(scope?.shared ? canvasUrl(scope, '/vocab') : `${API}/vocab`)
 
 export const createVocabApi = (
   kind: VocabKind,
