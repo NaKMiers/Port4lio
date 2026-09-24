@@ -19,6 +19,48 @@ export type UploadedAsset = {
   publicId?: string
 }
 
+export type CloudinaryAssetInfo = {
+  publicId: string
+  url: string
+  folder: string
+  format: string
+  width: number
+  height: number
+  bytes: number
+  createdAt: string
+  tags: string[]
+}
+
+function assertConfigured() {
+  if (!cloudName || !apiKey || !apiSecret)
+    throw new Error('Missing Cloudinary env vars')
+}
+
+function toAssetInfo(resource: {
+  public_id: string
+  secure_url: string
+  folder?: string
+  format?: string
+  width?: number
+  height?: number
+  bytes?: number
+  created_at?: string
+  tags?: string[]
+}): CloudinaryAssetInfo {
+  return {
+    publicId: resource.public_id,
+    url: resource.secure_url,
+    folder:
+      resource.folder ?? resource.public_id.split('/').slice(0, -1).join('/'),
+    format: resource.format ?? '',
+    width: resource.width ?? 0,
+    height: resource.height ?? 0,
+    bytes: resource.bytes ?? 0,
+    createdAt: resource.created_at ?? '',
+    tags: resource.tags ?? [],
+  }
+}
+
 /**
  * `resource_type`, and why `'auto'` was the wrong default once the blog existed.
  *
@@ -39,8 +81,7 @@ export async function uploadToCloudinary(
   folder: string,
   resourceType: 'image' | 'auto' = 'image'
 ): Promise<UploadedAsset> {
-  if (!cloudName || !apiKey || !apiSecret)
-    throw new Error('Missing Cloudinary env vars')
+  assertConfigured()
 
   if (typeof file.size === 'number' && file.size > MAX_UPLOAD_BYTES)
     throw new Error(
@@ -73,4 +114,72 @@ export async function uploadToCloudinary(
   })
 
   return uploadResult
+}
+
+/**
+ * Bring a remote image into Cloudinary by URL, `resource_type: 'image'` for the same reason
+ * as `uploadToCloudinary` - this is the only door the MCP agent has onto `res.cloudinary.com`,
+ * and the markdown pipeline trusts that host unconditionally.
+ */
+export async function uploadFromUrl(
+  sourceUrl: string,
+  folder: string
+): Promise<CloudinaryAssetInfo> {
+  assertConfigured()
+  const result = await cloudinary.uploader.upload(sourceUrl, {
+    folder,
+    resource_type: 'image',
+  })
+  return toAssetInfo(result)
+}
+
+export async function listCloudinaryAssets(options: {
+  folder?: string
+  maxResults: number
+  nextCursor?: string
+}): Promise<{ assets: CloudinaryAssetInfo[]; nextCursor?: string }> {
+  assertConfigured()
+  const result = await cloudinary.api.resources({
+    type: 'upload',
+    resource_type: 'image',
+    prefix: options.folder,
+    max_results: options.maxResults,
+    next_cursor: options.nextCursor,
+    tags: true,
+  })
+  return {
+    assets: (result.resources ?? []).map(toAssetInfo),
+    nextCursor: result.next_cursor,
+  }
+}
+
+export async function getCloudinaryAsset(
+  publicId: string
+): Promise<CloudinaryAssetInfo | null> {
+  assertConfigured()
+  try {
+    const result = await cloudinary.api.resource(publicId, {
+      resource_type: 'image',
+      tags: true,
+    })
+    return toAssetInfo(result)
+  } catch (error) {
+    if (error && typeof error === 'object' && 'http_code' in error) {
+      const httpCode = (error as { http_code?: unknown }).http_code
+      if (httpCode === 404) return null
+    }
+    throw error
+  }
+}
+
+/** Irreversible. Deleting an asset still referenced by a live post or the profile breaks it. */
+export async function deleteCloudinaryAsset(
+  publicId: string
+): Promise<boolean> {
+  assertConfigured()
+  const result = await cloudinary.uploader.destroy(publicId, {
+    resource_type: 'image',
+    invalidate: true,
+  })
+  return result?.result === 'ok'
 }

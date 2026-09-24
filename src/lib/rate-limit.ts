@@ -348,6 +348,20 @@ export const BLOG_GENERATE_IMAGE_LIMIT: RateLimitOptions = {
   windowSeconds: 10 * 60,
 }
 
+/** Fetching a remote image into Cloudinary storage. Priced like `BLOG_GENERATE_IMAGE_LIMIT`. */
+export const CLOUDINARY_UPLOAD_LIMIT: RateLimitOptions = {
+  route: 'cloudinary-upload',
+  limit: 30,
+  windowSeconds: 10 * 60,
+}
+
+/** Deleting a Cloudinary asset is irreversible, so its bucket is tighter than the upload one. */
+export const CLOUDINARY_DELETE_LIMIT: RateLimitOptions = {
+  route: 'cloudinary-delete',
+  limit: 15,
+  windowSeconds: 10 * 60,
+}
+
 /**
  * The daily blog cron, and this is where "1 blog/day" is actually enforced.
  *

@@ -140,11 +140,13 @@ const contextOf = async (token: string) => {
 const READ_TOOLS = [
   'ccaf_status',
   'get_briefing',
+  'get_cloudinary_asset',
   'get_me',
   'get_post',
   'get_profile',
   'get_writing_brief',
   'lint_draft',
+  'list_cloudinary_assets',
   'list_posts',
   'list_taxonomy',
   'whiteboard_get_item',
@@ -367,9 +369,9 @@ describe('per-request registration (C1, C6)', () => {
     expect(expected).toEqual(READ_TOOLS)
   })
 
-  it('the registry is the 27 designed tools less the four the Assignment cut (D1)', () => {
+  it('the registry is the 27 designed tools less the four the Assignment cut (D1), plus the 4 Cloudinary tools', () => {
     const names = serverLib.SITE_SERVER.tools.map(({ def }) => def.name)
-    expect(names).toHaveLength(23)
+    expect(names).toHaveLength(27)
     for (const cut of [
       'delete_post',
       'save_taxonomy',

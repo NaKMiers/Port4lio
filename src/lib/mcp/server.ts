@@ -17,6 +17,7 @@ import { LEGACY_SCOPE, type TokenScope } from '@/lib/mcp/scopes'
 import type { AgentContext } from '@/lib/mcp/token'
 import { BLOG_TOOLS } from '@/lib/mcp/tools/blog'
 import { CCAF_TOOLS } from '@/lib/mcp/tools/ccaf'
+import { CLOUDINARY_TOOLS } from '@/lib/mcp/tools/cloudinary'
 import {
   getMeTool,
   getProfileTool,
@@ -157,8 +158,9 @@ export interface ServerSpec {
 }
 
 /**
- * The site-wide registry: 23 tools, the design's 27 less the four the Assignment cut
- * (delete_post, save_taxonomy, get_test_metrics, whiteboard_update_item - acceptance.md D1).
+ * The site-wide registry: the design's 27 less the four the Assignment cut (delete_post,
+ * save_taxonomy, get_test_metrics, whiteboard_update_item - acceptance.md D1), plus the four
+ * Cloudinary asset tools added after the Assignment (`tools/cloudinary.ts`).
  */
 export const SITE_SERVER: ServerSpec = {
   name: 'port4lio',
@@ -170,6 +172,7 @@ export const SITE_SERVER: ServerSpec = {
     ...BLOG_TOOLS,
     ...METRICS_TOOLS,
     ...CCAF_TOOLS,
+    ...CLOUDINARY_TOOLS,
     ...whiteboardReadTools(SITE_WHITEBOARD_NAMES, ['read']),
     ...whiteboardWriteTools(),
   ]),

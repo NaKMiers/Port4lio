@@ -35,12 +35,12 @@ export const SCOPE_INFO: Record<McpScope, { label: string; grants: string }> = {
   write: {
     label: 'Write',
     grants:
-      'Drafts, images for unpublished posts, whiteboard cards and links, CCA-F progress.',
+      'Drafts, images for unpublished posts, whiteboard cards and links, CCA-F progress, uploading Cloudinary images.',
   },
   publish: {
     label: 'Publish',
     grants:
-      'Anything the public sees: publish and archive posts, edit a live post, edit profile sections (never the CV).',
+      'Anything the public sees: publish and archive posts, edit a live post, edit profile sections (never the CV), delete a Cloudinary image.',
   },
   pii: {
     label: 'Order lookup',
