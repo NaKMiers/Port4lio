@@ -602,7 +602,7 @@ export const archivePostTool = defineTool({
   name: 'archive_post',
   title: 'Archive or unarchive a post',
   description:
-    "action 'archive' takes a published post off the site (it 404s and leaves /blog and the feed; nothing is deleted). action 'unarchive' returns an archived post that was never public to draft; one that was public is refused - use publish_post to make it live again.",
+    "action 'archive' takes a published post off the site (its page 404s and it drops out of /blog and the RSS feed; nothing is deleted). action 'unarchive' returns an archived post that was never public to draft; one that was public is refused - use publish_post to make it live again.",
   scopes: ['publish'],
   audited: true,
   cost: () => [BLOG_SAVE_LIMIT],
