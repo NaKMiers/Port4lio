@@ -9,24 +9,25 @@ import { cn } from '@/lib/utils'
 
 /**
  * The top bar (DR2): the way back to the hub, the title, the save pill and the auto-save
- * controls, then the hidden chip, Backup, Agents and the one primary action, Export to AI.
+ * controls, then the hidden chip, Backup and the one primary action, Export to AI.
  *
  * ## Responsive: two rows on a phone, one 56px row from md
  *
  * ```
  *   < md     [grid] [Title that truncates.......▾] [• SAVED]
- *            [OFF|ON] [Save 3]              [Archive] [Key 2] [Sparkles]
+ *            [OFF|ON] [Save 3]              [Archive] [Sparkles]
  *
- *   md-lg    [grid] [Title....▾] [• SAVED] [OFF|ON] [Save 3]  [Eye 3] [Archive] [Key 2] [Spark]
+ *   md-lg    [grid] [Title....▾] [• SAVED] [OFF|ON] [Save 3]  [Eye 3] [Archive] [Spark]
  *   lg       ...same, and "Export to AI" gets its label back (the primary action)
- *   xl       ...every label: AUTO-SAVE, "3 hidden", BACKUP ▾, AGENTS
+ *   xl       ...every label: AUTO-SAVE, "3 hidden", BACKUP ▾
  * ```
  *
- * Nine controls do not fit one row at 360px - measured at 146px over with auto-save off - and
- * every one of them is used on a phone, so the bar folds into two rows there rather than
- * hiding any of them. The two row wrappers are `md:contents`: from md they stop being boxes
- * and their children become the header's own flex items, so one DOM order serves both
- * layouts and the spacer does the same job in either.
+ * Eight controls do not fit one row at 360px - nine were measured at 146px over with auto-save
+ * off, and the icon-only Agents link that has left since was a fraction of that - and every one
+ * is used on a phone, so the bar folds into two rows there rather than hiding any of them.
+ * The two row wrappers are `md:contents`: from md they stop being boxes and their children
+ * become the header's own flex items, so one DOM order serves both layouts and the spacer
+ * does the same job in either.
  *
  * The title is the ONLY thing that shrinks: `flex-1` on its row below md, `min-w-0` inside
  * the switcher, and `shrink-0` + `whitespace-nowrap` on everything else. It used to carry a
@@ -34,6 +35,10 @@ import { cn } from '@/lib/utils'
  * was painted over by the pill - and on top of the Auto-save switch, whose clicks it then
  * swallowed. Labels step in by breakpoint (CSS, not the JS tier) so each width has one
  * source of truth.
+ *
+ * There is no Agents button. It was a link to `/admin/agents` once MCP tokens went site-wide,
+ * and the admin hub already links there, so on the board it was a slot spent on a page that
+ * has nothing to do with the canvas.
  *
  * ## Leaving with work that has not been written
  *
@@ -54,7 +59,6 @@ function TopBar({
   boardHidden,
   onHiddenClick,
   backup,
-  agents,
   exportDisabled,
   exportOpen,
   onExport,
@@ -69,7 +73,6 @@ function TopBar({
   boardHidden: boolean
   onHiddenClick: () => void
   backup: ReactNode
-  agents: ReactNode
   exportDisabled: boolean
   exportOpen: boolean
   onExport: () => void
@@ -146,7 +149,6 @@ function TopBar({
           </button>
         ) : null}
         {backup}
-        {agents}
         <button
           type="button"
           disabled={exportDisabled}

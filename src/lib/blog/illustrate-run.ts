@@ -17,7 +17,8 @@ import { PostModel } from '@/models/Post'
  *   claimIllustration(post)        findOneAndUpdate(illustration.state != running
  *        │                                           OR leaseUntil < now)      (R3)
  *        ├─ no match ──▶ "already running" { remaining }
- *        └─ claimed: state = running, leaseUntil = now + 300 s
+ *        └─ claimed: state = running, leaseUntil = now + 300 s, startedAt = now (the fence)
+ *                    bookkeeping writes use timestamps: false - they never move updatedAt (R9)
  *        ▼
  *   runIllustration                (inline for the cron; inside after() for illustrate_post, R2)
  *     planIllustration ──▶ [ cover, image1, image2, ... ]   (a task only where there is a prompt)
@@ -26,14 +27,33 @@ import { PostModel } from '@/models/Post'
  *        ├─ spendImage()  out ──▶ lastError "rate limit", stop           (per-token bucket, R5)
  *        ├─ drawImageAsset ──▶ url
  *        │        └─ failed ──▶ warn, lastError, KEEP GOING, prompt stays on the post
- *        └─ patchImageIntoPost: replace THIS placeholder in the CURRENT body   (R3)
- *                 placeholder gone ──▶ skip        live post ──▶ revalidate (C8)
+ *        ├─ patchImageIntoPost: replace THIS placeholder in the CURRENT body   (R3)
+ *        │        placeholder gone ──▶ skip        live post ──▶ revalidate (C8)
+ *        │        went live, allowLive false ──▶ stop (no publish scope), the drawn URL in lastError
+ *        │        kept conflicting ──▶ lastError carries the drawn URL, KEEP GOING
+ *        └─ remaining counter, IF startedAt is still ours ──▶ else taken over: stop, touch nothing
  *        ▼
- *     publish: true (cron)  ──▶ publishBlockers ──▶ [] ──▶ status = 'published' · revalidate
+ *     publish: true (cron)  ──▶ publishBlockers ──▶ [] ──▶ status = 'published' IF updatedAt is
+ *                               still what the blockers read (else re-read, x3) · revalidate
  *     publish: false (MCP)  ──▶ never publishes; an agent calls publish_post separately
  *        ▼
- *     finally: state = idle | failed, leaseUntil = null, remaining, lastError  (never only a log)
+ *     finally: IF startedAt is still ours: state = idle | failed, leaseUntil = null, remaining,
+ *              lastError = every failure of the run, not only the last  (never only a log)
  * ```
+ *
+ * The revalidations a background run queues inside `after()` are flushed by Next once the
+ * `after()` queue is idle, not per image - so a live post's page updates when the run ends.
+ *
+ * ## Why a publishing run locks agents out
+ *
+ * The cron's post is `archived` while it draws, so the live-post rule does not cover it, and
+ * the patch saves above deliberately keep any edit made meanwhile. Without a lock, a `write`
+ * token could edit the post during those minutes and the final `published` would put its
+ * text on the live site - a publish without the publish scope. So a run claimed with
+ * `publishing: true` refuses `update_post` and `generate_image` attach until it lets go
+ * (`publishingRunHolds`). The owner's editor is not an agent and is not refused. An
+ * `illustrate_post` run never publishes, so it never locks, and an agent may keep editing
+ * during its own run (R3).
  *
  * ## Why the lease (R3)
  *
@@ -97,7 +117,13 @@ export type IllustrationOutcome = {
 }
 
 export type ClaimResult =
-  { claimed: true; planned: number } | { claimed: false; remaining: number }
+  | {
+      claimed: true
+      planned: number
+      /** The claim's `startedAt`: pass it to `runIllustration` as its `fence`. */
+      startedAt: Date
+    }
+  | { claimed: false; remaining: number }
 
 /** How many images a run would draw right now: the tasks `planIllustration` finds. */
 export function plannedImages(post: {
@@ -109,11 +135,16 @@ export function plannedImages(post: {
   return planIllustration(post).tasks.length
 }
 
-/** The atomic start (R3). An expired lease belongs to a killed run, and is taken over. */
+/**
+ * The atomic start (R3). An expired lease belongs to a killed run, and is taken over.
+ * `publishing` marks a run that will publish the post at the end (the cron), which is what
+ * makes agent writes wait for it - see `publishingRunHolds`.
+ */
 export async function claimIllustration(
   postId: string,
   planned: number,
-  now = new Date()
+  now = new Date(),
+  { publishing = false }: { publishing?: boolean } = {}
 ): Promise<ClaimResult> {
   await connectDatabase()
   const claimed = await PostModel.findOneAndUpdate(
@@ -133,14 +164,17 @@ export async function claimIllustration(
           leaseUntil: new Date(now.getTime() + ILLUSTRATION_LEASE_MS),
           remaining: planned,
           lastError: null,
+          publishing,
           startedAt: now,
           finishedAt: null,
         },
       },
     },
-    { projection: { _id: 1 } }
+    // Bookkeeping, not content: leaving updatedAt alone keeps the editor's stale-save check
+    // (R9) and update_post's conditional save from seeing a run's counters as edits.
+    { projection: { _id: 1 }, timestamps: false }
   ).lean()
-  if (claimed) return { claimed: true, planned }
+  if (claimed) return { claimed: true, planned, startedAt: now }
 
   const current = await PostModel.findById(postId, {
     'illustration.remaining': 1,
@@ -155,8 +189,23 @@ export interface RunOptions {
   /** true: the cron's "publish when whole". false: never publish (MCP, `publish: false`). */
   publish: boolean
   /** Spend one image from a per-token bucket (R5). Absent for the cron. */
-  spendImage?: () => Promise<{ ok: boolean; retryAfterSeconds: number }>
+  spendImage?: () => Promise<{
+    ok: boolean
+    retryAfterSeconds: number
+    /** The token was revoked during the run. */
+    revoked?: boolean
+  }>
+  /**
+   * false for a token without the publish scope: an image is never written into a post that
+   * went live during the run, and the run stops there (the live-post rule). Default true.
+   */
+  allowLive?: boolean
+  /** The `startedAt` from this run's claim. Without it the run reads it from the post. */
+  fence?: Date
 }
+
+/** `Post.illustration.lastError`'s schema cap. */
+const LAST_ERROR_MAX = 1000
 
 /**
  * The loop, for a post whose lease this caller holds. Never throws: every failure ends in
@@ -164,19 +213,46 @@ export interface RunOptions {
  */
 export async function runIllustration(
   postId: string,
-  { model, deadlineAt, publish, spendImage }: RunOptions
+  {
+    model,
+    deadlineAt,
+    publish,
+    spendImage,
+    allowLive = true,
+    fence: claimedFence,
+  }: RunOptions
 ): Promise<IllustrationOutcome> {
   const warnings: string[] = []
   let imagesMade = 0
   let imagesSkipped = 0
-  let lastError: string | null = null
   let published = false
   let blockers: string[] = []
+  // Every failure, not just the last one: an agent polling get_post has only lastError (R2).
+  const errors: string[] = []
+  const fail = (message: string) => {
+    errors.push(message)
+    warnings.push(message)
+  }
+  const lastErrorText = () =>
+    errors.length === 0
+      ? null
+      : (errors.length === 1
+          ? errors[0]
+          : `${errors.length} problems in this run: ${errors.join(' | ')}`
+        ).slice(0, LAST_ERROR_MAX)
+  /*
+    The fence: the `startedAt` this run's claim wrote. A run that outlives its lease (possible
+    off Vercel, where nothing kills it at 300 s) must not reset a newer run's lease or counter,
+    so both writes are conditional on it, and a miss means "taken over - stop".
+  */
+  let fence: Date | null = claimedFence ?? null
+  let ownsLease = true
 
   try {
     await connectDatabase()
     const post = await PostModel.findById(postId).select('+bodyMarkdown')
     if (!post) throw new Error('The post no longer exists.')
+    fence ??= post.illustration?.startedAt ?? null
 
     const { tasks, skipped } = planIllustration({
       coverImage: post.coverImage,
@@ -196,7 +272,9 @@ export async function runIllustration(
         warnings.push(
           `Ran out of time with ${left} image${left === 1 ? '' : 's'} left to draw. ${left === 1 ? 'Its prompt is' : 'Their prompts are'} on the post - make ${left === 1 ? 'it' : 'them'} in the editor.`
         )
-        lastError = `Ran out of time with ${left} image${left === 1 ? '' : 's'} left. Call illustrate_post again to draw the rest.`
+        errors.push(
+          `Ran out of time with ${left} image${left === 1 ? '' : 's'} left. Call illustrate_post again to draw the rest.`
+        )
         imagesSkipped += left
         break
       }
@@ -205,8 +283,11 @@ export async function runIllustration(
         const spent = await spendImage()
         if (!spent.ok) {
           const left = tasks.length - index
-          lastError = `rate limit: this token has used its image budget. ${left} image${left === 1 ? '' : 's'} left; call illustrate_post again in ${spent.retryAfterSeconds} s.`
-          warnings.push(lastError)
+          fail(
+            spent.revoked
+              ? `The token was revoked during the run, so it stopped. ${left} image${left === 1 ? '' : 's'} left undrawn.`
+              : `rate limit: this token has used its image budget. ${left} image${left === 1 ? '' : 's'} left; call illustrate_post again in ${spent.retryAfterSeconds} s.`
+          )
           imagesSkipped += left
           break
         }
@@ -237,92 +318,128 @@ export async function runIllustration(
         warnings.push(
           `Could not draw ${task.label}: ${message} Its prompt is still on the post.`
         )
-        lastError = `Could not draw ${task.label}: ${message}`
+        errors.push(`Could not draw ${task.label}: ${message}`)
         continue
       }
 
       const saved = await patchImageIntoPost(postId, task.key, url, {
         replaceCover: false,
+        allowLive,
       })
+      if (saved.outcome === 'live') {
+        const left = tasks.length - index
+        imagesSkipped += left
+        fail(
+          `The post was published while this run was drawing, and this token cannot change a live post (it needs the publish scope). ${left} image${left === 1 ? '' : 's'} not placed; the one just drawn is ${url}.`
+        )
+        break
+      }
       if (saved.outcome === 'saved') imagesMade += 1
-      else {
+      else if (saved.outcome === 'skipped') {
         imagesSkipped += 1
         warnings.push(
-          saved.outcome === 'skipped'
-            ? `Skipped ${task.label}: it was removed from the post while the run was drawing.`
-            : `Could not save ${task.label}: the post kept changing underneath the run.`
+          `Skipped ${task.label}: it was removed from the post while the run was drawing.`
         )
-        if (saved.outcome !== 'skipped')
-          lastError = `Could not save ${task.label}.`
+      } else {
+        imagesSkipped += 1
+        // The URL is kept: the image is paid for, and the agent can insert it itself.
+        fail(
+          `Could not save ${task.label}: the post kept changing underneath the run. It was drawn as ${url} - insert it with update_post.`
+        )
       }
 
-      await PostModel.updateOne(
-        { _id: postId },
-        { $set: { 'illustration.remaining': tasks.length - index - 1 } }
+      const counted = await PostModel.updateOne(
+        { _id: postId, 'illustration.startedAt': fence },
+        { $set: { 'illustration.remaining': tasks.length - index - 1 } },
+        { timestamps: false }
       )
-    }
-
-    if (publish) {
-      const fresh = await PostModel.findById(postId).select('+bodyMarkdown')
-      if (fresh) {
-        blockers = publishBlockers({
-          title: fresh.title,
-          bodyMarkdown: fresh.bodyMarkdown,
-          coverImage: fresh.coverImage,
-        })
-        if (blockers.length === 0) {
-          fresh.status = 'published'
-          // Stamped once and never reset - the same rule `patchPost` states. Moving it would
-          // rewrite `datePublished` in JSON-LD and `pubDate` in RSS on a re-publish, telling
-          // every feed reader a months-old post is new.
-          if (fresh.publishedAt === null) fresh.publishedAt = new Date()
-          await fresh.save()
-          published = true
-
-          /*
-            Isolated from the save it follows, and the post IS public at this point whatever
-            happens here. A `revalidatePath` throw reaching a caller's catch would have it
-            report the run as failed - and the cron would then be looking at a published post
-            it believes it did not publish. The honest failure is "it is live, the cache may be
-            stale".
-          */
-          try {
-            revalidatePublishedPost(fresh.slug)
-          } catch (error) {
-            console.error(
-              '[blog/illustrate-run] published but could not revalidate',
-              error
-            )
-            warnings.push(
-              'The post was published, but its page may serve from cache until ISR expires.'
-            )
-          }
-        }
+      if (counted.matchedCount === 0) {
+        ownsLease = false
+        fail(
+          'This run outlived its lease and another run took the post over, so it stopped.'
+        )
+        break
       }
     }
-  } catch (error) {
-    console.error('[blog/illustrate-run] run failed', error)
-    lastError =
-      error instanceof Error
-        ? `The image run failed: ${error.message}`
-        : 'The image run failed.'
-    warnings.push(lastError)
-  } finally {
-    // Release the lease, and leave the answer where get_post reads it (R2).
-    try {
+
+    // Publish only what the blockers were checked on: the write is conditional on the
+    // updatedAt read with it, so an edit landing in between (the owner's - agents are locked
+    // out by D8) is re-read and re-checked instead of going live unchecked.
+    for (let attempt = 0; publish && ownsLease && attempt < 3; attempt += 1) {
       const fresh = await PostModel.findById(postId).select('+bodyMarkdown')
-      await PostModel.updateOne(
-        { _id: postId },
+      if (!fresh) break
+      blockers = publishBlockers({
+        title: fresh.title,
+        bodyMarkdown: fresh.bodyMarkdown,
+        coverImage: fresh.coverImage,
+      })
+      if (blockers.length > 0) break
+      const written = await PostModel.updateOne(
+        { _id: postId, updatedAt: fresh.updatedAt },
         {
           $set: {
-            'illustration.state': lastError ? 'failed' : 'idle',
-            'illustration.leaseUntil': null,
-            'illustration.remaining': fresh ? plannedImages(fresh) : 0,
-            'illustration.lastError': lastError,
-            'illustration.finishedAt': new Date(),
+            status: 'published',
+            // Stamped once and never reset - the same rule `patchPost` states. Moving it
+            // would rewrite `datePublished` in JSON-LD and `pubDate` in RSS on a
+            // re-publish, telling every feed reader a months-old post is new.
+            publishedAt: fresh.publishedAt ?? new Date(),
           },
         }
       )
+      if (written.matchedCount === 0) continue
+      published = true
+
+      /*
+        Isolated from the save it follows, and the post IS public at this point whatever
+        happens here. A `revalidatePath` throw reaching a caller's catch would have it
+        report the run as failed - and the cron would then be looking at a published post
+        it believes it did not publish. The honest failure is "it is live, the cache may be
+        stale".
+      */
+      try {
+        revalidatePublishedPost(fresh.slug)
+      } catch (error) {
+        console.error(
+          '[blog/illustrate-run] published but could not revalidate',
+          error
+        )
+        warnings.push(
+          'The post was published, but its page may serve from cache until ISR expires.'
+        )
+      }
+      break
+    }
+  } catch (error) {
+    console.error('[blog/illustrate-run] run failed', error)
+    fail(
+      error instanceof Error
+        ? `The image run failed: ${error.message}`
+        : 'The image run failed.'
+    )
+  } finally {
+    // Release the lease - only our own (the fence) - and leave the answer where get_post
+    // reads it (R2).
+    try {
+      if (ownsLease) {
+        const fresh = await PostModel.findById(postId).select('+bodyMarkdown')
+        await PostModel.updateOne(
+          // No fence only when the first read failed and the caller passed none: release
+          // whatever run is marked, as before the fence existed.
+          fence
+            ? { _id: postId, 'illustration.startedAt': fence }
+            : { _id: postId, 'illustration.state': 'running' as const },
+          {
+            $set: {
+              'illustration.state': errors.length ? 'failed' : 'idle',
+              'illustration.leaseUntil': null,
+              'illustration.remaining': fresh ? plannedImages(fresh) : 0,
+              'illustration.lastError': lastErrorText(),
+              'illustration.finishedAt': new Date(),
+            },
+          },
+          { timestamps: false }
+        )
+      }
     } catch (error) {
       // The lease then expires on its own after 300 s; get_post reports that as a cut-off run.
       console.error('[blog/illustrate-run] could not release the lease', error)
@@ -335,7 +452,7 @@ export async function runIllustration(
     warnings,
     published,
     blockers,
-    lastError,
+    lastError: lastErrorText(),
   }
 }
 
@@ -353,7 +470,14 @@ export async function illustratePost(
   }: Omit<RunOptions, 'publish'> & { publish?: boolean }
 ): Promise<IllustrationOutcome> {
   const postId = String(post._id)
-  const claim = await claimIllustration(postId, plannedImages(post))
+  const claim = await claimIllustration(
+    postId,
+    plannedImages(post),
+    new Date(),
+    {
+      publishing: publish,
+    }
+  )
   if (!claim.claimed)
     return {
       imagesMade: 0,
@@ -369,6 +493,7 @@ export async function illustratePost(
     deadlineAt,
     publish,
     spendImage,
+    fence: claim.startedAt,
   })
 
   const fresh = await PostModel.findById(postId)

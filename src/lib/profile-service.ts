@@ -2,6 +2,7 @@ import 'server-only'
 
 import { revalidateTag } from 'next/cache'
 
+import { isAllowedImageUrl } from '@/lib/blog/rehype-restrict-image-hosts'
 import { connectDatabase } from '@/lib/mongodb'
 import { normalizeProfile } from '@/lib/profile'
 import { PUBLIC_PROFILE_CACHE_TAG } from '@/lib/profile-data'
@@ -11,6 +12,7 @@ import {
   sectionVersion,
   type ProfileSection,
 } from '@/lib/profile-sections'
+import { MAX_PROFILE_JSON_BYTES } from '@/lib/upload-limits'
 import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
 import type { Profile } from '@/types/profile'
 
@@ -60,12 +62,36 @@ import type { Profile } from '@/types/profile'
 
 type OwnerProfileDocument = Record<string, unknown>
 
-/** `POST /api/profile`: the editor's whole-document save, moved unchanged. */
+/**
+ * `POST /api/profile`: the editor's whole-document save, moved unchanged.
+ *
+ * `base` is the stale-tab guard, the profile's version of R9: the `updatedAt` the settings
+ * editor loaded. Given, the save lands only if the document is still that version, so an
+ * agent's `update_profile` made while the tab sat open is not silently replaced; a miss is
+ * `{ stale }`. Without it - every caller before the guard existed - the save is exactly what
+ * it always was, which `tests/api/profile-route.test.ts` pins (R10).
+ */
 export async function replaceProfile(
-  parsed: Profile
-): Promise<OwnerProfileDocument | null> {
+  parsed: Profile,
+  { base }: { base?: Date } = {}
+): Promise<OwnerProfileDocument | { stale: Date | null } | null> {
   await connectDatabase()
   const now = new Date()
+  if (base) {
+    const guarded = await ProfileModel.findOneAndUpdate(
+      { _id: PROFILE_DOCUMENT_ID, updatedAt: base },
+      { $set: { ...parsed, updatedAt: now } },
+      { returnDocument: 'after', lean: true, runValidators: true }
+    )
+    if (!guarded) {
+      const current = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
+        .select('updatedAt')
+        .lean<{ updatedAt?: Date }>()
+      return { stale: current?.updatedAt ?? null }
+    }
+    revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')
+    return guarded as OwnerProfileDocument
+  }
   const updatedDoc = await ProfileModel.findOneAndUpdate(
     { _id: PROFILE_DOCUMENT_ID },
     {
@@ -95,6 +121,54 @@ export type SectionPatchResult =
       value: Record<string, unknown>
     }
   | { ok: false; reason: 'resume' | 'invalid' | 'conflict'; error: string }
+
+/** Keys whose string values are rendered as an image on `/`, and those rendered as a link. */
+const IMAGE_KEYS = new Set(['avatar', 'backgroundImage', 'image'])
+const LINK_KEYS = new Set(['link', 'href', 'cv'])
+
+/** Every string under an image or link key, anywhere in a section value. */
+function urlsIn(
+  value: unknown,
+  into = { images: new Set<string>(), links: new Set<string>() },
+  depth = 0
+) {
+  if (depth > 12 || !value || typeof value !== 'object') return into
+  for (const [key, entry] of Object.entries(value))
+    if (typeof entry === 'string' && entry) {
+      if (IMAGE_KEYS.has(key)) into.images.add(entry)
+      else if (LINK_KEYS.has(key)) into.links.add(entry)
+    } else urlsIn(entry, into, depth + 1)
+
+  return into
+}
+
+function isSafeLink(value: string): boolean {
+  try {
+    return ['https:', 'http:', 'mailto:'].includes(new URL(value).protocol)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * An agent's section is rendered on `/`. A URL it introduces - one not already in the stored
+ * section - must be an image from this site's own Cloudinary (the same rule the blog
+ * pipeline enforces on posts) or an http(s)/mailto link, never a third-party tracking pixel
+ * or a `javascript:` href. URLs already stored pass: an agent re-sending the section with a
+ * typo fixed must not be refused over an avatar the owner uploaded years ago.
+ */
+function unsafeUrls(next: unknown, current: unknown): string[] {
+  const before = urlsIn(current)
+  const after = urlsIn(next)
+  return [
+    ...[...after.images].filter(
+      url => !before.images.has(url) && !isAllowedImageUrl(url)
+    ),
+    ...[...after.links].filter(
+      url => !before.links.has(url) && !isSafeLink(url)
+    ),
+  ]
+}
 
 /** `update_profile`: replace one section, given the version the agent read. */
 export async function patchProfileSection(
@@ -127,6 +201,14 @@ export async function patchProfileSection(
         .join(' '),
     }
 
+  // The owner's editor is capped at the route; this path must not be the way around it.
+  if (Buffer.byteLength(JSON.stringify(value)) > MAX_PROFILE_JSON_BYTES)
+    return {
+      ok: false,
+      reason: 'invalid',
+      error: `The ${section} section is over the ${MAX_PROFILE_JSON_BYTES / (1024 * 1024)} MB profile limit. Nothing was changed.`,
+    }
+
   await connectDatabase()
   const stored = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
     .select(`${fields.join(' ')} updatedAt`)
@@ -140,6 +222,13 @@ export async function patchProfileSection(
     }
 
   const next = pickSection(normalizeProfile(value), section)
+  const unsafe = unsafeUrls(next, current)
+  if (unsafe.length)
+    return {
+      ok: false,
+      reason: 'invalid',
+      error: `These URLs are not allowed on the profile: ${unsafe.map(url => JSON.stringify(url.slice(0, 120))).join(', ')}. Images must be uploaded to this site's Cloudinary (the owner does that in /admin/settings); links must be https, http or mailto. Nothing was changed.`,
+    }
   const now = new Date()
   const updated = await ProfileModel.findOneAndUpdate(
     stored

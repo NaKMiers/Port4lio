@@ -26,8 +26,8 @@ export type { ProductMetrics } from '@/lib/metrics/tests'
  * stops someone reading the data.
  *
  * The numbers themselves - why the shape is keyed by product, why documents are counted and
- * never `$sum: count` - moved to `lib/metrics/tests.ts`, which the site MCP's briefing reads
- * too. `tests/api/admin-metrics-route.test.ts` pins this route's output field by field.
+ * never `$sum: count` - moved to `lib/metrics/tests.ts`.
+ * `tests/api/admin-metrics-route.test.ts` pins this route's output field by field.
  */
 export async function GET(request: NextRequest) {
   const authCookie = request.cookies.get(getAuthCookieName())?.value

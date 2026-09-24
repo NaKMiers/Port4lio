@@ -16,6 +16,7 @@ import { SectionOpenProvider } from '@/components/settings/SectionOpenContext'
 import PreviewRail from '@/components/settings/preview/PreviewRail'
 import RailResizeHandle from '@/components/settings/RailResizeHandle'
 import ServicesSection from '@/components/settings/ServicesSection'
+import StaleSaveBanner from '@/components/blog-admin/StaleSaveBanner'
 import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoadError from '@/components/settings/SettingLoadError'
 import SettingLoading from '@/components/settings/SettingLoading'
@@ -123,6 +124,12 @@ interface SettingEditorProps {
 function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /*
+    The stale-tab guard: the updatedAt this page loaded, sent with Save so an agent's
+    update_profile made while it sat open is not silently replaced (409 + the banner).
+  */
+  const { profileUpdatedAt, setProfileUpdatedAt, refetchProfile } = useApp()
+  const [stale, setStale] = useState(false)
   // Seed the CV block so the editor opens pre-populated on a document that predates it.
   // Saving once persists it; from then on the stored value wins.
   const [profile, setProfile] = useState<Profile>(() => {
@@ -185,7 +192,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
     )
   }, [iconCatalog, iconQuery])
 
-  async function onSave() {
+  async function onSave(overwrite = false) {
     setSaving(true)
     setError(null)
     try {
@@ -197,14 +204,26 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
           `Profile data exceeds ${MAX_PROFILE_JSON_BYTES / (1024 * 1024)} MB`
         )
 
+      // No base (a document never saved) sends nothing, as every save did before the guard.
+      const base = overwrite ? '*' : profileUpdatedAt
       const res = await fetch('/api/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(base ? { 'x-profile-base-updated-at': base } : {}),
+        },
         body: json,
       })
 
       const data = await res.json()
+      if (res.status === 409 && data?.code === 'stale') {
+        setStale(true)
+        return
+      }
       if (!res.ok) throw new Error(data?.error || 'Failed to save profile')
+      setStale(false)
+      if (typeof data?.updatedAt === 'string')
+        setProfileUpdatedAt(data.updatedAt)
       if (data?.profile) {
         const next = normalizeProfile(data.profile)
         setAppProfile(next)
@@ -275,11 +294,25 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         uploading={uploading}
         fullWidth={fullWidth}
         onToggleFullWidth={() => setFullWidth(value => !value)}
-        onSave={onSave}
+        onSave={() => void onSave()}
         saveButtonRef={saveButtonRef}
       />
 
       <SettingErrorBanner message={error} />
+      {stale ? (
+        <StaleSaveBanner
+          subject="profile"
+          busy={saving}
+          onReload={() => {
+            setStale(false)
+            void refetchProfile({ blocking: true })
+          }}
+          onOverwrite={() => {
+            setStale(false)
+            void onSave(true)
+          }}
+        />
+      ) : null}
 
       <TabNav
         tabs={SETTING_TABS}
@@ -397,7 +430,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         anchorRef={saveButtonRef}
         saving={saving}
         uploading={uploading}
-        onSave={onSave}
+        onSave={() => void onSave()}
       />
 
       <IconPickerModal

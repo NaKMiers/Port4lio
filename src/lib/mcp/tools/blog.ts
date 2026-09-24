@@ -4,19 +4,20 @@ import { after } from 'next/server'
 import { z } from 'zod'
 
 import { COVER_KEY } from '@/lib/blog/auto-illustrate'
+import { findImagePlaceholders } from '@/lib/blog/image-placeholders'
 import { POST_STATUSES } from '@/lib/blog/constants'
 import { IMAGE_MODEL_OPTIONS } from '@/lib/blog/generation-fields'
+import {
+  claimIllustration,
+  plannedImages,
+  runIllustration,
+} from '@/lib/blog/illustrate-run'
 import { ImageGenError } from '@/lib/blog/image-gen'
 import {
   generateImageUrl,
   patchImageIntoPost,
   writeImagePrompt,
 } from '@/lib/blog/image-service'
-import {
-  claimIllustration,
-  plannedImages,
-  runIllustration,
-} from '@/lib/blog/illustrate-run'
 import { listKindsWithCounts } from '@/lib/blog/kind-data'
 import { lintDraft } from '@/lib/blog/lint-draft'
 import { LlmError } from '@/lib/blog/llm'
@@ -24,6 +25,8 @@ import {
   archivePost,
   createDraft,
   listPosts,
+  PUBLISHING_RUN_REFUSAL,
+  publishingRunHolds,
   publishPost,
   readPostPage,
   updatePostAsAgent,
@@ -32,7 +35,7 @@ import {
 import { listSeriesWithCounts } from '@/lib/blog/series-data'
 import { buildWritingBrief, STRUCTURE_NAMES } from '@/lib/blog/writing-brief'
 import { defineTool, ok, refuse, type ToolResult } from '@/lib/mcp/run-tool'
-import type { AgentContext } from '@/lib/mcp/token'
+import { isTokenLive, type AgentContext } from '@/lib/mcp/token'
 import { connectDatabase } from '@/lib/mongodb'
 import {
   BLOG_GENERATE_IMAGE_LIMIT,
@@ -340,7 +343,12 @@ export const updatePostTool = defineTool({
       coverImagePrompt: z.string().max(2000).optional(),
       imagePrompts: imagePrompts.optional(),
       edits: z
-        .array(z.object({ find: z.string().min(1), replace: z.string() }))
+        .array(
+          z.object({
+            find: z.string().min(1).max(20_000),
+            replace: z.string().max(50_000),
+          })
+        )
         .max(50)
         .optional(),
       bodyMarkdown: z.string().max(200_000).optional(),
@@ -380,6 +388,8 @@ export const generateImageTool = defineTool({
     args.mode === 'attach'
       ? [BLOG_GENERATE_IMAGE_LIMIT, BLOG_SAVE_LIMIT]
       : [BLOG_GENERATE_IMAGE_LIMIT],
+  // Spent right before the draw, so the cheap refusals below cost the token nothing.
+  lazyCost: true,
   input: z.object({
     postId: objectId,
     target: z
@@ -396,13 +406,15 @@ export const generateImageTool = defineTool({
     idempotentHint: false,
     openWorldHint: true,
   },
-  async run(args, { token, setTarget }) {
+  async run(args, { token, setTarget, spend }) {
     if (args.mode === 'attach' && !args.target)
       return refuse("mode 'attach' needs a target: 'cover' or an imageN key.")
 
     await connectDatabase()
     const post = await PostModel.findById(args.postId)
-      .select('slug status coverImagePrompt imagePrompts')
+      .select(
+        '+bodyMarkdown slug status coverImagePrompt imagePrompts illustration'
+      )
       .lean()
     if (!post || post.status === 'deleted')
       return refuse('Post not found.', 'not-found')
@@ -413,6 +425,21 @@ export const generateImageTool = defineTool({
       !canPublish(token)
     )
       return refuse(LIVE_POST_REFUSAL, 'live-post')
+    // Before the draw, so a refused attach spends no image; the patch checks again.
+    if (args.mode === 'attach' && publishingRunHolds(post.illustration))
+      return refuse(PUBLISHING_RUN_REFUSAL, 'conflict')
+    // A placeholder that is not in the body would be drawn, paid for, then refused.
+    if (
+      args.mode === 'attach' &&
+      args.target !== COVER_KEY &&
+      !findImagePlaceholders(post.bodyMarkdown ?? '').some(
+        item => item.key === args.target
+      )
+    )
+      return refuse(
+        `"${args.target}" is not a placeholder in the post body. get_post lists the unresolved ones; or use mode 'return' and insert the image yourself.`,
+        'not-found'
+      )
 
     let prompt = args.prompt
     if (!prompt && args.target)
@@ -447,6 +474,9 @@ export const generateImageTool = defineTool({
         prompt = written.value.prompt
       }
 
+      const refused = await spend()
+      if (refused) return refused
+
       const drawn = await generateImageUrl({
         postId: args.postId,
         prompt,
@@ -468,8 +498,21 @@ export const generateImageTool = defineTool({
       const saved = await patchImageIntoPost(
         args.postId,
         args.target!,
-        drawn.value.url
+        drawn.value.url,
+        // allowLive: the status was checked before a draw that takes minutes; the owner may
+        // have published the post meanwhile.
+        { refusePublishingRun: true, allowLive: canPublish(token) }
       )
+      if (saved.outcome === 'live')
+        return refuse(
+          `The post was published while the image was being drawn, and changing a live post needs the publish scope. Nothing was attached. The image: ${drawn.value.url}`,
+          'live-post'
+        )
+      if (saved.outcome === 'publishing')
+        return refuse(
+          `${PUBLISHING_RUN_REFUSAL} The image was drawn; its URL: ${drawn.value.url}`,
+          'conflict'
+        )
       if (saved.outcome === 'skipped')
         return refuse(
           `"${args.target}" is not a placeholder in the post body any more, so the image was not attached. Its URL: ${drawn.value.url}`,
@@ -551,11 +594,18 @@ export const illustratePostTool = defineTool({
         model,
         deadlineAt: startedAt + ILLUSTRATE_BUDGET_MS,
         publish: false,
-        spendImage: () =>
-          checkRateLimit(
+        fence: claim.startedAt,
+        // A post published during the run is then left alone by a token without publish.
+        allowLive: canPublish(token),
+        spendImage: async () => {
+          // A token revoked mid-run stops at its next image, not after its last one.
+          if (!(await isTokenLive(token)))
+            return { ok: false, retryAfterSeconds: 0, revoked: true }
+          return checkRateLimit(
             `mcp-token:${token.tokenId}`,
             BLOG_GENERATE_IMAGE_LIMIT
-          ),
+          )
+        },
       })
     )
 

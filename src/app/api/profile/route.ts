@@ -10,6 +10,9 @@ import { replaceProfile } from '@/lib/profile-service'
 import { MAX_PROFILE_JSON_BYTES } from '@/lib/upload-limits'
 import type { Profile } from '@/types/profile'
 
+/** The settings editor's stale-tab guard (see POST). */
+const PROFILE_BASE_HEADER = 'x-profile-base-updated-at'
+
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
@@ -54,15 +57,44 @@ export async function POST(request: NextRequest) {
       )
 
     const parsed = JSON.parse(raw || '{}') as Profile
+
+    /*
+      The stale-tab guard, sent as a header so the body stays the profile and nothing new is
+      ever stored: the updatedAt the settings editor loaded, or `*` for "Overwrite anyway"
+      (no check, but answer with the new updatedAt so the editor has a base again). Absent -
+      every caller before the guard - the save and its answer are exactly as they were.
+    */
+    const baseHeader = request.headers.get(PROFILE_BASE_HEADER)
+    let base: Date | undefined
+    if (baseHeader && baseHeader !== '*') {
+      base = new Date(baseHeader)
+      if (Number.isNaN(base.getTime()))
+        return jsonError(
+          `${PROFILE_BASE_HEADER} must be the updatedAt the editor loaded, or *`,
+          400
+        )
+    }
+
     // The write and the cache invalidation live in `profile-service`, shared with the site
     // MCP's `update_profile` (premise 2, C8).
-    const updatedDoc = await replaceProfile(parsed)
+    const updatedDoc = await replaceProfile(parsed, { base })
 
     if (!updatedDoc) return jsonError('Failed to load updated profile', 500)
+    if ('stale' in updatedDoc)
+      return NextResponse.json(
+        {
+          error:
+            'The profile changed since you opened this page - probably an agent edit. Reload to see it, or overwrite it with what you have.',
+          code: 'stale',
+          updatedAt: updatedDoc.stale,
+        },
+        { status: 409 }
+      )
 
     return NextResponse.json({
       ok: true,
       profile: toOwnerProfile(updatedDoc as Record<string, unknown>),
+      ...(baseHeader ? { updatedAt: updatedDoc.updatedAt ?? null } : {}),
     })
   } catch (error) {
     const message =

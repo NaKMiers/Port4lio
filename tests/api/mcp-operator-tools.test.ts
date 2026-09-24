@@ -236,6 +236,65 @@ describe('update_profile (R6, R8)', () => {
     expect(call.text).toMatch(/Missing: profileSubHeading, stats, aboutMe/)
   })
 
+  it('refuses a new off-site image or an unsafe link, but keeps a URL already stored', async () => {
+    await ProfileModel.create({
+      _id: DOC_ID,
+      fullName: 'Ada',
+      avatar: 'https://old-host.example.com/me.png',
+      socials: [{ name: 'Site', icon: 'globe', link: 'https://ada.dev' }],
+    })
+    const t = await token(['read', 'publish'])
+    const identity = async () =>
+      parse(
+        (await client.callTool(t, 'get_profile', { section: 'identity' })).text
+      )
+    const update = async (patch: Record<string, unknown>) => {
+      const read = await identity()
+      return client.callTool(t, 'update_profile', {
+        section: 'identity',
+        version: read.version,
+        value: { ...read.value, ...patch },
+      })
+    }
+
+    // The owner's old avatar is not re-judged when an agent fixes the name.
+    const fixed = await update({ fullName: 'Ada L.' })
+    expect(fixed.isError, fixed.text).toBe(false)
+
+    const pixel = await update({ avatar: 'https://tracker.example.com/p.png' })
+    expect(pixel.isError).toBe(true)
+    expect(pixel.text).toMatch(/not allowed on the profile/)
+
+    const badLink = await update({
+      socials: [{ name: 'Site', icon: 'globe', link: 'data:text/html,hi' }],
+    })
+    expect(badLink.isError).toBe(true)
+
+    const cloud = await update({
+      avatar: 'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png',
+    })
+    expect(cloud.isError, cloud.text).toBe(false)
+    const doc = await ProfileModel.findById(DOC_ID).lean()
+    expect(doc?.avatar).toBe(
+      'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png'
+    )
+  })
+
+  it('refuses a section over the profile size limit', async () => {
+    await seedProfile()
+    const t = await token(['read', 'publish'])
+    const read = parse(
+      (await client.callTool(t, 'get_profile', { section: 'about' })).text
+    )
+    const call = await client.callTool(t, 'update_profile', {
+      section: 'about',
+      version: read.version,
+      value: { ...read.value, aboutMe: 'x'.repeat(4 * 1024 * 1024 + 10) },
+    })
+    expect(call.isError).toBe(true)
+    expect(call.text).toMatch(/over the 4 MB profile limit/)
+  })
+
   it('needs publish: a read + write token does not list it', async () => {
     expect(
       await client.toolNames(await token(['read', 'write']))
@@ -331,6 +390,79 @@ describe('CCA-F', () => {
     ).toHaveLength(1)
   })
 
+  it('a save landing between the read and the write is re-read, not overwritten', async () => {
+    const t = await token(['read', 'write'])
+    await client.callTool(t, 'ccaf_update', {
+      logMock: { correct: 40, label: 'A' },
+      clientRef: 'mock-a',
+    })
+    // The tracker page (or another call) saves just after this update read the document.
+    const original = CcafProgressModel.updateOne.bind(CcafProgressModel)
+    const race = vi
+      .spyOn(CcafProgressModel, 'updateOne')
+      .mockImplementationOnce(((...args: Parameters<typeof original>) => {
+        const [filter, update, options] = args
+        return (async () => {
+          await CcafProgressModel.collection.updateOne(
+            { _id: 'ccaf-progress' as never },
+            {
+              $push: {
+                mocks: {
+                  id: 'mock-page',
+                  date: '2026-09-20',
+                  label: 'Page',
+                  correct: 38,
+                  domainPercents: [null, null, null, null, null],
+                },
+              } as never,
+              $set: { updatedAt: new Date(Date.now() + 5) },
+            }
+          )
+          return original(filter, update, options)
+        })()
+      }) as never)
+    const logged = await client.callTool(t, 'ccaf_update', {
+      logMock: { correct: 44, label: 'B' },
+      clientRef: 'mock-b',
+    })
+    race.mockRestore()
+    expect(logged.isError, logged.text).toBe(false)
+    const mocks =
+      (await CcafProgressModel.findById('ccaf-progress').lean())?.mocks ?? []
+    expect(mocks.map(mock => mock.label).sort()).toEqual(['A', 'B', 'Page'])
+  })
+
+  it('a database blip on the read fails the update instead of saving the empty plan', async () => {
+    const t = await token(['read', 'write'])
+    await client.callTool(t, 'ccaf_update', {
+      logMock: { correct: 42, label: 'Kept' },
+      clientRef: 'kept',
+    })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const blip = vi
+      .spyOn(CcafProgressModel, 'findById')
+      .mockImplementationOnce(() => {
+        throw new Error('connection reset')
+      })
+    const failed = await client.callTool(t, 'ccaf_update', {
+      confidence: [{ domain: 2, level: 3 }],
+    })
+    blip.mockRestore()
+    expect(failed.isError).toBe(true)
+    const mocks =
+      (await CcafProgressModel.findById('ccaf-progress').lean())?.mocks ?? []
+    expect(mocks.map(mock => mock.label)).toEqual(['Kept'])
+  })
+
+  it('an update refused for an unknown id spends none of the save budget', async () => {
+    const t = await token(['read', 'write'])
+    await client.callTool(t, 'ccaf_update', { tickTasks: ['w9-9-9'] })
+    const buckets = (await RateLimitModel.find({}).lean()).map(row =>
+      String(row._id)
+    )
+    expect(buckets.some(key => key.includes('mcp-token:'))).toBe(false)
+  })
+
   it('refuses unknown ids and a scaled score passed as correct, writing nothing', async () => {
     const t = await token(['read', 'write'])
     const unknown = await client.callTool(t, 'ccaf_update', {
@@ -348,7 +480,81 @@ describe('CCA-F', () => {
   })
 })
 
+describe('the settings save guard (stale tab)', () => {
+  const owner = async () => {
+    const { getAuthCookieName, makeAuthToken } = await import('@/lib/auth')
+    return `${getAuthCookieName()}=${makeAuthToken(Date.now() + 3_600_000)}`
+  }
+  const save = async (body: Record<string, unknown>, base?: string) => {
+    const { NextRequest } = await import('next/server')
+    const { POST } = await import('@/app/api/profile/route')
+    return POST(
+      new NextRequest('http://localhost/api/profile', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: await owner(),
+          ...(base ? { 'x-profile-base-updated-at': base } : {}),
+        },
+        body: JSON.stringify(body),
+      })
+    )
+  }
+
+  it('a save from a tab opened before an agent edit is a 409; overwrite and a fresh base work', async () => {
+    const loaded = new Date('2026-09-20T00:00:00.000Z')
+    await ProfileModel.create({
+      _id: DOC_ID,
+      fullName: 'Ada',
+      updatedAt: loaded,
+    })
+    // An agent's update_profile lands while the settings tab sits open.
+    await ProfileModel.updateOne(
+      { _id: DOC_ID },
+      {
+        $set: {
+          fullName: 'Agent fix',
+          updatedAt: new Date(loaded.getTime() + 1_000),
+        },
+      }
+    )
+
+    const stale = await save({ fullName: 'Old tab' }, loaded.toISOString())
+    expect(stale.status).toBe(409)
+    expect((await stale.json()).code).toBe('stale')
+    expect((await ProfileModel.findById(DOC_ID).lean())?.fullName).toBe(
+      'Agent fix'
+    )
+
+    const overwrite = await save({ fullName: 'Owner wins' }, '*')
+    expect(overwrite.status).toBe(200)
+    const { updatedAt } = (await overwrite.json()) as { updatedAt: string }
+    expect(typeof updatedAt).toBe('string')
+
+    const fresh = await save({ fullName: 'Next save' }, updatedAt)
+    expect(fresh.status).toBe(200)
+    expect((await ProfileModel.findById(DOC_ID).lean())?.fullName).toBe(
+      'Next save'
+    )
+  })
+})
+
 describe('the CV an agent reads', () => {
+  it('falls back to the avatar for the photo, as /cv does', async () => {
+    await ProfileModel.create({
+      _id: DOC_ID,
+      fullName: 'Ada',
+      avatar: 'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png',
+    })
+    const t = await token(['read'])
+    const section = JSON.parse(
+      (await client.callTool(t, 'get_profile', { section: 'resume' })).text
+    )
+    expect(section.value.resume.photo).toBe(
+      'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png'
+    )
+  })
+
   it('with no resume ever written, get_me and get_profile return the seed /cv prints', async () => {
     const { RESUME_SEED } = await import('@/lib/resume-seed')
     await ProfileModel.create({ _id: DOC_ID, fullName: 'Ada' })

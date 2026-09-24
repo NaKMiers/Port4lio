@@ -101,7 +101,7 @@ describe('the lease (R3)', () => {
   it('a second start while a run is live is refused with what is left', async () => {
     const post = await makePost()
     const id = String(post._id)
-    expect(await run.claimIllustration(id, 3)).toEqual({
+    expect(await run.claimIllustration(id, 3)).toMatchObject({
       claimed: true,
       planned: 3,
     })
@@ -122,13 +122,37 @@ describe('the lease (R3)', () => {
         finishedAt: null,
       },
     })
-    expect(await run.claimIllustration(String(post._id), 3)).toEqual({
+    expect(await run.claimIllustration(String(post._id), 3)).toMatchObject({
       claimed: true,
       planned: 3,
     })
     expect(
       (await stored(post._id))?.illustration?.leaseUntil?.getTime()
     ).toBeGreaterThan(Date.now())
+  })
+
+  it('two starts at the same moment: exactly one claims the lease', async () => {
+    const post = await makePost()
+    const id = String(post._id)
+    const claims = await Promise.all([
+      run.claimIllustration(id, 3),
+      run.claimIllustration(id, 3),
+    ])
+    expect(claims.filter(claim => claim.claimed)).toHaveLength(1)
+  })
+
+  it('get_post reports a running lease that ran out as a cut-off run, not as running', async () => {
+    const { illustrationStatus } = await import('@/lib/blog/post-service')
+    const status = illustrationStatus({
+      state: 'running',
+      leaseUntil: new Date(Date.now() - 1_000),
+      remaining: 2,
+      lastError: null,
+      startedAt: new Date(Date.now() - 400_000),
+      finishedAt: null,
+    })
+    expect(status).toMatchObject({ state: 'failed', remaining: 2 })
+    expect(status.lastError).toMatch(/cut off/)
   })
 
   it('a deleted post cannot be claimed', async () => {
@@ -278,6 +302,70 @@ describe('the run', () => {
     )
   })
 
+  it('lastError keeps every failure of the run, not only the last', async () => {
+    const { ImageGenError } = await import('@/lib/blog/image-gen')
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    draw.mockImplementation(async ({ name }: { name: string }) => {
+      if (name.endsWith('image1'))
+        throw new ImageGenError('The model refused the prompt.', 400)
+      if (name.endsWith('image2'))
+        throw new ImageGenError('Quota exhausted.', 429)
+      return { url: URL(name), model: 'm' }
+    })
+    const post = await makePost()
+    await run.claimIllustration(String(post._id), 3)
+    await run.runIllustration(String(post._id), options())
+    const lastError = (await stored(post._id))?.illustration?.lastError ?? ''
+    expect(lastError).toMatch(/^2 problems in this run/)
+    expect(lastError).toContain('The model refused the prompt.')
+    expect(lastError).toContain('Quota exhausted.')
+  })
+
+  it("a run's claim and bookkeeping never move updatedAt (no false stale-save banner)", async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    draw.mockRejectedValue(new Error('down'))
+    const post = await makePost()
+    const before = (await stored(post._id))!.updatedAt.getTime()
+    const claim = await run.claimIllustration(String(post._id), 3)
+    await run.runIllustration(
+      String(post._id),
+      options(claim.claimed ? { fence: claim.startedAt } : {})
+    )
+    const after = await stored(post._id)
+    expect(after?.illustration?.state).toBe('failed')
+    expect(after!.updatedAt.getTime()).toBe(before)
+  })
+
+  it('a run that outlived its lease stops, and leaves the newer run alone', async () => {
+    const post = await makePost()
+    const id = String(post._id)
+    const claim = await run.claimIllustration(id, 3)
+    const newer = new Date(Date.now() + 5_000)
+    draw.mockImplementationOnce(async ({ name }: { name: string }) => {
+      // Meanwhile another run took the lease over.
+      await PostModel.updateOne(
+        { _id: post._id },
+        {
+          $set: {
+            'illustration.state': 'running',
+            'illustration.startedAt': newer,
+            'illustration.leaseUntil': new Date(Date.now() + 300_000),
+          },
+        }
+      )
+      return { url: URL(name), model: 'm' }
+    })
+    const outcome = await run.runIllustration(
+      id,
+      options(claim.claimed ? { fence: claim.startedAt } : {})
+    )
+    expect(outcome.lastError).toMatch(/another run took the post over/)
+    expect(draw).toHaveBeenCalledTimes(1)
+    const after = await stored(post._id)
+    expect(after?.illustration?.state).toBe('running')
+    expect(after?.illustration?.startedAt?.getTime()).toBe(newer.getTime())
+  })
+
   it('an unexpected throw is still a released lease with lastError', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const post = await makePost()
@@ -352,6 +440,81 @@ describe('the cron path', () => {
     expect(doc.publishedAt).toBeInstanceOf(Date)
     expect((await stored(post._id))?.status).toBe('published')
     expect(revalidate).toHaveBeenCalledWith('illustrated')
+  })
+
+  it('agents cannot edit a post while a publishing run holds it, and can again once it lets go', async () => {
+    const service = await import('@/lib/blog/post-service')
+    const images = await import('@/lib/blog/image-service')
+    const post = await makePost({ status: 'archived' })
+    const id = String(post._id)
+    const edit = () =>
+      service.updatePostAsAgent(
+        id,
+        { edits: [{ find: 'Middle.', replace: 'Planted.' }] },
+        { canEditLive: false }
+      )
+
+    await run.claimIllustration(id, 3, new Date(), { publishing: true })
+    const refused = await edit()
+    expect(refused).toMatchObject({ ok: false, status: 409 })
+    expect(!refused.ok && refused.error).toMatch(/daily job/)
+    expect(
+      (
+        await images.patchImageIntoPost(id, 'image1', URL('planted'), {
+          refusePublishingRun: true,
+        })
+      ).outcome
+    ).toBe('publishing')
+    expect((await stored(post._id))?.bodyMarkdown).toContain('Middle.')
+    expect((await stored(post._id))?.bodyMarkdown).toContain('(image1)')
+
+    // A lease that ran out no longer locks anyone out.
+    await PostModel.updateOne(
+      { _id: post._id },
+      { $set: { 'illustration.leaseUntil': new Date(Date.now() - 1_000) } }
+    )
+    expect((await edit()).ok).toBe(true)
+  })
+
+  it('the cron publishes only what it drew: an agent edit during its run is refused', async () => {
+    const service = await import('@/lib/blog/post-service')
+    const post = await makePost({ status: 'archived' })
+    const doc = (await PostModel.findById(post._id).select('+bodyMarkdown'))!
+    let midRun: Awaited<ReturnType<typeof service.updatePostAsAgent>> | null =
+      null
+    draw.mockImplementation(async ({ name }: { name: string }) => {
+      midRun ??= await service.updatePostAsAgent(
+        String(post._id),
+        { edits: [{ find: 'Middle.', replace: 'Planted.' }] },
+        { canEditLive: false }
+      )
+      return { url: URL(name), model: 'm' }
+    })
+    const outcome = await run.illustratePost(doc, {
+      model: 'gemini-3.1-flash-lite-image',
+      deadlineAt: Date.now() + 240_000,
+    })
+    expect(midRun).toMatchObject({ ok: false, status: 409 })
+    expect(outcome.published).toBe(true)
+    const body = (await stored(post._id))?.bodyMarkdown
+    expect(body).toContain('Middle.')
+    expect(body).not.toContain('Planted.')
+  })
+
+  it('an illustrate_post run (publish: false) never locks the agent out (R3)', async () => {
+    const service = await import('@/lib/blog/post-service')
+    const post = await makePost()
+    const id = String(post._id)
+    await run.claimIllustration(id, 3)
+    expect(
+      (
+        await service.updatePostAsAgent(
+          id,
+          { edits: [{ find: 'Middle.', replace: 'Changed.' }] },
+          { canEditLive: false }
+        )
+      ).ok
+    ).toBe(true)
   })
 
   it('illustratePost refuses to start over a live run', async () => {

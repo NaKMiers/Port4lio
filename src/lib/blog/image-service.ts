@@ -18,7 +18,7 @@ import {
 } from '@/lib/blog/image-prompt'
 import { chatCompletion, extractJsonObject } from '@/lib/blog/llm'
 import { BLOG_PIPELINE_VERSION, renderMarkdown } from '@/lib/blog/markdown'
-import type { ServiceResult } from '@/lib/blog/post-service'
+import { publishingRunHolds, type ServiceResult } from '@/lib/blog/post-service'
 import { revalidatePublishedPost } from '@/lib/blog/revalidate'
 import { connectDatabase } from '@/lib/mongodb'
 import { PostModel } from '@/models/Post'
@@ -35,6 +35,8 @@ import { PostModel } from '@/models/Post'
  *            replace it, re-render
  *            updateOne({ _id, bodyMarkdown: what we read }) ──▶ matched? saved : someone edited, loop
  *            post live? ──▶ revalidatePublishedPost(slug)                                       (C8)
+ *      allowLive: false (no publish scope) ──▶ a post that went live meanwhile is 'live', not written
+ *      refusePublishingRun (agent attach)  ──▶ a cron run holding the lease is 'publishing', not written
  * ```
  *
  * ## Why the patch is conditional on the body it read
@@ -103,7 +105,20 @@ export async function writeImagePrompt(
   postId: string,
   target: { cover: true } | { cover: false; key: string },
   { save = true }: { save?: boolean } = {}
-): Promise<ServiceResult<{ prompt: string; key: string | null }>> {
+): Promise<
+  ServiceResult<{
+    prompt: string
+    key: string | null
+    /**
+     * Set only when the save was conditional on the `updatedAt` read before the model call and
+     * landed: `before` is that read, `updatedAt` this write's own. The editor adopts
+     * `updatedAt` as its stale-save base (R9) only if `before` is its current base - otherwise
+     * someone else wrote in between, and its next Save must see that.
+     */
+    updatedAt?: Date
+    before?: Date
+  }>
+> {
   await connectDatabase()
   if (!isObjectId(postId))
     return { ok: false, status: 404, error: 'Post not found.' }
@@ -220,6 +235,30 @@ export async function writeImagePrompt(
       post.markModified('imagePrompts')
     }
 
+    // Conditional on the updatedAt read before the (seconds-long) model call, so nothing
+    // written meanwhile is absorbed silently into the editor's base; a miss falls back to
+    // the plain save it always was - the prompt is what the owner asked for either way.
+    const before = post.updatedAt
+    await post.validate()
+    const changes = post.getChanges() as Record<string, unknown> & {
+      $set?: Record<string, unknown>
+    }
+    const now = new Date()
+    const written = await PostModel.updateOne(
+      { _id: post._id, updatedAt: before },
+      { ...changes, $set: { ...(changes.$set ?? {}), updatedAt: now } },
+      { runValidators: true, timestamps: false }
+    )
+    if (written.matchedCount === 1)
+      return {
+        ok: true,
+        value: {
+          prompt,
+          key: target.cover ? null : key,
+          updatedAt: now,
+          before,
+        },
+      }
     await post.save()
   }
 
@@ -228,7 +267,15 @@ export async function writeImagePrompt(
   return { ok: true, value: { prompt, key: target.cover ? null : key } }
 }
 
-export type PatchOutcome = 'saved' | 'skipped' | 'missing' | 'conflict'
+export type PatchOutcome =
+  | 'saved'
+  | 'skipped'
+  | 'missing'
+  | 'conflict'
+  /** `refusePublishingRun` and a publishing run (the cron) holds the lease. */
+  | 'publishing'
+  /** `allowLive: false` and the post is published (it may have gone live since the caller looked). */
+  | 'live'
 
 const PATCH_ATTEMPTS = 5
 
@@ -242,27 +289,60 @@ export async function patchImageIntoPost(
   url: string,
   {
     replaceCover = true,
+    refusePublishingRun = false,
+    allowLive = true,
   }: {
     /** false: leave a cover someone set meanwhile alone (the illustration run). */
     replaceCover?: boolean
+    /**
+     * true for an agent's attach: never write while a run that will publish the post holds
+     * its lease (illustrate-run.ts, "Why a publishing run locks agents out"). Checked on the
+     * read AND in the write's filter, so a run claimed in between is caught too.
+     */
+    refusePublishingRun?: boolean
+    /**
+     * false for a token without the publish scope: never write into a published post. The
+     * caller checked the status once, but an image takes minutes to draw and the owner may
+     * publish meanwhile, so it is checked again on every read AND in the write's filter.
+     */
+    allowLive?: boolean
   } = {}
 ): Promise<{ outcome: PatchOutcome; slug: string | null; live: boolean }> {
   await connectDatabase()
 
   for (let attempt = 0; attempt < PATCH_ATTEMPTS; attempt += 1) {
     const current = await PostModel.findById(postId)
-      .select('+bodyMarkdown slug status coverImage')
+      .select('+bodyMarkdown slug status coverImage illustration')
       .lean()
     if (!current || current.status === 'deleted')
       return { outcome: 'missing', slug: null, live: false }
     const live = current.status === 'published'
+    if (live && !allowLive) return { outcome: 'live', slug: current.slug, live }
+    const now = new Date()
+    if (refusePublishingRun && publishingRunHolds(current.illustration, now))
+      return { outcome: 'publishing', slug: current.slug, live }
+    const noPublishingRun = refusePublishingRun
+      ? {
+          $or: [
+            { 'illustration.state': { $ne: 'running' as const } },
+            { 'illustration.publishing': { $ne: true } },
+            { 'illustration.leaseUntil': { $lt: now } },
+          ],
+        }
+      : {}
+    const notLive = allowLive ? {} : { status: { $ne: 'published' as const } }
 
     let saved
     if (key === COVER_KEY) {
       if (!replaceCover && current.coverImage)
         return { outcome: 'skipped', slug: current.slug, live }
       saved = await PostModel.updateOne(
-        { _id: current._id, coverImage: current.coverImage },
+        {
+          _id: current._id,
+          coverImage: current.coverImage,
+          ...noPublishingRun,
+          ...notLive,
+        },
         { $set: { coverImage: url, contentUpdatedAt: new Date() } }
       )
     } else {
@@ -273,7 +353,12 @@ export async function patchImageIntoPost(
       const next = replacePlaceholder(body, key, url)
       const bodyHtml = await renderMarkdown(next, current.slug)
       saved = await PostModel.updateOne(
-        { _id: current._id, bodyMarkdown: body },
+        {
+          _id: current._id,
+          bodyMarkdown: body,
+          ...noPublishingRun,
+          ...notLive,
+        },
         {
           $set: {
             bodyMarkdown: next,

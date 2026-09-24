@@ -49,10 +49,6 @@ export const SCOPE_INFO: Record<McpScope, { label: string; grants: string }> = {
   },
 }
 
-export function isMcpScope(value: unknown): value is McpScope {
-  return MCP_SCOPES.includes(value as McpScope)
-}
-
 /** The shell variable the connect instructions use. The token itself never goes in a config. */
 export const MCP_TOKEN_ENV = 'PORT4LIO_MCP_TOKEN'
 

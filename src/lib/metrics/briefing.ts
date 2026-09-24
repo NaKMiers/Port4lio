@@ -26,7 +26,8 @@ import { TestEventModel } from '@/models/TestEvent'
  *   blog                  PostEvent documents by createdAt (never $sum)   2N <= 180 days  ──▶ N <= 90
  *   subscribers           Subscriber.confirmedAt / unsubscribedAt         any N
  *   orders + revenue      Payment + IqPayment, status paid, by paidAt     any N (paid rows are kept)
- *   test funnel           TestEvent funnel day buckets (UTC days)         2N <= 20 days   ──▶ N <= 10
+ *   test funnel           TestEvent funnel day buckets, full UTC days     2N <= 20 days   ──▶ N <= 10
+ *                         ending yesterday (today is partial)
  *     conversion = paid / paywall-seen, per product
  *
  *   a section whose windows do not fit is LEFT OUT, with a one-line reason - never computed
@@ -147,19 +148,25 @@ async function blogSection(
   const count = (kind: PostEventKind, window: Window) =>
     PostEventModel.countDocuments({ kind, createdAt: inWindow(window) })
 
-  const topViews = (window: Window, slugs?: string[]) =>
+  /*
+    Only slugs of real posts. `/api/blog/event` is public and anonymous, so its slug is
+    whatever a client sent - an invented one would otherwise crowd out real posts and put
+    arbitrary text, as a "title", in front of the agent writing the briefing up.
+  */
+  const known = await PostModel.distinct('slug', { status: { $ne: 'deleted' } })
+  const topViews = (window: Window, slugs: string[] = known) =>
     PostEventModel.aggregate<{ _id: string; views: number }>([
       {
         $match: {
           kind: 'view',
           createdAt: inWindow(window),
-          ...(slugs ? { slug: { $in: slugs } } : {}),
+          slug: { $in: slugs },
         },
       },
       // Documents, never `$sum: '$count'` - one document is one reader (see TestEvent.ts).
       { $group: { _id: '$slug', views: { $sum: 1 } } },
       { $sort: { views: -1, _id: 1 } },
-      ...(slugs ? [] : [{ $limit: TOP_POSTS }]),
+      ...(slugs === known ? [{ $limit: TOP_POSTS }] : []),
     ])
 
   const [
@@ -197,7 +204,7 @@ async function blogSection(
     attributions: compare(attributions, previousAttributions),
     topPosts: top.map(row => ({
       slug: row._id,
-      title: titleOf.get(row._id) ?? row._id,
+      title: titleOf.get(row._id) ?? '(untitled)',
       views: row.views,
       previousViews: previousOf.get(row._id) ?? 0,
     })),
@@ -287,7 +294,7 @@ async function ordersSection(
   }
 }
 
-/** `YYYY-MM-DD` for the `days` UTC days ending today, newest last. */
+/** `YYYY-MM-DD` for the `days` UTC days ending `endingDaysAgo` days before today, newest last. */
 function dayBuckets(days: number, endingDaysAgo: number, now: Date) {
   const today = Date.UTC(
     now.getUTCFullYear(),
@@ -311,8 +318,11 @@ async function funnelSection(
       reason: `Test attempts and their funnel events are deleted after ${ATTEMPT_TTL_DAYS} days, so a ${days}-day period and the one before it do not both fit. Ask for ${MAX_FUNNEL_DAYS} days or fewer for the funnel and conversion.`,
     }
 
-  const currentDays = dayBuckets(days, 0, now)
-  const previousDays = dayBuckets(days, days, now)
+  // Both windows are N FULL days, ending yesterday. Counting today's partial day against a
+  // full day made every week read low until evening (and the UTC day ends at 07:00 in
+  // Vietnam). The oldest bucket is then 2N days back, still inside the TTL for N <= 10.
+  const currentDays = dayBuckets(days, 1, now)
+  const previousDays = dayBuckets(days, days + 1, now)
   const events = [
     FUNNEL_EVENTS.resultViewed,
     FUNNEL_EVENTS.paywallSeen,
@@ -374,7 +384,7 @@ async function funnelSection(
 
   return {
     included: true,
-    note: `Counted in whole UTC days: the last ${days} days including today, against the ${days} before. Conversion is paid divided by paywall-seen.`,
+    note: `Counted in whole UTC days: the ${days} full days ending yesterday, against the ${days} before - so today is not in it yet, unlike the blog and order sections, which are rolling ${days}-day windows up to now. Conversion is paid divided by paywall-seen.`,
     byProduct,
   }
 }

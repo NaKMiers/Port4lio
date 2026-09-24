@@ -101,6 +101,9 @@ async function loadPost(id: string) {
   return PostModel.findById(id).select('+bodyMarkdown +bodyHtml')
 }
 
+/** The `Post.bodyMarkdown` schema cap. */
+export const POST_BODY_MAX = 200_000
+
 /** A body page for `get_post`: about 24k characters, so one page fits the response budget. */
 export const POST_PAGE_CHARS = 24_000
 
@@ -519,8 +522,9 @@ export async function patchPost(
     R9: a stale editor tab. Checked before anything else so a refused save changes nothing.
     Only when the field is sent - a PATCH without it behaves exactly as it always has.
   */
+  let base: Date | null = null
   if (body.baseUpdatedAt !== undefined) {
-    const base =
+    base =
       typeof body.baseUpdatedAt === 'string'
         ? new Date(body.baseUpdatedAt)
         : null
@@ -622,7 +626,41 @@ export async function patchPost(
     post.publishedAt = new Date()
 
   try {
-    await post.save()
+    if (base) {
+      /*
+        R9, the write half. The check above ran on the post as loaded; the render in between
+        can take seconds, and an agent edit or an image patch landing then would be silently
+        overwritten by a plain save. So a PATCH that sent a base writes only if updatedAt is
+        STILL that base, and sets updatedAt itself, so the value the editor adopts as its next
+        base is this write's own - never someone else's. No field: the plain save, as always.
+      */
+      await post.validate()
+      const changes = post.getChanges() as Record<string, unknown> & {
+        $set?: Record<string, unknown>
+      }
+      const now = new Date()
+      const written = await PostModel.updateOne(
+        { _id: post._id, updatedAt: base },
+        { ...changes, $set: { ...(changes.$set ?? {}), updatedAt: now } },
+        { runValidators: true, timestamps: false }
+      )
+      if (written.matchedCount === 0) {
+        const current = await PostModel.findById(post._id)
+          .select('updatedAt')
+          .lean()
+        return failure(
+          409,
+          'This post changed since you opened it - probably an agent edit. Reload to see it, or overwrite it with what you have.',
+          {
+            code: 'stale',
+            updatedAt: current
+              ? new Date(current.updatedAt).toISOString()
+              : null,
+          }
+        )
+      }
+      post.updatedAt = now
+    } else await post.save()
   } catch (error) {
     const known = saveFailure(error)
     if (known) return known
@@ -856,7 +894,9 @@ export async function createDraft(
     if (!kind) return failure(409, 'No post kinds exist.')
   }
 
-  const series = input.series ?? null
+  // `||`, not `??`: an empty string is "no series", as `update_post` and the editor PATCH
+  // treat it - `seriesExists('')` is false there, and a stored '' matches no series.
+  const series = input.series || null
   if (series && !(await seriesExists(series)))
     return failure(400, `"${series}" is not a series. Call list_taxonomy.`)
 
@@ -990,7 +1030,12 @@ export async function listPosts(query: ListPostsQuery): Promise<{
       : sort === 'publishedAt'
         ? (post.publishedAt?.getTime() ?? 0)
         : post.updatedAt.getTime()
-  posts.sort((a, b) => (keyOf(a) - keyOf(b)) * direction)
+  // `_id` breaks ties (views 0, never published), so an offset cursor never skips or repeats.
+  posts.sort(
+    (a, b) =>
+      (keyOf(a) - keyOf(b)) * direction ||
+      String(a._id).localeCompare(String(b._id))
+  )
 
   const limit = Math.min(25, Math.max(1, query.limit ?? 20))
   const offset = readCursor(query.cursor)
@@ -1022,6 +1067,23 @@ export async function listPosts(query: ListPostsQuery): Promise<{
     }),
   }
 }
+
+/** A run that will publish the post when it is whole (the cron) holds a live lease. */
+export function publishingRunHolds(
+  illustration: PostIllustration | undefined,
+  now = new Date()
+): boolean {
+  return Boolean(
+    illustration?.state === 'running' &&
+    illustration.publishing &&
+    illustration.leaseUntil &&
+    illustration.leaseUntil.getTime() >= now.getTime()
+  )
+}
+
+/** The refusal an agent gets while `publishingRunHolds`. */
+export const PUBLISHING_RUN_REFUSAL =
+  "The daily job is drawing this post's images and will publish it when they are in, so it cannot be changed by an agent until that run finishes (a few minutes; get_post shows illustration idle). Nothing was changed."
 
 export interface IllustrationStatus {
   state: 'idle' | 'running' | 'failed'
@@ -1200,6 +1262,7 @@ export function applyEdits(
  *
  * ```
  *   load ──▶ deleted? 404 ──▶ live && !canEditLive ──▶ refused (publish scope)
+ *        ──▶ a publishing run (the cron) holds the lease ──▶ refused (see illustrate-run.ts)
  *        ──▶ body: edits (each find exactly once) | whole body (one page + version + 50% guard)
  *        ──▶ live && unresolved placeholder in the result ──▶ refused (R7)
  *        ──▶ the editor's own field rules ──▶ render ──▶ save IF updatedAt unchanged
@@ -1235,6 +1298,10 @@ export async function updatePostAsAgent(
       { reason: 'live-post' }
     )
 
+  // A run claimed after this read is caught by the conditional save's filter below.
+  if (publishingRunHolds(post.illustration))
+    return failure(409, PUBLISHING_RUN_REFUSAL, { reason: 'conflict' })
+
   if (input.edits?.length && input.bodyMarkdown !== undefined)
     return failure(400, 'Send edits or bodyMarkdown, not both.')
 
@@ -1263,6 +1330,14 @@ export async function updatePostAsAgent(
       )
     nextBody = input.bodyMarkdown
   }
+
+  // Before the render: 50 edits can grow a body far past the schema's cap, and Shiki would
+  // chew through all of it only for `validate` to refuse it afterwards.
+  if (nextBody.length > POST_BODY_MAX)
+    return failure(
+      400,
+      `The result would be ${nextBody.length} characters, over the ${POST_BODY_MAX}-character limit for a post body. Nothing was changed.`
+    )
 
   if (live) {
     const unresolved = findImagePlaceholders(nextBody)
@@ -1297,7 +1372,17 @@ export async function updatePostAsAgent(
     const changes = post.getChanges()
     if (Object.keys(changes).length > 0) {
       const saved = await PostModel.updateOne(
-        { _id: post._id, updatedAt: loadedUpdatedAt },
+        {
+          _id: post._id,
+          updatedAt: loadedUpdatedAt,
+          // D8, again at the write: a publishing run claimed after the read above does not
+          // move updatedAt (its bookkeeping writes skip timestamps), so it is filtered here.
+          $or: [
+            { 'illustration.state': { $ne: 'running' as const } },
+            { 'illustration.publishing': { $ne: true } },
+            { 'illustration.leaseUntil': { $lt: new Date() } },
+          ],
+        },
         changes,
         { runValidators: true }
       )
@@ -1333,27 +1418,44 @@ export async function publishPost(
   id: string
 ): Promise<ServiceResult<{ slug: string; alreadyPublished: boolean }>> {
   await connectDatabase()
-  const post = await loadPost(id)
-  if (!post || post.status === 'deleted') return failure(404, 'Post not found.')
-  if (post.status === 'published')
-    return success({ slug: post.slug, alreadyPublished: true })
+  // The blockers are checked on one read and the status written conditionally on that
+  // read's updatedAt (patchPost's R9 path), so a placeholder added in between cannot go live
+  // unchecked: the write misses, and the post is read and checked again.
+  for (let attempt = 0; attempt < PUBLISH_ATTEMPTS; attempt += 1) {
+    const post = await loadPost(id)
+    if (!post || post.status === 'deleted')
+      return failure(404, 'Post not found.')
+    if (post.status === 'published')
+      return success({ slug: post.slug, alreadyPublished: true })
 
-  const blockers = publishBlockers({
-    title: post.title,
-    bodyMarkdown: post.bodyMarkdown,
-    coverImage: post.coverImage,
-  })
-  if (blockers.length > 0)
-    return failure(
-      409,
-      `Not published: ${blockers.join('; ')}. Fix that first (illustrate_post or generate_image for images), then call publish_post again.`,
-      { reason: 'blocked' }
-    )
+    const blockers = publishBlockers({
+      title: post.title,
+      bodyMarkdown: post.bodyMarkdown,
+      coverImage: post.coverImage,
+    })
+    if (blockers.length > 0)
+      return failure(
+        409,
+        `Not published: ${blockers.join('; ')}. Fix that first (illustrate_post or generate_image for images), then call publish_post again.`,
+        { reason: 'blocked' }
+      )
 
-  const result = await patchPost(id, { status: 'published' })
-  if (!result.ok) return result
-  return success({ slug: result.value.slug, alreadyPublished: false })
+    const result = await patchPost(id, {
+      status: 'published',
+      baseUpdatedAt: new Date(post.updatedAt).toISOString(),
+    })
+    if (result.ok)
+      return success({ slug: result.value.slug, alreadyPublished: false })
+    if (result.extra?.code !== 'stale') return result
+  }
+  return failure(
+    409,
+    'The post kept changing while it was being published. Re-read it with get_post and call publish_post again.',
+    { reason: 'conflict' }
+  )
 }
+
+const PUBLISH_ATTEMPTS = 3
 
 /**
  * `archive_post`: take a live post off the site, or bring an archived one back (C11).

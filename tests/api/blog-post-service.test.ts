@@ -152,6 +152,36 @@ describe('admin PATCH baseUpdatedAt (R9)', () => {
     })
   })
 
+  it('a base that goes stale during the render is a 409, and the agent write survives', async () => {
+    const post = await makePost()
+    const { renderMarkdown } = await import('@/lib/blog/markdown')
+    vi.mocked(renderMarkdown).mockImplementationOnce(
+      async (markdown: string) => {
+        // An agent's update_post lands while Shiki is still rendering the owner's save.
+        await PostModel.collection.updateOne(
+          { _id: post._id },
+          {
+            $set: {
+              title: 'Agent edit',
+              updatedAt: new Date(post.updatedAt.getTime() + 1_000),
+            },
+          }
+        )
+        return `<p>${markdown}</p>`
+      }
+    )
+    const res = await patchRequest(String(post._id), {
+      title: 'Owner save',
+      bodyMarkdown: '## Heading\n\nThe owner rewrote this.',
+      baseUpdatedAt: post.updatedAt.toISOString(),
+    })
+    expect(res.status).toBe(409)
+    expect((await res.json()).code).toBe('stale')
+    const stored = await PostModel.findById(post._id).select('+bodyMarkdown')
+    expect(stored?.title).toBe('Agent edit')
+    expect(stored?.bodyMarkdown).toBe('## Heading\n\nProse.')
+  })
+
   it('without the field the PATCH is unchanged: no check, no updatedAt in the answer', async () => {
     const post = await makePost()
     await PostModel.updateOne(
@@ -466,6 +496,31 @@ describe('publishPost', () => {
     expect(stored?.status).toBe('published')
     expect(stored?.publishedAt).toBeInstanceOf(Date)
     expect(revalidate).toHaveBeenCalledWith('a-post')
+  })
+
+  it('a placeholder added between the blocker check and the write keeps it unpublished', async () => {
+    const post = await makePost({ coverImage: CLOUD })
+    const original = PostModel.updateOne.bind(PostModel)
+    vi.spyOn(PostModel, 'updateOne').mockImplementationOnce(((
+      ...args: Parameters<typeof original>
+    ) =>
+      (async () => {
+        // Someone adds an unfilled placeholder just before the publish lands.
+        await PostModel.collection.updateOne(
+          { _id: post._id },
+          {
+            $set: {
+              bodyMarkdown: 'Now with ![x](image1)',
+              updatedAt: new Date(post.updatedAt.getTime() + 1_000),
+            },
+          }
+        )
+        return original(...args)
+      })()) as never)
+    const result = await service.publishPost(String(post._id))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain('image1')
+    expect((await PostModel.findById(post._id))?.status).toBe('draft')
   })
 
   it('republishing an archived, once-public post keeps its publishedAt', async () => {

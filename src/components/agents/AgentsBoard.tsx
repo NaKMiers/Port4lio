@@ -236,6 +236,8 @@ export default function AgentsBoard({ className }: Props) {
   const [createError, setCreateError] = useState<string | null>(null)
   const [fresh, setFresh] = useState<{ token: string; id: string } | null>(null)
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null)
+  // Revoke is how a leaked credential dies, so a failed one says so - never a silent reset.
+  const [revokeError, setRevokeError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -297,9 +299,14 @@ export default function AgentsBoard({ className }: Props) {
   }
 
   const revoke = async (id: string) => {
+    setRevokeError(null)
     try {
       await revokeAgentTokenApi(id)
       if (fresh?.id === id) setFresh(null)
+    } catch (error) {
+      setRevokeError(
+        `Could not revoke - the token still works. ${error instanceof Error ? error.message : ''}`.trim()
+      )
     } finally {
       setConfirmRevoke(null)
       await refresh()
@@ -455,6 +462,15 @@ export default function AgentsBoard({ className }: Props) {
         ) : null}
       </section>
 
+      {revokeError ? (
+        <p
+          role="alert"
+          data-testid="agents-revoke-error"
+          className="flex items-center gap-2 text-[12px] font-semibold text-pp-ink-rose"
+        >
+          <TriangleAlert size={14} /> {revokeError}
+        </p>
+      ) : null}
       {loadError && !data ? (
         <div className="flex items-center gap-2 text-[13px] text-pp-ink-rose">
           <TriangleAlert size={14} /> {loadError}

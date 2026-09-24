@@ -5,9 +5,10 @@ import { TEST_PRODUCTS, type TestProduct } from '@/lib/test-kit/nav'
 import { TestEventModel } from '@/models/TestEvent'
 
 /**
- * The MBTI / IQ funnel read, per product - moved from `GET /api/admin/metrics` so the admin
- * board and the site MCP's briefing read the same numbers (premise 2). The route is now a
- * gate and a `NextResponse.json` around `readTestMetrics`.
+ * The MBTI / IQ funnel read, per product - moved from `GET /api/admin/metrics`, which is now a
+ * gate and a `NextResponse.json` around `readTestMetrics`. Only the admin board reads it:
+ * `get_test_metrics` was cut (D1), and the briefing (`briefing.ts`) counts the same
+ * `TestEvent` day buckets with its own windowed query.
  *
  * ```
  *   per product in TEST_PRODUCTS:

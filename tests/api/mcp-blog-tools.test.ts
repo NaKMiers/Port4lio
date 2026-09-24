@@ -717,3 +717,113 @@ describe('the write-post prompt and the brief (C6)', () => {
     expect(brief).toContain('create_draft')
   })
 })
+
+describe('races, costs and caps (the /review follow-ups)', () => {
+  const imagePost = () =>
+    makePost({
+      coverImage: URL('c'),
+      bodyMarkdown: 'Intro. ![x](image1) End.',
+      imagePrompts: [{ key: 'image1', prompt: 'p' }],
+    })
+
+  it('generate_image attach: a post published during the draw is not changed by a write-only token', async () => {
+    const t = await token(['read', 'write'])
+    const post = await imagePost()
+    draw.mockImplementation(async ({ name }: { name: string }) => {
+      // The owner publishes while the image is being drawn.
+      await PostModel.updateOne(
+        { _id: post._id },
+        { $set: { status: 'published', publishedAt: new Date() } }
+      )
+      return { url: URL(name), model: 'm' }
+    })
+    const call = await client.callTool(t, 'generate_image', {
+      postId: String(post._id),
+      target: 'image1',
+      mode: 'attach',
+      prompt: 'a box',
+    })
+    expect(call.isError).toBe(true)
+    expect(call.text).toMatch(/published while the image was being drawn/)
+    const stored = await PostModel.findById(post._id).select('+bodyMarkdown')
+    expect(stored?.bodyMarkdown).toContain('(image1)')
+  })
+
+  it('generate_image attach to a placeholder that is not in the body spends no image', async () => {
+    const t = await token(['read', 'write'])
+    const post = await imagePost()
+    const call = await client.callTool(t, 'generate_image', {
+      postId: String(post._id),
+      target: 'image9',
+      mode: 'attach',
+      prompt: 'a box',
+    })
+    expect(call.isError).toBe(true)
+    expect(call.text).toMatch(/not a placeholder/)
+    expect(draw).not.toHaveBeenCalled()
+    const buckets = (await RateLimitModel.find({}).lean()).map(row =>
+      String(row._id)
+    )
+    expect(buckets.some(key => key.startsWith('blog-generate-image:'))).toBe(
+      false
+    )
+  })
+
+  it('illustrate_post: a draft published mid-run is left alone by a write-only token', async () => {
+    const t = await token(['read', 'write'])
+    const post = await makePost({
+      coverImagePrompt: 'c',
+      bodyMarkdown: 'Intro. ![x](image1) End.',
+      imagePrompts: [{ key: 'image1', prompt: 'p' }],
+    })
+    draw.mockImplementation(async ({ name }: { name: string }) => {
+      await PostModel.updateOne(
+        { _id: post._id },
+        { $set: { status: 'published', publishedAt: new Date() } }
+      )
+      return { url: URL(name), model: 'm' }
+    })
+    await client.callTool(t, 'illustrate_post', { id: String(post._id) })
+    await flushAfter()
+    const stored = await PostModel.findById(post._id).select('+bodyMarkdown')
+    expect(stored?.coverImage).toBeNull()
+    expect(stored?.bodyMarkdown).toContain('(image1)')
+    expect(stored?.illustration?.state).toBe('failed')
+    expect(stored?.illustration?.lastError).toMatch(
+      /published while this run was drawing/
+    )
+  })
+
+  it('illustrate_post: revoking the token stops the run at its next image', async () => {
+    const t = await token(['read', 'write'])
+    const post = await makePost({
+      coverImagePrompt: 'c',
+      bodyMarkdown: 'Intro. ![x](image1) End.',
+      imagePrompts: [{ key: 'image1', prompt: 'p' }],
+    })
+    draw.mockImplementation(async ({ name }: { name: string }) => ({
+      url: URL(name),
+      model: 'm',
+    }))
+    await client.callTool(t, 'illustrate_post', { id: String(post._id) })
+    await AgentTokenModel.updateMany({}, { $set: { revokedAt: new Date() } })
+    await flushAfter()
+    expect(draw).not.toHaveBeenCalled()
+    const stored = await PostModel.findById(post._id)
+    expect(stored?.illustration?.lastError).toMatch(/revoked/)
+  })
+
+  it('update_post: edits that would grow the body past the cap are refused before the render', async () => {
+    const t = await token(['read', 'write'])
+    const post = await makePost({ bodyMarkdown: `A${'y'.repeat(160_000)}` })
+    const { renderMarkdown } = await import('@/lib/blog/markdown')
+    vi.mocked(renderMarkdown).mockClear()
+    const call = await client.callTool(t, 'update_post', {
+      id: String(post._id),
+      edits: [{ find: 'Ay', replace: 'z'.repeat(50_000) }],
+    })
+    expect(call.isError).toBe(true)
+    expect(call.text).toMatch(/over the 200000-character limit/)
+    expect(renderMarkdown).not.toHaveBeenCalled()
+  })
+})

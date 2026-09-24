@@ -303,18 +303,16 @@ test('(5) Esc peels one layer at a time: tool, then sheet, then selection', asyn
   await expect(page.getByText('Nothing selected')).toBeVisible()
 })
 
-test('(6) the Agents button opens /admin/agents, where MCP tokens now live', async ({
+test('(6) the board has no Agents button: MCP tokens live on /admin/agents', async ({
   page,
 }) => {
   // Token creation moved from this board's popover to /admin/agents when the MCP became
-  // site-wide (docs/designs/mcp/mcp.md premise 7). The create-and-Connected flow it used to
-  // cover is tests/e2e/agents.spec.ts (1), against p4_ tokens.
+  // site-wide (docs/designs/mcp/mcp.md premise 7), and the link that replaced it left the top
+  // bar too - the admin hub reaches that page. The token flow it used to cover is
+  // tests/e2e/agents.spec.ts (1), against p4_ tokens.
   await openBoard(page)
-  await page.getByRole('link', { name: /^Agents/ }).click()
-  await expect(page).toHaveURL(/\/admin\/agents$/)
-  await expect(
-    page.getByRole('heading', { name: 'Agents', level: 1 })
-  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Export to AI' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /^Agents/ })).toHaveCount(0)
 })
 
 test('(7) a card deleted and brought back by a restore can be edited again', async ({

@@ -141,6 +141,12 @@ export type PostIllustration = {
   remaining: number
   /** The last failure inside a run, in words. Never only in a log (R2). */
   lastError: string | null
+  /**
+   * true while the lease is held by a run that publishes the post when it comes out whole
+   * (the cron). Agent writes are refused meanwhile, or that final publish would put their
+   * text on the live site without the publish scope. An `illustrate_post` run never sets it.
+   */
+  publishing?: boolean
   startedAt: Date | null
   finishedAt: Date | null
 }
@@ -300,6 +306,7 @@ const postSchema = new Schema<PostDocument>(
           leaseUntil: { type: Date, default: null },
           remaining: { type: Number, default: 0 },
           lastError: { type: String, default: null, maxlength: 1000 },
+          publishing: { type: Boolean, default: false },
           startedAt: { type: Date, default: null },
           finishedAt: { type: Date, default: null },
         },

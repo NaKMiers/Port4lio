@@ -160,9 +160,9 @@ Rejected. `run_action` would have to be `destructiveHint: true` for everything, 
 
 `whiteboard:legacy` is internal. It is held only by migrated `wbt_` tokens, it is never grantable, and it disappears with the alias.
 
-**The live-post rule.** `update_post`, `generate_image` (attach mode) and `illustrate_post` check `publish` at run time whenever the target post is `published`. Only these tools, plus `publish_post`, `archive_post` and `delete_post`, can change a post's status, and **status is not an input to `update_post`**.
+**The live-post rule.** `update_post`, `generate_image` (attach mode) and `illustrate_post` check `publish` at run time whenever the target post is `published`. Only these tools, plus `publish_post`, `archive_post` and `delete_post` (cut, D1), can change a post's status, and **status is not an input to `update_post`**.
 
-### Tools (27; a `read`-only token sees 13)
+### Tools (27 designed; 23 shipped after the D1 cuts, of which a `read`-only token sees 12)
 
 | Domain     | Tool                       | Scope     | What it does                                                                                                   | Service (new = extracted from a route) |
 | ---------- | -------------------------- | --------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
@@ -180,23 +180,23 @@ Rejected. `run_action` would have to be `destructiveHint: true` for everything, 
 | Blog       | `illustrate_post`          | write*    | Start filling every unresolved placeholder and return `{ started, placeholders }` at once; the run continues in `after()` (same 300 s budget and 85% stop) under a per-post lease, patching each image into the current body (R2, R3). **`publish: false`**: it never publishes; *`publish` if the post is live | illustrate-run (+ flag, lease) |
 | Blog       | `publish_post`             | publish   | Draft to published after `publishBlockers`                                                                     | post-service                           |
 | Blog       | `archive_post`             | publish   | Archive or unarchive. Unarchive uses the PATCH route's rules (C11): to `draft` if never published, otherwise refused with a pointer to `publish_post` | post-service |
-| Blog       | `delete_post`              | publish   | Soft delete only (slug held forever); `destructiveHint: true`                                                 | post-service                           |
-| Blog       | `save_taxonomy`            | publish   | Create or rename a kind or series. No delete                                                                   | **taxonomy-service (new)**             |
+| Blog       | `delete_post`              | publish   | **Cut (D1), not registered.** Soft delete only (slug held forever); `destructiveHint: true`                                                 | post-service                           |
+| Blog       | `save_taxonomy`            | publish   | **Cut (D1), not registered.** Create or rename a kind or series. No delete                                                                   | **taxonomy-service (new)**             |
 | Metrics    | `get_briefing`             | read      | Period vs the previous period; details below                                                                   | **metrics/briefing (new)**             |
-| Metrics    | `get_test_metrics`         | read      | MBTI/IQ funnel detail, type distribution, IQ score bands, abandonment (last 21 days only; attempts expire)      | **metrics/tests (from admin/metrics)** |
+| Metrics    | `get_test_metrics`         | read      | **Cut (D1), not registered.** MBTI/IQ funnel detail, type distribution, IQ score bands, abandonment (last 21 days only; attempts expire)      | **metrics/tests (from admin/metrics)** |
 | Metrics    | `find_order`               | pii       | ONE order by order code: product, amount, status, created/paid dates, whether the result email went out. Never the email or the certificate name | **metrics/orders (new)** |
 | Whiteboard | `whiteboard_overview`      | read      | Today's `get_overview`                                                                                         | whiteboard/context                     |
 | Whiteboard | `whiteboard_search`        | read      | Today's `search_context`                                                                                       | whiteboard/context                     |
 | Whiteboard | `whiteboard_get_item`      | read      | Today's `get_item`, plus the item's `updatedAt`                                                                | whiteboard/context                     |
 | Whiteboard | `whiteboard_add_item`      | write     | Text or to-do card with a meaning, on a visible board or inside a visible frame; accepts `clientRef` (R4)     | whiteboard/data (+ agent wrapper)      |
-| Whiteboard | `whiteboard_update_item`   | write     | Patch the status/body/rows of a VISIBLE item; requires the `updatedAt` it last read                            | whiteboard/data                        |
+| Whiteboard | `whiteboard_update_item`   | write     | **Cut (D1), not registered.** Patch the status/body/rows of a VISIBLE item; requires the `updatedAt` it last read                            | whiteboard/data                        |
 | Whiteboard | `whiteboard_link`          | write     | Labelled link between two visible items; accepts `clientRef` (R4)                                              | whiteboard/data                        |
 | CCA-F      | `ccaf_status`              | read      | Progress, readiness, estimated scaled score, days to the exam, weakest domains                                | ccaf/progress-data                     |
 | CCA-F      | `ccaf_update`              | write     | Tick tasks or checks, log a mock score, set domain confidence; accepts `clientRef` (R4)                       | **ccaf/progress-service (from api/ccaf PUT)** |
 
 `record_on_whiteboard` from the cold read is not a separate tool. It is `whiteboard_add_item` plus `whiteboard_link`, which the `weekly-briefing` prompt asks the agent to use.
 
-The counts above are the **starting** registry. The Assignment may cut tools before phase 2. The success criteria are written against whatever the registry holds, not against these numbers.
+The counts above are the **starting** registry. The Assignment may cut tools before phase 2, and did: D1 in `acceptance.md` cut the four rows marked above. The service extractions behind them (`taxonomy-service`, `metrics/tests.ts`, the soft delete) still happened, because the admin routes use them. The success criteria are written against whatever the registry holds, not against these numbers.
 
 #### Tool behaviour details
 
@@ -222,11 +222,11 @@ The counts above are the **starting** registry. The Assignment may cut tools bef
 **Inside the service, never in a front door.** Each mutating service function calls the right invalidation itself, after its write succeeds:
 
 - `revalidatePublishedPost(slug)` whenever the post is published before OR after the change. That covers publish, a live PATCH, archive, soft delete, an image attached to a live post, and a slug change.
-- `revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')` after every profile write, the same two-argument call as `src/app/api/profile/route.ts:76`.
+- `revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')` after the owner's profile save, the same two-argument call as `src/app/api/profile/route.ts:76`. `update_profile` uses `{ expire: 0 }` instead, so the next load is fresh (D7).
 - `revalidatePath('/blog')` from `taxonomy-service` after a kind or series change, as the kind PATCH does today (C8).
-- `illustratePost` revalidates a live post after its image saves, even with `publish: false` (C8).
+- `illustratePost` revalidates a live post after its image saves, even with `publish: false` (C8). Inside `after()`, Next flushes those revalidations once the background run is done, so the page updates when the run ends, not per image.
 
-`generate-run.ts` is the template only for "no auth, no body parsing inside". Invalidation moves in, because it is exactly the step a second front door would forget. An e2e test under `next start` covers every mutating blog tool, not just `publish_post`, including `illustrate_post` on a live post and `save_taxonomy` refreshing `/blog`.
+`generate-run.ts` is the template only for "no auth, no body parsing inside". Invalidation moves in, because it is exactly the step a second front door would forget. An e2e test under `next start` covers every mutating blog tool, not just `publish_post`, including `illustrate_post` on a live post and a taxonomy change refreshing `/blog` (`save_taxonomy` was cut by D1, so that e2e goes through the admin kind route, which calls the same `taxonomy-service`).
 
 ### MCP prompts
 
@@ -412,6 +412,17 @@ Before any code, write `docs/designs/mcp/first-week-asks.md`: the first 10 thing
 - **R11:** date indexes for the briefing.
 - **TODO follow-ups:** the IQ certificate expiry and the cron limit mismatch are in TODOS.md, and the `payos-fulfil.ts` header gets fixed in the comment pass.
 - **Test plan:** `docs/designs/mcp/mcp-test-plan.md`.
+- **Owner decisions after the plan (D1-D9, `acceptance.md` "Owner decisions"):**
+  - D1: 4 tools cut (`delete_post`, `save_taxonomy`, `get_test_metrics`, `whiteboard_update_item`)
+  - D2: `resultEmailedAt` on both payment models
+  - D3: `ccaf_update` takes `correct` only
+  - D4: the legacy `wbt_` create route stays until T11
+  - D5: image prompts on create and update
+  - D6: 4 pre-existing red tests tolerated
+  - D7: `update_profile` invalidates with `{ expire: 0 }`
+  - D8: a publishing (cron) illustration run locks agent writes out
+  - D9: `ccaf_update` is a conditional write
+  - D10: the /review follow-ups (batch refusal, live re-checks at save time, a fenced lease, conditional publish, the settings stale-tab guard, profile URL rules, briefing top posts and funnel days)
 - **Reviewer Concerns below (R2-1 to R2-21), all resolved:**
   - R2-1 → R1
   - R2-2 → R6

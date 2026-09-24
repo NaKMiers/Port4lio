@@ -10,7 +10,9 @@ import type { Profile } from '@/types/profile'
  * NEVER add: email, phone, date of birth, street address / ward / district, national id,
  * salary expectation, referee contact details, or any field whose value is a route to
  * reach a person directly. The CV block (`resume`) is deliberately absent - `/cv` renders
- * it as a page through `loadPublicResume`, but it is never served as machine-readable JSON.
+ * it as a page through `loadPublicResume`, but it is never served to the public as
+ * machine-readable JSON. The one exception is token-gated: the site MCP's `get_me` and
+ * `get_profile` (see `loadPublicResume`, C7).
  */
 export const PUBLIC_PROFILE_FIELDS = [
   'cv',

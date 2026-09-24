@@ -16,7 +16,7 @@ import {
   type CcafMock,
   type CcafState,
 } from '@/lib/ccaf/progress'
-import { loadCcafState } from '@/lib/ccaf/progress-data'
+import { loadCcafState, stateFromDocument } from '@/lib/ccaf/progress-data'
 import { EXAM_DAY_CHECKS } from '@/lib/ccaf/reference'
 import { DOMAINS, WEEKS } from '@/lib/ccaf/roadmap'
 import { connectDatabase } from '@/lib/mongodb'
@@ -32,19 +32,30 @@ import {
  * ```
  *   PUT /api/ccaf ──▶ saveCcafState(body)        sanitizeState ──▶ null ──▶ 400 (caller)
  *                                                └─ upsert the WHOLE state (replace, never merge)
- *   ccaf_update   ──▶ applyCcafUpdate(ops)       loadCcafState ──▶ apply ops ──▶ saveCcafState
+ *   ccaf_update   ──▶ applyCcafUpdate(ops)       read ──▶ apply ops ──▶ sanitizeState
+ *                                                └─ write IF updatedAt unchanged, else re-read (x3)
  *                      tick/untick tasks + checks · log a mock (correct out of 60) · confidence
  *                      unknown task or check ids ──▶ refused, nothing written
  *   ccaf_status   ──▶ ccafStatus()               progress, readiness, latest mock's scaled score,
  *                                                days to the exam, weakest domains, next tasks
  * ```
  *
- * ## Why the agent's update goes through the same whole-state save
+ * ## Why the agent's update is the same whole-state write, made conditional
  *
  * The PUT replaces the document (see its header: "I unticked everything" must be expressible),
  * and `sanitizeState` is the one place that bounds it. An agent update is read, change, and
- * the same replace - so the bound and the shape cannot drift between the two doors. Last write
- * wins, as it always has for this one-owner document.
+ * the same sanitised replace - so the bound and the shape cannot drift between the two doors.
+ *
+ * It is not a blind replace, though. The first version read through `loadCcafState` and
+ * `$set` the result: two agent calls in flight lost one's mock, and - worse - that loader
+ * answers a database blip with the EMPTY plan, which the update then saved over the real
+ * state. So the agent reads the document itself (a blip throws), and writes only if
+ * `updatedAt` is still what it read; a lost race re-reads and re-applies. `$addToSet` and
+ * friends were the alternative, and would have let the agent's path skip `sanitizeState`.
+ *
+ * What this does not cover: a tracker tab opened BEFORE the agent's write, saving later. The
+ * PUT is a whole-state replace by contract, so that tab's save still wins. Guarding it is a
+ * change to the PUT (a baseUpdatedAt 409, as R9 does for posts), which is the owner's call.
  *
  * ## Why a mock is logged as `correct`, not as a scaled score (acceptance.md D3)
  *
@@ -110,9 +121,11 @@ export type CcafUpdateResult =
   | { ok: true; state: CcafState; loggedMock: CcafMock | null }
   | { ok: false; error: string }
 
-export async function applyCcafUpdate(
-  update: CcafUpdate
-): Promise<CcafUpdateResult> {
+/** Re-reads when a concurrent write moved `updatedAt`; rare, so a few tries are plenty. */
+const UPDATE_ATTEMPTS = 3
+
+/** The ids and domains an update names, checked against the plan. The refusal, or null. */
+export function checkCcafUpdate(update: CcafUpdate): string | null {
   const unknownTasks = [
     ...(update.tickTasks ?? []),
     ...(update.untickTasks ?? []),
@@ -122,32 +135,95 @@ export async function applyCcafUpdate(
     ...(update.untickChecks ?? []),
   ].filter(id => !CHECK_IDS.has(id))
   if (unknownTasks.length || unknownChecks.length)
-    return {
-      ok: false,
-      error: `Unknown ${[
-        unknownTasks.length ? `task ids: ${unknownTasks.join(', ')}` : '',
-        unknownChecks.length ? `check ids: ${unknownChecks.join(', ')}` : '',
-      ]
-        .filter(Boolean)
-        .join('; ')}. ccaf_status lists the real ones. Nothing was changed.`,
-    }
+    return `Unknown ${[
+      unknownTasks.length ? `task ids: ${unknownTasks.join(', ')}` : '',
+      unknownChecks.length ? `check ids: ${unknownChecks.join(', ')}` : '',
+    ]
+      .filter(Boolean)
+      .join('; ')}. ccaf_status lists the real ones. Nothing was changed.`
   const badDomain = (update.confidence ?? []).find(
     entry => entry.domain < 1 || entry.domain > DOMAINS.length
   )
   if (badDomain)
-    return {
-      ok: false,
-      error: `Domain ${badDomain.domain} does not exist: domains are 1 to ${DOMAINS.length}. Nothing was changed.`,
-    }
+    return `Domain ${badDomain.domain} does not exist: domains are 1 to ${DOMAINS.length}. Nothing was changed.`
 
-  const state = await loadCcafState()
-  // `sanitizeState` keeps the FIRST MAX_MOCKS, so a mock past the cap would be dropped on
-  // save while the call reported success. Refused instead, and the owner prunes in the page.
-  if (update.logMock && state.mocks.length >= MAX_MOCKS)
-    return {
-      ok: false,
-      error: `The tracker already holds ${MAX_MOCKS} mocks, its limit. Delete an old one in /admin/certificates/ccaf first. Nothing was changed.`,
+  return null
+}
+
+export async function applyCcafUpdate(
+  update: CcafUpdate
+): Promise<CcafUpdateResult> {
+  const refused = checkCcafUpdate(update)
+  if (refused) return { ok: false, error: refused }
+
+  await connectDatabase()
+  for (let attempt = 0; attempt < UPDATE_ATTEMPTS; attempt += 1) {
+    // Read directly, not through `loadCcafState`: that one answers a blip with the empty
+    // plan, which this write would then save over the real state.
+    const doc = await CcafProgressModel.findById(
+      CCAF_PROGRESS_DOCUMENT_ID
+    ).lean()
+    const state = stateFromDocument(doc)
+    // `sanitizeState` keeps the FIRST MAX_MOCKS, so a mock past the cap would be dropped on
+    // save while the call reported success. Refused instead, and the owner prunes in the page.
+    if (update.logMock && state.mocks.length >= MAX_MOCKS)
+      return {
+        ok: false,
+        error: `The tracker already holds ${MAX_MOCKS} mocks, its limit. Delete an old one in /admin/certificates/ccaf first. Nothing was changed.`,
+      }
+    const next = applyOps(state, update)
+    const sanitised = sanitizeState(next.state)
+    if (!sanitised)
+      return { ok: false, error: 'The update could not be applied.' }
+
+    const now = new Date()
+    let written: boolean
+    if (!doc)
+      // Never saved: an insert, so two first writes cannot both land - the loser re-reads.
+      written = await CcafProgressModel.create({
+        _id: CCAF_PROGRESS_DOCUMENT_ID,
+        ...sanitised,
+        createdAt: now,
+        updatedAt: now,
+      }).then(
+        () => true,
+        (error: unknown) => {
+          if ((error as { code?: number }).code === 11000) return false
+          throw error
+        }
+      )
+    else {
+      const saved = await CcafProgressModel.updateOne(
+        // `?? null`: an undefined filter value is dropped, which would make this a blind write.
+        { _id: CCAF_PROGRESS_DOCUMENT_ID, updatedAt: doc.updatedAt ?? null },
+        { $set: { ...sanitised, updatedAt: now } },
+        { runValidators: true }
+      )
+      written = saved.matchedCount === 1
     }
+    if (!written) continue
+
+    return {
+      ok: true,
+      state: sanitised,
+      loggedMock: next.loggedMock
+        ? (sanitised.mocks.find(mock => mock.id === next.loggedMock!.id) ??
+          next.loggedMock)
+        : null,
+    }
+  }
+  return {
+    ok: false,
+    error:
+      'The tracker kept changing while this update was being applied (the page or another call saved it). Retry. Nothing was changed.',
+  }
+}
+
+/** Read, change: the ops over a state, nothing written. */
+function applyOps(
+  state: CcafState,
+  update: CcafUpdate
+): { state: CcafState; loggedMock: CcafMock | null } {
   const tasks = new Set(state.doneTaskIds)
   update.tickTasks?.forEach(id => tasks.add(id))
   update.untickTasks?.forEach(id => tasks.delete(id))
@@ -174,20 +250,15 @@ export async function applyCcafUpdate(
     mocks.push(loggedMock)
   }
 
-  const saved = await saveCcafState({
-    doneTaskIds: [...tasks],
-    doneCheckIds: [...checks],
-    confidence,
-    mocks,
-    examDate: update.examDate ?? state.examDate,
-  })
-  if (!saved) return { ok: false, error: 'The update could not be applied.' }
   return {
-    ok: true,
-    state: saved,
-    loggedMock: loggedMock
-      ? (saved.mocks.find(mock => mock.id === loggedMock!.id) ?? loggedMock)
-      : null,
+    state: {
+      doneTaskIds: [...tasks],
+      doneCheckIds: [...checks],
+      confidence,
+      mocks,
+      examDate: update.examDate ?? state.examDate,
+    },
+    loggedMock,
   }
 }
 

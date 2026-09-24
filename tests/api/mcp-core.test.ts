@@ -37,9 +37,9 @@ import {
  *                 per-token cost bucket (R5) · one row per audited call · the budget net's marker (C10)
  * ```
  *
- * The write-tool mechanics are exercised through a synthetic server spec, because phase 1
- * ships no write tool yet; the same `runTool` runs every real tool, and phase 2's tests drive
- * it again through `create_draft` and `generate_image`.
+ * The write-tool mechanics are exercised through a synthetic server spec, which isolates
+ * `runTool` from any one tool's service; the same `runTool` runs every real tool, and
+ * mcp-blog-tools, mcp-operator-tools and mcp-whiteboard-tools drive it through them.
  */
 
 vi.hoisted(() => {
@@ -513,6 +513,54 @@ describe('R1: calls outside the token', () => {
     await flushAfter()
     expect(await AgentActionModel.countDocuments()).toBe(0)
   })
+
+  it('a JSON-RPC batch is refused before the SDK, so it cannot carry an unaudited call', async () => {
+    const token = await p4(['read'])
+    const res = await mcpPost(
+      agentRequest(MCP_URL, {
+        token,
+        ip: freshIp(),
+        body: [
+          {
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/call',
+            params: { name: 'publish_post', arguments: { id: 'x' } },
+          },
+          { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+        ],
+      })
+    )
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { error?: { code: number } }
+    expect(body.error?.code).toBe(-32600)
+    expect(res.headers.get('cache-control')).toContain('no-store')
+  })
+
+  it('a mixed-case Content-Type does not skip the audit', async () => {
+    const token = await p4(['write'])
+    const res = await mcpPost(
+      agentRequest(MCP_URL, {
+        token,
+        ip: freshIp(),
+        body: {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: { name: 'get_profile', arguments: { section: 'identity' } },
+        },
+        headers: { 'content-type': 'Application/JSON' },
+      })
+    )
+    expect(res.status).toBe(200)
+    await flushAfter()
+    expect(
+      await AgentActionModel.countDocuments({
+        outcome: 'refused',
+        reason: 'scope',
+      })
+    ).toBe(1)
+  })
 })
 
 describe('runTool', () => {
@@ -714,6 +762,146 @@ describe('runTool', () => {
     expect(counter.runs).toBe(2)
   })
 
+  it('clientRef: an ok row older than 24 h runs again instead of replaying', async () => {
+    counter.runs = 0
+    const token = await contextOf(await p4(['write']))
+    await call(makeKeyed(), { title: 'a', clientRef: 'r6' }, token)
+    await AgentActionModel.updateOne(
+      { clientRef: 'r6' },
+      { $set: { at: new Date(Date.now() - 25 * 60 * 60 * 1000) } }
+    )
+    const later = await call(
+      makeKeyed(),
+      { title: 'a', clientRef: 'r6' },
+      token
+    )
+    expect(later).toEqual({ text: 'created a #2', isError: false })
+    expect(counter.runs).toBe(2)
+  })
+
+  it('clientRef: a pending row abandoned by a killed call is taken over, and kept as an error', async () => {
+    counter.runs = 0
+    const token = await contextOf(await p4(['write']))
+    await call(makeKeyed(), { title: 'a', clientRef: 'r7' }, token)
+    // As a function killed mid-call leaves it: never finalized, 11 minutes old.
+    await AgentActionModel.updateOne(
+      { clientRef: 'r7' },
+      {
+        $set: {
+          outcome: 'pending',
+          at: new Date(Date.now() - 11 * 60 * 1000),
+        },
+      }
+    )
+    const retried = await call(
+      makeKeyed(),
+      { title: 'a', clientRef: 'r7' },
+      token
+    )
+    expect(retried).toEqual({ text: 'created a #2', isError: false })
+    await flushAfter()
+    const outcomes = (await rows())
+      .map(row => `${row.outcome}:${row.reason}:${row.clientRef ?? '-'}`)
+      .sort()
+    expect(outcomes).toEqual(['error:abandoned:-', 'ok:null:r7'])
+  })
+
+  it('clientRef: two concurrent retries of a failed call run it once', async () => {
+    counter.runs = 0
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const token = await contextOf(await p4(['write']))
+    const args = { title: 'boom', delayMs: 150, clientRef: 'r8' }
+    await call(makeKeyed(), args, token)
+    expect(counter.runs).toBe(1)
+    const [a, b] = await Promise.all([
+      call(makeKeyed(), args, token),
+      call(makeKeyed(), args, token),
+    ])
+    expect(counter.runs).toBe(2)
+    expect(
+      [a.text, b.text].filter(text => text.includes('still running'))
+    ).toHaveLength(1)
+  })
+
+  it('clientRef: the same key on a different tool is a mismatch, and runs nothing', async () => {
+    counter.runs = 0
+    const token = await contextOf(await p4(['write']))
+    const other = runToolLib.defineTool({
+      name: 'other_thing',
+      title: 'Other',
+      description: 'd',
+      scopes: ['write'],
+      input: z.object({ title: z.string().min(1) }),
+      annotations: {},
+      keyed: true,
+      async run() {
+        counter.runs += 1
+        return runToolLib.ok('other')
+      },
+    })
+    await call(makeKeyed(), { title: 'a', clientRef: 'r9' }, token)
+    const reused = await call(
+      other as never,
+      { title: 'a', clientRef: 'r9' },
+      token
+    )
+    expect(reused.isError).toBe(true)
+    expect(reused.text).toContain('already used with different arguments')
+    expect(counter.runs).toBe(1)
+  })
+
+  it('lazyCost: a call refused by its own cheap checks spends nothing; the paid step spends once', async () => {
+    const token = await contextOf(await p4(['write']))
+    const lazy = runToolLib.defineTool({
+      name: 'lazy_thing',
+      title: 'Lazy',
+      description: 'd',
+      scopes: ['write'],
+      input: z.object({ ok: z.boolean() }),
+      annotations: {},
+      audited: true,
+      cost: () => [{ route: 'lazy-cost', limit: 5, windowSeconds: 600 }],
+      lazyCost: true,
+      async run({ ok }, ctx) {
+        if (!ok) return runToolLib.refuse('cheap refusal')
+        const refused = await ctx.spend()
+        if (refused) return refused
+        await ctx.spend()
+        return runToolLib.ok('paid')
+      },
+    })
+    await call(lazy as never, { ok: false }, token)
+    const spentAfterRefusal = await RateLimitModel.countDocuments({
+      _id: { $regex: '^lazy-cost:' },
+    })
+    expect(spentAfterRefusal).toBe(0)
+    await call(lazy as never, { ok: true }, token)
+    const row = await RateLimitModel.findOne({
+      _id: { $regex: '^lazy-cost:' },
+    }).lean()
+    expect((row as { count?: number } | null)?.count).toBe(1)
+  })
+
+  it('clientRef: a call whose claim was taken over does not overwrite the newer attempt', async () => {
+    counter.runs = 0
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const token = await contextOf(await p4(['write']))
+    const first = call(
+      makeKeyed(),
+      { title: 'slow', delayMs: 200, clientRef: 'r10' },
+      token
+    )
+    await new Promise(resolve => setTimeout(resolve, 50))
+    // A newer attempt now holds the row (as a takeover after 10 minutes would leave it).
+    await AgentActionModel.updateOne(
+      { clientRef: 'r10' },
+      { $set: { at: new Date(Date.now() + 1_000) } }
+    )
+    await first
+    const row = await AgentActionModel.findOne({ clientRef: 'r10' }).lean()
+    expect(row?.outcome).toBe('pending')
+  })
+
   it('per-token cost bucket: the token is refused at its limit while the editor IP bucket is untouched (R5)', async () => {
     const token = await contextOf(await p4(['write']))
     const def = makeKeyed('image')
@@ -755,6 +943,24 @@ describe('runTool', () => {
     expect(preview).toContain('mail [email] please')
     expect(preview).not.toContain('ada@example.com')
     expect(Buffer.byteLength(preview)).toBeLessThanOrEqual(2048)
+    // Keys too: a refusal previews raw, unparsed arguments.
+    expect(runToolLib.previewArgs({ 'ada@example.com': 1 })).toBe(
+      '{"[email]":1}'
+    )
+    // Deep nesting is a marker, not a stack overflow outside the call's try.
+    let deep: unknown = 'bottom'
+    for (let i = 0; i < 20_000; i += 1) deep = { a: deep }
+    expect(runToolLib.previewArgs(deep)).toContain('[nested]')
+  })
+
+  it('isTokenLive: true for an active token, false once revoked', async () => {
+    const token = await contextOf(await p4(['write']))
+    expect(await tokenLib.isTokenLive(token)).toBe(true)
+    await AgentTokenModel.updateOne(
+      { _id: token.tokenId },
+      { $set: { revokedAt: new Date() } }
+    )
+    expect(await tokenLib.isTokenLive(token)).toBe(false)
   })
 
   it('the budget net cuts with an explicit marker and a warning (C10)', async () => {

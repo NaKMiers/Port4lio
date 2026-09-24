@@ -67,9 +67,10 @@ export type IqPaymentDocument = {
   paidAt?: Date | null
   /**
    * When the result email was handed to the mail server, stamped by the fulfilment path after
-   * `deliver` succeeds (acceptance.md D2). `null` on a paid order means it was not sent - or
-   * that the order was paid before this field existed, which `find_order` reports as "not
-   * recorded". Never the address itself.
+   * `deliver` succeeds (acceptance.md D2). `null` on a paid order means it was not sent (or
+   * the stamp itself failed). ABSENT means the row predates the field - Mongoose writes the
+   * `null` default only on new documents - which `find_order` reports as "not recorded".
+   * Never the address itself.
    */
   resultEmailedAt?: Date | null
   createdAt: Date

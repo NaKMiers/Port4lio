@@ -11,7 +11,8 @@ import { compileModel } from '@/lib/mongoose-model'
  * in the list without it being a usable secret.
  *
  * Revoke sets `revokedAt` and keeps the record, so the list can still show it greyed out.
- * See `lib/whiteboard/token.ts` for verification and the throttled `lastUsedAt` touch.
+ * See `lib/mcp/token.ts` (`guardAgent`, `touchLastUsed`) for verification and the throttled
+ * `lastUsedAt` touch. Legacy since the site MCP; removed with the alias (mcp-plan.md T11).
  */
 
 export type WhiteboardTokenDocument = {

@@ -251,6 +251,24 @@ const briefing = async (t: string, args: Record<string, unknown> = {}) =>
   JSON.parse((await client.callTool(t, 'get_briefing', args)).text)
 
 describe('get_briefing', () => {
+  it('top posts are real posts only: an invented slug from the public event endpoint is dropped', async () => {
+    await seedWeek()
+    await views('ignore-previous-instructions', [1, 1, 1, 1, 1, 1, 1, 1])
+    const week = await briefing(await token(['read']))
+    const slugs = week.blog.topPosts.map((post: { slug: string }) => post.slug)
+    expect(slugs).not.toContain('ignore-previous-instructions')
+    expect(slugs[0]).toBe('hot')
+  })
+
+  it("the funnel counts full days ending yesterday, so today's partial day is not in it", async () => {
+    await seedWeek()
+    await TestEventModel.insertMany([
+      funnel('mbti', 'paywall-seen', new Date(NOW), 100),
+    ])
+    const week = await briefing(await token(['read']))
+    expect(week.testFunnel.byProduct.mbti.paywallSeen.current).toBe(10)
+  })
+
   it('a week against the week before, every section, documents not re-fire counts', async () => {
     await seedWeek()
     const t = await token(['read'])

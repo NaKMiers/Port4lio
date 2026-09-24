@@ -296,13 +296,20 @@ export default function BlogEditor({ id }: { id: string }) {
    * The server refused Save because the post changed after this tab loaded it (R9).
    *
    * `baseUpdatedAt` is the `updatedAt` this tab last knew the server had: set on load, moved
-   * forward by every save this tab makes, and re-read after the two writes that bump it
-   * behind the editor's back (a prompt rewrite, an overwrite). Save sends it; a PATCH that
+   * forward by every save this tab makes (the PATCH answers with its own write's updatedAt),
+   * by a prompt rewrite only when that route read this exact base, and re-read after an
+   * overwrite, whose field-less PATCH answers without one. Save sends it; a PATCH that
    * finds the post newer answers 409 `stale` instead of writing an old copy over an agent's
    * edit. A ref, not state: it never renders, and a save must read the latest value.
    */
   const [stale, setStale] = useState(false)
   const baseUpdatedAt = useRef<string | null>(null)
+  /**
+   * The post a refused save tried to write. `applyStatus` rolls the badge back when Publish or
+   * Archive is refused as stale, so "Overwrite anyway" resends the status that was pressed,
+   * over whatever the author typed since - not the rolled-back one.
+   */
+  const staleAttempt = useRef<EditorPost | null>(null)
   /**
    * The series dropdown's options, fetched rather than imported.
    *
@@ -555,6 +562,7 @@ export default function BlogEditor({ id }: { id: string }) {
           updatedAt?: string
         }
         if (res.status === 409 && data.code === 'stale') {
+          staleAttempt.current = next
           setStale(true)
           return false
         }
@@ -782,13 +790,30 @@ export default function BlogEditor({ id }: { id: string }) {
           key ? { target: 'body', key } : { target: 'cover' }
         ),
       })
-      const data = (await res.json()) as { prompt?: string; error?: string }
+      const data = (await res.json()) as {
+        prompt?: string
+        error?: string
+        updatedAt?: string
+        before?: string
+      }
       if (!res.ok || !data.prompt)
         throw new Error(data.error ?? 'Could not write a prompt')
 
       const prompt = data.prompt
-      // The route saved the prompt, which moved the post's updatedAt past this tab's base.
-      await refreshBase()
+      /*
+        The route saved the prompt, which moved the post's updatedAt past this tab's base.
+        Adopt its new updatedAt only if the route read exactly this tab's base - never a blind
+        re-read, which would absorb an agent edit that landed in between and let the next
+        Save overwrite it without a banner. Otherwise the base stays, and Save reports stale.
+      */
+      if (
+        data.updatedAt &&
+        data.before &&
+        baseUpdatedAt.current &&
+        new Date(data.before).getTime() ===
+          new Date(baseUpdatedAt.current).getTime()
+      )
+        baseUpdatedAt.current = data.updatedAt
       setPost(current => {
         if (!current) return current
         if (!key) return { ...current, coverImagePrompt: prompt }
@@ -1035,7 +1060,15 @@ export default function BlogEditor({ id }: { id: string }) {
             }}
             onOverwrite={() => {
               setStale(false)
-              if (post) void flush(post, true)
+              if (!post) return
+              const attempted = staleAttempt.current
+              staleAttempt.current = null
+              const retry = attempted
+                ? { ...post, status: attempted.status }
+                : post
+              void flush(retry, true).then(saved => {
+                if (saved) setPost(retry)
+              })
             }}
           />
         ) : null}

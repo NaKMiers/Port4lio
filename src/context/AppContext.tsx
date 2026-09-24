@@ -17,6 +17,12 @@ interface AppContextProps {
   loading: boolean
   error: string | null
   refetchProfile: (options?: { blocking?: boolean }) => Promise<void>
+  /**
+   * The loaded document's `updatedAt`, when the endpoint sends one (`/api/admin/profile`
+   * does): the settings editor's stale-tab base. null elsewhere.
+   */
+  profileUpdatedAt: string | null
+  setProfileUpdatedAt: (value: string | null) => void
 }
 
 const AppContext = createContext<AppContextProps | null>(null)
@@ -40,6 +46,7 @@ function AppProvider({
     initialProfile ?? null
   )
   const [loading, setLoading] = useState(!initialProfile && !!bootstrapOnMount)
+  const [profileUpdatedAt, setProfileUpdatedAt] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const setProfile = (nextProfile: Profile) => {
@@ -65,6 +72,9 @@ function AppProvider({
         throw new Error(data?.error || 'Failed to fetch profile')
 
       setProfileState(data?.profile ? normalizeProfile(data.profile) : null)
+      setProfileUpdatedAt(
+        typeof data?.updatedAt === 'string' ? data.updatedAt : null
+      )
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch profile')
       if (shouldBlock) setProfileState(null)
@@ -89,7 +99,15 @@ function AppProvider({
 
   return (
     <AppContext.Provider
-      value={{ profile, setProfile, loading, error, refetchProfile }}
+      value={{
+        profile,
+        setProfile,
+        loading,
+        error,
+        refetchProfile,
+        profileUpdatedAt,
+        setProfileUpdatedAt,
+      }}
     >
       {children}
     </AppContext.Provider>

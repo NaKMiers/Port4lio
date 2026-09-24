@@ -60,7 +60,9 @@ function describeEmail(row: OrderRow): string {
     return `sent at ${row.resultEmailedAt.toISOString()}`
   if (!('resultEmailedAt' in row))
     return 'not recorded - this order was paid before result emails were tracked'
-  return 'not sent - fulfilment logged a delivery failure; the result page still opens from its link'
+  // Not a promise that the result page opens: the same null is left when the attempt had
+  // already expired (nothing to unlock) and when the email went out but the stamp failed.
+  return 'not sent - no successful delivery was stamped (the email may have failed, or the attempt had already expired); check the fulfilment log'
 }
 
 export async function findOrder(

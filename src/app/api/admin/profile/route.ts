@@ -26,10 +26,12 @@ export async function GET(request: NextRequest) {
     const {
       _id,
       createdAt: _createdAt,
-      updatedAt: _updatedAt,
+      updatedAt,
       ...profile
     } = doc as Record<string, unknown>
-    return NextResponse.json({ profile })
+    // `updatedAt` beside the profile, never inside it: the settings editor's stale-tab base
+    // (POST /api/profile), which must not end up saved back as a profile field.
+    return NextResponse.json({ profile, updatedAt: updatedAt ?? null })
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Unknown server error'

@@ -88,6 +88,28 @@ const TOUCH_INTERVAL_MS = 5 * 60 * 1000
 const BEARER = /^Bearer\s+((p4|wbt)_[A-Za-z0-9_-]{16,128})\s*$/
 const KIND_OF_PREFIX: Record<string, TokenKind> = { p4: 'agent', wbt: 'legacy' }
 
+/**
+ * Is this token still unrevoked? For work that outlives the request that verified it - an
+ * `illustrate_post` run draws for minutes, and revoking a leaked token in /admin/agents must
+ * stop its next paid image, not only its next request. A lookup error answers false (fail
+ * closed, like `guardAgent`).
+ */
+export async function isTokenLive(token: AgentContext): Promise<boolean> {
+  try {
+    const model =
+      token.kind === 'legacy' ? WhiteboardTokenModel : AgentTokenModel
+    return Boolean(
+      await (model as typeof AgentTokenModel).exists({
+        _id: token.tokenId,
+        revokedAt: null,
+      })
+    )
+  } catch (error) {
+    console.error('[mcp] token liveness check failed', error)
+    return false
+  }
+}
+
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }

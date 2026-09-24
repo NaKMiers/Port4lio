@@ -14,8 +14,9 @@ export const dynamic = 'force-dynamic'
  * [POST] /api/admin/whiteboard/tokens - `{ name }`, returns the plaintext token ONCE
  *
  * The list never carries the hash, and the plaintext exists only in the POST response -
- * which is why that response is `no-store` like every other one here. The Agents panel polls
- * GET every 5 s while a fresh token is unused, to flip to "Connected" (DR5).
+ * which is why that response is `no-store` like every other one here. Nothing in the UI calls
+ * this any more (D4): `/admin/agents` creates `p4_` tokens and lists these legacy ones through
+ * `/api/admin/agents/tokens`. Kept for existing scripts until the alias goes (T11).
  */
 export async function GET(request: NextRequest) {
   const denied = requireOwner(request)

@@ -3,7 +3,11 @@ import 'server-only'
 import { z } from 'zod'
 
 import { MAX_CONFIDENCE, MOCK_QUESTION_COUNT } from '@/lib/ccaf/progress'
-import { applyCcafUpdate, ccafStatus } from '@/lib/ccaf/progress-service'
+import {
+  applyCcafUpdate,
+  ccafStatus,
+  checkCcafUpdate,
+} from '@/lib/ccaf/progress-service'
 import { defineTool, ok, refuse } from '@/lib/mcp/run-tool'
 import { CCAF_SAVE_LIMIT } from '@/lib/rate-limit'
 
@@ -22,6 +26,12 @@ import { CCAF_SAVE_LIMIT } from '@/lib/rate-limit'
 const day = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a calendar day, YYYY-MM-DD')
+  // The shape alone lets 2026-13-01 through, and `sanitizeState` would then swap in the
+  // default exam date (or file a mock under it) while the call reports ok.
+  .refine(
+    value => !Number.isNaN(new Date(`${value}T00:00:00Z`).getTime()),
+    'must be a real calendar day'
+  )
 
 export const ccafStatusTool = defineTool({
   name: 'ccaf_status',
@@ -43,6 +53,8 @@ export const ccafUpdateTool = defineTool({
   scopes: ['write'],
   keyed: true,
   cost: () => [CCAF_SAVE_LIMIT],
+  // Spent after the id checks, so a typo'd task id costs the token nothing.
+  lazyCost: true,
   input: z.object({
     tickTasks: z.array(z.string().max(40)).max(100).optional(),
     untickTasks: z.array(z.string().max(40)).max(100).optional(),
@@ -76,7 +88,7 @@ export const ccafUpdateTool = defineTool({
     idempotentHint: false,
     openWorldHint: false,
   },
-  async run(args, { setTarget }) {
+  async run(args, { setTarget, spend }) {
     setTarget({ kind: 'ccaf', id: 'ccaf-progress' })
     const { clientRef: _clientRef, ...update } = args as typeof args & {
       clientRef?: string
@@ -85,6 +97,10 @@ export const ccafUpdateTool = defineTool({
       return refuse(
         'Nothing to change: pass tickTasks, untickTasks, tickChecks, untickChecks, logMock, confidence or examDate.'
       )
+    const invalid = checkCcafUpdate(update)
+    if (invalid) return refuse(invalid)
+    const refused = await spend()
+    if (refused) return refused
     const result = await applyCcafUpdate(update)
     if (!result.ok) return refuse(result.error)
     return ok(

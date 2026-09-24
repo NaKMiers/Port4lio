@@ -108,13 +108,19 @@ export async function readProfileSection(section: ProfileSection): Promise<{
   version: string
 }> {
   await connectDatabase()
+  // The resume also reads `avatar`: `/cv` falls back to it when the CV has no photo of its
+  // own, and the agent must see (and version) the sheet `/cv` actually prints.
   const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
-    .select(PROFILE_SECTIONS[section].join(' '))
+    .select(
+      section === 'resume'
+        ? 'resume avatar'
+        : PROFILE_SECTIONS[section].join(' ')
+    )
     .lean()
   const profile = doc ? normalizeProfile(doc) : makeEmptyProfile()
   const value =
     section === 'resume'
-      ? { resume: deriveResume(profile) }
+      ? { resume: deriveResume(profile, profile.avatar) }
       : pickSection(profile, section)
   return { value, version: sectionVersion(value) }
 }

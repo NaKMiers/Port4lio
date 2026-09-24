@@ -17,7 +17,7 @@ export const writePostPrompt: PromptDefinition = {
   name: 'write-post',
   title: 'Write a post in my voice',
   description:
-    "Draft a blog post in the owner's voice: the brief (method, shape, evidence law, sentence rules, markdown contract, a structure), then the loop - lint_draft, create_draft, illustrate_post, get_post, and publish_post when your token has it.",
+    "Draft a blog post in the owner's voice: the brief (method, shape, evidence law, sentence rules, markdown contract, a structure), then the loop - lint_draft, create_draft, illustrate_post, get_post, and publish_post if it is in your tool list.",
   scopes: ['read'],
   args: z.object({
     topic: z.string(),

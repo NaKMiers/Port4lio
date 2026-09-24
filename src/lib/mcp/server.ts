@@ -45,6 +45,7 @@ import {
  *     compile(REGISTRY): zod ──▶ JSON Schema, frozen          never per request (perf, R2-19)
  *
  *   per request, after guardAgent verified { tokenId, name, scopes }
+ *     body is a JSON-RPC batch (an array)? ──▶ 400 -32600, never reaches the SDK
  *     body is a tools/call for a registry tool this token lacks?
  *        └─ yes ──▶ isError naming the missing scope + ONE refused AgentAction row   (R1)
  *     createMcpHandler(server => {                    mcp-handler builds a fresh McpServer anyway
@@ -267,13 +268,22 @@ export function registerFor(
 
 type RpcCall = { id: string | number; name: string; arguments: unknown }
 
-/** A single `tools/call` naming a registry tool this token lacks, or null. */
-async function outOfScopeCall(
+/**
+ * What the body needs before the SDK sees it: a batch (refused outright), a single `tools/call`
+ * naming a registry tool this token lacks (refused and audited, R1), or nothing.
+ */
+async function preflight(
   request: Request,
   spec: ServerSpec,
   token: AgentContext
-): Promise<RpcCall | null> {
-  if (!(request.headers.get('content-type') ?? '').includes('application/json'))
+): Promise<{ kind: 'batch' } | { kind: 'refused'; call: RpcCall } | null> {
+  // Lowercased: the SDK matches the media type case-insensitively, so `Application/JSON`
+  // would otherwise skip this peek and still be served, leaving no refused row.
+  if (
+    !(request.headers.get('content-type') ?? '')
+      .toLowerCase()
+      .includes('application/json')
+  )
     return null
   let body: unknown
   try {
@@ -281,7 +291,14 @@ async function outOfScopeCall(
   } catch {
     return null
   }
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return null
+  /*
+    A JSON-RPC batch. The SDK's legacy path would serve up to 100 calls from one array, which
+    let an out-of-scope call skip the R1 audit below (this peek reads one object) and charged
+    the front-door rate limit once for 100 calls. MCP 2025-06-18 dropped batching and no
+    client this server supports sends one, so it is refused before the SDK sees it.
+  */
+  if (Array.isArray(body)) return { kind: 'batch' }
+  if (!body || typeof body !== 'object') return null
   const message = body as {
     method?: unknown
     id?: unknown
@@ -295,7 +312,10 @@ async function outOfScopeCall(
 
   const tool = spec.tools.find(({ def }) => def.name === name)
   if (!tool || hasAnyScope(tool.def.scopes, token)) return null
-  return { id: message.id, name, arguments: message.params?.arguments }
+  return {
+    kind: 'refused',
+    call: { id: message.id, name, arguments: message.params?.arguments },
+  }
 }
 
 export async function handleMcpRequest(
@@ -303,8 +323,22 @@ export async function handleMcpRequest(
   token: AgentContext,
   spec: ServerSpec
 ): Promise<Response> {
-  const refused = await outOfScopeCall(request, spec, token)
-  if (refused) {
+  const checked = await preflight(request, spec, token)
+  if (checked?.kind === 'batch')
+    return agentJson(
+      {
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: -32600,
+          message:
+            'Invalid Request: batching is not supported. Send one JSON-RPC message per request.',
+        },
+      },
+      { status: 400 }
+    )
+  if (checked?.kind === 'refused') {
+    const refused = checked.call
     const def = spec.tools.find(({ def }) => def.name === refused.name)!.def
     recordScopeRefusal(token, refused.name, refused.arguments)
     return agentJson({

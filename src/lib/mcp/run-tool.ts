@@ -32,11 +32,12 @@ import {
  *                        different args          ──▶ refused "clientRef reused with different arguments"
  *                        refused | error | stale ──▶ take the row over (old row copied to history), run
  *       4 cost       checkRateLimit('mcp-token:<id>', def.cost(args)) ──▶ refused(rate)       (R5)
+ *                      lazyCost tools spend it themselves via ctx.spend(), after their cheap checks
  *       5 run        def.run(args, ctx) ──▶ the same src/lib service /api/admin/** calls
  *       6 budget     clipToBudget: the net no tool is meant to reach (C10)
  *     finally:
  *       7 audited tools write EXACTLY ONE AgentAction row per call, whatever happened:
- *           keyed   ──▶ finalize the claimed row, awaited
+ *           keyed   ──▶ finalize the claimed row, awaited, retried, only if still this call's claim
  *           unkeyed ──▶ insert via after(), off the response path
  * ```
  *
@@ -88,6 +89,12 @@ export interface ToolRunContext {
   token: AgentContext
   /** What the call was about, for the audit row (a post, a card, an order). */
   setTarget(target: AgentActionTarget): void
+  /**
+   * Spend the call's `cost` buckets now, once. For a `lazyCost` tool, called right before the
+   * paid step, so a call refused by its own cheap checks spends nothing. `null` = spent;
+   * otherwise the refusal to return. A no-op after the first call, and for other tools.
+   */
+  spend(): Promise<ToolResult | null>
 }
 
 /** `z.ZodObject` with its shape erased, the one form a registry array can hold. */
@@ -107,6 +114,11 @@ export interface ToolDefinition<S extends AnyObjectSchema = AnyObjectSchema> {
   keyed?: boolean
   /** Per-token buckets this call spends (R5). */
   cost?: (args: z.output<S>) => readonly RateLimitOptions[]
+  /**
+   * true: `cost` is spent when `run` calls `ctx.spend()`, not before `run` starts - for a tool
+   * whose cheap refusals (a missing target, a live post) would otherwise burn a paid unit.
+   */
+  lazyCost?: boolean
   run(args: z.output<S>, ctx: ToolRunContext): Promise<ToolResult>
 }
 
@@ -151,18 +163,29 @@ export function hasAnyScope(
 const EMAIL = /[^\s@"'<>()[\]]+@[^\s@"'<>()[\]]+\.[A-Za-z]{2,}/g
 const PREVIEW_MAX_BYTES = 2048
 const LONG_STRING = 200
+const PREVIEW_MAX_DEPTH = 8
 
-/** At most 2 KB, long strings (markdown bodies) as their length, emails masked. */
+/**
+ * At most 2 KB, long strings (markdown bodies) as their length, emails masked - in keys as
+ * well as values, because a refusal previews the raw, unparsed arguments.
+ */
 export function previewArgs(args: unknown): string {
-  const walk = (value: unknown): unknown => {
-    if (typeof value === 'string')
-      return value.length > LONG_STRING
-        ? `[${value.length} chars]`
-        : value.replace(EMAIL, '[email]')
-    if (Array.isArray(value)) return value.map(walk)
+  const mask = (text: string) =>
+    text.length > LONG_STRING
+      ? `[${text.length} chars]`
+      : text.replace(EMAIL, '[email]')
+  // Depth-capped: this runs on raw, unparsed arguments before anything else, so a deeply
+  // nested body must become a marker, not a stack overflow outside the call's try.
+  const walk = (value: unknown, depth = 0): unknown => {
+    if (depth > PREVIEW_MAX_DEPTH) return '[nested]'
+    if (typeof value === 'string') return mask(value)
+    if (Array.isArray(value)) return value.map(entry => walk(entry, depth + 1))
     if (value && typeof value === 'object')
       return Object.fromEntries(
-        Object.entries(value).map(([key, entry]) => [key, walk(entry)])
+        Object.entries(value).map(([key, entry]) => [
+          mask(key),
+          walk(entry, depth + 1),
+        ])
       )
     return value
   }
@@ -262,7 +285,7 @@ const REPLAY_WINDOW_MS = 24 * 60 * 60 * 1000
 const ABANDONED_CLAIM_MS = 10 * 60 * 1000
 
 type Claim =
-  | { kind: 'claimed'; rowId: string }
+  | { kind: 'claimed'; rowId: string; at: Date }
   | { kind: 'replay'; text: string }
   | { kind: 'busy' }
   | { kind: 'mismatch' }
@@ -295,7 +318,7 @@ async function claim(
       clientRef,
       argsHash,
     })
-    return { kind: 'claimed', rowId: String(row._id) }
+    return { kind: 'claimed', rowId: String(row._id), at: now }
   } catch (error) {
     if (!isDuplicateKey(error)) throw error
   }
@@ -353,11 +376,61 @@ async function claim(
     resultPreview: _oldResult,
     ...history
   } = existing
-  await AgentActionModel.create(history).catch((error: unknown) =>
+  // A pending row being replaced is a call that never finished (a killed function): kept as
+  // an error, so the feed does not show it in flight for the next 180 days.
+  await AgentActionModel.create(
+    existing.outcome === 'pending'
+      ? { ...history, outcome: 'error', reason: 'abandoned' }
+      : history
+  ).catch((error: unknown) =>
     console.error('[mcp] could not keep the replaced audit row', error)
   )
-  return { kind: 'claimed', rowId: String(taken._id) }
+  return { kind: 'claimed', rowId: String(taken._id), at: now }
 }
+
+/**
+ * Close a claimed row. Retried, because a row left `pending` is taken over as abandoned ten
+ * minutes later and the call runs AGAIN - the duplicate R4 exists to prevent. Conditional on
+ * the claim this call made (`pending` at its own `at`), so a call whose row was already taken
+ * over cannot overwrite the newer attempt's outcome.
+ */
+async function finalize(
+  tool: string,
+  claimed: { rowId: string; at: Date },
+  row: AuditRow,
+  text: string
+) {
+  for (let attempt = 0; attempt < FINALIZE_ATTEMPTS; attempt += 1)
+    try {
+      const saved = await AgentActionModel.updateOne(
+        { _id: claimed.rowId, outcome: 'pending', at: claimed.at },
+        {
+          $set: {
+            outcome: row.outcome,
+            reason: row.reason,
+            target: row.target,
+            ...(row.outcome === 'ok' ? { resultPreview: text } : {}),
+          },
+        }
+      )
+      if (saved.matchedCount === 0)
+        console.warn(
+          `[mcp] ${tool} claim ${claimed.rowId} was taken over before it finished; its outcome (${row.outcome}) is not recorded on it`
+        )
+      return
+    } catch (error) {
+      if (attempt === FINALIZE_ATTEMPTS - 1) {
+        console.error(
+          `[mcp] could not finalize ${tool} claim ${claimed.rowId} (outcome ${row.outcome}, target ${JSON.stringify(row.target)}); a retry after 10 min will run it again`,
+          error
+        )
+        return
+      }
+      await new Promise(resolve => setTimeout(resolve, 100 * 4 ** attempt))
+    }
+}
+
+const FINALIZE_ATTEMPTS = 3
 
 // MARK: runTool
 
@@ -375,7 +448,7 @@ export async function runTool(
 ) {
   let target: AgentActionTarget | null = null
   let result: ToolResult | null = null
-  let claimedRowId: string | null = null
+  let claimed: { rowId: string; at: Date } | null = null
   const argsPreview = def.audited ? previewArgs(rawArgs) : ''
 
   try {
@@ -400,42 +473,53 @@ export async function runTool(
     const clientRef =
       def.keyed && typeof args.clientRef === 'string' ? args.clientRef : null
     if (clientRef) {
-      const claimed = await claim(
+      const outcome = await claim(
         token,
         def.name,
         clientRef,
         hashArgs(args),
         argsPreview
       )
-      if (claimed.kind === 'replay') {
-        result = { text: claimed.text, outcome: 'ok', reason: 'replay' }
+      if (outcome.kind === 'replay') {
+        result = { text: outcome.text, outcome: 'ok', reason: 'replay' }
         return toCallResult(result)
       }
-      if (claimed.kind === 'busy') {
+      if (outcome.kind === 'busy') {
         result = refuse(
           `A call with clientRef "${clientRef}" is still running. Retry shortly with the same clientRef to get its result.`,
           'in-flight'
         )
         return toCallResult(result)
       }
-      if (claimed.kind === 'mismatch') {
+      if (outcome.kind === 'mismatch') {
         result = refuse(
           `clientRef "${clientRef}" was already used with different arguments in the last 24 hours. Use a new clientRef for a different call.`,
           'invalid'
         )
         return toCallResult(result)
       }
-      claimedRowId = claimed.rowId
+      claimed = { rowId: outcome.rowId, at: outcome.at }
     }
 
     // 4
-    for (const limit of def.cost?.(args) ?? []) {
-      const spent = await checkRateLimit(`mcp-token:${token.tokenId}`, limit)
-      if (!spent.ok) {
-        result = refuse(
-          `Rate limit: this token has used its ${limit.route} budget (${limit.limit} per ${Math.round(limit.windowSeconds / 60)} min). Try again in ${spent.retryAfterSeconds} s. Nothing was changed.`,
-          'rate'
-        )
+    let spent = false
+    const spend = async (): Promise<ToolResult | null> => {
+      if (spent) return null
+      spent = true
+      for (const limit of def.cost?.(args) ?? []) {
+        const bucket = await checkRateLimit(`mcp-token:${token.tokenId}`, limit)
+        if (!bucket.ok)
+          return refuse(
+            `Rate limit: this token has used its ${limit.route} budget (${limit.limit} per ${Math.round(limit.windowSeconds / 60)} min). Try again in ${bucket.retryAfterSeconds} s. Nothing was changed.`,
+            'rate'
+          )
+      }
+      return null
+    }
+    if (!def.lazyCost) {
+      const refused = await spend()
+      if (refused) {
+        result = refused
         return toCallResult(result)
       }
     }
@@ -446,6 +530,7 @@ export async function runTool(
       setTarget: next => {
         target = next
       },
+      spend,
     })
 
     // 6
@@ -469,20 +554,7 @@ export async function runTool(
         target,
         argsPreview,
       }
-      if (claimedRowId)
-        await AgentActionModel.updateOne(
-          { _id: claimedRowId },
-          {
-            $set: {
-              outcome: row.outcome,
-              reason: row.reason,
-              target: row.target,
-              ...(row.outcome === 'ok' ? { resultPreview: result.text } : {}),
-            },
-          }
-        ).catch((error: unknown) =>
-          console.error(`[mcp] could not finalize ${def.name} claim`, error)
-        )
+      if (claimed) await finalize(def.name, claimed, row, result.text)
       else recordLater(token, row)
     }
   }

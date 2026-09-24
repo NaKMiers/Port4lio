@@ -5,7 +5,6 @@ import { Pencil, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
-import { AgentsButton } from '@/components/whiteboard/AgentsPopover'
 import { BackupMenu, RestoreDialog } from '@/components/whiteboard/Backup'
 import BoardSwitcher from '@/components/whiteboard/BoardSwitcher'
 import ExportSheet from '@/components/whiteboard/ExportSheet'
@@ -46,7 +45,7 @@ import type { ClientItem } from '@/lib/whiteboard/types'
  *
  * ```
  *   ┌ frame (viewport-sized, DR2) ──────────────────────────────────────────────┐
- *   │ TopBar: [grid] Whiteboard (pill)   [N hidden] [Backup] [Agents] [Export]   │
+ *   │ TopBar: [grid] Whiteboard (pill)   [N hidden] [Backup] [Export]            │
  *   ├────────────────────────────────────────────────────────────┬──────────────┤
  *   │ ToolRail   Canvas (React Flow, dot grid)                   │ Inspector    │
  *   │ Zoom                                    Export sheet (DR3) │ 320px (lg)   │
@@ -514,7 +513,6 @@ function WhiteboardShell({ boardId }: { boardId: string }) {
               heldWrites={board.status.holding ? board.status.pending : 0}
             />
           }
-          agents={<AgentsButton />}
           exportDisabled={readOnly || empty}
           exportOpen={surface === 'export'}
           onExport={() =>

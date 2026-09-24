@@ -44,6 +44,7 @@ The design doc is the source of truth for the problem, premises and chosen appro
 
 - Feature answers: no cuts proposed by the review. The approved Assignment (`first-week-asks.md`) remains the cut mechanism.
 - Structure: A) Original arrangement (D16, answered 2026-09-24).
+- Owner decisions after this review (D1-D9 in `acceptance.md` "Owner decisions") amend it: D1 cut the registry to 23 tools (12 for `read`), D7 changes the `update_profile` invalidation, D8 adds the publishing-run lock, D9 makes `ccaf_update` conditional, D10 lists the /review follow-ups. The rest are listed in `mcp.md` "Eng review amendments".
 - Accepted scope: the design doc's 27-tool registry, 4 scopes, 3 prompts, 5 phases, with corrections C1-C10 applied, in these files:
   - `src/lib/mcp/{token,server,run-tool,budget}.ts`
   - `src/lib/mcp/tools/{me,blog,metrics,whiteboard,ccaf,prompts}.ts`
