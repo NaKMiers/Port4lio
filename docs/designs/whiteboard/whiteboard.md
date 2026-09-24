@@ -86,14 +86,14 @@ Approach B. Wireframe (approved in design review, DR2): `~/.gstack/projects/NaKM
  │   ├ ExportDrawer ──────┐     │                      │ 1 checkRateLimit(WHITEBOARD_AGENT_LIMIT)
  │   └ useSaveQueue       │     │                      │ 2 token.ts verify (sha256 lookup; DB error -> 503)
  └──────┬─────────────────┼─────┘                      │ 3 tools: get_overview / search_context / get_item
-        │ items/links     │ POST /context              │   (<= ~32k chars per answer, D18)
-        │ CRUD + bulk     │ (server-rendered preview)  ▼
+        │ items/links     │ no request: in-browser     │   (<= ~32k chars per answer, D18)
+        │ CRUD + bulk     │ preview (visible.ts)       ▼
         ▼                 ▼                     ┌─────────────────────────────────────────┐
  /api/admin/whiteboard/*  (requireOwner)        │ lib/whiteboard/data.ts                  │
-   validate (limits.ts) ──────────────────────▶ │   loadAgentVisible(scope)  <── ONLY read │
-   write order, rule 8 (hide on leave)          │   path for drawer, context.md, MCP      │
-   GET canvas / backup: streamed NDJSON (D21)   │   (includeInAi, hidden frames, no       │
-   restore: <= 2 MB idempotent batches (D21)    │    orphans, $text inside the filter)    │
+   validate (limits.ts) ──────────────────────▶ │   loadAgentVisible(scope)  <── agents   │
+   write order, rule 8 (hide on leave)          │   path for context.md, MCP; the drawer  │
+   GET canvas / backup: streamed NDJSON (D21)   │   mirrors it, held by a parity test     │
+   restore: <= 2 MB idempotent batches (D21)    │   (includeInAi, frames, orphans, $text) │
         │                                       └───────────────┬─────────────────────────┘
         ▼                                                       ▼
    MongoDB: WhiteboardItem · WhiteboardLink · WhiteboardToken    lib/whiteboard/context.ts (pure)
@@ -214,7 +214,7 @@ Other indexes: text index on `title`, `body`, `tags`, `todos.text` with **`defau
 
 ### Many boards (D32, after v1)
 
-- `/admin/whiteboard` is the board index (new, rename in place, the per-board agent switch, delete); `/admin/whiteboard/<id>` is a canvas. A switcher in the top bar moves between them.
+- `/admin/whiteboard` is the board index (new, rename in place, the per-board agent switch, delete; a new board stays on the index with its name selected, and clicking a card opens it); `/admin/whiteboard/<id>` is a canvas. A switcher in the top bar moves between them, and also renames the board on screen and flips its agent switch. Delete stays on the index only.
 - Switching is a navigation, not a state change: the canvas remounts, so one board's save queue, undo history and held writes can never reach another.
 - Every item and link carries `boardId`, and every index leads with it. The text index stays global, because agent search crosses boards.
 - **One migration, once:** the first read that finds no board creates "Whiteboard" and adopts every item and link written before boards existed. It only ever runs while no board exists, and two first reads at once both keep the oldest board and drop the other, so the adoption always has exactly one target.
@@ -254,7 +254,7 @@ Every route below that touches items or links carries **`?board=<id>`** (D32) an
 - `PATCH  /api/admin/whiteboard/items` - bulk position update `{ updates: [{ id, x, y, parentId }] }`, max 500.
 - `PATCH  /api/admin/whiteboard/items/[id]`, `DELETE /api/admin/whiteboard/items/[id]`.
 - `POST   /api/admin/whiteboard/links`, `PATCH /api/admin/whiteboard/links/[id]` (`{ label }`, D19), `DELETE /api/admin/whiteboard/links/[id]`.
-- `POST   /api/admin/whiteboard/context` - body `{ scope: { kind: 'all' } | { kind: 'frame', id } | { kind: 'selection', ids: [...] (max 500) } | { kind: 'filter', meanings?, status?, from?, to?, targetFrom?, targetTo? } }`, returns markdown. The dates follow the shared date rule. The drawer's live preview calls this with a ~400 ms debounce. It is computed on the server, so the privacy filter has exactly one code path.
+- ~~`POST /api/admin/whiteboard/context`~~ - removed. The drawer's preview is now built in the browser from the board already on screen (`src/lib/whiteboard/visible.ts`, then the same `renderContext`), on every edit with no debounce and unsaved edits included. Scopes are unchanged (`all` / `frame` / `selection` / `filter` with meanings, status and the shared date rule). The privacy filter now has two implementations - Mongo queries in `loadAgentVisible` for agents, plain arrays in `visible.ts` for the drawer - and `tests/api/whiteboard-export-parity.test.ts` asserts they render byte-identical markdown and the same counts for every scope.
 - `GET    /api/admin/whiteboard/backup` - full JSON, including hidden items (it's the owner's backup) Versioned: `{ version: 1, exportedAt, items, links }`, streamed (D21).
 - `POST   /api/admin/whiteboard/restore` - D20/D21: the client validates the whole file first, then `{ dryRun, overwrite, items[], links[] }` batches of <= 2 MB (`maxBytes` 2 MB). The server re-validates each batch and upserts by `_id` (overwrite opt-in). Batches are idempotent: re-run to finish.
 - `GET    /api/admin/whiteboard/tokens` - returns only `{ id, name, prefix, createdAt, lastUsedAt, revokedAt }`, never the hash.

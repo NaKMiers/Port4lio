@@ -1,0 +1,317 @@
+{
+  "version": 1,
+  "round": 2,
+  "document": "/home/KHOANA/ME/IT_IT/Webs/Port4lio/docs/designs/mcp/mcp.md",
+  "quality_score": 7,
+  "dimensions": {
+    "completeness": "ISSUES",
+    "consistency": "ISSUES",
+    "clarity": "ISSUES",
+    "scope": "PASS",
+    "feasibility": "ISSUES"
+  },
+  "findings": [
+    {
+      "id": "R2-1",
+      "dimension": "feasibility",
+      "problem": "`handlerFor(scopes)` registers ONLY the tools in the token's scopes, so a `read` token calling `publish_post` by name never reaches `runTool`. The MCP server answers with its own unknown-tool error, and steps 1 and 7 never run. The success criterion 'Calling any non-`read` tool by name with that token returns `isError`, writes nothing, and leaves one `refused` AgentAction row' therefore cannot pass as the request flow describes it. Step 1's 'the filter is not the gate' recheck can only fire for tools that are registered.",
+      "remedy": "Choose one. (a) Register every tool, filter only the `tools/list` response, and let step 1 refuse and audit. (b) Add a catch-all for unregistered names at the route or handler that writes the `refused` row. (c) Restate the criterion as 'unknown-tool error, no write, no row', and keep `refused` rows for run-time refusals such as the live-post rule. Then test whichever you chose."
+    },
+    {
+      "id": "R2-2",
+      "dimension": "completeness",
+      "problem": "Truncated reads can still be saved, which was R1-14's obligation. `get_post` returns a `version` token on every page, so an agent that read only page 1 still holds a current version. The shrink guard only catches a new body under 50% of the old one. For a post of about 24k to 48k characters, a body built from page 1 alone (about 24k) passes both checks and silently cuts the tail. `get_profile` also pages an over-budget section, but `update_profile` replaces a whole section with no version or shrink guard at all.",
+      "remedy": "Make a body write require proof of a complete read. For example, return `version` (or a hash of the full body) only with the page that has `complete: true`, or offer an offset/length range replace instead of a whole-body replace. Apply the same rule to `get_profile`/`update_profile` sections, and add an API test with a post just over one page."
+    },
+    {
+      "id": "R2-3",
+      "dimension": "consistency",
+      "problem": "`runTool` step 6 says every answer is 'clip[ped] to the response budget', but the Budget success criterion says 'over-budget bodies come back paged, never clipped'. Only `get_post` and `get_profile` have paging. Nothing says what `get_me` does (profile + CV + goals + 5 posts), or what `list_posts`, `whiteboard_search` and `get_briefing` do when they exceed the budget.",
+      "remedy": "Say for each tool whether it pages or clips. Paged tools never clip. Tools that clip return an explicit truncation marker and say what was dropped. Then reconcile step 6 with the success criterion."
+    },
+    {
+      "id": "R2-4",
+      "dimension": "completeness",
+      "problem": "Step 3 replays any `AgentAction` row with the same (tokenId, clientRef) from the last 24 h, and step 7 writes rows for `refused` and `error` outcomes too. A retry after a rate-limit refusal, a validation error or a transient service error would therefore replay the old failure for 24 h, not try again. That defeats the retry safety that `clientRef` exists to give.",
+      "remedy": "State that only an `ok` row is replayed. A `refused` or `error` row does not block a retry with the same `clientRef`. Add an API test for a retry after a refusal."
+    },
+    {
+      "id": "R2-5",
+      "dimension": "feasibility",
+      "problem": "The idempotency ledger is written 'via after() so it never blocks the answer', which is after the response and after the service call. A client that times out and retries while the first call is still running, or two calls sent close together, both miss the ledger and both execute. No unique index on (tokenId, clientRef) is defined. `resultPreview` has no size rule, and the design never says whether it holds the full result or only a preview, yet it is what a replay returns.",
+      "remedy": "Before step 5, claim the key by inserting a pending row under a unique partial index on (tokenId, clientRef). Finalize that row in `finally`. An in-flight duplicate gets a 'still running' answer, and a replay returns the stored full result, bounded by the budget. Test concurrent duplicates, not only sequential ones."
+    },
+    {
+      "id": "R2-6",
+      "dimension": "clarity",
+      "problem": "`clientRef` appears only in `create_draft`'s inputs, but step 3 is written as generic. It is unspecified which other tools accept it. That matters most for the paid tools (`generate_image` in URL mode, `illustrate_post`), which are the likeliest to be retried after a client timeout and the costliest to repeat.",
+      "remedy": "List the tools that accept `clientRef`, at least `create_draft` and `generate_image`, and say how a retry of each of the others behaves."
+    },
+    {
+      "id": "R2-7",
+      "dimension": "feasibility",
+      "problem": "`illustrate_post` can run for about 255 s. `illustratePost` loads the post once and calls `post.save()` after each image with the body it holds in memory. It has no lock and no version check. Two things can go wrong. (1) An `update_post`, or an owner editor save, that lands during the run is overwritten by the next per-image save, which bypasses the `version` concurrency that `update_post` enforces. (2) A client timeout below 255 s (Open Question 3 is unresolved) followed by a retry starts a second concurrent run on the same placeholders. That doubles the image cost, and the two runs clobber each other's saves.",
+      "remedy": "Add a per-post illustration lease so a second run returns 'already running'. Make each per-image save conditional (re-read the post and apply the URL to the current body, or check the version). State this in the illustrate-run changes and cover it with an API test."
+    },
+    {
+      "id": "R2-8",
+      "dimension": "completeness",
+      "problem": "The only change listed for `illustrate-run.ts` is the `publish: false` flag. Today that function calls `revalidatePublishedPost` only on the publish branch. With `publish: false` on a live post (allowed for a token with `publish`), each image is saved into the live post, and nothing in the listed change invalidates `/blog/<slug>`. The general 'services revalidate' rule is not applied to this service.",
+      "remedy": "State that `illustratePost` revalidates when the post is live, after each save or once at the end, even with `publish: false`. Include `illustrate_post` on a live post in the e2e revalidation test."
+    },
+    {
+      "id": "R2-9",
+      "dimension": "completeness",
+      "problem": "The design allows `illustrate_post` on a live post, which implies a live post can carry unresolved image placeholders. The current PATCH that `update_post` reuses runs no `publishBlockers`. So an agent with `publish` can add an `imageN` placeholder to a live post, and the live page shows a broken image until the illustration finishes. The `illustrate-run.ts` header states that nothing goes public with a placeholder in it.",
+      "remedy": "Decide whether `update_post` refuses, on a live post, a body that introduces unresolved placeholders (so an agent drafts images first or unpublishes first), or state that the temporary broken image is accepted."
+    },
+    {
+      "id": "R2-10",
+      "dimension": "feasibility",
+      "problem": "Today `POST /api/admin/blog` accepts only slug and title (8 KB cap) and creates a bare draft. `create_draft` also sets markdown, excerpt, kind, series and language, which is create plus a PATCH (kind/series checks, rendering, a pillar clash). The design does not say whether this is one atomic write. If the second step fails, a bare draft is left holding the slug. A retry then hits a slug clash, or, under step 3 as written, replays the error.",
+      "remedy": "Specify that `create_draft` validates every field and renders the markdown before a single insert (or removes the draft it created on failure). Add an API test in which an invalid series leaves no post behind."
+    },
+    {
+      "id": "R2-11",
+      "dimension": "completeness",
+      "problem": "When no `slug` is given it is derived with 'the existing `slugify(title)`', but the rules the result must satisfy are not stated: `SLUG_PATTERN` `^[a-z0-9-]{1,80}$`, `isReservedSlug`, and Vietnamese titles (diacritics, `đ`) that could slugify to something empty or invalid. The review could not confirm that a `slugify` helper already exists.",
+      "remedy": "Define the derivation: diacritic folding including `đ`, truncation to 80 characters at a hyphen, and an `isError` for an empty or reserved result. Name the helper, or mark it as new."
+    },
+    {
+      "id": "R2-12",
+      "dimension": "consistency",
+      "problem": "The Success Criteria give scene 3 'read (write for tailoring the CV into the profile)', but `update_profile` is scoped `publish` in both the scope table and the tool table. A `write` token cannot save a tailored CV.",
+      "remedy": "Change scene 3's setup to read, plus publish when the CV is saved into the profile."
+    },
+    {
+      "id": "R2-13",
+      "dimension": "completeness",
+      "problem": "The `Resume` type documents that `/cv` is fixed A4 geometry (`height: 297mm; overflow: hidden`), where longer copy silently clips the last line. `update_profile` with a `resume`/`cv` section, reached through `tailor-cv`, is validated only by 'the existing normalizers', which do not check fit. An agent-written CV can therefore publish a clipped `/cv` with no signal.",
+      "remedy": "Either keep `resume` out of `update_profile`, so `tailor-cv` stays markdown-only, or have the tool return a warning with a `/cv` link to check after any resume write, or add a length-budget check for resume lines."
+    },
+    {
+      "id": "R2-14",
+      "dimension": "clarity",
+      "problem": "`get_profile`'s sections include `cv`, but `Profile` has both a `cv` string field (on the public allowlist) and the `resume` block (the CV with contact details). It is ambiguous which one the `cv` section and `update_profile` address.",
+      "remedy": "List the section keys and the `Profile` fields each one maps to, naming `resume` explicitly."
+    },
+    {
+      "id": "R2-15",
+      "dimension": "feasibility",
+      "problem": "Phase 1 ships `get_me`, whose table row lists `post-service` as a source ('5 most recent posts'). `post-service` is extracted only in phase 2.",
+      "remedy": "Move `get_me` to phase 2. Alternatively, pull the read-only post query forward into phase 1, or have phase 1's `get_me` omit posts and say so."
+    },
+    {
+      "id": "R2-16",
+      "dimension": "completeness",
+      "problem": "'Where revalidation lives' names only `revalidatePublishedPost` and the profile tag, and the e2e check covers only `/blog/<slug>`. Today the kind PATCH calls `revalidatePath('/blog')`, because a kind's `label` prints on the listing cards. The design never says that `taxonomy-service` carries this invalidation or that `save_taxonomy` is tested for it.",
+      "remedy": "Add taxonomy writes (`revalidatePath('/blog')` inside `taxonomy-service`) to the revalidation section. Extend the e2e check so `save_taxonomy` refreshes `/blog`."
+    },
+    {
+      "id": "R2-17",
+      "dimension": "clarity",
+      "problem": "`runTool` step 1 checks `def.scope ∈ ctx.scopes`. A migrated `wbt_` token holds only `whiteboard:legacy`, while the alias serves the whiteboard tools, whose scope is `read`. The design does not say how the alias tool definitions accept either `read` or `whiteboard:legacy`. Without that, step 1 refuses every legacy call.",
+      "remedy": "State that the alias definitions accept the set {`read`, `whiteboard:legacy`}. Add a test that a `wbt_` token passes step 1 on the alias and a `p4_` token without `read` does not."
+    },
+    {
+      "id": "R2-18",
+      "dimension": "clarity",
+      "problem": "`archive_post` does 'Archive or unarchive', but the target state of unarchive is undefined. The current PATCH refuses archived to draft (409) for a post that was published once, and generated posts start `archived` with `publishedAt: null`.",
+      "remedy": "Define unarchive. For example: to draft when `publishedAt` is null; otherwise refused, with a pointer to `publish_post`."
+    },
+    {
+      "id": "R2-19",
+      "dimension": "clarity",
+      "problem": "Prompt text depends on the token ('`publish_post` if the token allows', 'If the token has `write`'), but prompts are static text, and nothing says whether they are rendered for each scope set or how the agent learns what its token holds.",
+      "remedy": "Say that `handlerFor(scopes)` renders prompts for the scope set, or word them as 'if `publish_post` is in your tool list'."
+    },
+    {
+      "id": "R2-20",
+      "dimension": "completeness",
+      "problem": "Blog posts have a one-way concurrency rule. `update_post` requires `version`, but the admin editor's PATCH, kept 'byte for byte', has none. An owner saving a stale editor tab therefore silently overwrites an agent's `update_post` text or attached images. The whiteboard section states its reverse rule explicitly, but the blog section does not.",
+      "remedy": "State the blog rule: either accept that the owner's save wins, with the reason, or add an optional version check to the editor PATCH and explain how that fits the 'byte for byte' extraction rule."
+    },
+    {
+      "id": "R2-21",
+      "dimension": "clarity",
+      "problem": "`loadPublicResume` in `src/lib/profile-data.ts` documents that the CV's contact details are rendered on `/cv` 'but they are never served as machine-readable JSON'. `get_me`/`get_profile` will serve them as JSON to any `read` token. Premise 5 justifies the exposure by `/cv`, but it neither acknowledges this documented invariant nor plans the comment update the house rules require.",
+      "remedy": "Acknowledge the invariant in premise 5 and add the `profile-data.ts` comment update (the token-gated MCP read as the one exception) to the phase that ships `get_me`."
+    }
+  ],
+  "prior": [
+    {
+      "id": "R1-1",
+      "status": "resolved",
+      "evidence": "The tool table has `illustrate_post` run with `publish: false` ('it never publishes'), requiring `publish` if the post is live. The services section adds the flag, and the criterion 'illustrate_post on a draft never leaves it published' tests it.",
+      "current_id": null
+    },
+    {
+      "id": "R1-2",
+      "status": "resolved",
+      "evidence": "The live-post rule says 'status is not an input to `update_post`'. `post-service` notes that the MCP never passes `status`, and the criterion '`update_post` has no `status` input at all' tests it.",
+      "current_id": null
+    },
+    {
+      "id": "R1-3",
+      "status": "resolved",
+      "evidence": "The live-post rule covers `generate_image` (attach mode), and `image-service` `attachImage()` 'revalidates if the post is live'. Covered by the write-without-publish criterion.",
+      "current_id": null
+    },
+    {
+      "id": "R1-4",
+      "status": "resolved",
+      "evidence": "'Where revalidation lives' puts invalidation inside each service for publish, live PATCH, archive, soft delete, attach and profile, and the e2e check covers every mutating blog tool. The illustrate and taxonomy gaps are new findings R2-8 and R2-16.",
+      "current_id": null
+    },
+    {
+      "id": "R1-5",
+      "status": "resolved",
+      "evidence": "Premise 7 and the request flow: `/api/mcp` accepts only `p4_`, and `wbt_` maps to the internal `whiteboard:legacy` scope, honoured only on the alias and `context.md`. The criterion 'A wbt_ token gets 401 from /api/mcp' tests it.",
+      "current_id": null
+    },
+    {
+      "id": "R1-6",
+      "status": "resolved",
+      "evidence": "The data model and routes: `/admin/agents` lists 'Legacy whiteboard tokens' and can revoke them during the alias release.",
+      "current_id": null
+    },
+    {
+      "id": "R1-7",
+      "status": "resolved",
+      "evidence": "Routes: `GET /api/whiteboard/context.md` is kept, accepting `p4_` with `read` and `wbt_` during the alias release. The scope table lists `context.md` under `read`, and the success criteria cover it.",
+      "current_id": null
+    },
+    {
+      "id": "R1-8",
+      "status": "resolved",
+      "evidence": "The `get_briefing` windows table caps the test funnel and conversion at 10 days (both windows inside the 21-day TTL) and leaves the section out with a reason for longer periods. Orders use `Payment` rows that are kept forever (`expireAt: null` on paid, verified in `payos-fulfil.ts`).",
+      "current_id": null
+    },
+    {
+      "id": "R1-9",
+      "status": "resolved",
+      "evidence": "Scene 4 now says 'no views in the last 180 days', and `list_posts` gains a `publishedAt` range, a sort by views, and a stated per-row window of 180 days.",
+      "current_id": null
+    },
+    {
+      "id": "R1-10",
+      "status": "resolved",
+      "evidence": "Premise 5: `find_order` looks up by order code only and never returns the email or the certificate name. Lookup by email is deferred until the privacy pages change (Open Question 4). A personal-data API test covers it.",
+      "current_id": null
+    },
+    {
+      "id": "R1-11",
+      "status": "resolved",
+      "evidence": "Premise 5, the tool table and Open Question 4 all agree on ONE order by order code, and email lookup is deferred.",
+      "current_id": null
+    },
+    {
+      "id": "R1-12",
+      "status": "resolved",
+      "evidence": "Step 7 and `AgentAction` audit every write tool plus `find_order`, `argsPreview` never holds an email, and the `/admin/agents` feed includes `find_order` lookups.",
+      "current_id": null
+    },
+    {
+      "id": "R1-13",
+      "status": "resolved",
+      "evidence": "Premise 5 states that the owner's own contact details are deliberately in `read` because `/cv` publishes them. The `loadPublicResume` comment in `profile-data.ts` confirms that `/cv` renders them. The undocumented JSON invariant is the new finding R2-21.",
+      "current_id": null
+    },
+    {
+      "id": "R1-14",
+      "status": "persisting",
+      "evidence": "The obligation that `update_post` refuse a body built from a truncated read is still unmet: `version` comes with every page, and the 50% shrink guard passes a page-1-only body for posts of about 24k to 48k characters. `update_profile` has no guard for paged sections.",
+      "current_id": "R2-2"
+    },
+    {
+      "id": "R1-15",
+      "status": "resolved",
+      "evidence": "The `create_draft` details define slug derivation, `isError` on a clash (soft-deleted posts included), and `clientRef` idempotency in place of slug reuse. The refinements are new findings R2-4, R2-5, R2-10 and R2-11.",
+      "current_id": null
+    },
+    {
+      "id": "R1-16",
+      "status": "resolved",
+      "evidence": "`runTool` uses try/finally, and step 7 writes one row for ok, refused (scope, invalid, rate) or error. The Audit criterion tests every outcome. Out-of-scope calls not reaching `runTool` is the new finding R2-1.",
+      "current_id": null
+    },
+    {
+      "id": "R1-17",
+      "status": "resolved",
+      "evidence": "'Whiteboard writes, Concurrent edits': `whiteboard_update_item` requires `updatedAt` and returns `isError` on a mismatch, an owner's pending save wins, and open tabs see agent items on the next load (live refresh deferred).",
+      "current_id": null
+    },
+    {
+      "id": "R1-18",
+      "status": "resolved",
+      "evidence": "'Whiteboard writes, Visibility': create only on an `includeInAi` board, at top level or inside a visible frame, and new items get `includeInAi: true`. This matches the `visible.ts`/`loadAgentVisible` rules, and a parity-test case is added.",
+      "current_id": null
+    },
+    {
+      "id": "R1-19",
+      "status": "resolved",
+      "evidence": "'Marking agent cards' uses the existing `tags` field (confirmed on `ClientItem` in `types.ts`) with the value `agent`, so there is no schema, backup, `visible.ts` or parity change. The badge is left to the design review.",
+      "current_id": null
+    },
+    {
+      "id": "R1-20",
+      "status": "resolved",
+      "evidence": "`profile-service` offers both `replaceProfile(body)` (the admin whole-body `$set`, unchanged) and `patchProfileSection`, and the existing profile route tests must pass unchanged.",
+      "current_id": null
+    },
+    {
+      "id": "R1-21",
+      "status": "resolved",
+      "evidence": "Premise 4 and the Deferred list defer `generate_post`/`runGeneration`, so no phase ships the near-300 s generation. The `illustrate_post` retry risk is the new finding R2-7.",
+      "current_id": null
+    },
+    {
+      "id": "R1-22",
+      "status": "resolved",
+      "evidence": "`generate_post` is deferred, justified by 'no scene needs it, it would make the server a second author'.",
+      "current_id": null
+    },
+    {
+      "id": "R1-23",
+      "status": "resolved",
+      "evidence": "`get_writing_brief` (a read tool) serves the same voice rules, and the `create_draft`/`lint_draft` descriptions point to it. MCP prompts states that the fallback makes Codex prompt support irrelevant.",
+      "current_id": null
+    },
+    {
+      "id": "R1-24",
+      "status": "resolved",
+      "evidence": "The Scenes success criterion now lists token creation with scopes per scene, the `export`, one `claude mcp add`, and the client timeout. The scene 3 scope error is the new finding R2-12.",
+      "current_id": null
+    },
+    {
+      "id": "R1-25",
+      "status": "resolved",
+      "evidence": "The counts are called the 'starting registry', the criteria use 'the registry's tools marked read', and Next Steps puts the Assignment's cut at phase 0.",
+      "current_id": null
+    },
+    {
+      "id": "R1-26",
+      "status": "resolved",
+      "evidence": "The Problem Statement makes scene acceptance a manual scripted check in `acceptance.md`, with deterministic behaviour in `tests/api` and `tests/e2e`.",
+      "current_id": null
+    },
+    {
+      "id": "R1-27",
+      "status": "resolved",
+      "evidence": "Cross-Model Perspective now says 'The owner accepted the challenge and switched from full rows to aggregates plus a single lookup.'",
+      "current_id": null
+    },
+    {
+      "id": "R1-28",
+      "status": "resolved",
+      "evidence": "Supersedes names the canonical `docs/designs/whiteboard/whiteboard.md` (confirmed to exist) with the other file as its cross-session copy, and explains premise 5, S1 and R3-9.",
+      "current_id": null
+    },
+    {
+      "id": "R1-29",
+      "status": "resolved",
+      "evidence": "'Where revalidation lives' uses `revalidateTag(PUBLIC_PROFILE_CACHE_TAG, 'max')`, matching `src/app/api/profile/route.ts:76` (verified).",
+      "current_id": null
+    }
+  ]
+}
