@@ -36,3 +36,8 @@ Short notes after each phase (done / next / surprises), so the work survives a c
 - Tests: `mcp-whiteboard-tools.test.ts` (10), `mcp-operator-tools.test.ts` (13), `whiteboard-export-parity.test.ts` +agent case (51), `mcp-core.test.ts` (34, pins the 23 tools); R10 `profile-route` (18) and `ccaf-route` (16) unmodified and green. e2e `taxonomy-revalidate.spec.ts` (1) + `agents.spec.ts` + `mcp-scene1.spec.ts`: 10 passed, 2 skipped (no `GOOGLE_API_KEY`). Full suite: only the 4 D6 failures.
 - Surprises: `sanitizeState` keeps the first `MAX_MOCKS` mocks, so a mock logged past the cap would have vanished on save while reporting success - `ccaf_update` refuses it instead. The taxonomy e2e goes through the admin route, since `save_taxonomy` was cut (D1); the revalidation under test lives in the shared service either way.
 - Next: phase 5 (header diagrams, `payos-fulfil.ts:17` diagram fix, AGENTS.md cross-cutting pieces; no T11), then final verification and the report.
+
+## Phase 5 - done
+
+- Done: `payos-fulfil.ts` header diagram corrected (the claim clears `Payment.expireAt`; `Attempt.expireAt` is left alone, as the code and the privacy page say - D30). AGENTS.md: `src/lib/mcp/` in Layering, plus "Site MCP" and "One service per write" (revalidation inside the service) under Cross-cutting pieces. The other T10 headers (`mcp/token.ts`, `server.ts`, `run-tool.ts`, `illustrate-run.ts`, `AgentsPopover.tsx`, `whiteboard/token.ts`, `profile-data.ts` C7, `post-service.ts`, `briefing.ts`) were rewritten in the phase that changed them and re-read here. T11 not done, by instruction.
+- Next: final verification and the report.

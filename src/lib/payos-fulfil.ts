@@ -12,9 +12,9 @@ import { PaymentModel, type PaymentDocument } from '@/models/Payment'
  * ```
  *   webhook ─┐
  *   retry   ─┼──▶ findOneAndUpdate({orderCode, status: {$ne:'paid'}})  ── exactly one wins
- *   poller  ─┘                    │
+ *   poller  ─┘                    │  the claim also sets Payment.expireAt = null (a financial record)
  *                                 ▼
- *                    Attempt.paid = true, expireAt = null
+ *                    Attempt.paid = true        expireAt untouched: answers expire on schedule
  *                                 ▼
  *                          send result email
  *                                 ▼  sent

@@ -148,6 +148,7 @@ which is where to look first:
 - `src/lib/iq/`, `src/lib/mbti/` - item banks, scoring, pricing, result emails
 - `src/lib/ccaf/` - a private study tracker under `/admin/certificates/ccaf`; `/admin/certificates` is the overview of all certificates
 - `src/lib/test-kit/` - shared shell for the two test products (nav, payment copy, effort rules)
+- `src/lib/mcp/` - the site MCP: tokens, `runTool`, the tool registry (`tools/*`), prompts, audit
 - `src/models/` - Mongoose schemas
 
 ## Cross-cutting pieces to reuse rather than re-derive
@@ -176,6 +177,25 @@ which is where to look first:
   take `PublicProfile`, not `Profile`.
 - **Class names**: `cn()` from `src/lib/utils.ts` (`twMerge(clsx(...))`). Every
   reusable component takes `className?: string` and merges it with `cn()`.
+- **Site MCP**: `/api/mcp` is the one agent front door. It takes scoped `p4_`
+  tokens (`read`, `write`, `publish`, `pii`), which are created and revoked in
+  `/admin/agents` and verified by `guardAgent` (`src/lib/mcp/token.ts`). It
+  never uses the owner cookie, and `REQUIRE_ADMIN` does not affect it.
+  - Every tool is a registry entry run through `runTool`
+    (`src/lib/mcp/run-tool.ts`). That handles the scope recheck, zod
+    validation, the `clientRef` replay, the per-token cost bucket, the response
+    budget and the `AgentAction` audit row, so a new tool gets none of these by
+    hand.
+  - `/api/whiteboard/mcp` is a legacy alias for `wbt_` tokens and is due for
+    removal (mcp-plan.md T11).
+- **One service per write**: a route handler and an MCP tool that change the same
+  data call the same function in `src/lib/<domain>/*-service.ts`. Examples are
+  `blog/post-service.ts`, `blog/taxonomy-service.ts`, `profile-service.ts` and
+  `ccaf/progress-service.ts`. Never re-implement a write inside a tool.
+  Revalidation (`revalidatePublishedPost`, `revalidatePath('/blog')`,
+  `revalidateTag`) lives **inside** the service after the write succeeds. A
+  second front door that forgot it would still return 200, and the live page
+  would stay stale until the ISR window runs out.
 
 ## Blog specifics
 
