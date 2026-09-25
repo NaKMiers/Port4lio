@@ -152,7 +152,7 @@ export default function BoardSwitcher({
         aria-label={`Board: ${title}. Rename or switch board`}
         onClick={toggle}
         data-testid="wb-board-switcher"
-        className="flex min-w-0 max-w-full items-center gap-1.5 rounded-xl px-1.5 py-1 font-display text-[17px] font-semibold tracking-[-0.01em] text-pp-text hover:bg-pp-text/5"
+        className="flex min-w-0 max-w-full items-center gap-1.5 rounded-xl px-1.5 py-1 font-display text-[15px] font-semibold tracking-[-0.01em] text-pp-text hover:bg-pp-text/5 md:text-[17px]"
       >
         {/*
           `min-w-0` is what lets this give way as the bar narrows (TopBar's header). The cap

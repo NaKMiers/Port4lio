@@ -29,9 +29,12 @@ import {
   type BoardFields,
   type BoardPatch,
   checkMergedItem,
+  DEFAULT_SHARE_UNLOCK_TTL,
   deriveInkBBox,
   isObjectIdString,
   type ShareMode,
+  SHARE_UNLOCK_SECONDS,
+  type ShareUnlockTtl,
   LIMITS,
   validateBoard,
   validateItem,
@@ -58,6 +61,14 @@ import {
   checkVocab,
   normalizeStatus,
 } from '@/lib/whiteboard/vocab'
+import {
+  decryptSharePassword,
+  encryptSharePassword,
+  hashSharePassword,
+  newAccessVersion,
+  verifySharePassword,
+  type ShareGate,
+} from '@/lib/whiteboard/share-password'
 import { getVocab } from '@/lib/whiteboard/vocab-service'
 import type { ExportLoad } from '@/lib/whiteboard/visible'
 import {
@@ -253,6 +264,10 @@ export interface ClientBoard {
   share: ShareMode
   /** The readable part of the share link, or null when the link uses the id. */
   slug: string | null
+  /** The link asks for a password. The password is only read through its own owner route. */
+  passwordSet: boolean
+  /** How long a visitor stays let in after typing it (WhiteboardBoard.ts). */
+  unlockTtl: ShareUnlockTtl
   /** Items on it, for the index page. */
   items: number
   createdAt: string
@@ -266,6 +281,8 @@ function toClientBoard(doc: WhiteboardBoardDocument, items = 0): ClientBoard {
     includeInAi: doc.includeInAi,
     share: doc.share ?? 'off',
     slug: doc.slug ?? null,
+    passwordSet: Boolean(doc.sharePasswordHash),
+    unlockTtl: doc.shareUnlockTtl ?? DEFAULT_SHARE_UNLOCK_TTL,
     items,
     createdAt: new Date(doc.createdAt).toISOString(),
     updatedAt: new Date(doc.updatedAt).toISOString(),
@@ -348,11 +365,24 @@ export async function patchBoard(
   if (!isObjectIdString(id)) return failure(404, 'Board not found.')
   // A cleared slug is removed, not stored as null: the unique index only covers boards that
   // HAVE a slug (WhiteboardBoard.ts), and a field that is simply absent keeps it that way.
-  const { slug, ...fields } = patch
-  const update: Record<string, unknown> = { $set: { ...fields } }
-  if (slug === null) update.$unset = { slug: 1 }
-  else if (slug !== undefined)
-    (update.$set as Record<string, unknown>).slug = slug
+  const { slug, password, unlockTtl, ...fields } = patch
+  const set: Record<string, unknown> = { ...fields }
+  const unset: Record<string, 1> = {}
+  if (slug === null) unset.slug = 1
+  else if (slug !== undefined) set.slug = slug
+  if (unlockTtl !== undefined) set.shareUnlockTtl = unlockTtl
+  // Any change to the password - set, changed or removed - is a new access version, which is
+  // what signs out every visitor who typed the old one (share-password.ts).
+  if (password !== undefined) set.shareAccessVersion = newAccessVersion()
+  if (password === null) {
+    unset.sharePasswordHash = 1
+    unset.sharePasswordCipher = 1
+  } else if (password !== undefined) {
+    set.sharePasswordHash = await hashSharePassword(password)
+    set.sharePasswordCipher = encryptSharePassword(password)
+  }
+  const update: Record<string, unknown> = { $set: set }
+  if (Object.keys(unset).length) update.$unset = unset
   let doc: WhiteboardBoardDocument | null
   try {
     doc = await WhiteboardBoardModel.findByIdAndUpdate(id, update, {
@@ -380,6 +410,8 @@ export interface SharedBoard {
   share: Exclude<ShareMode, 'off'>
   /** The link's own path, slug first: what "Copy link" hands out. */
   path: string
+  /** Server only: what a visitor must hold to get in, or null for no password. */
+  gate: ShareGate | null
 }
 
 /**
@@ -412,7 +444,67 @@ export async function resolveSharedBoard(
     title: doc.title ?? '',
     share: doc.share,
     path: `/whiteboard/${doc.slug ?? id}`,
+    gate: doc.sharePasswordHash
+      ? {
+          // A hash without a version is a board whose password was written before versions
+          // existed, or by hand; '' still has to match exactly, so nothing slips through.
+          version: doc.shareAccessVersion ?? '',
+          ttlSeconds:
+            SHARE_UNLOCK_SECONDS[
+              doc.shareUnlockTtl ?? DEFAULT_SHARE_UNLOCK_TTL
+            ] ?? null,
+        }
+      : null,
   }
+}
+
+/**
+ * The link's password as the owner set it, for the Share menu's eye button (owner route only).
+ * `null` with ok: no password, or one whose copy cannot be read back - set before copies were
+ * kept, or under a rotated `AUTH_SECRET` - which the menu asks the owner to type again.
+ */
+export async function getSharePassword(
+  boardId: string
+): Promise<DataResult<{ passwordSet: boolean; password: string | null }>> {
+  await connectDatabase()
+  if (!isObjectIdString(boardId)) return failure(404, 'Board not found.')
+  const doc = await WhiteboardBoardModel.findById(boardId, {
+    sharePasswordHash: 1,
+    sharePasswordCipher: 1,
+  }).lean()
+  if (!doc) return failure(404, 'Board not found.')
+  return {
+    ok: true,
+    value: {
+      passwordSet: Boolean(doc.sharePasswordHash),
+      password:
+        doc.sharePasswordHash && doc.sharePasswordCipher
+          ? decryptSharePassword(doc.sharePasswordCipher)
+          : null,
+    },
+  }
+}
+
+/**
+ * The password check behind a share link's form. Reads the hash here, on its own, so the
+ * lookup every other request makes (`resolveSharedBoard`) never carries it at all. The
+ * version comes back from the SAME read as the hash, so the cookie signed with it is for
+ * the password that was just checked, even if the owner changes it a moment later.
+ * `unprotected` is a board with no password - the form had nothing to guard.
+ */
+export async function checkSharedBoardPassword(
+  boardId: string,
+  password: string
+): Promise<'unprotected' | 'wrong' | { version: string }> {
+  await connectDatabase()
+  const doc = await WhiteboardBoardModel.findById(boardId, {
+    sharePasswordHash: 1,
+    shareAccessVersion: 1,
+  }).lean()
+  if (!doc?.sharePasswordHash) return 'unprotected'
+  return (await verifySharePassword(password, doc.sharePasswordHash))
+    ? { version: doc.shareAccessVersion ?? '' }
+    : 'wrong'
 }
 
 /**

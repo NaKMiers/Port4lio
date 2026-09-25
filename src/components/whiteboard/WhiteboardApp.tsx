@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
-import { Eye, Undo2 } from 'lucide-react'
+import { Eye, Undo2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
@@ -22,7 +22,6 @@ import {
   type TransientMap,
 } from '@/components/whiteboard/canvas-state'
 import Inspector from '@/components/whiteboard/Inspector'
-import SaveControls from '@/components/whiteboard/SaveControls'
 import SavePill from '@/components/whiteboard/SavePill'
 import { CopyLinkButton, ShareMenu } from '@/components/whiteboard/ShareMenu'
 import ShortcutsHelp from '@/components/whiteboard/ShortcutsHelp'
@@ -61,11 +60,25 @@ import type { VocabKind } from '@/lib/whiteboard/vocab'
  *   │ TopBar: [grid] Whiteboard (pill)   [N hidden] [Backup] [Export]            │
  *   ├────────────────────────────────────────────────────────────┬──────────────┤
  *   │ ToolRail   Canvas (React Flow, dot grid)                   │ Inspector    │
- *   │ Zoom                                    Export sheet (DR3) │ 320px (lg)   │
+ *   │                   Export sheet (DR3)  Zoom + lock (right) │ 320px (lg)   │
  *   └────────────────────────────────────────────────────────────┴──────────────┘
- *     md: inspector becomes a bottom sheet    sm: + the rail lies along the top (DR8)
+ *     md: inspector becomes a bottom sheet (60dvh)
+ *     sm: + the rail lies along the top and folds away; the inspector covers the whole
+ *         canvas, header to bottom edge, with a close button (DR8)
  *     every tier has every tool; a finger (not the width) changes the gestures (Canvas.tsx)
  * ```
+ *
+ * ## Locked (the lock beside the zoom)
+ *
+ * `frozen` is `readOnly || locked`, and everything here checks it in place of `readOnly`:
+ * the canvas (no drag, resize, link, create or select), create, delete, nudge, the tool
+ * keys, undo/redo and the inline editors (`ui.readOnly`). So a locked board is a view link
+ * for as long as the lock is on: pan and zoom, nothing else. Nothing selects either, so no
+ * inspector opens - the owner asked for that (2026-09-25): a tap on a locked board is for
+ * looking, and a sheet over the whole phone screen is the opposite of looking. Locking
+ * clears the selection for the same reason. Undo is frozen too: stepping history back is an
+ * edit, and a locked board promised none. Save and Export stay live, because neither
+ * changes the board.
  *
  * ## Keyboard (DR9)
  *
@@ -189,6 +202,10 @@ function WhiteboardShell({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const readOnly = load.phase !== 'ready' || viewOnly
+  const [locked, setLocked] = useState(false)
+  const frozen = readOnly || locked
+  // Below md only (the horizontal rail): the tools fold away behind one button.
+  const [railOpen, setRailOpen] = useState(true)
   const empty = load.phase === 'ready' && Object.keys(data.items).length === 0
   const setTool = useCallback((next: Tool) => {
     setBoxSelect(false)
@@ -212,7 +229,7 @@ function WhiteboardShell({
   const create = useCallback(
     (which: Tool, at: { x: number; y: number }) => {
       const spec = CREATE_FORM[which]
-      if (!spec || readOnly) return
+      if (!spec || frozen) return
       const half = HALF[spec.form]
       const topLeft = {
         x: Math.round(at.x - half.x),
@@ -229,7 +246,7 @@ function WhiteboardShell({
       setToolState('select')
       setEditingId(id)
     },
-    [actions, readOnly, selectOnly]
+    [actions, frozen, selectOnly]
   )
 
   const viewCentre = useCallback(() => {
@@ -261,7 +278,7 @@ function WhiteboardShell({
 
   /** "Add sample data" (D33): a board's worth of cards around the middle of the view. */
   const addMock = useCallback(() => {
-    if (readOnly || !isOwner) return
+    if (frozen || !isOwner) return
     const ids = actions.addMock(viewCentre())
     setSurface(null)
     selectOnly([])
@@ -273,13 +290,13 @@ function WhiteboardShell({
         padding: 0.2,
       })
     )
-  }, [actions, flow, isOwner, readOnly, selectOnly, viewCentre])
+  }, [actions, flow, frozen, isOwner, selectOnly, viewCentre])
 
   // MARK: Undo / redo (D30)
 
   const stepHistory = useCallback(
     (which: 'undo' | 'redo') => {
-      if (readOnly) return
+      if (frozen) return
       const plan =
         which === 'undo' ? board.history.undo() : board.history.redo()
       // Cards that came back are selected, so the inspector is on what just reappeared and
@@ -287,14 +304,15 @@ function WhiteboardShell({
       if (plan?.createItems.length)
         selectOnly(plan.createItems.map(item => item._id))
     },
-    [board.history, readOnly, selectOnly]
+    [board.history, frozen, selectOnly]
   )
   const undoStep = useCallback(() => stepHistory('undo'), [stepHistory])
+  const redoStep = useCallback(() => stepHistory('redo'), [stepHistory])
 
   // MARK: Delete (R3-7, R3-19, D30)
 
   const deleteSelection = useCallback(() => {
-    if (readOnly) return
+    if (frozen) return
     const plan = deletePlan(selection, data)
     if (!plan) return
     if (plan.kind === 'links') actions.deleteLinks(plan.ids)
@@ -306,7 +324,7 @@ function WhiteboardShell({
     clearSelection()
     // After the actions: each of them clears a stale Undo toast as it records its own step.
     board.setNotice({ text: deletedText(plan), undo: undoStep })
-  }, [actions, board, clearSelection, data, readOnly, selection, undoStep])
+  }, [actions, board, clearSelection, data, frozen, selection, undoStep])
 
   const erase = useCallback(
     (id: string) => actions.deleteItems([id]),
@@ -337,18 +355,18 @@ function WhiteboardShell({
       if (!action) return
       switch (action.type) {
         case 'edit':
-          if (readOnly) return
+          if (frozen) return
           event.preventDefault()
           selectOnly([action.id])
           setEditingId(action.id)
           return
         case 'nudge':
-          if (readOnly || !selection.nodes.length) return
+          if (frozen || !selection.nodes.length) return
           event.preventDefault()
           nudge(action.dx, action.dy)
           return
         case 'tool':
-          if (readOnly) return
+          if (frozen) return
           event.preventDefault()
           setTool(action.tool)
           return
@@ -396,7 +414,7 @@ function WhiteboardShell({
     const onFocusIn = (event: FocusEvent) => {
       const id = canvasNodeId(event.target)
       const el = event.target as HTMLElement
-      if (!id || readOnly || !el.matches?.(':focus-visible')) return
+      if (!id || frozen || !el.matches?.(':focus-visible')) return
       if (selection.nodes.length === 1 && selection.nodes[0] === id) return
       selectOnly([id])
     }
@@ -411,6 +429,7 @@ function WhiteboardShell({
     clearSelection,
     deleteSelection,
     empty,
+    frozen,
     helpOpen,
     nudge,
     openExport,
@@ -441,7 +460,8 @@ function WhiteboardShell({
     () => ({
       actions,
       tool,
-      readOnly,
+      // The nodes' own editors and resize handles: locked is as good as read-only to them.
+      readOnly: frozen,
       editingId,
       setEditingId,
       editingEdgeId,
@@ -451,7 +471,7 @@ function WhiteboardShell({
         requestAnimationFrame(() => document.getElementById('wb-body')?.focus())
       },
     }),
-    [actions, editingEdgeId, editingId, readOnly, selectOnly, tool]
+    [actions, editingEdgeId, editingId, frozen, selectOnly, tool]
   )
 
   // The pulse class is on only for the length of the animation (900ms, whiteboard.css).
@@ -484,11 +504,21 @@ function WhiteboardShell({
       onExportSelection={isOwner ? () => openExport('selection') : undefined}
       onUnhideFrame={(frame, readable) => setUnhide({ frame, readable })}
       onManageVocab={isOwner ? setVocabKind : undefined}
-      readOnly={readOnly}
+      readOnly={frozen}
       aiControls={isOwner}
     />
   )
   const hasSelection = selection.nodes.length + selection.edges.length > 0
+
+  const toggleLock = useCallback(() => {
+    setLocked(on => !on)
+    // Whatever was mid-edit, mid-tool or selected lets go, so locking never leaves an editor
+    // or an inspector open on a board that now refuses both.
+    setTool('select')
+    setEditingId(null)
+    setEditingEdgeId(null)
+    clearSelection()
+  }, [clearSelection, setTool])
   /**
    * Writes that leaving would lose. A write that is merely queued under auto-save is not one
    * of them: it goes out on unmount and finishes during the navigation. One that is held
@@ -551,16 +581,16 @@ function WhiteboardShell({
                 />
               )
             }
-            saveControls={
-              viewOnly ? undefined : (
-                <SaveControls
-                  autoSave={board.autoSave}
-                  onAutoSave={board.setAutoSave}
-                  onSave={board.saveNow}
-                  pending={board.status.pending}
-                  disabled={readOnly}
-                />
-              )
+            save={
+              viewOnly
+                ? undefined
+                : {
+                    autoSave: board.autoSave,
+                    onAutoSave: board.setAutoSave,
+                    onSave: board.saveNow,
+                    pending: board.status.pending,
+                    disabled: readOnly,
+                  }
             }
             hiddenCount={
               // "Hidden from AI" is the owner's business, not a visitor's (access.ts).
@@ -599,6 +629,8 @@ function WhiteboardShell({
                 />
               )
             }
+            onOpenShare={isOwner ? () => setSurface('share') : undefined}
+            onOpenBackup={isOwner ? () => setSurface('backup') : undefined}
             share={
               access.kind === 'shared' ? (
                 <CopyLinkButton path={access.path} />
@@ -619,7 +651,7 @@ function WhiteboardShell({
                   onToggle={open => setSurface(open ? 'backup' : null)}
                   onRestore={pickRestoreFile}
                   onMock={addMock}
-                  mockDisabled={readOnly}
+                  mockDisabled={frozen}
                   beforeDownload={() => board.queue.flush()}
                   heldWrites={board.status.holding ? board.status.pending : 0}
                 />
@@ -645,12 +677,28 @@ function WhiteboardShell({
               <ToolRail
                 tool={tool}
                 onTool={setTool}
-                disabled={readOnly}
+                disabled={frozen}
                 large={tier !== 'lg' || coarse}
                 horizontal={tier === 'sm'}
                 boxSelect={
                   coarse
                     ? { on: boxSelect, onToggle: toggleBoxSelect }
+                    : undefined
+                }
+                // Where there may be no keyboard for Cmd/Ctrl+Z (ToolRail).
+                history={
+                  tier !== 'lg' || coarse
+                    ? {
+                        onUndo: undoStep,
+                        onRedo: redoStep,
+                        canUndo: board.history.canUndo,
+                        canRedo: board.history.canRedo,
+                      }
+                    : undefined
+                }
+                collapse={
+                  tier === 'sm'
+                    ? { open: railOpen, onToggle: () => setRailOpen(o => !o) }
                     : undefined
                 }
               />
@@ -659,7 +707,7 @@ function WhiteboardShell({
             <Canvas
               board={board}
               tool={tool}
-              readOnly={readOnly}
+              readOnly={frozen}
               aiStyling={isOwner}
               coarse={coarse}
               boxSelect={boxSelect}
@@ -674,10 +722,16 @@ function WhiteboardShell({
               onCreate={create}
               onErase={erase}
             >
-              <ZoomControls />
+              <ZoomControls
+                lock={
+                  viewOnly
+                    ? undefined
+                    : { on: locked, onToggle: toggleLock, disabled: readOnly }
+                }
+              />
             </Canvas>
 
-            {tool === 'pen' && !readOnly ? (
+            {tool === 'pen' && !frozen ? (
               <InkLayer
                 onStroke={(points, origin) => actions.addInk(points, origin)}
               />
@@ -707,7 +761,9 @@ function WhiteboardShell({
               <div
                 role="status"
                 data-testid="wb-notice"
-                className="absolute bottom-3.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-pp-line bg-pp-panel-strong px-4 py-2 text-[12.5px] text-pp-text shadow-panel"
+                // Above the zoom cluster, not beside it: on a phone, and on a narrow lg canvas
+                // next to the inspector, the two are wider together than the board.
+                className="absolute bottom-[4.75rem] left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full border border-pp-line bg-pp-panel-strong px-4 py-2 text-[12.5px] text-pp-text shadow-panel lg:bottom-16"
               >
                 {board.notice.text}
                 {board.notice.undo ? (
@@ -740,10 +796,36 @@ function WhiteboardShell({
             </div>
           ) : hasSelection ? (
             <div
-              className="absolute inset-x-0 bottom-0 z-30 max-h-[60dvh] overflow-y-auto rounded-t-[1.4rem] border-t border-pp-line bg-pp-panel-strong pb-[env(safe-area-inset-bottom)] shadow-panel"
+              className={cn(
+                'z-30 overflow-y-auto border-pp-line bg-pp-panel-strong pb-[env(safe-area-inset-bottom)] shadow-panel',
+                // A phone: the canvas's whole cell, header to bottom edge. A 60dvh sheet
+                // left a strip of board too thin to use and a form too short to fill in.
+                tier === 'sm'
+                  ? 'relative col-start-1 row-start-2 min-h-0'
+                  : 'absolute inset-x-0 bottom-0 max-h-[60dvh] rounded-t-[1.4rem] border-t',
+                // The Export sheet's entrance (whiteboard.css), so the two sheets arrive alike.
+                // Only on appearing: the sheet stays mounted while the selection moves from one
+                // card to the next, so picking another card does not replay it.
+                !reducedMotion && 'animate-[wb-sheet-up_180ms_ease-out]'
+              )}
               role="dialog"
               aria-label="Inspector"
             >
+              {/* Outside the inspector's fieldset, so a board still loading can close it. */}
+              <div className="sticky top-0 z-10 flex justify-end bg-pp-panel-strong/95 px-2 pt-2 backdrop-blur-sm">
+                <button
+                  type="button"
+                  aria-label="Close inspector"
+                  title="Close"
+                  onClick={clearSelection}
+                  className="grid h-10 w-10 place-items-center rounded-full text-pp-muted hover:bg-pp-text/5 hover:text-pp-text"
+                >
+                  <X
+                    aria-hidden
+                    size={18}
+                  />
+                </button>
+              </div>
               {inspector}
             </div>
           ) : null}

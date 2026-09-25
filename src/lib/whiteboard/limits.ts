@@ -692,11 +692,76 @@ export function validateSlug(input: unknown): Verdict<string> {
   return { ok: true, value: slug }
 }
 
-/** A board patch: the fields above, plus how it is shared. `slug: null` clears it. */
+/**
+ * How long a visitor who typed a share link's password stays let in (WhiteboardBoard.ts).
+ * Counted from the moment they typed it, against the board's CURRENT setting - so the owner
+ * shortening it cuts sessions already open, and lengthening it stretches them.
+ */
+export const SHARE_UNLOCK_TTLS = [
+  '10m',
+  '1h',
+  '1d',
+  '2d',
+  '7d',
+  '30d',
+  'unlimited',
+] as const
+export type ShareUnlockTtl = (typeof SHARE_UNLOCK_TTLS)[number]
+export const DEFAULT_SHARE_UNLOCK_TTL: ShareUnlockTtl = '1d'
+
+/** Seconds per setting; `null` is "until the password changes". */
+export const SHARE_UNLOCK_SECONDS: Record<ShareUnlockTtl, number | null> = {
+  '10m': 10 * 60,
+  '1h': 60 * 60,
+  '1d': 24 * 60 * 60,
+  '2d': 2 * 24 * 60 * 60,
+  '7d': 7 * 24 * 60 * 60,
+  '30d': 30 * 24 * 60 * 60,
+  unlimited: null,
+}
+
+export const SHARE_UNLOCK_LABELS: Record<ShareUnlockTtl, string> = {
+  '10m': '10 minutes',
+  '1h': '1 hour',
+  '1d': '1 day',
+  '2d': '2 days',
+  '7d': '7 days',
+  '30d': '30 days',
+  unlimited: 'Until the password changes',
+}
+
+export const SHARE_PASSWORD_MIN = 4
+export const SHARE_PASSWORD_MAX = 128
+
+/**
+ * A share link's password, as typed. Not trimmed: a password is exactly the characters in
+ * it, and a space the owner meant would otherwise be one the visitor can never match.
+ */
+export function validateSharePassword(input: unknown): Verdict<string> {
+  if (typeof input !== 'string') return fail('password must be a string.')
+  if (input.length < SHARE_PASSWORD_MIN || input.length > SHARE_PASSWORD_MAX)
+    return fail(
+      `The password must be ${SHARE_PASSWORD_MIN}-${SHARE_PASSWORD_MAX} characters.`
+    )
+  return { ok: true, value: input }
+}
+
+/**
+ * A board patch: the fields above, plus how it is shared. `slug: null` clears it, and so
+ * does `password: null` - there the link opens without one again.
+ */
 export type BoardPatch = Partial<BoardFields> & {
   share?: ShareMode
   slug?: string | null
+  password?: string | null
+  unlockTtl?: ShareUnlockTtl
 }
+
+/** What the Share menu may change about a board (the rest of `BoardPatch` is not its to set). */
+export type SharePatch = Pick<
+  BoardPatch,
+  'share' | 'slug' | 'password' | 'unlockTtl'
+>
 
 export function validateBoardPatch(input: unknown): Verdict<BoardPatch> {
   const raw = (input ?? {}) as Record<string, unknown>
@@ -727,6 +792,19 @@ export function validateBoardPatch(input: unknown): Verdict<BoardPatch> {
     const slug = validateSlug(raw.slug)
     if (!slug.ok) return slug
     patch.slug = slug.value
+  }
+  // Only null clears a password. An empty string is refused rather than read as "clear", so
+  // a form that sent an untouched field can never take the password off by accident.
+  if ('password' in raw && raw.password === null) patch.password = null
+  else if ('password' in raw) {
+    const password = validateSharePassword(raw.password)
+    if (!password.ok) return password
+    patch.password = password.value
+  }
+  if ('unlockTtl' in raw) {
+    if (!SHARE_UNLOCK_TTLS.includes(raw.unlockTtl as ShareUnlockTtl))
+      return fail(`unlockTtl must be one of ${SHARE_UNLOCK_TTLS.join(', ')}.`)
+    patch.unlockTtl = raw.unlockTtl as ShareUnlockTtl
   }
   if (Object.keys(patch).length === 0) return fail('Nothing to update.')
   return { ok: true, value: patch }

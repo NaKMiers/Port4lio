@@ -1,6 +1,6 @@
 import type { SaveOp, SendResult } from '@/components/whiteboard/save-queue'
 import type { ClientBoard } from '@/lib/whiteboard/data'
-import type { ShareMode } from '@/lib/whiteboard/limits'
+import type { ShareMode, ShareUnlockTtl } from '@/lib/whiteboard/limits'
 import type { RestoreBatchResult } from '@/lib/whiteboard/types'
 import type { Vocab, VocabKind } from '@/lib/whiteboard/vocab'
 
@@ -176,6 +176,15 @@ export async function createBoardApi(title: string): Promise<ClientBoard> {
   return (await res.json()).board
 }
 
+/** The share link's password, for the owner's Share menu (null: none, or unreadable). */
+export async function getBoardPasswordApi(
+  id: string
+): Promise<{ passwordSet: boolean; password: string | null }> {
+  const res = await call(`${API}/boards/${id}/password`)
+  if (!res.ok) throw new Error(await errorMessage(res))
+  return res.json()
+}
+
 export async function patchBoardApi(
   id: string,
   patch: {
@@ -184,6 +193,9 @@ export async function patchBoardApi(
     share?: ShareMode
     /** '' or null clears it, and the link falls back to the board id. */
     slug?: string | null
+    /** null removes it; any change signs every visitor out (share-password.ts). */
+    password?: string | null
+    unlockTtl?: ShareUnlockTtl
   }
 ): Promise<ClientBoard> {
   const res = await call(`${API}/boards/${id}`, {

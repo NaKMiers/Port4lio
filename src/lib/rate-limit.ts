@@ -208,6 +208,19 @@ export const WHITEBOARD_SHARE_READ_LIMIT: RateLimitOptions = {
 }
 
 /**
+ * Password tries on a whiteboard share link's form (share-password.ts). Ten per quarter
+ * hour per caller is plenty for someone mistyping and nowhere near enough to guess even a
+ * short password: at that rate a four-digit PIN takes over two weeks. It is its own bucket
+ * so that a visitor who is simply reading the board never uses up their tries, and so the
+ * tries cannot be spent through the far looser read bucket.
+ */
+export const WHITEBOARD_SHARE_UNLOCK_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-share-unlock',
+  limit: 10,
+  windowSeconds: 15 * 60,
+}
+
+/**
  * The contact form. The tightest bucket here, and the window is an hour rather than a
  * minute.
  *

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { ClientBoard } from '@/lib/whiteboard/data'
-import type { ShareMode } from '@/lib/whiteboard/limits'
+import type { SharePatch } from '@/lib/whiteboard/limits'
 import {
   createBoardApi,
   deleteBoardApi,
@@ -33,10 +33,7 @@ export interface BoardsState {
   rename: (id: string, title: string) => Promise<void>
   setIncludeInAi: (id: string, includeInAi: boolean) => Promise<void>
   /** Who the link lets in, and/or its readable name (`null` clears it). */
-  setSharing: (
-    id: string,
-    patch: { share?: ShareMode; slug?: string | null }
-  ) => Promise<void>
+  setSharing: (id: string, patch: SharePatch) => Promise<void>
   remove: (id: string) => Promise<void>
 }
 
@@ -91,12 +88,9 @@ export function useBoards({ enabled = true } = {}): BoardsState {
     []
   )
 
-  const setSharing = useCallback(
-    async (id: string, patch: { share?: ShareMode; slug?: string | null }) => {
-      replace(await patchBoardApi(id, patch))
-    },
-    []
-  )
+  const setSharing = useCallback(async (id: string, patch: SharePatch) => {
+    replace(await patchBoardApi(id, patch))
+  }, [])
 
   const remove = useCallback(async (id: string) => {
     await deleteBoardApi(id)

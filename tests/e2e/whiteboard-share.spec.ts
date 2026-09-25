@@ -14,7 +14,7 @@ import { STORAGE_STATE } from './global-setup'
  * is the owner's canvas, read-only or editable, and nothing else.
  *
  * ```
- *   owner: new board + a card ──▶ Share menu: Can view, link name ──▶ visitor sees it, can't edit
+ *   owner: new board + a card ──▶ Share menu: Can view, link name, Share ──▶ visitor sees it, can't edit
  *   owner: edit (API)          ──▶ visitor adds a card             ──▶ owner's stream has it
  *   owner: off (API)           ──▶ visitor gets a 404
  * ```
@@ -102,8 +102,12 @@ test('(1) the owner shares view-only from the menu; a visitor sees the board and
     'true'
   )
   await panel.getByLabel('Link name').fill(SLUG)
-  await panel.getByRole('button', { name: 'Save' }).click()
-  await expect(panel.getByRole('button', { name: 'Save' })).toBeDisabled()
+  // Choices are drafts: nothing is shared until the Share button.
+  await expect(panel.getByTestId('wb-share-copy')).toBeDisabled()
+  await panel.getByTestId('wb-share-apply').click()
+  await expect(panel.getByTestId('wb-share-state')).toHaveText(/Shared/)
+  await expect(panel.getByTestId('wb-share-apply')).toHaveText('Update')
+  await expect(panel.getByTestId('wb-share-apply')).toBeDisabled()
   await expect(panel.getByTestId('wb-share-copy')).toBeEnabled()
 
   const context = await visitor(browser)
