@@ -60,6 +60,8 @@ import type { VocabKind } from '@/lib/whiteboard/vocab'
  *   │ TopBar: [grid] Whiteboard (pill)   [N hidden] [Backup] [Export]            │
  *   ├────────────────────────────────────────────────────────────┬──────────────┤
  *   │ ToolRail   Canvas (React Flow, dot grid)                   │ Inspector    │
+ *   │                                                            │ (only while  │
+ *   │                                                            │  selected)   │
  *   │                   Export sheet (DR3)  Zoom + lock (right) │ 320px (lg)   │
  *   └────────────────────────────────────────────────────────────┴──────────────┘
  *     md: inspector becomes a bottom sheet (60dvh)
@@ -550,7 +552,9 @@ function WhiteboardShell({
         <div
           className={cn(
             'relative grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-panel border border-pp-line bg-[rgba(251,248,244,0.97)] shadow-panel backdrop-blur-md',
-            tier === 'lg' && !viewOnly
+            // The column is there only while something is selected: "Nothing selected" and a
+            // shortcut list took 320px of canvas on every visit (the list is still on `?`).
+            tier === 'lg' && !viewOnly && hasSelection
               ? 'grid-cols-[minmax(0,1fr)_320px]'
               : 'grid-cols-1'
           )}
@@ -790,11 +794,11 @@ function WhiteboardShell({
             ) : null}
           </section>
 
-          {viewOnly ? null : tier === 'lg' ? (
+          {viewOnly || !hasSelection ? null : tier === 'lg' ? (
             <div className="col-start-2 row-start-2 min-h-0 overflow-y-auto border-l border-pp-line bg-white/70">
               {inspector}
             </div>
-          ) : hasSelection ? (
+          ) : (
             <div
               className={cn(
                 'z-30 overflow-y-auto border-pp-line bg-pp-panel-strong pb-[env(safe-area-inset-bottom)] shadow-panel',
@@ -828,7 +832,7 @@ function WhiteboardShell({
               </div>
               {inspector}
             </div>
-          ) : null}
+          )}
 
           {surface === 'export' && isOwner ? (
             <ExportSheet
