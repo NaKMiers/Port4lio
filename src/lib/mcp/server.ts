@@ -17,6 +17,7 @@ import { LEGACY_SCOPE, type TokenScope } from '@/lib/mcp/scopes'
 import type { AgentContext } from '@/lib/mcp/token'
 import { BLOG_TOOLS } from '@/lib/mcp/tools/blog'
 import { CLOUDINARY_TOOLS } from '@/lib/mcp/tools/cloudinary'
+import { CV_TOOLS } from '@/lib/mcp/tools/cv'
 import {
   getMeTool,
   getProfileTool,
@@ -162,7 +163,8 @@ export interface ServerSpec {
  * Cloudinary asset tools added after the Assignment (`tools/cloudinary.ts`) and the two
  * whiteboard composition tools (`whiteboard_compose`, `whiteboard_arrange`), less the two
  * CCA-F tools (`ccaf_status`, `ccaf_update`). Certificates will grow past CCA-F, so a
- * per-certificate tool pair was the wrong shape; nothing replaces them yet.
+ * per-certificate tool pair was the wrong shape; nothing replaces them yet. Plus the six CV
+ * tools (`tools/cv.ts`, multi-cv-plan.md Phase 2).
  */
 export const SITE_SERVER: ServerSpec = {
   name: 'port4lio',
@@ -171,6 +173,7 @@ export const SITE_SERVER: ServerSpec = {
     getMeTool,
     getProfileTool,
     updateProfileTool,
+    ...CV_TOOLS,
     ...BLOG_TOOLS,
     ...METRICS_TOOLS,
     ...CLOUDINARY_TOOLS,
@@ -184,6 +187,9 @@ export const SITE_SERVER: ServerSpec = {
       'Your tool list is exactly what this token allows; a tool you do not see is not available to you.',
       'Errors come back as tool results that say how to fix the call.',
       tools.has('get_me') ? 'For "who am I", call get_me first.' : '',
+      tools.has('create_cv')
+        ? 'The owner keeps several CVs and /cv prints the published one. To tailor a CV, copy it (create_cv) and edit the copy (update_cv, or the tailor-cv prompt); publish only when the owner asks.'
+        : '',
       tools.has('create_draft')
         ? 'To write a post, read get_writing_brief (or use the write-post prompt) and follow its loop; drafts never publish themselves.'
         : '',

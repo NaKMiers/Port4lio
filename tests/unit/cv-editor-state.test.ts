@@ -11,8 +11,11 @@ import {
   isDirty,
   loaded,
   markStale,
+  needsFitCheck,
+  orphaned,
   published,
   renamed,
+  rescued,
   saved,
   selected,
   type CvEditorState,
@@ -30,6 +33,8 @@ import type { CvDto } from '@/types/cv'
  *   discard     re-selecting the CV drops the draft                                (D4)
  *   delete      the published CV is selected afterwards
  *   upload lock picker, New, Delete, Publish off while the CV photo uploads       (OV-6)
+ *   agent edit  fitVerified false ──▶ the fit banner, until the owner's Save CV     (P2-A)
+ *   404 rescue  Save CV found the CV deleted ──▶ draft kept, dirty, Save as new CV (P2-D)
  * ```
  */
 
@@ -43,6 +48,7 @@ const cv = (
   resume: { ...makeEmptyResume(), name },
   publishedAt: null,
   updatedAt,
+  fitVerified: true,
 })
 
 const LIST = {
@@ -268,5 +274,124 @@ describe('action gates', () => {
     const empty = gates(initialCvEditorState())
     expect(empty.canSave).toBe(false)
     expect(empty.canCreate).toBe(false)
+  })
+})
+
+describe('agent-edit fit banner (P2-A)', () => {
+  const agentEdited = (): CvEditorState =>
+    loaded(initialCvEditorState(), {
+      ...LIST,
+      cvs: [LIST.cvs[0], LIST.cvs[1], { ...LIST.cvs[2], fitVerified: false }],
+    })
+
+  it('shows for a CV an agent wrote, and only for that CV', () => {
+    expect(needsFitCheck(ready())).toBe(false)
+    const state = selected(agentEdited(), 'c')
+    expect(needsFitCheck(state)).toBe(true)
+    expect(needsFitCheck(selected(state, 'a'))).toBe(false)
+  })
+
+  it("does not dirty the CV by itself: the owner's plain Save CV is enough to clear it", () => {
+    const state = selected(agentEdited(), 'c')
+    expect(isDirty(state)).toBe(false)
+    expect(gates(state).canSave).toBe(true)
+
+    const server = { ...cv('c', 'Charlie', '2026-09-25T12:00:00.000Z') }
+    expect(server.fitVerified).toBe(true)
+    expect(needsFitCheck(saved(state, server))).toBe(false)
+  })
+
+  it('an on-open refit of the agent CV raises both notices, and Save CV clears both', () => {
+    const fitted = autoFitted(selected(agentEdited(), 'c'), {
+      sectionIndex: 0,
+      projectIndex: 1,
+      highlightsOnFirstSheet: 2,
+    })
+    expect(needsFitCheck(fitted)).toBe(true)
+    expect(fitted.refitted).toBe(true)
+
+    const after = saved(fitted, {
+      ...cv('c', 'Charlie', '2026-09-25T12:00:00.000Z'),
+      resume: fitted.draft!,
+    })
+    expect(needsFitCheck(after)).toBe(false)
+    expect(after.refitted).toBe(false)
+  })
+})
+
+describe('404 rescue: Save as new CV (P2-D)', () => {
+  const lost = () => orphaned(rename(selected(ready(), 'c'), 'Unsaved work'))
+
+  it('keeps the draft and counts it as unsaved, even when it matches the lost snapshot', () => {
+    const state = lost()
+    expect(state.orphaned).toBe(true)
+    expect(state.draft?.name).toBe('Unsaved work')
+    expect(isDirty(state)).toBe(true)
+
+    const clean = orphaned(selected(ready(), 'c'))
+    expect(deepEqual(clean.draft, clean.snapshot)).toBe(true)
+    expect(isDirty(clean)).toBe(true)
+    // The fit banner gives way to the deleted notice.
+    expect(needsFitCheck(clean)).toBe(false)
+  })
+
+  it('only Save as new CV (and leaving) stays on: no Save CV, Rename, New, Delete or Publish', () => {
+    const g = gates(lost())
+    expect(g.canSaveAsNew).toBe(true)
+    expect(g.canSave).toBe(false)
+    expect(g.saveTitle).toMatch(/Save as new CV/)
+    expect(g.canRename).toBe(false)
+    expect(g.canCreate).toBe(false)
+    expect(g.canDelete).toBe(false)
+    expect(g.canPublish).toBe(false)
+    expect(g.canSelect).toBe(true)
+
+    expect(gates(lost(), { busy: true }).canSaveAsNew).toBe(false)
+    expect(gates(lost(), { uploadingCvPhoto: true }).canSaveAsNew).toBe(false)
+    expect(gates(ready()).canSaveAsNew).toBe(false)
+  })
+
+  it('rescued: the deleted CV leaves the list, the new one is selected with the draft saved', () => {
+    const state = lost()
+    const sent = state.draft!
+    const server = {
+      ...cv('d', 'Unsaved work', '2026-09-25T14:00:00.000Z'),
+      resume: { ...sent },
+    }
+
+    const next = rescued(state, server, sent)
+
+    expect(next.cvs.map(item => item.id)).toEqual(['a', 'b', 'd'])
+    expect(next.selectedId).toBe('d')
+    expect(next.draft?.name).toBe('Unsaved work')
+    expect(next.base).toBe('2026-09-25T14:00:00.000Z')
+    expect(next.orphaned).toBe(false)
+    expect(isDirty(next)).toBe(false)
+  })
+
+  it('rescued: edits typed while the create was in flight are kept, and stay dirty', () => {
+    const state = lost()
+    const sent = state.draft!
+    const typedSince = rename(state, 'Unsaved work, and more')
+    const server = { ...cv('d', 'Unsaved work'), resume: { ...sent } }
+
+    const next = rescued(typedSince, server, sent)
+
+    expect(next.draft?.name).toBe('Unsaved work, and more')
+    expect(next.snapshot?.name).toBe('Unsaved work')
+    expect(isDirty(next)).toBe(true)
+  })
+
+  it('leaving the orphaned CV (after the discard confirm) drops it from the list', () => {
+    const next = selected(lost(), 'a')
+    expect(next.cvs.map(item => item.id)).toEqual(['a', 'b'])
+    expect(next.orphaned).toBe(false)
+    expect(isDirty(next)).toBe(false)
+  })
+
+  it("Reload clears it: the server's list no longer has the CV", () => {
+    const next = loaded(lost(), { ...LIST, cvs: [LIST.cvs[0], LIST.cvs[1]] })
+    expect(next.orphaned).toBe(false)
+    expect(next.selectedId).toBe('b')
   })
 })

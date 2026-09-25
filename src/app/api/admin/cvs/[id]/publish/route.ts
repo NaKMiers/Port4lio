@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const result = await publishCv(id)
     if (!result.ok) return serviceErrorResponse(result)
-    return NextResponse.json(result.value)
+    return NextResponse.json({ publishedId: result.value.publishedId })
   } catch (error) {
     console.error('[api/admin/cvs/[id]/publish] publish failed', error)
     return jsonError('Unable to publish the CV right now.', 500)

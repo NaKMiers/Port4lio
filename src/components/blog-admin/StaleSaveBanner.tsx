@@ -24,8 +24,8 @@ const TEST_ID: Record<NonNullable<Props['subject']>, string> = {
  * Shown when Save was refused because the post changed after this tab loaded it (R9) -
  * almost always an agent's `update_post` or an image run through the site MCP. The settings
  * editor shows it too (`subject="profile"`), for an agent's `update_profile`, and the CV tab
- * (`subject="cv"`) for a CV saved in another tab. Agents never write CVs (R8), so the CV copy
- * does not blame one.
+ * (`subject="cv"`) for a CV saved in another tab or by an agent's `update_cv` (agents write
+ * CVs since multi-cv-plan.md Phase 2, which amends OV-5's copy).
  *
  * Reload discards what is on screen and loads the server's copy. Overwrite anyway resends the
  * save without the staleness check, which is the old behaviour, chosen on purpose.
@@ -53,7 +53,7 @@ export default function StaleSaveBanner({
       />
       <p className="min-w-0 flex-1 font-medium">
         {subject === 'cv'
-          ? 'This CV was saved somewhere else since you opened it - probably another tab.'
+          ? 'This CV changed since you opened it - in another tab, or by an agent.'
           : `This ${subject} changed since you opened it - probably an agent edit.`}{' '}
         Reload to see it (your unsaved changes here are dropped), or overwrite
         it with what you have.

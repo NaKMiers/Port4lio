@@ -58,6 +58,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       resume: body.resume,
       label: body.label,
       base,
+      actor: 'owner',
     })
     if (!result.ok) return serviceErrorResponse(result)
     return NextResponse.json({ cv: result.value })

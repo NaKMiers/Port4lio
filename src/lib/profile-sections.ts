@@ -48,7 +48,8 @@ import type { Profile } from '@/types/profile'
  * A profile that never had a CV block written has no `resume` field, and `/cv` then prints
  * the transcribed seed (`deriveResume`). The raw read returned `null` there, so `get_me` said
  * "no CV" about a page that shows one - found in the acceptance walk, ask 4. The resume is
- * never agent-written (R8), so its version guards nothing and deriving it costs nothing.
+ * never written through `update_profile` (CVs have their own tools, `mcp/tools/cv.ts`), so
+ * its version guards nothing and deriving it costs nothing.
  */
 
 export const PROFILE_SECTIONS = {

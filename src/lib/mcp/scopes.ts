@@ -3,10 +3,12 @@
  * owner page can use them too.
  *
  * ```
- *   read     every read tool, lint_draft, get_writing_brief, context.md      on by default
- *   write    drafts, images for unpublished posts, whiteboard writes          on by default
+ *   read     every read tool, lint_draft, get_writing_brief, context.md,     on by default
+ *            every CV (published or not)
+ *   write    drafts, images for unpublished posts, whiteboard writes,         on by default
+ *            creating and editing unpublished CVs
  *   publish  anything the public sees: publish, archive, a live post,         off by default
- *            profile edits (never the resume)
+ *            profile edits, the published CV, publishing and deleting CVs
  *   pii      find_order, and nothing else                                     off by default
  *
  *   whiteboard:legacy   held only by a migrated wbt_ token, never grantable, gone with the
@@ -30,17 +32,17 @@ export const SCOPE_INFO: Record<McpScope, { label: string; grants: string }> = {
   read: {
     label: 'Read',
     grants:
-      'Profile, CV, posts, metrics and the visible whiteboard. Linting and the writing brief.',
+      'Profile, all CVs, posts, metrics and the visible whiteboard. Linting and the writing brief.',
   },
   write: {
     label: 'Write',
     grants:
-      'Drafts, images for unpublished posts, whiteboard cards and links, uploading Cloudinary images.',
+      'Drafts, images for unpublished posts, creating and editing unpublished CVs, whiteboard cards and links, uploading Cloudinary images.',
   },
   publish: {
     label: 'Publish',
     grants:
-      'Anything the public sees: publish and archive posts, edit a live post, edit profile sections (never the CV), delete a Cloudinary image.',
+      'Anything the public sees: publish and archive posts, edit a live post, edit profile sections, edit the published CV, publish and delete CVs, delete a Cloudinary image.',
   },
   pii: {
     label: 'Order lookup',

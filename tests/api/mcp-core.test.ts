@@ -140,17 +140,28 @@ const contextOf = async (token: string) => {
 const READ_TOOLS = [
   'get_briefing',
   'get_cloudinary_asset',
+  'get_cv',
   'get_me',
   'get_post',
   'get_profile',
   'get_writing_brief',
   'lint_draft',
   'list_cloudinary_assets',
+  'list_cvs',
   'list_posts',
   'list_taxonomy',
   'whiteboard_get_item',
   'whiteboard_overview',
   'whiteboard_search',
+]
+
+const CV_TOOL_NAMES = [
+  'list_cvs',
+  'get_cv',
+  'create_cv',
+  'update_cv',
+  'publish_cv',
+  'delete_cv',
 ]
 
 describe('the front door (guardAgent)', () => {
@@ -368,12 +379,13 @@ describe('per-request registration (C1, C6)', () => {
     expect(expected).toEqual(READ_TOOLS)
   })
 
-  it('the registry is the 27 designed tools less the four the Assignment cut (D1), plus the 4 Cloudinary tools and the 2 whiteboard composition tools, less the 2 CCA-F tools', () => {
+  it('the registry is the 27 designed tools less the four the Assignment cut (D1), plus the 4 Cloudinary tools and the 2 whiteboard composition tools, less the 2 CCA-F tools, plus the 6 CV tools', () => {
     const names = serverLib.SITE_SERVER.tools.map(({ def }) => def.name)
-    expect(names).toHaveLength(27)
+    expect(names).toHaveLength(33)
     expect(names).toEqual(
       expect.arrayContaining(['whiteboard_compose', 'whiteboard_arrange'])
     )
+    expect(names).toEqual(expect.arrayContaining(CV_TOOL_NAMES))
     for (const cut of [
       'delete_post',
       'save_taxonomy',
@@ -390,6 +402,22 @@ describe('per-request registration (C1, C6)', () => {
       'tailor-cv',
       'build-whiteboard',
     ])
+  })
+
+  it('the CV tools per scope: read lists and reads, write creates and edits, publish publishes and deletes (P2-B)', async () => {
+    const { toolNames } = mcpClient(mcpPost, MCP_URL)
+    const cvTools = async (scopes: Scope[]) =>
+      (await toolNames(await p4(scopes))).filter(name =>
+        CV_TOOL_NAMES.includes(name)
+      )
+
+    expect(await cvTools(['read'])).toEqual(['get_cv', 'list_cvs'])
+    expect(await cvTools(['write'])).toEqual(['create_cv', 'update_cv'])
+    expect(await cvTools(['publish'])).toEqual(['delete_cv', 'publish_cv'])
+    expect(await cvTools(['pii'])).toEqual([])
+    expect(await cvTools(['read', 'write', 'publish'])).toEqual(
+      [...CV_TOOL_NAMES].sort()
+    )
   })
 
   it('every listed tool carries its JSON Schema, built once at module load', async () => {

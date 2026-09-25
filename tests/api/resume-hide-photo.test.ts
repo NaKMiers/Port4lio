@@ -67,7 +67,11 @@ describe('resume.hidePhoto', () => {
     expect(body.hidePhoto).toBe(true)
 
     // What PATCH /api/admin/cvs/<id> writes.
-    const saved = await saveCv(mainId, { resume: body, base: new Date(base) })
+    const saved = await saveCv(mainId, {
+      actor: 'owner',
+      resume: body,
+      base: new Date(base),
+    })
     expect(saved.ok).toBe(true)
     if (saved.ok) base = saved.value.updatedAt
 
@@ -84,6 +88,7 @@ describe('resume.hidePhoto', () => {
 
   it('turning it back off and saving again clears it', async () => {
     const saved = await saveCv(mainId, {
+      actor: 'owner',
       resume: saveCvBody({ ...RESUME_SEED, hidePhoto: false }),
       base: new Date(base),
     })

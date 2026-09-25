@@ -153,9 +153,10 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   */
   const cv = useCvEditor({ active: tab === 'cv', onError: setError })
   const cvSaveButtonRef = useRef<HTMLButtonElement | null>(null)
-  const [cvLabelDialog, setCvLabelDialog] = useState<'new' | 'rename' | null>(
-    null
-  )
+  // 'rescue' is Save as new CV: Save CV found the CV deleted, maybe by an agent (P2-D).
+  const [cvLabelDialog, setCvLabelDialog] = useState<
+    'new' | 'rename' | 'rescue' | null
+  >(null)
   /*
     `discard` guards every action that would drop a dirty draft - picking another CV, New,
     which selects the copy it makes (D4), and the profile banner's Reload, which unmounts
@@ -351,9 +352,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
                 onSave: () => void cv.save(),
                 saving: cv.saving,
                 disabled: !cvGates.canSave,
-                title: uploading.cvPhoto
-                  ? 'Waiting for the CV photo upload to finish'
-                  : undefined,
+                title: cvGates.saveTitle,
               }
             : undefined
         }
@@ -484,6 +483,7 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
                 onRename={() => setCvLabelDialog('rename')}
                 onPublish={() => void cv.publish()}
                 onDelete={() => setCvConfirm({ kind: 'delete' })}
+                onSaveAsNew={() => setCvLabelDialog('rescue')}
                 uploading={uploading}
                 setUploading={setUploading}
                 setError={setError}
@@ -532,21 +532,26 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         <CvLabelDialog
           key={`${cvLabelDialog}-${cv.state.selectedId}`}
           open
-          title={cvLabelDialog === 'new' ? 'New CV' : 'Rename CV'}
-          confirmLabel={cvLabelDialog === 'new' ? 'Create' : 'Rename'}
+          title={CV_LABEL_DIALOG[cvLabelDialog].title}
+          confirmLabel={CV_LABEL_DIALOG[cvLabelDialog].confirmLabel}
+          // A rescued CV keeps its old name: it is free again now the CV is gone.
           initialLabel={
-            cvLabelDialog === 'rename' ? (cv.selected?.label ?? '') : ''
+            cvLabelDialog === 'new' ? '' : (cv.selected?.label ?? '')
           }
           hint={
             cvLabelDialog === 'new'
               ? `Starts as a copy of the saved "${cvLabel}". It is not published until you publish it.`
-              : undefined
+              : cvLabelDialog === 'rescue'
+                ? 'The CV you were editing was deleted. Your changes are saved as a new CV, not published.'
+                : undefined
           }
           onSubmit={async label => {
             const failure =
               cvLabelDialog === 'new'
                 ? await cv.create(label)
-                : await cv.rename(label)
+                : cvLabelDialog === 'rescue'
+                  ? await cv.saveAsNew(label)
+                  : await cv.rename(label)
             if (!failure) setCvLabelDialog(null)
             return failure
           }}
@@ -600,6 +605,12 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   )
 }
 
+const CV_LABEL_DIALOG = {
+  new: { title: 'New CV', confirmLabel: 'Create' },
+  rename: { title: 'Rename CV', confirmLabel: 'Rename' },
+  rescue: { title: 'Save as new CV', confirmLabel: 'Save' },
+} as const
+
 /**
  * The CV tab's column: its own loading and error states (the page can open straight onto
  * this tab, `readStoredTab`), then the picker and the cards for the selected CV's draft.
@@ -613,6 +624,7 @@ function CvTab({
   onRename,
   onPublish,
   onDelete,
+  onSaveAsNew,
   uploading,
   setUploading,
   setError,
@@ -625,6 +637,7 @@ function CvTab({
   onRename: () => void
   onPublish: () => void
   onDelete: () => void
+  onSaveAsNew: () => void
   uploading: UploadingState
   setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
   setError: React.Dispatch<React.SetStateAction<string | null>>
@@ -664,12 +677,15 @@ function CvTab({
         publishedId={state.publishedId}
         dirty={cv.dirty}
         refitted={state.refitted}
+        needsFitCheck={cv.needsFitCheck}
+        orphaned={state.orphaned}
         gates={gates}
         onSelect={onSelect}
         onNew={onNew}
         onRename={onRename}
         onPublish={onPublish}
         onDelete={onDelete}
+        onSaveAsNew={onSaveAsNew}
       />
       <CvTabSections
         cvId={state.selectedId}

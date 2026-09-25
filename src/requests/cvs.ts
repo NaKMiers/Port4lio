@@ -56,11 +56,11 @@ export function listCvsApi(): Promise<CvListDto> {
   return send(API, 'GET')
 }
 
+/** New (a copy of `fromId`), or Save as new CV (the draft of a CV that was deleted, P2-D). */
 export function createCvApi(
-  label: string,
-  fromId: string
+  body: { label: string } & ({ fromId: string } | { resume: Resume })
 ): Promise<{ cv: CvDto }> {
-  return send(API, 'POST', { label, fromId })
+  return send(API, 'POST', body)
 }
 
 /** Save CV and Rename. `base` is the `updatedAt` the editor holds, or `'*'` to overwrite. */

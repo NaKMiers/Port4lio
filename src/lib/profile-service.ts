@@ -2,7 +2,7 @@ import 'server-only'
 
 import { revalidateTag } from 'next/cache'
 
-import { isAllowedImageUrl } from '@/lib/blog/rehype-restrict-image-hosts'
+import { listUnsafe, unsafeUrls } from '@/lib/mcp/safe-urls'
 import { connectDatabase } from '@/lib/mongodb'
 import { normalizeProfile } from '@/lib/profile'
 import { PUBLIC_PROFILE_CACHE_TAG } from '@/lib/profile-data'
@@ -24,7 +24,7 @@ import type { Profile } from '@/types/profile'
  *   POST /api/profile ──▶ replaceProfile(body)        the whole document, $set + upsert, unchanged
  *                            the editor's body no longer carries `resume` (multi-CV, below)
  *   update_profile    ──▶ patchProfileSection(section, value, version)
- *                            resume ──▶ refused: edited only in /admin/settings        (R8)
+ *                            resume ──▶ refused: CVs are written by update_cv (cv-service)
  *                            keys   ──▶ exactly the section's fields, or refused
  *                            version ≠ hash of the stored section ──▶ refused, re-read   (R6)
  *                            normalizeProfile ──▶ $set IF updatedAt is still what was read
@@ -33,12 +33,17 @@ import type { Profile } from '@/types/profile'
  *     patchProfileSection ──▶ revalidateTag(PUBLIC_PROFILE_CACHE_TAG, { expire: 0 }) fresh on the next load
  * ```
  *
- * ## Why the resume is never agent-written (R8)
+ * ## Why the resume is not a section update_profile writes (R8, reversed by Phase 2)
  *
- * `/cv` is fixed A4 geometry (`height: 297mm; overflow: hidden`): text that runs long is cut
- * off at the bottom of the sheet with no signal, and nothing on the server can tell whether a
- * tailored CV still fits without rendering it. The settings editor is the one place the owner
- * sees the page. So `tailor-cv` returns markdown and the owner pastes what they keep.
+ * R8 kept the resume human-only: `/cv` is fixed A4 geometry (`height: 297mm; overflow:
+ * hidden`), text that runs long is cut off at the bottom of the sheet with no signal, and
+ * nothing on the server can tell whether a tailored CV still fits without rendering it.
+ * multi-cv-plan.md Phase 2 lets agents write CVs anyway, at the owner's request - but through
+ * `update_cv` (`mcp/tools/cv.ts` ──▶ `cv-service.saveCv`, actor 'agent'), not here. That path
+ * tracks the risk instead of forbidding it: an agent's write sets `fitVerified: false`,
+ * publishing an unverified CV answers with a warning, and the settings editor re-fits the
+ * page and shows a banner until the owner's Save CV verifies it (P2-A). The `resume` section
+ * here is still refused, pointing at `update_cv`.
  *
  * ## Where the CV is written now
  *
@@ -132,54 +137,6 @@ export type SectionPatchResult =
     }
   | { ok: false; reason: 'resume' | 'invalid' | 'conflict'; error: string }
 
-/** Keys whose string values are rendered as an image on `/`, and those rendered as a link. */
-const IMAGE_KEYS = new Set(['avatar', 'backgroundImage', 'image'])
-const LINK_KEYS = new Set(['link', 'href', 'cv'])
-
-/** Every string under an image or link key, anywhere in a section value. */
-function urlsIn(
-  value: unknown,
-  into = { images: new Set<string>(), links: new Set<string>() },
-  depth = 0
-) {
-  if (depth > 12 || !value || typeof value !== 'object') return into
-  for (const [key, entry] of Object.entries(value))
-    if (typeof entry === 'string' && entry) {
-      if (IMAGE_KEYS.has(key)) into.images.add(entry)
-      else if (LINK_KEYS.has(key)) into.links.add(entry)
-    } else urlsIn(entry, into, depth + 1)
-
-  return into
-}
-
-function isSafeLink(value: string): boolean {
-  try {
-    return ['https:', 'http:', 'mailto:'].includes(new URL(value).protocol)
-  } catch {
-    return false
-  }
-}
-
-/**
- * An agent's section is rendered on `/`. A URL it introduces - one not already in the stored
- * section - must be an image from this site's own Cloudinary (the same rule the blog
- * pipeline enforces on posts) or an http(s)/mailto link, never a third-party tracking pixel
- * or a `javascript:` href. URLs already stored pass: an agent re-sending the section with a
- * typo fixed must not be refused over an avatar the owner uploaded years ago.
- */
-function unsafeUrls(next: unknown, current: unknown): string[] {
-  const before = urlsIn(current)
-  const after = urlsIn(next)
-  return [
-    ...[...after.images].filter(
-      url => !before.images.has(url) && !isAllowedImageUrl(url)
-    ),
-    ...[...after.links].filter(
-      url => !before.links.has(url) && !isSafeLink(url)
-    ),
-  ]
-}
-
 /** `update_profile`: replace one section, given the version the agent read. */
 export async function patchProfileSection(
   section: ProfileSection,
@@ -191,7 +148,7 @@ export async function patchProfileSection(
       ok: false,
       reason: 'resume',
       error:
-        'The CV (resume) is edited only in /admin/settings: /cv is a fixed A4 page, and the server cannot tell whether new text still fits. Give the owner the text instead. Nothing was changed.',
+        'The CV (resume) is not a profile section: the owner keeps several CVs, and /cv prints the published one. Edit a CV with update_cv (list_cvs and get_cv give you its id and version); the owner checks the page fit in /admin/settings. Nothing was changed.',
     }
 
   const fields: readonly string[] = PROFILE_SECTIONS[section]
@@ -237,7 +194,7 @@ export async function patchProfileSection(
     return {
       ok: false,
       reason: 'invalid',
-      error: `These URLs are not allowed on the profile: ${unsafe.map(url => JSON.stringify(url.slice(0, 120))).join(', ')}. Images must be uploaded to this site's Cloudinary (the owner does that in /admin/settings); links must be https, http or mailto. Nothing was changed.`,
+      error: `These URLs are not allowed on the profile: ${listUnsafe(unsafe)}. Images must be uploaded to this site's Cloudinary (the owner does that in /admin/settings); links must be https, http or mailto. Nothing was changed.`,
     }
   const now = new Date()
   const updated = await ProfileModel.findOneAndUpdate(

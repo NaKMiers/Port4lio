@@ -249,14 +249,19 @@ invent one. The mitigation is P2-A below.
 ### Tools (all registry entries run through `runTool`, `src/lib/mcp/tools/cv.ts`)
 
 ```text
- list_cvs      read     -> [{ id, label, published, version, updatedAt, fitVerified }]
+ list_cvs      read     -> { publishedId,
+                             cvs: [{ id, label, published, version, updatedAt, fitVerified }] }
  get_cv        read     { id? = published } -> { id, label, published, version, fitVerified,
                           resume (STORED: photo '' means "inherits avatar"), avatar }
- create_cv     write    keyed (clientRef)  { label, fromId? = published } -> { id, version }
- update_cv     write*   { id, version, label?, resume? } -> { id, version, fitVerified: false }
+ create_cv     write    keyed (clientRef)  { label, fromId? = published }
+                          -> { id, label, version, published: false, fitVerified: false,
+                               copiedFrom, next }
+ update_cv     write*   { id, version, label?, resume? }
+                          -> { id, label, version, published, fitVerified: false, warning? }
                         * the published CV needs publish   [P2-B]
+                          published and warning are read after the write
  publish_cv    publish  { id } -> { publishedId, warning? }   [P2-A]
- delete_cv     publish  { id } -> { ok } ; published -> refused 'published'   [P2-B]
+ delete_cv     publish  { id } -> { ok, id } ; published -> refused 'published'   [P2-B]
 ```
 
 - `version` is the CV's `updatedAt` as an ISO string: the same stale guard `saveCv` already
@@ -914,26 +919,32 @@ Task ids are `IT*` so they do not collide with TODO `T1`.
 
 Phase 2 (MCP controls the CVs), after IT1-IT4 are merged:
 
-- [ ] **IT10 (P1, human: ~2h / CC: ~10min)** - shared URL rule - move `urlsIn`/`unsafeUrls`/`isSafeLink` from `profile-service.ts` to `src/lib/mcp/safe-urls.ts`; both services call it
+- [x] **IT10 (P1, human: ~2h / CC: ~10min)** - shared URL rule - move `urlsIn`/`unsafeUrls`/`isSafeLink` from `profile-service.ts` to `src/lib/mcp/safe-urls.ts`; both services call it
   - Surfaced by: Phase 2 "Tools" (URL rule), shared-code rubric (2 real callers: `patchProfileSection`, CV agent writes)
   - Files: `src/lib/mcp/safe-urls.ts`, `src/lib/profile-service.ts`, `tests/api/profile-safe-urls.test.ts`
   - Verify: `bunx vitest run tests/api/profile-safe-urls.test.ts tests/api/mcp-operator-tools.test.ts`
-- [ ] **IT11 (P1, human: ~3h / CC: ~10min)** - fit tracking + service - `Cv.fitVerified`; `cv-service` takes an `actor: 'owner' | 'agent'` so agent writes set false and editor saves set true; `createCv({ label, resume })` variant
+- [x] **IT11 (P1, human: ~3h / CC: ~10min)** - fit tracking + service - `Cv.fitVerified`; `cv-service` takes an `actor: 'owner' | 'agent'` so agent writes set false and editor saves set true; `createCv({ label, resume })` variant
   - Surfaced by: P2-A, P2-D
   - Files: `src/models/Cv.ts`, `src/lib/cv/cv-service.ts`, `src/app/api/admin/cvs/route.ts`, `tests/api/cv-service.test.ts`
   - Verify: `bunx vitest run tests/api/cv-service.test.ts tests/api/cv-routes.test.ts`
-- [ ] **IT12 (P1, human: ~1 day / CC: ~25min)** - MCP tools - `src/lib/mcp/tools/cv.ts` (list_cvs, get_cv, create_cv keyed, update_cv, publish_cv, delete_cv) with the P2-B scope rules, the P2-A warning, stored-resume reads, the URL rule and error-to-refusal mapping; register them in `server.ts`; tool header diagram
+- [x] **IT12 (P1, human: ~1 day / CC: ~25min)** - MCP tools - `src/lib/mcp/tools/cv.ts` (list_cvs, get_cv, create_cv keyed, update_cv, publish_cv, delete_cv) with the P2-B scope rules, the P2-A warning, stored-resume reads, the URL rule and error-to-refusal mapping; register them in `server.ts`; tool header diagram
   - Surfaced by: R6, R7, P2-A, P2-B, P2-C
   - Files: `src/lib/mcp/tools/cv.ts`, `src/lib/mcp/server.ts`, `tests/api/mcp-cv-tools.test.ts`, `tests/api/mcp-core.test.ts`
   - Verify: `bunx vitest run tests/api/mcp-cv-tools.test.ts tests/api/mcp-core.test.ts`
-- [ ] **IT13 (P2, human: ~2h / CC: ~10min)** - MCP copy - `get_me` adds `cvs`; `update_profile` resume refusal points to `update_cv`; `tailor-cv` prompt uses create_cv + update_cv and never publishes unasked; `SCOPE_INFO`; rewrite the R8 section of the `profile-service.ts` header
+- [x] **IT13 (P2, human: ~2h / CC: ~10min)** - MCP copy - `get_me` adds `cvs`; `update_profile` resume refusal points to `update_cv`; `tailor-cv` prompt uses create_cv + update_cv and never publishes unasked; `SCOPE_INFO`; rewrite the R8 section of the `profile-service.ts` header
   - Surfaced by: Phase 2 "Other changes", P2-C
   - Files: `src/lib/mcp/tools/me.ts`, `src/lib/mcp/tools/prompts.ts`, `src/lib/mcp/scopes.ts`, `src/lib/profile-service.ts`, `tests/api/mcp-operator-tools.test.ts`
   - Verify: `bun run test:api`
-- [ ] **IT14 (P2, human: ~3h / CC: ~10min)** - editor - agent-edit fit banner; 404 rescue with [Save as new CV]; stale banner copy mentions agents
+- [x] **IT14 (P2, human: ~3h / CC: ~10min)** - editor - agent-edit fit banner; 404 rescue with [Save as new CV]; stale banner copy mentions agents
   - Surfaced by: P2-A, P2-D, OV-5 amendment
   - Files: `src/components/settings/cv-editor-state.ts`, `useCvEditor.ts`, `CvPicker.tsx`, `src/components/blog-admin/StaleSaveBanner.tsx`, `tests/unit/cv-editor-state.test.ts`
   - Verify: `bunx vitest run tests/unit/cv-editor-state.test.ts`; then IT9's full gate again
+  - Result (2026-09-25): typecheck, lint (0 errors) and build green; every new and extended
+    suite green (`profile-safe-urls`, `mcp-cv-tools`, `cv-service`, `cv-routes`, `mcp-core`,
+    `mcp-operator-tools`, `cv-editor-state`), and `cv-publish.spec.ts` still green via
+    `bun run test:e2e:local`. Not green, as before Phase 2: `format:check` (the same 3 docs +
+    `CvSheets.tsx`) and the same 4 blog tests. Under full-suite load some whiteboard tests
+    timed out on 2 of 3 runs (5 s limit); they pass alone and on the third full run.
 
 Effort ratios assumed: features ~30x, tests ~50x, scaffolding ~100x.
 

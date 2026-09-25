@@ -1,6 +1,6 @@
 'use client'
 
-import { Globe, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Globe, Pencil, Plus, Save, Trash2, TriangleAlert } from 'lucide-react'
 
 import SelectField from '@/components/settings/SelectField'
 import type { CvActionGates } from '@/components/settings/cv-editor-state'
@@ -14,12 +14,18 @@ interface Props {
   dirty: boolean
   /** The on-open fit moved the page break (D9). */
   refitted: boolean
+  /** An agent wrote this CV since the owner last saved it: its fit is unchecked (P2-A). */
+  needsFitCheck: boolean
+  /** Save CV found this CV deleted (P2-D). */
+  orphaned: boolean
   gates: CvActionGates
   onSelect: (id: string) => void
   onNew: () => void
   onRename: () => void
   onPublish: () => void
   onDelete: () => void
+  /** Opens the label dialog that saves the orphaned draft as a new CV. */
+  onSaveAsNew: () => void
   className?: string
 }
 
@@ -27,12 +33,18 @@ interface Props {
 const iconBtnCls =
   'inline-flex h-10 w-10 flex-none items-center justify-center rounded-full border border-pp-line bg-white/82 text-pp-text shadow-[0_8px_20px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0'
 
+/** The same amber as `StaleSaveBanner`, one line tall. */
+const noticeCls =
+  'flex flex-wrap items-center gap-2 rounded-[1rem] border border-[rgba(163,110,47,0.22)] bg-[rgba(233,176,97,0.14)] px-3 py-2 text-xs font-medium text-[#6b4515]'
+
 /**
  * The CV tab's header: which CV is being edited, and what can be done to it. One row.
  *
  * ```
  *   [ Frontend CV (Published) v ] (+) (pencil) (globe) (bin)  Unsaved
  *   Page break re-fitted - Save CV to keep it                 (only after an on-open refit)
+ *   ! Edited by an agent - check the page fit, then Save CV    (fitVerified false, P2-A)
+ *   ! This CV was deleted, maybe by an agent. [Save as new CV] (Save CV got a 404, P2-D)
  * ```
  *
  * It used to be a labelled card with four text buttons and a help line - most of a screen
@@ -57,6 +69,9 @@ export default function CvPicker({
   onRename,
   onPublish,
   onDelete,
+  onSaveAsNew,
+  needsFitCheck,
+  orphaned,
   className,
 }: Props) {
   const options = cvs.map(cv => ({
@@ -159,6 +174,47 @@ export default function CvPicker({
         <p className="px-1 text-xs font-medium text-pp-text">
           Page break re-fitted - Save CV to keep it
         </p>
+      ) : null}
+      {needsFitCheck ? (
+        <p
+          data-testid="cv-fit-banner"
+          className={noticeCls}
+        >
+          <TriangleAlert
+            aria-hidden
+            size={14}
+            className="shrink-0"
+          />
+          Edited by an agent - check the page fit, then Save CV
+        </p>
+      ) : null}
+      {orphaned ? (
+        <div
+          role="alert"
+          data-testid="cv-orphaned"
+          className={noticeCls}
+        >
+          <TriangleAlert
+            aria-hidden
+            size={14}
+            className="shrink-0"
+          />
+          <span className="min-w-0 flex-1">
+            This CV was deleted, maybe by an agent.
+          </span>
+          <button
+            type="button"
+            onClick={onSaveAsNew}
+            disabled={!gates.canSaveAsNew}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#6b4515] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            <Save
+              aria-hidden
+              size={13}
+            />
+            Save as new CV
+          </button>
+        </div>
       ) : null}
     </div>
   )

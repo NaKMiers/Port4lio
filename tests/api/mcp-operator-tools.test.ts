@@ -29,7 +29,7 @@ import { mcpClient, type RouteHandler } from './mcp-helpers'
  *   get_me / resume  never written ──▶ the seed /cv prints, not null
  *   archive_post     archive a live post (revalidates) · unarchive: never public ──▶ draft,
  *                    once public ──▶ refused, pointing at publish_post (C11)
- *   tailor-cv        markdown only; tells the agent never to call update_profile (R8)
+ *   tailor-cv        write: a copy via create_cv + update_cv, never published · else markdown
  *   taxonomy-service a relabel revalidates /blog; the delete guards hold (C8)
  * ```
  */
@@ -546,5 +546,68 @@ describe('taxonomy-service (C8)', () => {
       ok: false,
       status: 400,
     })
+  })
+})
+
+describe('the MCP copy after Phase 2 (multi-cv-plan.md IT13)', () => {
+  it('get_me names every CV once migrated, and [] before - it never migrates', async () => {
+    await ProfileModel.create({ _id: DOC_ID, fullName: 'Ada', resume: RESUME })
+    const t = await token(['read'])
+
+    const before = JSON.parse((await client.callTool(t, 'get_me', {})).text)
+    expect(before.cvs).toEqual([])
+    expect(await CvModel.countDocuments()).toBe(0)
+
+    const { listCvs, createCv } = await import('@/lib/cv/cv-service')
+    const { publishedId } = await listCvs()
+    await createCv({ label: 'Frontend', fromId: publishedId, actor: 'owner' })
+
+    const after = JSON.parse((await client.callTool(t, 'get_me', {})).text)
+    expect(after.cvs).toEqual([
+      { id: publishedId, label: 'Main CV', published: true },
+      { id: expect.any(String), label: 'Frontend', published: false },
+    ])
+    expect(after.cv.name).toBe('Ada')
+  })
+
+  it('the update_profile resume refusal points to update_cv', async () => {
+    await ProfileModel.create({ _id: DOC_ID, fullName: 'Ada', resume: RESUME })
+    const t = await token(['read', 'publish'])
+    const read = JSON.parse(
+      (await client.callTool(t, 'get_profile', { section: 'resume' })).text
+    )
+    const call = await client.callTool(t, 'update_profile', {
+      section: 'resume',
+      version: read.version,
+      value: read.value,
+    })
+    expect(call.isError).toBe(true)
+    expect(call.text).toMatch(/update_cv/)
+    expect(call.text).toMatch(/\/admin\/settings/)
+  })
+
+  it('tailor-cv with write access copies and edits, never publishes unasked, and sends the owner to check the fit', async () => {
+    const t = await token(['read', 'write', 'publish'])
+    const reply = await client.rpc(t, 'prompts/get', {
+      name: 'tailor-cv',
+      arguments: { job_posting: 'Senior TypeScript engineer, Next.js' },
+    })
+    const text = reply.body.result?.messages?.[0].content.text ?? ''
+    expect(text).toContain('Senior TypeScript engineer, Next.js')
+    expect(text).toMatch(/create_cv/)
+    expect(text).toMatch(/update_cv/)
+    expect(text).toMatch(/Leave fromId out: it copies the published CV/)
+    expect(text).toMatch(/Do not call publish_cv unless the owner asks/)
+    expect(text).toMatch(/\/admin\/settings/)
+    expect(text).toMatch(/Invent nothing/)
+    expect(text).not.toMatch(/as markdown/)
+  })
+
+  it('SCOPE_INFO says read covers all CVs and drops "never the CV"', async () => {
+    const { SCOPE_INFO } = await import('@/lib/mcp/scopes')
+    expect(SCOPE_INFO.read.grants).toMatch(/all CVs/)
+    expect(SCOPE_INFO.write.grants).toMatch(/unpublished CVs/)
+    expect(SCOPE_INFO.publish.grants).toMatch(/publish and delete CVs/)
+    expect(SCOPE_INFO.publish.grants).not.toMatch(/never the CV/)
   })
 })

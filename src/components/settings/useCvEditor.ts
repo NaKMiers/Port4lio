@@ -33,6 +33,8 @@ import type { Resume, ResumePageBreak } from '@/types/profile'
  *   active (the CV tab opened) ──▶ first time only: GET /api/admin/cvs   (migrates "Main CV")
  *   save(overwrite)  PATCH { resume: pruneResumeForCv(draft), base | '*' }
  *                      409 stale ──▶ state.stale, the CV banner (Reload / Overwrite)
+ *                      404       ──▶ state.orphaned: deleted, maybe by an agent; draft kept
+ *   saveAsNew(label) POST { label, resume: pruneResumeForCv(draft) } ──▶ the new CV selected
  *   reload()         GET again, draft reset to the server copy - never refetchProfile, which
  *                    would unmount the whole editor (OV-5)
  *   create / rename  PATCH / POST; a 409 message goes back to the dialog, shown inline (D6)
@@ -135,20 +137,19 @@ export function useCvEditor({
 
   async function saveDraft(id: string, draft: Resume, base: string) {
     const resume = pruneResumeForCv(draft)
-    // The whole body, as the server's readJsonBody measures it - not just the resume.
-    if (
-      new TextEncoder().encode(JSON.stringify({ resume, base })).length >
-      MAX_CV_JSON_BYTES
-    )
-      throw new Error(
-        `This CV is over the ${MAX_CV_JSON_BYTES / 1024} KB limit.`
-      )
+    checkBodySize({ resume, base })
     try {
       const { cv } = await saveCvApi(id, { resume, base })
       setState(s => cvState.saved(s, cv, draft))
     } catch (error) {
       if (error instanceof CvApiError && error.code === 'stale') {
         setState(s => cvState.markStale(s))
+        return
+      }
+      // Deleted since it was opened - by an agent's delete_cv, or another tab. The draft is
+      // the only copy now; the picker offers Save as new CV (P2-D).
+      if (error instanceof CvApiError && error.status === 404) {
+        setState(s => cvState.orphaned(s))
         return
       }
       throw error
@@ -166,7 +167,7 @@ export function useCvEditor({
     if (!fromId) return 'Pick a CV to copy first.'
     setBusy(true)
     try {
-      const { cv } = await createCvApi(label, fromId)
+      const { cv } = await createCvApi({ label, fromId })
       setState(s => cvState.created(s, cv))
       return null
     } catch (error) {
@@ -175,6 +176,30 @@ export function useCvEditor({
       setBusy(false)
     }
   }, [])
+
+  /**
+   * Save as new CV, for an orphaned draft: the CV it was editing was deleted. Resolves to an
+   * error message for the dialog, or `null` on success.
+   */
+  const saveAsNew = useCallback(
+    async (label: string): Promise<string | null> => {
+      const { draft } = stateRef.current
+      if (!draft) return 'There is nothing to save.'
+      setBusy(true)
+      try {
+        const resume = pruneResumeForCv(draft)
+        checkBodySize({ label, resume })
+        const { cv } = await createCvApi({ label, resume })
+        setState(s => cvState.rescued(s, cv, draft))
+        return null
+      } catch (error) {
+        return error instanceof Error ? error.message : 'Unable to save the CV.'
+      } finally {
+        setBusy(false)
+      }
+    },
+    []
+  )
 
   /** Resolves to an error message for the dialog, or `null` on success. */
   const rename = useCallback(async (label: string): Promise<string | null> => {
@@ -224,6 +249,7 @@ export function useCvEditor({
     saving,
     dirty: cvState.isDirty(state),
     selected: cvState.selectedCv(state),
+    needsFitCheck: cvState.needsFitCheck(state),
     gates: (uploadingCvPhoto: boolean) =>
       cvState.cvActionGates(state, { busy, uploadingCvPhoto }),
     setDraft,
@@ -233,6 +259,7 @@ export function useCvEditor({
     reload,
     retry: () => void load(),
     create,
+    saveAsNew,
     rename,
     publish,
     remove,
@@ -240,3 +267,9 @@ export function useCvEditor({
 }
 
 export type CvEditor = ReturnType<typeof useCvEditor>
+
+/** The whole body, as the server's readJsonBody measures it - not just the resume. */
+function checkBodySize(body: unknown) {
+  if (new TextEncoder().encode(JSON.stringify(body)).length > MAX_CV_JSON_BYTES)
+    throw new Error(`This CV is over the ${MAX_CV_JSON_BYTES / 1024} KB limit.`)
+}

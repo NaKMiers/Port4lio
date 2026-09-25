@@ -3,6 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { listPosts } from '@/lib/blog/post-service'
+import { listCvSummaries } from '@/lib/cv/cv-service'
 import { defineTool, ok, refuse } from '@/lib/mcp/run-tool'
 import {
   PROFILE_SECTION_KEYS,
@@ -19,8 +20,10 @@ import { loadAgentVisible } from '@/lib/whiteboard/data'
  * ```
  *   get_profile(section) ──▶ profile-sections: one findById, projected ──▶ { section, version, value }
  *   update_profile(section, version, value) ──▶ profile-service.patchProfileSection
- *                            resume refused (R8) · stale version refused (R6) · revalidateTag
+ *                            resume refused: CVs have their own tools (tools/cv.ts, update_cv)
+ *                            · stale version refused (R6) · revalidateTag
  *   get_me ──▶ identity + about (clipped) + resume   (profile-sections: the PUBLISHED CV)
+ *            + cvs: [{ id, label, published }]      (cv-service.listCvSummaries, never migrates)
  *            + active dreams and goals              (loadAgentVisible overview: visible only)
  *            + 5 latest published posts             (post-service listPosts)
  * ```
@@ -28,7 +31,8 @@ import { loadAgentVisible } from '@/lib/whiteboard/data'
  * The resume carries the owner's own contact details on purpose (premise 5: `/cv` already
  * publishes them). These two tools are the one token-gated machine-readable exception, which
  * the `loadPublishedResume` comment in `profile-data.ts` records (C7). The owner keeps many
- * CVs; only the published one - the one `/cv` prints - is readable here.
+ * CVs; `cv` here is the published one - the one `/cv` prints - and `cvs` names the rest, which
+ * `get_cv` reads in full.
  */
 
 export const getProfileTool = defineTool({
@@ -64,15 +68,16 @@ export const getMeTool = defineTool({
   name: 'get_me',
   title: 'Who the owner is',
   description:
-    "One call for 'who am I': the owner's public profile summary, their published CV (the printable /cv sheet, including their own contact details), their active goals and dreams from the whiteboard (titles only), and their 5 most recent published posts (titles only). Use get_profile for a whole section, whiteboard_get_item or get_post for detail.",
+    "One call for 'who am I': the owner's public profile summary, their published CV (cv: the printable /cv sheet, including their own contact details), the names of all their CVs (cvs: id, label, published), their active goals and dreams from the whiteboard (titles only), and their 5 most recent published posts (titles only). Use get_profile for a whole section, get_cv for one CV, whiteboard_get_item or get_post for detail.",
   scopes: ['read'],
   input: z.object({}),
   annotations: { readOnlyHint: true, openWorldHint: false },
   async run() {
-    const [identity, about, resume, overview, posts] = await Promise.all([
+    const [identity, about, resume, cvs, overview, posts] = await Promise.all([
       readProfileSection('identity'),
       readProfileSection('about'),
       readProfileSection('resume'),
+      listCvSummaries(),
       loadAgentVisible({ kind: 'overview' }),
       listPosts({ status: ['published'], sort: 'publishedAt', limit: 5 }),
     ])
@@ -89,6 +94,7 @@ export const getMeTool = defineTool({
                 : aboutMe,
           },
           cv: resume.value.resume,
+          cvs,
           activeGoalsAndDreams: overview.active.map(item => ({
             id: item.id,
             title: item.title,
@@ -115,7 +121,7 @@ export const updateProfileTool = defineTool({
   name: 'update_profile',
   title: 'Edit one profile section',
   description:
-    "Replace one section of the owner's public portfolio profile - identity, about, career, offering, work or cvFile - with the version get_profile gave you. Send the WHOLE section value (every field get_profile returned, with your edits); a stale version is refused, so re-read and retry. The resume (the /cv sheet) cannot be written here: it is a fixed A4 page edited only in /admin/settings - give the owner the text instead. Changes the public site immediately.",
+    "Replace one section of the owner's public portfolio profile - identity, about, career, offering, work or cvFile - with the version get_profile gave you. Send the WHOLE section value (every field get_profile returned, with your edits); a stale version is refused, so re-read and retry. The resume (the /cv sheet) cannot be written here: CVs have their own tools - get_cv, create_cv, update_cv. Changes the public site immediately.",
   scopes: ['publish'],
   audited: true,
   input: z.object({

@@ -18,13 +18,21 @@ import type { Resume, ResumePageBreak } from '@/types/profile'
  *   created(cv)              appended and selected
  *   deleted(id)              removed; the published CV is selected
  *   published(id)            publishedId moves
+ *   orphaned()               Save CV got a 404: the CV was deleted, maybe by an agent (P2-D).
+ *                            The draft stays; only Save as new CV (or discarding) moves on
+ *   rescued(cv, sent)        Save as new CV: the deleted CV leaves the list, `cv` is selected
  *
- *   dirty = draft deep-differs from snapshot             (D9: not "any setResume happened")
+ *   dirty = draft deep-differs from snapshot, or orphaned  (D9: not "any setResume happened")
+ *   needsFitCheck = the selected CV has fitVerified false  (an agent wrote it, P2-A)
  * ```
  *
  * One draft at a time, for the selected CV only (D4). `snapshot` is what makes `dirty`
  * honest: an edit that is typed and then undone is not unsaved work, and the auto-fit
  * repairing a clipped page genuinely is.
+ *
+ * An orphaned draft counts as dirty even when it equals its snapshot: the server copy is
+ * gone, so the draft is the only copy left, and every action that would drop it must go
+ * through the discard confirm first.
  */
 
 export type CvEditorState = {
@@ -43,6 +51,8 @@ export type CvEditorState = {
   stale: boolean
   /** The on-open fit moved the page break since the CV was selected or saved. */
   refitted: boolean
+  /** Save CV found the selected CV deleted (by an agent, or another tab): P2-D. */
+  orphaned: boolean
 }
 
 export function initialCvEditorState(): CvEditorState {
@@ -57,6 +67,7 @@ export function initialCvEditorState(): CvEditorState {
     base: null,
     stale: false,
     refitted: false,
+    orphaned: false,
   }
 }
 
@@ -81,11 +92,21 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 }
 
 export function isDirty(state: CvEditorState): boolean {
-  return !!state.draft && !deepEqual(state.draft, state.snapshot)
+  return (
+    !!state.draft && (state.orphaned || !deepEqual(state.draft, state.snapshot))
+  )
 }
 
 export function selectedCv(state: CvEditorState): CvDto | null {
   return state.cvs.find(cv => cv.id === state.selectedId) ?? null
+}
+
+/**
+ * The selected CV was last written by an agent, so nothing has measured its page fit yet
+ * (P2-A). The editor's on-open fit runs regardless; the owner's Save CV clears this.
+ */
+export function needsFitCheck(state: CvEditorState): boolean {
+  return !state.orphaned && selectedCv(state)?.fitVerified === false
 }
 
 /** Opens `cv` fresh: its saved resume becomes both the draft and the snapshot. */
@@ -98,6 +119,7 @@ function open(state: CvEditorState, cv: CvDto | null): CvEditorState {
     base: cv?.updatedAt ?? null,
     stale: false,
     refitted: false,
+    orphaned: false,
   }
 }
 
@@ -137,7 +159,12 @@ export function loaded(
 
 export function selected(state: CvEditorState, id: string): CvEditorState {
   const cv = state.cvs.find(item => item.id === id)
-  return cv ? open(state, cv) : state
+  if (!cv) return state
+  // Leaving an orphaned CV discards its draft, and the CV itself no longer exists.
+  const cvs = state.orphaned
+    ? state.cvs.filter(item => item.id !== state.selectedId)
+    : state.cvs
+  return open({ ...state, cvs }, cv)
 }
 
 export function editDraft(
@@ -223,6 +250,32 @@ export function markStale(state: CvEditorState): CvEditorState {
   return { ...state, stale: true }
 }
 
+/** Save CV answered 404. The draft is kept - it is now the only copy of this CV (P2-D). */
+export function orphaned(state: CvEditorState): CvEditorState {
+  return { ...state, orphaned: true, stale: false }
+}
+
+/**
+ * Save as new CV succeeded: the deleted CV leaves the list and the new one is selected. As
+ * in `saved`, edits typed while the request was in flight stay in the draft.
+ */
+export function rescued(
+  state: CvEditorState,
+  cv: CvDto,
+  sent?: Resume
+): CvEditorState {
+  const next = {
+    ...state,
+    cvs: [...state.cvs.filter(item => item.id !== state.selectedId), cv],
+  }
+  const editedSince = sent !== undefined && state.draft !== sent
+  if (!editedSince) return open(next, cv)
+  return {
+    ...open(next, cv),
+    draft: state.draft,
+  }
+}
+
 export type CvActionGates = {
   /** Picker, New, Delete and Publish: off while a CV photo uploads (OV-6). */
   locked: boolean
@@ -236,6 +289,9 @@ export type CvActionGates = {
   publishTitle: string | undefined
   /** Save CV gates on its own save and the CV photo upload only (OV-6). */
   canSave: boolean
+  saveTitle: string | undefined
+  /** Save as new CV, the one way forward for an orphaned draft (P2-D). */
+  canSaveAsNew: boolean
 }
 
 /**
@@ -253,26 +309,39 @@ export function cvActionGates(
   const dirty = isDirty(state)
   const locked = uploadingCvPhoto
   const open = ready && !busy && !locked
+  // The selected CV is gone: only Save as new CV, or leaving it, still makes sense.
+  const gone = state.orphaned
+  const goneTitle = 'This CV was deleted - use Save as new CV'
 
   return {
     locked,
     canSelect: open && state.cvs.length > 1,
-    canCreate: open,
-    canRename: ready && !busy,
-    canDelete: open && !isPublished,
-    deleteTitle: isPublished
-      ? 'This is the published CV. Publish another CV first.'
-      : locked
-        ? 'Waiting for the CV photo upload to finish'
-        : undefined,
-    canPublish: open && !isPublished && !dirty,
-    publishTitle: isPublished
-      ? 'This CV is already published'
-      : dirty
-        ? 'Save first - only the saved CV goes live'
+    canCreate: open && !gone,
+    canRename: ready && !busy && !gone,
+    canDelete: open && !isPublished && !gone,
+    deleteTitle: gone
+      ? goneTitle
+      : isPublished
+        ? 'This is the published CV. Publish another CV first.'
         : locked
           ? 'Waiting for the CV photo upload to finish'
           : undefined,
-    canSave: ready && !busy && !uploadingCvPhoto,
+    canPublish: open && !isPublished && !dirty,
+    publishTitle: gone
+      ? goneTitle
+      : isPublished
+        ? 'This CV is already published'
+        : dirty
+          ? 'Save first - only the saved CV goes live'
+          : locked
+            ? 'Waiting for the CV photo upload to finish'
+            : undefined,
+    canSave: ready && !busy && !uploadingCvPhoto && !gone,
+    canSaveAsNew: ready && !busy && !uploadingCvPhoto && gone,
+    saveTitle: gone
+      ? goneTitle
+      : uploadingCvPhoto
+        ? 'Waiting for the CV photo upload to finish'
+        : undefined,
   }
 }

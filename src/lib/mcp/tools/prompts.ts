@@ -67,24 +67,51 @@ export const weeklyBriefingPrompt: PromptDefinition = {
   },
 }
 
+/**
+ * Tailoring writes a COPY, never the live CV (multi-cv-plan.md Phase 2): `/cv` is a fixed A4
+ * sheet that clips text running long, only a browser can measure that, and the owner checks
+ * it in `/admin/settings`. A token without `create_cv` gets the old markdown answer instead.
+ */
 export const tailorCvPrompt: PromptDefinition = {
   name: 'tailor-cv',
   title: 'Tailor my CV to a job posting',
   description:
-    "Read the owner's CV and profile with get_me, then return a CV tailored to the posting, as markdown. It never writes the profile: the /cv sheet is edited only in /admin/settings.",
+    "Tailor the owner's CV to a job posting: copy the published CV (create_cv) and tailor the copy (update_cv), or, without write access, return the tailored CV as markdown. It never publishes unless the owner asks; the owner checks the page fit in /admin/settings.",
   scopes: ['read'],
   args: z.object({ job_posting: z.string() }),
-  render(args) {
-    return [
+  render(args, tools) {
+    const posting = [
       "Tailor the owner's CV to this job posting:",
       '```',
       args.job_posting ?? '(the owner will paste it)',
       '```',
-      "Call get_me first (its cv field is the owner's real CV, contact details included), and get_profile career or work when you need more detail on a project or role.",
-      'Then return the tailored CV as markdown, in the same sections the CV already has: lead with the experience and projects that match the posting, reword bullets toward its language where the facts support it, and drop what does not help.',
-      'Invent nothing: every role, date, number and skill must come from what get_me or get_profile returned. If the posting asks for something the owner does not have, say so in a short note after the CV instead of adding it.',
-      'Do not call update_profile, even if it is in your tool list. The /cv page is a fixed A4 sheet edited only in /admin/settings; the owner pastes what they keep there.',
-    ].join('\n')
+    ]
+    const tailoring =
+      'Lead with the experience and projects that match the posting, reword bullets toward its language where the facts support it, and drop what does not help.'
+    const inventNothing =
+      'Invent nothing: every role, date, number and skill must come from what get_me, get_cv or get_profile returned. If the posting asks for something the owner does not have, say so in a short note to the owner instead of adding it.'
+
+    if (!tools.has('create_cv') || !tools.has('update_cv'))
+      return [
+        ...posting,
+        "Call get_me first (its cv field is the owner's real CV, contact details included), and get_profile career or work when you need more detail on a project or role.",
+        `Then return the tailored CV as markdown, in the same sections the CV already has. ${tailoring}`,
+        inventNothing,
+        'Do not call update_profile, even if it is in your tool list. This token cannot write CVs, so the owner pastes what they keep into a CV in /admin/settings; a token with the write scope would let you save it as a new CV directly.',
+      ].join('\n')
+
+    return [
+      ...posting,
+      [
+        '1. Read. Call get_me (cv is the published CV, cvs names every CV), then get_profile career or work when you need more detail on a project or role.',
+        '2. Copy. Call create_cv with a label naming the posting (for example "Acme - Senior TypeScript") and a clientRef. Leave fromId out: it copies the published CV. Never edit the published CV itself.',
+        "3. Read the copy. Call get_cv with the new id: it returns the CV exactly as stored, and its version. Keep photo '' as it is - that means the masthead follows the owner's avatar.",
+        `4. Tailor. Call update_cv once with the id, the version and the WHOLE resume with your edits, in the sections it already has. ${tailoring} Keep it to what fits two A4 pages: shorten rather than add.`,
+        '5. Report. Tell the owner the label of the new CV, what you changed and why, and that it is not published: they should open it in /admin/settings to check the page fit (the page is fixed A4 and clips text that runs long), then Save CV.',
+      ].join('\n'),
+      inventNothing,
+      'Do not call publish_cv unless the owner asks you to publish it. Do not call update_profile.',
+    ].join('\n\n')
   },
 }
 

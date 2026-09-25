@@ -14,8 +14,11 @@ import {
   createCv,
   deleteCv,
   findPublished,
+  getCv,
   listCvs,
+  listCvSummaries,
   publishCv,
+  publishedCvId,
   readPublishedResumeSource,
   saveCv,
 } from '@/lib/cv/cv-service'
@@ -38,6 +41,11 @@ import type { Resume } from '@/types/profile'
  *   saveCv          base ok ──▶ normalized · stale ──▶ 409 · always expire 0          (OV-5, D10)
  *   publishCv       latest wins · ties by _id · never bumps updatedAt                 (OV-1, OV-3)
  *   deleteCv        published 409 · other deleted · 404 · the publish/delete race     (R3, D10)
+ *   actor           owner Save CV ──▶ fitVerified true · agent write ──▶ false          (P2-A)
+ *                   agent: no '*', whole resume only, new URLs judged, stale first
+ *                   onlyIfUnpublished ──▶ 409 published, even for a publish mid-write     (P2-B)
+ *   createCv        { label, resume } · exactly one of fromId / resume                 (P2-D)
+ *   agent reads     getCv: stored photo '' · listCvSummaries never migrates
  * ```
  *
  * `next/cache` is mocked at the framework boundary, so the assertions follow the real
@@ -48,6 +56,8 @@ const DOC_ID = 'cv-service-profile'
 
 vi.hoisted(() => {
   process.env.PROFILE_DOCUMENT_ID = 'cv-service-profile'
+  // Read at module load by the image-host rule the agent path uses (safe-urls).
+  process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud'
 })
 
 const cache = vi.hoisted(() => ({
@@ -97,7 +107,7 @@ async function migrated() {
 }
 
 async function created(label: string, fromId = String(LEGACY_CV_ID)) {
-  const result = await createCv({ label, fromId })
+  const result = await createCv({ actor: 'owner', label, fromId })
   if (!result.ok) throw new Error(result.error)
   return result.value
 }
@@ -199,6 +209,7 @@ describe('readPublishedResumeSource (the /cv and MCP resolver)', () => {
     const other = await created('Frontend')
     const base = other.updatedAt
     await saveCv(other.id, {
+      actor: 'owner',
       resume: resumeNamed('Frontend Name'),
       base: new Date(base),
     })
@@ -229,11 +240,16 @@ describe('createCv', () => {
   it('unknown or malformed fromId is 404', async () => {
     await migrated()
     const unknown = await createCv({
+      actor: 'owner',
       label: 'X',
       fromId: new mongoose.Types.ObjectId().toHexString(),
     })
     expect(unknown).toMatchObject({ ok: false, status: 404 })
-    const malformed = await createCv({ label: 'X', fromId: 'nope' })
+    const malformed = await createCv({
+      actor: 'owner',
+      label: 'X',
+      fromId: 'nope',
+    })
     expect(malformed).toMatchObject({ ok: false, status: 404 })
   })
 
@@ -242,6 +258,7 @@ describe('createCv', () => {
     await created('Frontend')
 
     const dup = await createCv({
+      actor: 'owner',
       label: 'FRONTEND ',
       fromId: String(LEGACY_CV_ID),
     })
@@ -257,7 +274,7 @@ describe('createCv', () => {
     await migrated()
     for (const label of ['   ', 'x'.repeat(61), 42])
       expect(
-        await createCv({ label, fromId: String(LEGACY_CV_ID) })
+        await createCv({ actor: 'owner', label, fromId: String(LEGACY_CV_ID) })
       ).toMatchObject({ ok: false, status: 400 })
   })
 
@@ -267,6 +284,7 @@ describe('createCv', () => {
     expect(await CvModel.countDocuments()).toBe(MAX_CVS)
 
     const over = await createCv({
+      actor: 'owner',
       label: 'One too many',
       fromId: String(LEGACY_CV_ID),
     })
@@ -290,6 +308,7 @@ describe('saveCv', () => {
     const { main } = await migrated()
 
     const result = await saveCv(main.id, {
+      actor: 'owner',
       resume: { name: 'Only a name' },
       base: new Date(main.updatedAt),
     })
@@ -303,6 +322,7 @@ describe('saveCv', () => {
     expect(result.value.updatedAt).not.toBe(main.updatedAt)
 
     const again = await saveCv(main.id, {
+      actor: 'owner',
       resume: resumeNamed('Second save'),
       base: new Date(result.value.updatedAt),
     })
@@ -312,12 +332,14 @@ describe('saveCv', () => {
   it('a stale base is 409 stale with the current updatedAt, and writes nothing', async () => {
     const { main } = await migrated()
     const first = await saveCv(main.id, {
+      actor: 'owner',
       resume: resumeNamed('Other tab'),
       base: new Date(main.updatedAt),
     })
     if (!first.ok) throw new Error(first.error)
 
     const stale = await saveCv(main.id, {
+      actor: 'owner',
       resume: resumeNamed('This tab'),
       base: new Date(main.updatedAt),
     })
@@ -339,11 +361,13 @@ describe('saveCv', () => {
   it("base '*' overwrites whatever is stored", async () => {
     const { main } = await migrated()
     await saveCv(main.id, {
+      actor: 'owner',
       resume: resumeNamed('Other tab'),
       base: new Date(main.updatedAt),
     })
 
     const overwrite = await saveCv(main.id, {
+      actor: 'owner',
       resume: resumeNamed('Owner wins'),
       base: '*',
     })
@@ -358,15 +382,18 @@ describe('saveCv', () => {
     const { main } = await migrated()
     expect(
       await saveCv(new mongoose.Types.ObjectId().toHexString(), {
+        actor: 'owner',
         resume: resumeNamed('x'),
         base: '*',
       })
     ).toMatchObject({ ok: false, status: 404 })
-    expect(await saveCv(main.id, { resume: null, base: '*' })).toMatchObject({
+    expect(
+      await saveCv(main.id, { actor: 'owner', resume: null, base: '*' })
+    ).toMatchObject({
       ok: false,
       status: 400,
     })
-    expect(await saveCv(main.id, { base: '*' })).toMatchObject({
+    expect(await saveCv(main.id, { actor: 'owner', base: '*' })).toMatchObject({
       ok: false,
       status: 400,
     })
@@ -376,7 +403,11 @@ describe('saveCv', () => {
     const { main } = await migrated()
     await created('Frontend')
 
-    const clash = await saveCv(main.id, { label: 'frontend', base: '*' })
+    const clash = await saveCv(main.id, {
+      actor: 'owner',
+      label: 'frontend',
+      base: '*',
+    })
 
     expect(clash).toMatchObject({
       ok: false,
@@ -389,6 +420,7 @@ describe('saveCv', () => {
     const { main } = await migrated()
 
     const renamed = await saveCv(main.id, {
+      actor: 'owner',
       label: 'Backend',
       base: new Date(main.updatedAt),
     })
@@ -405,13 +437,21 @@ describe('saveCv', () => {
     const other = await created('Not published')
     vi.clearAllMocks()
 
-    await saveCv(other.id, { resume: resumeNamed('x'), base: '*' })
+    await saveCv(other.id, {
+      actor: 'owner',
+      resume: resumeNamed('x'),
+      base: '*',
+    })
     expect(cache.revalidateTag).toHaveBeenCalledWith(PUBLIC_PROFILE_CACHE_TAG, {
       expire: 0,
     })
 
     vi.clearAllMocks()
-    await saveCv(main.id, { resume: resumeNamed('y'), base: '*' })
+    await saveCv(main.id, {
+      actor: 'owner',
+      resume: resumeNamed('y'),
+      base: '*',
+    })
     expect(cache.revalidateTag).toHaveBeenCalledWith(PUBLIC_PROFILE_CACHE_TAG, {
       expire: 0,
     })
@@ -421,6 +461,7 @@ describe('saveCv', () => {
     const { main } = await migrated()
     vi.clearAllMocks()
     await saveCv(main.id, {
+      actor: 'owner',
       resume: resumeNamed('x'),
       base: new Date('2000-01-01'),
     })
@@ -436,7 +477,10 @@ describe('publishCv', () => {
 
     const result = await publishCv(other.id)
 
-    expect(result).toEqual({ ok: true, value: { publishedId: other.id } })
+    expect(result).toEqual({
+      ok: true,
+      value: { publishedId: other.id, fitVerified: true },
+    })
     expect((await listCvs()).publishedId).toBe(other.id)
     expect(cache.revalidateTag).toHaveBeenCalledWith(PUBLIC_PROFILE_CACHE_TAG, {
       expire: 0,
@@ -453,6 +497,7 @@ describe('publishCv', () => {
     const stored = await CvModel.findById(main.id).lean()
     expect(stored?.updatedAt.toISOString()).toBe(main.updatedAt)
     const saved = await saveCv(main.id, {
+      actor: 'owner',
       resume: resumeNamed('After publish'),
       base: new Date(main.updatedAt),
     })
@@ -567,5 +612,315 @@ describe('deleteCv', () => {
     })
     expect(await CvModel.exists({ _id: target.id })).not.toBeNull()
     expect((await listCvs()).publishedId).toBe(target.id)
+  })
+})
+
+describe('fit tracking: the actor decides fitVerified (P2-A)', () => {
+  const agentSave = (id: string, base: string, patch: Partial<Resume>) =>
+    getCv(id).then(read => {
+      if (!read.ok) throw new Error(read.error)
+      return saveCv(id, {
+        resume: { ...read.value.cv.resume, ...patch },
+        base: new Date(base),
+        actor: 'agent',
+      })
+    })
+
+  it('the migrated CV and an owner-created one start verified; an agent copy does not', async () => {
+    const { main } = await migrated()
+    expect(main.fitVerified).toBe(true)
+    expect((await created('Owner copy')).fitVerified).toBe(true)
+
+    const agentCopy = await createCv({
+      label: 'Agent copy',
+      fromId: main.id,
+      actor: 'agent',
+    })
+    expect(agentCopy).toMatchObject({ ok: true, value: { fitVerified: false } })
+  })
+
+  it('an agent write clears it, the owner Save CV sets it, an owner rename leaves it', async () => {
+    const { main } = await migrated()
+
+    const byAgent = await agentSave(main.id, main.updatedAt, { role: 'Agent' })
+    if (!byAgent.ok) throw new Error(byAgent.error)
+    expect(byAgent.value.fitVerified).toBe(false)
+
+    const renamed = await saveCv(main.id, {
+      label: 'Renamed',
+      base: new Date(byAgent.value.updatedAt),
+      actor: 'owner',
+    })
+    if (!renamed.ok) throw new Error(renamed.error)
+    expect(renamed.value.fitVerified).toBe(false)
+
+    const saved = await saveCv(main.id, {
+      resume: renamed.value.resume,
+      base: new Date(renamed.value.updatedAt),
+      actor: 'owner',
+    })
+    expect(saved).toMatchObject({ ok: true, value: { fitVerified: true } })
+  })
+
+  it('an agent label-only write clears it too: every agent write is unverified', async () => {
+    const { main } = await migrated()
+    const result = await saveCv(main.id, {
+      label: 'Agent name',
+      base: new Date(main.updatedAt),
+      actor: 'agent',
+    })
+    expect(result).toMatchObject({ ok: true, value: { fitVerified: false } })
+  })
+
+  it('publishCv reports the flag, for publish_cv to warn on', async () => {
+    const { main } = await migrated()
+    const copy = await createCv({
+      label: 'Unverified',
+      fromId: main.id,
+      actor: 'agent',
+    })
+    if (!copy.ok) throw new Error(copy.error)
+    expect(await publishCv(copy.value.id)).toEqual({
+      ok: true,
+      value: { publishedId: copy.value.id, fitVerified: false },
+    })
+  })
+
+  it('a CV stored before the field existed reads as verified', async () => {
+    await migrated()
+    await CvModel.collection.updateOne(
+      { _id: LEGACY_CV_ID },
+      { $unset: { fitVerified: '' } }
+    )
+    expect((await listCvs()).cvs[0].fitVerified).toBe(true)
+  })
+})
+
+describe('the agent rules in saveCv', () => {
+  const CLOUD = 'https://res.cloudinary.com/test-cloud/image/upload/v1/c.png'
+
+  it("never takes '*'", async () => {
+    const { main } = await migrated()
+    expect(
+      await saveCv(main.id, {
+        label: 'X',
+        base: '*',
+        actor: 'agent',
+      })
+    ).toMatchObject({ ok: false, status: 400 })
+  })
+
+  it('refuses a partial resume, naming what is missing, and changes nothing', async () => {
+    const { main } = await migrated()
+    const result = await saveCv(main.id, {
+      resume: { name: 'Only the name' },
+      base: new Date(main.updatedAt),
+      actor: 'agent',
+    })
+    expect(result).toMatchObject({ ok: false, status: 400 })
+    if (result.ok) return
+    expect(result.error).toMatch(/Missing: role, photo/)
+    expect((await CvModel.findById(main.id).lean())?.resume.name).toBe(
+      main.resume.name
+    )
+  })
+
+  it('refuses a new third-party image or unsafe link; a URL already stored passes', async () => {
+    const { main } = await migrated()
+    // The owner's CV holds a photo from a host the rule would now refuse.
+    await CvModel.updateOne(
+      { _id: main.id },
+      { $set: { 'resume.photo': 'https://old-host.example.com/me.png' } }
+    )
+    const read = await getCv(main.id)
+    if (!read.ok) throw new Error(read.error)
+    const { resume, updatedAt } = read.value.cv
+    const write = (next: Resume) =>
+      saveCv(main.id, {
+        resume: next,
+        base: new Date(updatedAt),
+        actor: 'agent',
+      })
+
+    const pixel = await write({
+      ...resume,
+      photo: 'https://tracker.example.com/p.png',
+    })
+    expect(pixel).toMatchObject({ ok: false, status: 400 })
+    if (!pixel.ok) expect(pixel.error).toMatch(/not allowed on the CV/)
+
+    const badLink = await write({
+      ...resume,
+      contact: {
+        ...resume.contact,
+        links: [{ label: 'X', text: 'x', href: 'javascript:alert(1)' }],
+      },
+    })
+    expect(badLink).toMatchObject({ ok: false, status: 400 })
+
+    expect((await write({ ...resume, role: 'Kept photo' })).ok).toBe(true)
+  })
+
+  it('a Cloudinary image from this site passes', async () => {
+    const { main } = await migrated()
+    const result = await saveCv(main.id, {
+      resume: { ...main.resume, photo: CLOUD },
+      base: new Date(main.updatedAt),
+      actor: 'agent',
+    })
+    expect(result).toMatchObject({
+      ok: true,
+      value: { resume: { photo: CLOUD } },
+    })
+  })
+
+  it('a stale version is refused as stale, before the URLs are judged', async () => {
+    const { main } = await migrated()
+    await saveCv(main.id, {
+      resume: resumeNamed('Owner saved'),
+      base: '*',
+      actor: 'owner',
+    })
+    const result = await saveCv(main.id, {
+      resume: { ...main.resume, photo: 'https://tracker.example.com/p.png' },
+      base: new Date(main.updatedAt),
+      actor: 'agent',
+    })
+    expect(result).toMatchObject({
+      ok: false,
+      status: 409,
+      extra: { code: 'stale' },
+    })
+  })
+})
+
+describe('onlyIfUnpublished (P2-B, backing the tool check)', () => {
+  it('refuses the published CV as `published`, and saves any other', async () => {
+    const { main } = await migrated()
+    const other = await created('Other')
+
+    expect(
+      await saveCv(main.id, {
+        label: 'Nope',
+        base: new Date(main.updatedAt),
+        actor: 'agent',
+        onlyIfUnpublished: true,
+      })
+    ).toMatchObject({ ok: false, status: 409, extra: { code: 'published' } })
+    expect(
+      (
+        await saveCv(other.id, {
+          label: 'Fine',
+          base: new Date(other.updatedAt),
+          actor: 'agent',
+          onlyIfUnpublished: true,
+        })
+      ).ok
+    ).toBe(true)
+  })
+
+  it('a publish landing between the tool check and the write is refused at the write', async () => {
+    await migrated()
+    const target = await created('Published mid-write')
+
+    const real = CvModel.findOneAndUpdate.bind(CvModel)
+    vi.spyOn(CvModel, 'findOneAndUpdate').mockImplementationOnce(((
+      ...args: Parameters<typeof CvModel.findOneAndUpdate>
+    ) => {
+      const query = real(...args)
+      const exec = query.exec.bind(query)
+      // The owner's Publish lands after saveCv read the latest publish, before its write.
+      query.exec = (async () => {
+        await CvModel.updateOne(
+          { _id: target.id },
+          { $currentDate: { publishedAt: true } },
+          { timestamps: false }
+        )
+        return exec()
+      }) as never
+      return query
+    }) as never)
+
+    expect(
+      await saveCv(target.id, {
+        label: 'Sneaky',
+        base: new Date(target.updatedAt),
+        actor: 'agent',
+        onlyIfUnpublished: true,
+      })
+    ).toMatchObject({ ok: false, status: 409, extra: { code: 'published' } })
+    expect((await CvModel.findById(target.id).lean())?.label).toBe(
+      'Published mid-write'
+    )
+  })
+})
+
+describe('createCv with a resume (P2-D)', () => {
+  it('creates an unpublished, verified CV from the content sent', async () => {
+    await migrated()
+    const result = await createCv({
+      label: 'Rescued',
+      resume: { ...resumeNamed('  Rescued draft  ') },
+      actor: 'owner',
+    })
+    if (!result.ok) throw new Error(result.error)
+    expect(result.value.resume.name).toBe('  Rescued draft  ')
+    expect(result.value.publishedAt).toBeNull()
+    expect(result.value.fitVerified).toBe(true)
+  })
+
+  it('takes exactly one of fromId and resume', async () => {
+    await migrated()
+    expect(await createCv({ label: 'Neither', actor: 'owner' })).toMatchObject({
+      ok: false,
+      status: 400,
+    })
+    expect(
+      await createCv({
+        label: 'Both',
+        fromId: String(LEGACY_CV_ID),
+        resume: resumeNamed('x'),
+        actor: 'owner',
+      })
+    ).toMatchObject({ ok: false, status: 400 })
+    expect(
+      await createCv({ label: 'Bad', resume: 'text', actor: 'owner' })
+    ).toMatchObject({ ok: false, status: 400 })
+    expect(await CvModel.countDocuments()).toBe(1)
+  })
+})
+
+describe('agent reads', () => {
+  it('getCv returns the STORED resume - photo "" when it inherits the avatar - and the avatar', async () => {
+    await ProfileModel.create({
+      _id: DOC_ID,
+      avatar: 'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png',
+      resume: { ...legacyResume(), photo: '' },
+    })
+    const published = await getCv()
+    if (!published.ok) throw new Error(published.error)
+    expect(published.value.published).toBe(true)
+    expect(published.value.cv.resume.photo).toBe('')
+    expect(published.value.avatar).toBe(
+      'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png'
+    )
+
+    const other = await created('Other')
+    const read = await getCv(other.id)
+    expect(read).toMatchObject({ ok: true, value: { published: false } })
+    expect(await getCv('nope')).toMatchObject({ ok: false, status: 404 })
+    expect(
+      await getCv(new mongoose.Types.ObjectId().toHexString())
+    ).toMatchObject({ ok: false, status: 404 })
+  })
+
+  it('publishedCvId migrates first; listCvSummaries never does', async () => {
+    expect(await listCvSummaries()).toEqual([])
+    expect(await CvModel.countDocuments()).toBe(0)
+
+    expect(await publishedCvId()).toBe(String(LEGACY_CV_ID))
+    expect(await listCvSummaries()).toEqual([
+      { id: String(LEGACY_CV_ID), label: 'Main CV', published: true },
+    ])
   })
 })

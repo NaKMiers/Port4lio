@@ -25,7 +25,9 @@ import type { CvDto } from '@/types/cv'
  *   bodies          malformed ──▶ 400 · over MAX_CV_JSON_BYTES ──▶ 413          (D8)
  *   [id]            not an ObjectId ──▶ 404 · unknown ──▶ 404 (params awaited, Next 16)
  *   PATCH           base required · '*' overwrites · stale ──▶ 409 code stale + updatedAt
- *   answers         CvDto { id, label, resume, publishedAt, updatedAt }
+ *                   the owner's Save CV verifies the fit an agent write cleared      (P2-A)
+ *   POST            { label, fromId } or { label, resume } - exactly one            (P2-D)
+ *   answers         CvDto { id, label, resume, publishedAt, updatedAt, fitVerified }
  * ```
  */
 
@@ -147,6 +149,7 @@ describe('GET /api/admin/cvs', () => {
     expect(body.publishedId).toBe(LEGACY)
     expect(body.cvs).toHaveLength(1)
     expect(Object.keys(body.cvs[0]).sort()).toEqual([
+      'fitVerified',
       'id',
       'label',
       'publishedAt',
@@ -189,6 +192,39 @@ describe('POST /api/admin/cvs', () => {
   })
 })
 
+describe('POST /api/admin/cvs with a resume (Save as new CV, P2-D)', () => {
+  const post = (body: unknown) =>
+    list.POST(request('POST', '/api/admin/cvs', { body }))
+
+  it('201 with a new, unpublished CV holding the content sent', async () => {
+    await listed()
+    const res = await post({
+      label: 'Rescued',
+      resume: { ...makeEmptyResume(), name: 'The kept draft' },
+    })
+    expect(res.status).toBe(201)
+    const { cv } = (await res.json()) as { cv: CvDto }
+    expect(cv.resume.name).toBe('The kept draft')
+    expect(cv.publishedAt).toBeNull()
+    expect(cv.fitVerified).toBe(true)
+  })
+
+  it('400 for both fromId and resume, or neither', async () => {
+    await listed()
+    expect(
+      (
+        await post({
+          label: 'Both',
+          fromId: LEGACY,
+          resume: makeEmptyResume(),
+        })
+      ).status
+    ).toBe(400)
+    expect((await post({ label: 'Neither' })).status).toBe(400)
+    expect(await CvModel.countDocuments()).toBe(1)
+  })
+})
+
 describe('PATCH /api/admin/cvs/[id]', () => {
   const patch = (id: string, body: unknown) =>
     item.PATCH(request('PATCH', `/api/admin/cvs/${id}`, { body }), ctx(id))
@@ -224,6 +260,23 @@ describe('PATCH /api/admin/cvs/[id]', () => {
     expect(((await overwrite.json()) as { cv: CvDto }).cv.resume.name).toBe(
       'Owner wins'
     )
+  })
+
+  it("the owner's Save CV sets fitVerified; a rename does not (P2-A)", async () => {
+    await listed()
+    await CvModel.updateOne(
+      { _id: LEGACY_CV_ID },
+      { $set: { fitVerified: false } }
+    )
+
+    const renamed = await patch(LEGACY, { label: 'Renamed', base: '*' })
+    expect(((await renamed.json()) as { cv: CvDto }).cv.fitVerified).toBe(false)
+
+    const saved = await patch(LEGACY, {
+      resume: { ...makeEmptyResume(), name: 'Checked' },
+      base: '*',
+    })
+    expect(((await saved.json()) as { cv: CvDto }).cv.fitVerified).toBe(true)
   })
 
   it('404 for a malformed or unknown id, 400 without a usable base, 400 malformed, 413 oversize', async () => {
