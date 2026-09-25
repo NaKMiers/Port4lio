@@ -363,6 +363,29 @@ export const CLOUDINARY_DELETE_LIMIT: RateLimitOptions = {
 }
 
 /**
+ * The small whiteboard writes an agent makes - `whiteboard_add_item`, `whiteboard_link`,
+ * `whiteboard_arrange` - per token. Sized for a session that records a briefing and links it
+ * to a dozen goals, or tidies a board it composed, several times over; it only stops a loop
+ * that is adding cards one by one at request speed.
+ */
+export const WHITEBOARD_AGENT_WRITE_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-agent-write',
+  limit: 200,
+  windowSeconds: 10 * 60,
+}
+
+/**
+ * `whiteboard_compose`, per token. One call writes up to COMPOSE_LIMITS.items (150), so this
+ * bounds an agent at a few thousand items an hour - room to compose a board, look at the
+ * result and compose a second draft, without a runaway filling the collection.
+ */
+export const WHITEBOARD_COMPOSE_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-compose',
+  limit: 20,
+  windowSeconds: 60 * 60,
+}
+
+/**
  * The daily blog cron, and this is where "1 blog/day" is actually enforced.
  *
  * NOT the schedule. Vercel's own cron docs are explicit that delivery is best effort and that

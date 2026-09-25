@@ -1,8 +1,20 @@
 import 'server-only'
 
+import crypto from 'node:crypto'
+
 import mongoose, { Types, type QueryFilter } from 'mongoose'
 
 import { connectDatabase } from '@/lib/mongodb'
+import {
+  COMPOSE_LIMITS,
+  layoutComposition,
+  pickHandles,
+  type CardWidth,
+  type ComposeLayout,
+  type LayoutSection,
+  type Placed,
+  type Rect,
+} from '@/lib/whiteboard/compose-layout'
 import {
   dayRangeBounds,
   type ContextBoard,
@@ -20,9 +32,13 @@ import {
   deriveInkBBox,
   isObjectIdString,
   type ShareMode,
+  LIMITS,
+  validateBoard,
   validateItem,
+  validateItemPatch,
   validateLink,
   type BulkPositionUpdate,
+  type Shape,
   type ItemFields,
   type InkPoint,
   type ItemPatch,
@@ -80,6 +96,11 @@ import {
  *   agent writes:  createAgentItem ─▶ only on a VISIBLE board, at top level or inside a
  *                  VISIBLE frame; the card gets includeInAi: true and the tag `agent`
  *                  createAgentLink ─▶ only between two items loadAgentVisible can see
+ *                  composeAgentBoard ─▶ a whole outline (frames, cards, shapes, links) laid
+ *                                      out by compose-layout.ts, on a visible board or a
+ *                                      new one it creates visible; every item tagged `agent`
+ *                  arrangeAgentItems ─▶ move, resize or delete - only VISIBLE items that
+ *                                      carry the `agent` tag, never an owner-written card
  * ```
  *
  * ## Boards scope every query (D32)
@@ -1550,6 +1571,598 @@ export async function createAgentLink(input: {
   })
   if (!checked.ok) return failure(checked.status ?? 400, checked.error)
   return createLink(String(from.boardId), checked.value)
+}
+
+// MARK: Agent compose (site MCP: whiteboard_compose)
+
+export interface ComposeCardInput {
+  ref?: string
+  form: 'text' | 'todo' | 'shape'
+  /** For a shape card; `rect` when omitted. */
+  shape?: Shape
+  title: string
+  body?: string
+  meaning?: Meaning | null
+  status?: Status | null
+  todos?: { text: string; done?: boolean }[]
+  tags?: string[]
+  when?: string | null
+  targetBy?: string | null
+}
+
+export interface ComposeSectionInput {
+  ref?: string
+  title: string
+  columns?: number
+  cardWidth?: CardWidth
+  cards: ComposeCardInput[]
+}
+
+export interface ComposeInput {
+  boardId?: string
+  newBoard?: { title: string }
+  layout: ComposeLayout
+  heading?: string
+  sections: ComposeSectionInput[]
+  /** Ends are refs from this call, or ids of visible items already on the board. */
+  links?: { from: string; to: string; label?: string }[]
+}
+
+export interface ComposeResult {
+  board: { id: string; title: string; created: boolean; path: string }
+  items: number
+  links: number
+  /** Every ref in the call, mapped to the id it was written under. */
+  refs: Record<string, string>
+  bounds: Rect
+}
+
+/** Gap between what is already on the board and a new composition. */
+const COMPOSE_OFFSET = 200
+
+/**
+ * The id for one planned document. With a seed (the token and its clientRef) it is derived,
+ * so a retry after a partial write lands on the SAME ids and every upsert below is a no-op
+ * for what already landed - the call converges instead of drawing a second board.
+ */
+function plannedId(seed: string | null, key: string): string {
+  if (!seed) return new Types.ObjectId().toHexString()
+  return crypto
+    .createHash('sha256')
+    .update(`${seed}\u0000${key}`)
+    .digest('hex')
+    .slice(0, 24)
+}
+
+/**
+ * Write a whole board outline for an agent in one call.
+ *
+ * ```
+ *   1 target     boardId (visible) │ newBoard (created visible, last) │ the one visible board
+ *   2 refs       every section, card and the heading gets a ref ──▶ a planned id
+ *   3 origin     right of what is already at top level (ignoring this call's own ids)
+ *   4 layout     compose-layout.ts: frames, card positions, estimated heights, auto arrows
+ *   5 validate   validateItem + vocab for every item, every link end resolved   ← nothing
+ *                                                                                  written yet
+ *   6 write      board ─▶ items (one ordered bulk upsert, frames first) ─▶ links
+ * ```
+ *
+ * Everything that can be refused is refused in 1-5, before the first write, so a bad meaning
+ * on card 37 does not leave 36 cards and an empty board behind - that includes a planned id
+ * that already sits on another board, which is looked up rather than discovered by the
+ * upsert. What can still fail after a write is a database error, or a link whose existing end
+ * the owner deleted while the call ran. That refusal says the items landed, and the planned
+ * ids make a retry with the same clientRef finish the board rather than copy it.
+ *
+ * Every item is `includeInAi: true` and tagged `agent`, the same marker `createAgentItem`
+ * uses, which is also what `arrangeAgentItems` checks before it will touch anything.
+ */
+export async function composeAgentBoard(
+  input: ComposeInput,
+  { seed = null }: { seed?: string | null } = {}
+): Promise<DataResult<ComposeResult>> {
+  await connectDatabase()
+  const boards = await visibleBoards()
+  const listBoards = () =>
+    boards.length
+      ? `Visible boards: ${boards.map(board => `${board.title || 'Untitled'} (${String(board._id)})`).join(', ')}.`
+      : 'No board is shared with agents yet; pass newBoard to start one.'
+
+  // 1 Target. A new board is only planned here; it is written in step 6.
+  let target: { id: string; title: string; created: boolean }
+  if (input.newBoard) {
+    if (input.boardId)
+      return failure(400, 'Pass boardId or newBoard, not both.')
+    // The owner's own board validator, so an agent cannot store a title the board API
+    // would refuse (a newline, say).
+    const board = validateBoard({
+      title: input.newBoard.title,
+      includeInAi: true,
+    })
+    if (!board.ok) return failure(400, `newBoard: ${board.error}`)
+    target = {
+      id: plannedId(seed, 'board'),
+      title: board.value.title,
+      created: true,
+    }
+  } else if (input.boardId) {
+    const board = boards.find(
+      entry => String(entry._id) === input.boardId!.toLowerCase()
+    )
+    if (!board)
+      return failure(404, `No visible board with that id. ${listBoards()}`)
+    target = { id: String(board._id), title: board.title ?? '', created: false }
+  } else if (boards.length === 1)
+    target = {
+      id: String(boards[0]._id),
+      title: boards[0].title ?? '',
+      created: false,
+    }
+  else
+    return failure(
+      400,
+      `Say which board: pass boardId, or newBoard to start a fresh one. ${listBoards()}`
+    )
+  const boardId = oid(target.id)
+
+  // 2 Refs.
+  const idOf = new Map<string, string>()
+  const claimRef = (ref: string, where: string): string | null => {
+    if (idOf.has(ref)) return `${where}: ref "${ref}" is used twice.`
+    if (isObjectIdString(ref))
+      return `${where}: ref "${ref}" looks like an item id; pick a short name instead.`
+    idOf.set(ref, plannedId(seed, `ref:${ref}`))
+    return null
+  }
+  const withHeading = input.layout === 'mindmap' || Boolean(input.heading)
+  if (withHeading) idOf.set('heading', plannedId(seed, 'ref:heading'))
+
+  const sections: LayoutSection[] = []
+  const cardInput = new Map<string, ComposeCardInput>()
+  let total = withHeading ? 1 : 0
+  for (const [s, section] of input.sections.entries()) {
+    const sectionRef = section.ref ?? `section-${s + 1}`
+    const clash = claimRef(sectionRef, `sections[${s}]`)
+    if (clash) return failure(400, clash)
+    const cards = section.cards.map((card, c) => ({
+      ...card,
+      ref: card.ref ?? `${sectionRef}.card-${c + 1}`,
+    }))
+    for (const [c, card] of cards.entries()) {
+      const cardClash = claimRef(card.ref, `sections[${s}].cards[${c}]`)
+      if (cardClash) return failure(400, cardClash)
+      cardInput.set(card.ref, card)
+    }
+    total += 1 + cards.length
+    sections.push({
+      ref: sectionRef,
+      title: section.title,
+      columns: section.columns,
+      cardWidth: section.cardWidth,
+      cards: cards.map(card => ({
+        ref: card.ref,
+        form: card.form,
+        title: card.title,
+        body: card.body ?? '',
+        todos: (card.todos ?? []).map(row => row.text),
+        tags: card.tags ?? [],
+        hasMeta: Boolean(card.status || card.when || card.targetBy),
+      })),
+    })
+  }
+  if (total > COMPOSE_LIMITS.items)
+    return failure(
+      400,
+      `This outline is ${total} items; one call writes at most ${COMPOSE_LIMITS.items}. Split it across two calls (the second can link to the first's ids).`
+    )
+
+  // 3 Origin: beside the board's existing top-level items, never on top of them. Hidden
+  // items count too, on purpose: this looks like it reads past the privacy filter, but a
+  // composition drawn over the owner's private cards would be worse than `bounds` implying
+  // that something sits to its left.
+  const planned = [...idOf.values()].map(oid)
+  const existing = target.created
+    ? []
+    : await WhiteboardItemModel.find(
+        { boardId, parentId: null, _id: { $nin: planned } },
+        { x: 1, y: 1, width: 1, height: 1 }
+      ).lean()
+  const origin = existing.length
+    ? {
+        x:
+          Math.max(...existing.map(item => item.x + item.width)) +
+          COMPOSE_OFFSET,
+        y: Math.min(...existing.map(item => item.y)),
+      }
+    : { x: 0, y: 0 }
+
+  // 4 Layout.
+  const layout = layoutComposition({
+    layout: input.layout,
+    heading: withHeading ? (input.heading ?? target.title) : null,
+    sections,
+    origin,
+  })
+
+  // 5 Validate every item and link before anything is written.
+  const vocab = await getVocab()
+  const items: ItemFields[] = []
+  const absolute = new Map<string, Rect>()
+  const frameAt = new Map(layout.frames.map(frame => [frame.ref, frame]))
+
+  const build = (
+    placed: Placed,
+    fields: Record<string, unknown>,
+    where: string
+  ): string | null => {
+    const tags = Array.from(
+      new Set(['agent', ...((fields.tags as string[] | undefined) ?? [])])
+    ).slice(0, LIMITS.tags)
+    const checked = validateItem({
+      _id: idOf.get(placed.ref),
+      parentId: placed.parentRef ? idOf.get(placed.parentRef) : null,
+      x: placed.x,
+      y: placed.y,
+      width: placed.width,
+      height: placed.height,
+      includeInAi: true,
+      ...fields,
+      tags,
+    })
+    if (!checked.ok) return `${where}: ${checked.error}`
+    const unknown = checkVocab(
+      vocab,
+      checked.value.meaning,
+      checked.value.status
+    )
+    if (unknown) return `${where}: ${unknown}`
+    items.push({
+      ...checked.value,
+      status: normalizeStatus(
+        vocab,
+        checked.value.meaning,
+        checked.value.status
+      ),
+    })
+    const frame = placed.parentRef ? frameAt.get(placed.parentRef) : undefined
+    absolute.set(placed.ref, {
+      x: placed.x + (frame?.x ?? 0),
+      y: placed.y + (frame?.y ?? 0),
+      width: placed.width,
+      height: placed.height,
+    })
+    return null
+  }
+
+  // Frames first: the ordered bulk write below then never inserts a child before its frame.
+  for (const [index, frame] of layout.frames.entries()) {
+    const error = build(
+      frame,
+      { form: 'frame', title: sections[index].title, z: 0 },
+      `sections[${index}]`
+    )
+    if (error) return failure(400, error)
+  }
+  if (layout.heading) {
+    const error = build(
+      layout.heading,
+      {
+        form: 'shape',
+        shape: input.layout === 'mindmap' ? 'ellipse' : 'rect',
+        title: input.heading ?? target.title,
+        z: 1,
+      },
+      'heading'
+    )
+    if (error) return failure(400, error)
+  }
+  for (const placed of layout.cards) {
+    const card = cardInput.get(placed.ref)!
+    const error = build(
+      placed,
+      {
+        form: card.form,
+        shape: card.form === 'shape' ? (card.shape ?? 'rect') : null,
+        title: card.title,
+        body: card.body ?? '',
+        meaning: card.meaning ?? null,
+        status: card.status ?? null,
+        todos: (card.todos ?? []).map((row, index) => ({
+          id: `row-${index + 1}`,
+          text: row.text,
+          done: row.done ?? false,
+        })),
+        tags: card.tags,
+        when: card.when ?? null,
+        targetBy: card.targetBy ?? null,
+        z: 1,
+      },
+      `card "${placed.ref}"`
+    )
+    if (error) return failure(400, error)
+  }
+
+  // Link ends: a ref from this call, or a visible item already on this board.
+  const scope = await visibleScope(await visibleBoardIds())
+  const resolveEnd = async (
+    value: string,
+    where: string
+  ): Promise<{ id: string; rect: Rect } | string> => {
+    const ref = idOf.get(value)
+    if (ref) return { id: ref, rect: absolute.get(value)! }
+    if (!isObjectIdString(value) || target.created)
+      return `${where}: "${value}" is not a ref in this call${target.created ? '' : ' or a visible item on this board'}.`
+    const found = await WhiteboardItemModel.findOne(
+      visibleAnd(scope, { _id: oid(value), boardId }),
+      { x: 1, y: 1, width: 1, height: 1, parentId: 1 }
+    ).lean()
+    if (!found)
+      return `${where}: "${value}" is not a ref in this call or a visible item on this board.`
+    const parent = found.parentId
+      ? await WhiteboardItemModel.findById(found.parentId, {
+          x: 1,
+          y: 1,
+        }).lean()
+      : null
+    return {
+      id: String(found._id),
+      rect: {
+        x: found.x + (parent?.x ?? 0),
+        y: found.y + (parent?.y ?? 0),
+        width: found.width,
+        height: found.height,
+      },
+    }
+  }
+
+  const links: LinkFields[] = []
+  const seen = new Set<string>()
+  const addLink = (fields: Omit<LinkFields, '_id'>, where: string) => {
+    const key = `${fields.from}|${fields.to}|${fields.label}`
+    if (seen.has(key)) return null
+    seen.add(key)
+    const checked = validateLink({
+      ...fields,
+      _id: plannedId(seed, `link:${key}`),
+    })
+    if (!checked.ok) return `${where}: ${checked.error}`
+    links.push(checked.value)
+    return null
+  }
+  for (const auto of layout.autoLinks) {
+    const error = addLink(
+      {
+        from: idOf.get(auto.from)!,
+        to: idOf.get(auto.to)!,
+        label: '',
+        fromHandle: auto.fromHandle,
+        toHandle: auto.toHandle,
+      },
+      'layout'
+    )
+    if (error) return failure(400, error)
+  }
+  for (const [index, link] of (input.links ?? []).entries()) {
+    const where = `links[${index}]`
+    const from = await resolveEnd(link.from, `${where}.from`)
+    if (typeof from === 'string') return failure(400, from)
+    const to = await resolveEnd(link.to, `${where}.to`)
+    if (typeof to === 'string') return failure(400, to)
+    if (from.id === to.id)
+      return failure(400, `${where}: a link needs two different items.`)
+    const [fromHandle, toHandle] = pickHandles(from.rect, to.rect)
+    const error = addLink(
+      {
+        from: from.id,
+        to: to.id,
+        label: (link.label ?? '').trim(),
+        fromHandle,
+        toHandle,
+      },
+      where
+    )
+    if (error) return failure(400, error)
+  }
+
+  // The last check, and a read: a planned id already on ANOTHER board would make the upsert
+  // below a silent no-op for it. Looked up here, so the refusal still comes before a write.
+  const [itemClash, linkClash] = await Promise.all([
+    WhiteboardItemModel.exists({
+      _id: { $in: items.map(fields => oid(fields._id)) },
+      boardId: { $ne: boardId },
+    }),
+    WhiteboardLinkModel.exists({
+      _id: { $in: links.map(link => oid(link._id)) },
+      boardId: { $ne: boardId },
+    }),
+  ])
+  if (itemClash || linkClash)
+    return failure(
+      409,
+      'Some planned ids already belong to another board. Retry with a new clientRef. Nothing was changed.'
+    )
+
+  // 6 Write. The board first.
+  if (target.created) {
+    await WhiteboardBoardModel.updateOne(
+      { _id: boardId },
+      { $setOnInsert: { title: target.title, includeInAi: true } },
+      { upsert: true }
+    )
+    // A retry whose board the owner has since hidden must not keep writing into it.
+    const board = await WhiteboardBoardModel.findById(boardId, {
+      includeInAi: 1,
+    }).lean()
+    if (!board?.includeInAi)
+      return failure(409, 'That board is no longer shared with agents.')
+  }
+
+  await WhiteboardItemModel.bulkWrite(
+    items.map(fields => ({
+      updateOne: {
+        filter: { _id: oid(fields._id) },
+        update: { $setOnInsert: { ...withBBox(fields), boardId } },
+        upsert: true,
+      },
+    })),
+    { ordered: true }
+  )
+  // By id alone, then checked, as `createItem` does: an id already on another board is a
+  // refusal, never a silent move.
+  const landed = await WhiteboardItemModel.countDocuments({
+    _id: { $in: items.map(fields => oid(fields._id)) },
+    boardId,
+  })
+  const path = `/admin/whiteboard/${target.id}`
+  const partial = (why: string) =>
+    failure(
+      409,
+      `The ${items.length} items were written to ${path}, but ${why} Retry with the same clientRef to finish this board; do not start a new one.`
+    )
+  if (landed !== items.length)
+    return partial('some of them could not be confirmed on that board.')
+
+  let written = 0
+  for (const link of links) {
+    const result = await createLink(target.id, link)
+    // An arrow the owner already drew between two existing cards is not an error.
+    if (result.ok) written += 1
+    else if (result.error !== 'That link already exists.')
+      return partial(`a link failed: ${result.error}`)
+  }
+
+  return {
+    ok: true,
+    value: {
+      board: {
+        id: target.id,
+        title: target.title,
+        created: target.created,
+        path,
+      },
+      items: items.length,
+      links: written,
+      refs: Object.fromEntries(idOf),
+      bounds: layout.bounds,
+    },
+  }
+}
+
+// MARK: Agent arrange (site MCP: whiteboard_arrange)
+
+export interface ArrangeInput {
+  moves?: {
+    id: string
+    x?: number
+    y?: number
+    width?: number
+    height?: number
+  }[]
+  deletes?: string[]
+}
+
+export interface ArrangeResult {
+  moved: string[]
+  deleted: string[]
+}
+
+/**
+ * Move, resize or delete items an agent wrote itself - the tidy-up pass after a compose.
+ *
+ * The line D1 drew is "no agent write changes an owner-written card", and this keeps it:
+ * every id must be VISIBLE and carry the `agent` tag, checked for the whole call before the
+ * first write, and one id that fails refuses all of them.
+ *
+ * ```
+ *   id not visible, or no `agent` tag     ──▶ refused, whole call  (same answer as unknown)
+ *   an agent FRAME holding anything else  ──▶ refused, whole call
+ *   otherwise                             ──▶ patchItem / deleteItem, the owner's own paths
+ * ```
+ *
+ * The frame rule exists because a frame carries its children: moving one moves every card
+ * inside it, and deleting one un-parents them (`deleteItem`). An owner card dragged into an
+ * agent frame would be changed by either, so such a frame is the owner's to move.
+ *
+ * The tag is the whole ownership test, and it is the OWNER's to edit: removing `agent` from
+ * a card claims it, and no agent can touch it again; adding it hands a card over. There is
+ * deliberately no hidden `createdBy` field - it would change the backup format and
+ * `visible.ts` (mcp.md "Marking agent cards") for a boundary the owner can already see and
+ * set on the card itself.
+ */
+export async function arrangeAgentItems(
+  input: ArrangeInput
+): Promise<DataResult<ArrangeResult>> {
+  await connectDatabase()
+  const moves = input.moves ?? []
+  const deletes = input.deletes ?? []
+  if (!moves.length && !deletes.length)
+    return failure(400, 'Give at least one move or delete.')
+
+  const ids = [...moves.map(move => move.id), ...deletes].map(id =>
+    id.toLowerCase()
+  )
+  if (new Set(ids).size !== ids.length)
+    return failure(400, 'Each id may appear once, in moves or in deletes.')
+  const bad = ids.find(id => !isObjectIdString(id))
+  if (bad) return failure(404, `Not an agent item you can change: ${bad}.`)
+
+  const scope = await visibleScope(await visibleBoardIds())
+  const found = await WhiteboardItemModel.find(
+    visibleAnd(scope, { _id: { $in: ids.map(oid) }, tags: 'agent' }),
+    { boardId: 1, form: 1 }
+  ).lean()
+  const boardOf = new Map(
+    found.map(doc => [String(doc._id), String(doc.boardId)])
+  )
+  const missing = ids.find(id => !boardOf.has(id))
+  // Hidden, unknown and owner-written ids are one answer (rule 6).
+  if (missing)
+    return failure(
+      404,
+      `Not an agent item you can change: ${missing}. whiteboard_arrange only touches visible items tagged agent. Nothing was changed.`
+    )
+
+  // Frames the agent wrote that hold something it did not (see the header). The message
+  // names no child, so a private card inside stays unnamed.
+  const frameIds = found.filter(doc => doc.form === 'frame').map(doc => doc._id)
+  if (frameIds.length) {
+    const holding = await WhiteboardItemModel.findOne(
+      { parentId: { $in: frameIds }, tags: { $ne: 'agent' } },
+      { parentId: 1 }
+    ).lean()
+    if (holding)
+      return failure(
+        400,
+        `Frame ${String(holding.parentId)} holds items the owner put there, so moving or deleting it would move theirs too. Leave it, or arrange the agent cards inside it instead. Nothing was changed.`
+      )
+  }
+
+  const patches = []
+  for (const move of moves) {
+    const { id, ...fields } = move
+    const patch = validateItemPatch(
+      Object.fromEntries(
+        Object.entries(fields).filter(([, value]) => value !== undefined)
+      )
+    )
+    if (!patch.ok) return failure(400, `${id}: ${patch.error}`)
+    patches.push({ id: id.toLowerCase(), patch: patch.value })
+  }
+
+  const moved: string[] = []
+  for (const { id, patch } of patches) {
+    const result = await patchItem(boardOf.get(id)!, id, patch)
+    if (!result.ok) return result
+    moved.push(id)
+  }
+  const deleted: string[] = []
+  for (const raw of deletes) {
+    const id = raw.toLowerCase()
+    const result = await deleteItem(boardOf.get(id)!, id)
+    if (!result.ok) return result
+    deleted.push(id)
+  }
+  return { ok: true, value: { moved, deleted } }
 }
 
 // MARK: Restore (D20, D21)

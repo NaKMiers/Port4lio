@@ -12,7 +12,6 @@ import {
 
 import { AgentActionModel } from '@/models/AgentAction'
 import { AgentTokenModel } from '@/models/AgentToken'
-import { CcafProgressModel } from '@/models/CcafProgress'
 import { KindModel } from '@/models/Kind'
 import { PostModel } from '@/models/Post'
 import { RateLimitModel } from '@/models/RateLimit'
@@ -29,7 +28,6 @@ import { mcpClient, type RouteHandler } from './mcp-helpers'
  *   get_me / resume  never written ──▶ the seed /cv prints, not null
  *   archive_post     archive a live post (revalidates) · unarchive: never public ──▶ draft,
  *                    once public ──▶ refused, pointing at publish_post (C11)
- *   ccaf             status ids · log a mock of 42 correct, once per clientRef · confidence
  *   tailor-cv        markdown only; tells the agent never to call update_profile (R8)
  *   taxonomy-service a relabel revalidates /blog; the delete guards hold (C8)
  * ```
@@ -103,7 +101,6 @@ afterEach(async () => {
   await Promise.all([
     AgentTokenModel.deleteMany({}),
     AgentActionModel.deleteMany({}),
-    CcafProgressModel.deleteMany({}),
     KindModel.deleteMany({}),
     PostModel.deleteMany({}),
     ProfileModel.deleteMany({}),
@@ -353,130 +350,6 @@ describe('archive_post (C11)', () => {
     expect(call.text).toMatch(/Publish it again to make it live/)
     expect(call.text).toMatch(/publish_post/)
     expect((await PostModel.findById(once._id))?.status).toBe('archived')
-  })
-})
-
-describe('CCA-F', () => {
-  it('logs a mock by correct answers, once per clientRef, and reports readiness', async () => {
-    const t = await token(['read', 'write'])
-    const status = parse((await client.callTool(t, 'ccaf_status')).text)
-    expect(status.progress.total).toBeGreaterThan(0)
-    expect(status.nextTasks[0].id).toMatch(/^w\d+-\d+-\d+$/)
-    expect(status.latestMock).toBeNull()
-
-    const args = {
-      logMock: { correct: 42, label: 'Mock 3' },
-      confidence: [{ domain: 1, level: 4 }],
-      tickTasks: [status.nextTasks[0].id],
-      clientRef: 'mock-3',
-    }
-    const logged = await client.callTool(t, 'ccaf_update', args)
-    expect(logged.isError, logged.text).toBe(false)
-    const result = parse(logged.text)
-    expect(result.loggedMock).toMatchObject({ correct: 42, label: 'Mock 3' })
-    expect(result.status.latestMock).toMatchObject({
-      correct: 42,
-      outOf: 60,
-      estimatedScaledScore: 730,
-      passes: true,
-    })
-    expect(result.status.readinessPercent).not.toBeNull()
-    expect(result.status.progress.done).toBe(1)
-
-    // A retry after a timeout does not log the mock twice.
-    await client.callTool(t, 'ccaf_update', args)
-    expect(
-      (await CcafProgressModel.findById('ccaf-progress').lean())?.mocks
-    ).toHaveLength(1)
-  })
-
-  it('a save landing between the read and the write is re-read, not overwritten', async () => {
-    const t = await token(['read', 'write'])
-    await client.callTool(t, 'ccaf_update', {
-      logMock: { correct: 40, label: 'A' },
-      clientRef: 'mock-a',
-    })
-    // The tracker page (or another call) saves just after this update read the document.
-    const original = CcafProgressModel.updateOne.bind(CcafProgressModel)
-    const race = vi
-      .spyOn(CcafProgressModel, 'updateOne')
-      .mockImplementationOnce(((...args: Parameters<typeof original>) => {
-        const [filter, update, options] = args
-        return (async () => {
-          await CcafProgressModel.collection.updateOne(
-            { _id: 'ccaf-progress' as never },
-            {
-              $push: {
-                mocks: {
-                  id: 'mock-page',
-                  date: '2026-09-20',
-                  label: 'Page',
-                  correct: 38,
-                  domainPercents: [null, null, null, null, null],
-                },
-              } as never,
-              $set: { updatedAt: new Date(Date.now() + 5) },
-            }
-          )
-          return original(filter, update, options)
-        })()
-      }) as never)
-    const logged = await client.callTool(t, 'ccaf_update', {
-      logMock: { correct: 44, label: 'B' },
-      clientRef: 'mock-b',
-    })
-    race.mockRestore()
-    expect(logged.isError, logged.text).toBe(false)
-    const mocks =
-      (await CcafProgressModel.findById('ccaf-progress').lean())?.mocks ?? []
-    expect(mocks.map(mock => mock.label).sort()).toEqual(['A', 'B', 'Page'])
-  })
-
-  it('a database blip on the read fails the update instead of saving the empty plan', async () => {
-    const t = await token(['read', 'write'])
-    await client.callTool(t, 'ccaf_update', {
-      logMock: { correct: 42, label: 'Kept' },
-      clientRef: 'kept',
-    })
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    const blip = vi
-      .spyOn(CcafProgressModel, 'findById')
-      .mockImplementationOnce(() => {
-        throw new Error('connection reset')
-      })
-    const failed = await client.callTool(t, 'ccaf_update', {
-      confidence: [{ domain: 2, level: 3 }],
-    })
-    blip.mockRestore()
-    expect(failed.isError).toBe(true)
-    const mocks =
-      (await CcafProgressModel.findById('ccaf-progress').lean())?.mocks ?? []
-    expect(mocks.map(mock => mock.label)).toEqual(['Kept'])
-  })
-
-  it('an update refused for an unknown id spends none of the save budget', async () => {
-    const t = await token(['read', 'write'])
-    await client.callTool(t, 'ccaf_update', { tickTasks: ['w9-9-9'] })
-    const buckets = (await RateLimitModel.find({}).lean()).map(row =>
-      String(row._id)
-    )
-    expect(buckets.some(key => key.includes('mcp-token:'))).toBe(false)
-  })
-
-  it('refuses unknown ids and a scaled score passed as correct, writing nothing', async () => {
-    const t = await token(['read', 'write'])
-    const unknown = await client.callTool(t, 'ccaf_update', {
-      tickTasks: ['w9-9-9'],
-    })
-    expect(unknown.isError).toBe(true)
-    expect(unknown.text).toMatch(/Unknown task ids: w9-9-9/)
-
-    const scaled = await client.callTool(t, 'ccaf_update', {
-      logMock: { correct: 720 },
-    })
-    expect(scaled.isError).toBe(true)
-    expect(scaled.text).toMatch(/logMock\.correct/)
-    expect(await CcafProgressModel.countDocuments()).toBe(0)
   })
 })
 

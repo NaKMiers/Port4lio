@@ -126,7 +126,7 @@ export const CV_SHEET_CSS = `
 .cv .gBody  { margin-top: ${u(14.829)}; } /* heading       -> body          */
 .cv .gSkill { margin-top: ${u(12.079)}; } /* heading       -> skill row     */
 .cv .gProj  { margin-top: ${u(10.5)}; }   /* project       -> project       */
-.cv .gTop   { margin-top: ${u(42.629)}; } /* page 2 top    -> first body    */
+.cv .gTop   { margin-top: ${u(32)}; }     /* page 2 top    -> first body    */
 
 /* Bullet indents. Level 1 text sits 26.5u in from the margin, level 2 at 51.5u. */
 .cv .ind1 { padding-left: ${u(26.5)}; }

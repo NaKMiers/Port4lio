@@ -28,6 +28,20 @@
 **Priority:** P3
 **Depends on:** None
 
+## CV
+
+### Remove the legacy `profile.resume` field once multi-CV is proven
+
+**What:** Drop `resume` from the Profile schema, stop `POST /api/profile` accepting it, and `$unset` it from the stored profile.
+
+**Why:** After multi-CV ships, the `cvs` collection is the only CV source. `profile.resume` is read only as the pre-migration fallback, and a stale settings tab can still write to it and get a 200 while nothing reads it.
+
+**Context:** Kept on purpose by the multi-CV plan (`docs/designs/cv/multi-cv-plan.md` D5, T1) as the migration source and rollback path. Removing it touches `src/models/Profile.ts`, `src/lib/profile.ts` (`normalizeProfile`), the legacy fallback in `loadPublishedResume` and `readProfileSection('resume')`, and the pinned `tests/api/profile-route.test.ts:265` and `tests/api/mcp-operator-tools.test.ts:416,431` cases, which move to the `cvs` path.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Multi-CV live in prod and the "Main CV" migrated (the CV tab opened once after deploy)
+
 ## Completed
 
 ### Local undo/redo on the canvas

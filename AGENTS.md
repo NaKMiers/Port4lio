@@ -191,8 +191,8 @@ which is where to look first:
     removal (mcp-plan.md T11).
 - **One service per write**: a route handler and an MCP tool that change the same
   data call the same function in `src/lib/<domain>/*-service.ts`. Examples are
-  `blog/post-service.ts`, `blog/taxonomy-service.ts`, `profile-service.ts` and
-  `ccaf/progress-service.ts`. Never re-implement a write inside a tool.
+  `blog/post-service.ts`, `blog/taxonomy-service.ts` and `profile-service.ts`.
+  Never re-implement a write inside a tool.
   Revalidation (`revalidatePublishedPost`, `revalidatePath('/blog')`,
   `revalidateTag`) lives **inside** the service after the write succeeds. A
   second front door that forgot it would still return 200, and the live page

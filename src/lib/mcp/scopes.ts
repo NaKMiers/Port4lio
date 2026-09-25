@@ -4,7 +4,7 @@
  *
  * ```
  *   read     every read tool, lint_draft, get_writing_brief, context.md      on by default
- *   write    drafts, images for unpublished posts, whiteboard + CCA-F writes  on by default
+ *   write    drafts, images for unpublished posts, whiteboard writes          on by default
  *   publish  anything the public sees: publish, archive, a live post,         off by default
  *            profile edits (never the resume)
  *   pii      find_order, and nothing else                                     off by default
@@ -30,12 +30,12 @@ export const SCOPE_INFO: Record<McpScope, { label: string; grants: string }> = {
   read: {
     label: 'Read',
     grants:
-      'Profile, CV, posts, metrics, the visible whiteboard and CCA-F progress. Linting and the writing brief.',
+      'Profile, CV, posts, metrics and the visible whiteboard. Linting and the writing brief.',
   },
   write: {
     label: 'Write',
     grants:
-      'Drafts, images for unpublished posts, whiteboard cards and links, CCA-F progress, uploading Cloudinary images.',
+      'Drafts, images for unpublished posts, whiteboard cards and links, uploading Cloudinary images.',
   },
   publish: {
     label: 'Publish',

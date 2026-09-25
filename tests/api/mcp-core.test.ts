@@ -138,7 +138,6 @@ const contextOf = async (token: string) => {
 
 /** The registry's read tools, grown phase by phase (acceptance.md "Tool coverage"). */
 const READ_TOOLS = [
-  'ccaf_status',
   'get_briefing',
   'get_cloudinary_asset',
   'get_me',
@@ -369,21 +368,27 @@ describe('per-request registration (C1, C6)', () => {
     expect(expected).toEqual(READ_TOOLS)
   })
 
-  it('the registry is the 27 designed tools less the four the Assignment cut (D1), plus the 4 Cloudinary tools', () => {
+  it('the registry is the 27 designed tools less the four the Assignment cut (D1), plus the 4 Cloudinary tools and the 2 whiteboard composition tools, less the 2 CCA-F tools', () => {
     const names = serverLib.SITE_SERVER.tools.map(({ def }) => def.name)
     expect(names).toHaveLength(27)
+    expect(names).toEqual(
+      expect.arrayContaining(['whiteboard_compose', 'whiteboard_arrange'])
+    )
     for (const cut of [
       'delete_post',
       'save_taxonomy',
       'get_test_metrics',
       'whiteboard_update_item',
       'generate_post',
+      'ccaf_status',
+      'ccaf_update',
     ])
       expect(names).not.toContain(cut)
     expect(serverLib.SITE_SERVER.prompts.map(({ def }) => def.name)).toEqual([
       'write-post',
       'weekly-briefing',
       'tailor-cv',
+      'build-whiteboard',
     ])
   })
 

@@ -2,13 +2,13 @@ import 'server-only'
 
 import { z } from 'zod'
 
+import { defineTool, ok, refuse } from '@/lib/mcp/run-tool'
 import {
   getBriefing,
   MAX_BLOG_DAYS,
   MAX_FUNNEL_DAYS,
 } from '@/lib/metrics/briefing'
 import { findOrder } from '@/lib/metrics/orders'
-import { defineTool, ok, refuse } from '@/lib/mcp/run-tool'
 
 /**
  * Metrics tools: aggregates only, and one order by code (premise 5). `get_test_metrics` was
