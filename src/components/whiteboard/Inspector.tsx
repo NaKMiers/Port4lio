@@ -17,7 +17,6 @@ import {
   skipsBulkAiOn,
 } from '@/components/whiteboard/frame-geometry'
 import { MeaningChip } from '@/components/whiteboard/nodes/badges'
-import { ShortcutList } from '@/components/whiteboard/ShortcutsHelp'
 import type { Board } from '@/components/whiteboard/useBoard'
 import { cn } from '@/lib/utils'
 import { LIMITS, type Meaning, type Status } from '@/lib/whiteboard/limits'
@@ -32,8 +31,8 @@ import {
 import { useVocab } from '@/components/whiteboard/vocab-context'
 
 /**
- * The 320px inspector (a bottom sheet below lg): nothing selected, one item, several items,
- * or one link.
+ * The 320px inspector (a bottom sheet below lg): one item, several items, or one link. It is
+ * only on screen while something is selected - with nothing selected there is no column.
  *
  * ## One item (DR10)
  *
@@ -156,7 +155,8 @@ function Inspector(props: InspectorProps) {
   let body: React.ReactNode
   if (items.length === 0 && selection.edges.length > 0)
     body = <LinkPanel {...props} />
-  else if (items.length === 0) body = <NothingSelected />
+  // Nothing selected is no inspector at all (WhiteboardApp), so there is no panel for it.
+  else if (items.length === 0) return null
   else if (items.length === 1)
     body = (
       <ItemPanel
@@ -187,19 +187,6 @@ function Inspector(props: InspectorProps) {
         {body}
       </fieldset>
     </aside>
-  )
-}
-
-function NothingSelected() {
-  return (
-    <>
-      <p className={labelCls}>Nothing selected</p>
-      <p className="text-[12px] leading-relaxed text-pp-muted">
-        Select a card to edit its meaning, dates, links and AI visibility.
-      </p>
-      <p className={cn(labelCls, 'mt-3')}>Shortcuts</p>
-      <ShortcutList />
-    </>
   )
 }
 

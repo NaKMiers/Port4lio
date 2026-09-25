@@ -303,7 +303,10 @@ test('(5) Esc peels one layer at a time: tool, then sheet, then selection', asyn
   await expect(page.getByRole('textbox', { name: 'Title' })).toBeVisible()
 
   await page.keyboard.press('Escape')
-  await expect(page.getByText('Nothing selected')).toBeVisible()
+  // Nothing selected is no inspector column at all.
+  await expect(
+    page.getByRole('complementary', { name: 'Inspector' })
+  ).toHaveCount(0)
 })
 
 test('(6) the board has no Agents button: MCP tokens live on /admin/agents', async ({
@@ -678,7 +681,10 @@ test('(14) dragging a card moves it without selecting it; a click selects it', a
   })
   await openBoard(page)
   const inspector = page.getByRole('complementary')
-  await expect(page.getByText('Nothing selected')).toBeVisible()
+  // Nothing selected is no inspector column at all.
+  await expect(
+    page.getByRole('complementary', { name: 'Inspector' })
+  ).toHaveCount(0)
 
   const from = await centreOf(page.getByTestId('wb-card'))
   await page.mouse.move(from.x, from.y)
@@ -691,7 +697,10 @@ test('(14) dragging a card moves it without selecting it; a click selects it', a
   await expect
     .poll(async () => (await itemOnServer(request, card))?.x)
     .not.toBe(0)
-  await expect(page.getByText('Nothing selected')).toBeVisible()
+  // Nothing selected is no inspector column at all.
+  await expect(
+    page.getByRole('complementary', { name: 'Inspector' })
+  ).toHaveCount(0)
   await expect(inspector.locator('#wb-title')).toHaveCount(0)
 
   await page.getByText('Drag me').click()
@@ -717,7 +726,10 @@ test('(19) a new card opens its own title editor, not the inspector', async ({
   await expect(
     page.getByTestId('wb-card').getByRole('textbox', { name: 'Title' })
   ).toBeFocused()
-  await expect(page.getByText('Nothing selected')).toBeVisible()
+  // Nothing selected is no inspector column at all.
+  await expect(
+    page.getByRole('complementary', { name: 'Inspector' })
+  ).toHaveCount(0)
   await expect(inspector.locator('#wb-title')).toHaveCount(0)
 })
 
