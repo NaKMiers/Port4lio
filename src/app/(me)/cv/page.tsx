@@ -5,7 +5,7 @@ import CvSheets from '@/components/cv/CvSheets'
 import { CV_ROUTE_CSS } from '@/components/cv/cv-sheet-css'
 import JsonLd from '@/components/JsonLd'
 import { arimo } from '@/lib/cv-font'
-import { loadPublicResume } from '@/lib/profile-data'
+import { loadPublishedResume } from '@/lib/profile-data'
 import { deriveResume } from '@/lib/resume-view-model'
 import { resolveSiteOrigin } from '@/lib/seo'
 import { personEntityId } from '@/lib/structured-data'
@@ -18,12 +18,16 @@ import { personEntityId } from '@/lib/structured-data'
  * print button, `@page`). The sheets themselves live in `CvSheets`, which the settings
  * editor also renders against unsaved state - see `cv-sheet-css.ts` for why the stylesheet
  * is split the way it is.
+ *
+ * The resume is the PUBLISHED CV: the owner keeps many in `/admin/settings` and this page
+ * prints the one published there. `loadPublishedResume` (`profile-data.ts`) resolves it, and
+ * `cv-service` expires its cache on every Save CV and Publish.
  */
 
 export const revalidate = 60
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { resume: stored, avatar } = await loadPublicResume()
+  const { resume: stored, avatar } = await loadPublishedResume()
   const resume = deriveResume({ resume: stored }, avatar)
 
   const title = `${resume.name} - CV`
@@ -54,7 +58,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function CVPage() {
-  const { resume: stored, avatar } = await loadPublicResume()
+  const { resume: stored, avatar } = await loadPublishedResume()
   // An unset `resume.photo` inherits the portfolio avatar, so the printed CV tracks the
   // profile picture until a CV-specific one is uploaded.
   const resume = deriveResume({ resume: stored }, avatar)

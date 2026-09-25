@@ -5,6 +5,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import AboutSection from '@/components/settings/AboutSection'
 import BasicsSection from '@/components/settings/BasicsSection'
 import CertificatesSection from '@/components/settings/CertificatesSection'
+import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import CvLabelDialog from '@/components/settings/CvLabelDialog'
+import CvPicker from '@/components/settings/CvPicker'
 import CvTabSections from '@/components/settings/CvTabSections'
 import EducationSection from '@/components/settings/EducationSection'
 import ExperienceSection from '@/components/settings/ExperienceSection'
@@ -21,13 +24,21 @@ import SettingErrorBanner from '@/components/settings/SettingErrorBanner'
 import SettingLoadError from '@/components/settings/SettingLoadError'
 import SettingLoading from '@/components/settings/SettingLoading'
 import SettingToolbar from '@/components/settings/SettingToolbar'
+import Spinner from '@/components/settings/Spinner'
 import SkillsSection from '@/components/settings/SkillsSection'
 import SocialsSection from '@/components/settings/SocialsSection'
 import StatsSection from '@/components/settings/StatsSection'
 import TabNav from '@/components/settings/TabNav'
+import { useCvEditor, type CvEditor } from '@/components/settings/useCvEditor'
 import { useRailWidth } from '@/components/settings/useRailWidth'
 import type { TabItem } from '@/components/settings/TabNav'
 import { cleanProfileForSave } from '@/components/settings/cleanProfileForSave'
+import {
+  hasActiveUploads,
+  helpTextCls,
+  secondaryBtnCls,
+} from '@/components/settings/settings-utils'
+import type { CvActionGates } from '@/components/settings/cv-editor-state'
 import type {
   IconPickerTarget,
   SettingTabId,
@@ -35,7 +46,6 @@ import type {
 } from '@/components/settings/types'
 import { useApp } from '@/context/AppContext'
 import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
-import { deriveResume } from '@/lib/resume-view-model'
 import { MAX_PROFILE_JSON_BYTES } from '@/lib/upload-limits'
 import type { Profile, ServiceItem } from '@/types/profile'
 import { getIconCatalog } from '@/utils/iconResolver'
@@ -96,7 +106,7 @@ export default function SettingPage() {
 function SettingEditorGate() {
   const { profile, setProfile, loading, error, refetchProfile } = useApp()
 
-  if (loading) return <SettingLoading />
+  if (loading) return <SettingLoading hubPill />
   if (error)
     return (
       <SettingLoadError
@@ -130,13 +140,32 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
   */
   const { profileUpdatedAt, setProfileUpdatedAt, refetchProfile } = useApp()
   const [stale, setStale] = useState(false)
-  // Seed the CV block so the editor opens pre-populated on a document that predates it.
-  // Saving once persists it; from then on the stored value wins.
-  const [profile, setProfile] = useState<Profile>(() => {
-    const normalized = normalizeProfile(appProfile)
-    return { ...normalized, resume: deriveResume(normalized) }
-  })
+  // No CV seeding here any more: the CV tab edits CVs from `/api/admin/cvs` (useCvEditor),
+  // and `profile.resume` is only the legacy migration source, never sent back on save.
+  const [profile, setProfile] = useState<Profile>(() =>
+    normalizeProfile(appProfile)
+  )
   const [tab, setTab] = useState<SettingTabId>(readStoredTab)
+  /*
+    The CV tab's state lives HERE, not in CvTabSections: that unmounts on every tab switch,
+    and the draft must survive one (multi-cv-plan.md OV-4). It loads the first time the CV
+    tab shows, which is also what migrates the legacy CV (D5).
+  */
+  const cv = useCvEditor({ active: tab === 'cv', onError: setError })
+  const cvSaveButtonRef = useRef<HTMLButtonElement | null>(null)
+  const [cvLabelDialog, setCvLabelDialog] = useState<'new' | 'rename' | null>(
+    null
+  )
+  /*
+    `discard` guards every action that would drop a dirty draft - picking another CV, New,
+    which selects the copy it makes (D4), and the profile banner's Reload, which unmounts
+    this whole editor and the CV draft with it. `delete` is Delete's own confirm.
+  */
+  const [cvConfirm, setCvConfirm] = useState<
+    | { kind: 'discard'; then: { select: string } | 'new' | 'reloadProfile' }
+    | { kind: 'delete' }
+    | null
+  >(null)
   const [fullWidth, setFullWidth] = useState(readStoredFullWidth)
   const [iconPickerTarget, setIconPickerTarget] =
     useState<IconPickerTarget>(null)
@@ -236,6 +265,26 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
     }
   }
 
+  const onCvTab = tab === 'cv'
+  const cvGates = cv.gates(uploading.cvPhoto)
+  const cvLabel = cv.selected?.label ?? 'this CV'
+
+  const requestCvSelect = (id: string) => {
+    if (id === cv.state.selectedId) return
+    if (cv.dirty) setCvConfirm({ kind: 'discard', then: { select: id } })
+    else cv.select(id)
+  }
+
+  const requestCvNew = () => {
+    if (cv.dirty) setCvConfirm({ kind: 'discard', then: 'new' })
+    else setCvLabelDialog('new')
+  }
+
+  const reloadProfile = () => {
+    setStale(false)
+    void refetchProfile({ blocking: true })
+  }
+
   const updateService = (idx: number, patch: Partial<ServiceItem>) => {
     setProfile(prev => {
       const next = [...prev.services]
@@ -296,6 +345,19 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
         onToggleFullWidth={() => setFullWidth(value => !value)}
         onSave={() => void onSave()}
         saveButtonRef={saveButtonRef}
+        cvSave={
+          onCvTab
+            ? {
+                onSave: () => void cv.save(),
+                saving: cv.saving,
+                disabled: !cvGates.canSave,
+                title: uploading.cvPhoto
+                  ? 'Waiting for the CV photo upload to finish'
+                  : undefined,
+              }
+            : undefined
+        }
+        cvSaveButtonRef={cvSaveButtonRef}
       />
 
       <SettingErrorBanner message={error} />
@@ -304,13 +366,24 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
           subject="profile"
           busy={saving}
           onReload={() => {
-            setStale(false)
-            void refetchProfile({ blocking: true })
+            if (cv.dirty)
+              setCvConfirm({ kind: 'discard', then: 'reloadProfile' })
+            else reloadProfile()
           }}
           onOverwrite={() => {
             setStale(false)
             void onSave(true)
           }}
+        />
+      ) : null}
+      {cv.state.stale ? (
+        <StaleSaveBanner
+          subject="cv"
+          // Overwrite is a Save CV and Reload re-opens the CV: both wait for the photo
+          // upload, or the photo is lost or lands in another CV's draft (OV-6).
+          busy={cv.busy || uploading.cvPhoto}
+          onReload={() => void cv.reload()}
+          onOverwrite={() => void cv.save(true)}
         />
       ) : null}
 
@@ -330,8 +403,9 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
           className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_var(--rail-width)] xl:gap-8"
           style={{ '--rail-width': `${railWidth}px` } as React.CSSProperties}
         >
-          {/* Every tab writes into the same `profile` state, so switching tabs never
-            discards an unsaved edit - only the section cards unmount. */}
+          {/* Every tab writes into state held up here - `profile`, or the CV draft in
+            `cv` - so switching tabs never discards an unsaved edit; only the section
+            cards unmount. */}
           <div className="space-y-5">
             {tab === 'profile' ? (
               <>
@@ -400,10 +474,16 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
               </>
             ) : null}
 
-            {tab === 'cv' ? (
-              <CvTabSections
-                profile={profile}
-                setProfile={setProfile}
+            {onCvTab ? (
+              <CvTab
+                cv={cv}
+                gates={cvGates}
+                avatar={profile.avatar ?? ''}
+                onSelect={requestCvSelect}
+                onNew={requestCvNew}
+                onRename={() => setCvLabelDialog('rename')}
+                onPublish={() => void cv.publish()}
+                onDelete={() => setCvConfirm({ kind: 'delete' })}
                 uploading={uploading}
                 setUploading={setUploading}
                 setError={setError}
@@ -421,16 +501,88 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
             <PreviewRail
               tab={tab}
               profile={profile}
+              cvDraft={cv.state.draft}
             />
           </div>
         </div>
       </SectionOpenProvider>
 
-      <FloatingSaveButton
-        anchorRef={saveButtonRef}
-        saving={saving}
-        uploading={uploading}
-        onSave={() => void onSave()}
+      {/* Follows whichever toolbar button is primary on this tab (R5). */}
+      {onCvTab ? (
+        <FloatingSaveButton
+          anchorRef={cvSaveButtonRef}
+          label="Save CV"
+          saving={cv.saving}
+          blocked={uploading.cvPhoto}
+          blockedTitle="Waiting for the CV photo upload to finish"
+          disabled={!cvGates.canSave}
+          onSave={() => void cv.save()}
+        />
+      ) : (
+        <FloatingSaveButton
+          anchorRef={saveButtonRef}
+          label="Save profile"
+          saving={saving}
+          blocked={hasActiveUploads(uploading)}
+          onSave={() => void onSave()}
+        />
+      )}
+
+      {cvLabelDialog ? (
+        <CvLabelDialog
+          key={`${cvLabelDialog}-${cv.state.selectedId}`}
+          open
+          title={cvLabelDialog === 'new' ? 'New CV' : 'Rename CV'}
+          confirmLabel={cvLabelDialog === 'new' ? 'Create' : 'Rename'}
+          initialLabel={
+            cvLabelDialog === 'rename' ? (cv.selected?.label ?? '') : ''
+          }
+          hint={
+            cvLabelDialog === 'new'
+              ? `Starts as a copy of the saved "${cvLabel}". It is not published until you publish it.`
+              : undefined
+          }
+          onSubmit={async label => {
+            const failure =
+              cvLabelDialog === 'new'
+                ? await cv.create(label)
+                : await cv.rename(label)
+            if (!failure) setCvLabelDialog(null)
+            return failure
+          }}
+          onCancel={() => setCvLabelDialog(null)}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={cvConfirm?.kind === 'discard'}
+        title="Discard changes?"
+        message={`Discard unsaved changes to ${cvLabel}?`}
+        confirmLabel="Discard"
+        onConfirm={() => {
+          const then = cvConfirm?.kind === 'discard' ? cvConfirm.then : null
+          setCvConfirm(null)
+          if (then === 'new') {
+            // Back to the saved copy first: the new CV copies what was SAVED (P1), and the
+            // discarded edits must not linger on this CV either.
+            if (cv.state.selectedId) cv.select(cv.state.selectedId)
+            setCvLabelDialog('new')
+          } else if (then === 'reloadProfile') reloadProfile()
+          else if (then) cv.select(then.select)
+        }}
+        onCancel={() => setCvConfirm(null)}
+      />
+      <ConfirmDialog
+        open={cvConfirm?.kind === 'delete'}
+        title={`Delete ${cvLabel}?`}
+        message="This CV is deleted for good. The published CV on /cv is not affected."
+        confirmLabel="Delete"
+        busy={cv.busy}
+        onConfirm={() => {
+          setCvConfirm(null)
+          void cv.remove()
+        }}
+        onCancel={() => setCvConfirm(null)}
       />
 
       <IconPickerModal
@@ -443,6 +595,91 @@ function SettingEditor({ appProfile, setAppProfile }: SettingEditorProps) {
           setIconPickerTarget(null)
           setIconQuery('')
         }}
+      />
+    </div>
+  )
+}
+
+/**
+ * The CV tab's column: its own loading and error states (the page can open straight onto
+ * this tab, `readStoredTab`), then the picker and the cards for the selected CV's draft.
+ */
+function CvTab({
+  cv,
+  gates,
+  avatar,
+  onSelect,
+  onNew,
+  onRename,
+  onPublish,
+  onDelete,
+  uploading,
+  setUploading,
+  setError,
+}: {
+  cv: CvEditor
+  gates: CvActionGates
+  avatar: string
+  onSelect: (id: string) => void
+  onNew: () => void
+  onRename: () => void
+  onPublish: () => void
+  onDelete: () => void
+  uploading: UploadingState
+  setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
+  setError: React.Dispatch<React.SetStateAction<string | null>>
+}) {
+  const { state } = cv
+
+  if (state.status === 'error')
+    return (
+      <div className="bg-white/72 space-y-3 rounded-[1.6rem] border border-pp-line p-5 shadow-panel">
+        <p className="text-sm font-medium text-pp-text">
+          The CVs could not be loaded.
+        </p>
+        <p className={helpTextCls}>{state.error}</p>
+        <button
+          type="button"
+          className={secondaryBtnCls}
+          onClick={cv.retry}
+        >
+          Try again
+        </button>
+      </div>
+    )
+
+  if (state.status !== 'ready' || !state.selectedId || !state.draft)
+    return (
+      <div className="bg-white/72 flex items-center gap-3 rounded-[1.6rem] border border-pp-line p-5 text-sm text-pp-muted shadow-panel">
+        <Spinner />
+        Loading CVs...
+      </div>
+    )
+
+  return (
+    <div className="space-y-5">
+      <CvPicker
+        cvs={state.cvs}
+        selectedId={state.selectedId}
+        publishedId={state.publishedId}
+        dirty={cv.dirty}
+        refitted={state.refitted}
+        gates={gates}
+        onSelect={onSelect}
+        onNew={onNew}
+        onRename={onRename}
+        onPublish={onPublish}
+        onDelete={onDelete}
+      />
+      <CvTabSections
+        cvId={state.selectedId}
+        resume={state.draft}
+        setResume={cv.setDraft}
+        avatar={avatar}
+        onClippedRefit={cv.onClippedRefit}
+        uploading={uploading}
+        setUploading={setUploading}
+        setError={setError}
       />
     </div>
   )

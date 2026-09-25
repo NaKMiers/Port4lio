@@ -12,6 +12,8 @@ Feature: multi-CV (docs/designs/cv/multi-cv-plan.md)
 - /api/admin/cvs, /api/admin/cvs/[id], /api/admin/cvs/[id]/publish - owner-only; 401 without the cookie
 - /api/mcp get_me, get_profile resume - return the published CV
 
+- /api/mcp list_cvs, get_cv, create_cv, update_cv, publish_cv, delete_cv (Phase 2) - scope per tool: read / write / publish
+
 ## Key Interactions to Verify
 
 - First open of the CV tab after deploy shows exactly one "Main CV", published, identical to the old /cv
@@ -22,6 +24,9 @@ Feature: multi-CV (docs/designs/cv/multi-cv-plan.md)
 - On the CV tab, Save profile is disabled and Save CV is shown; the floating button follows the tab
 - Profile edits on other tabs survive switching to the CV tab and back, and save with Save profile
 
+- Phase 2: an agent tailors a copy of the published CV (create_cv + update_cv); it appears in the dropdown with the 'Edited by an agent - check the page fit' banner
+- Phase 2: an agent publishes an unverified CV; the tool result carries the fit warning and /cv shows it
+
 ## Edge Cases
 
 - Rename or create with a label that differs only in case from an existing one: inline error
@@ -31,6 +36,9 @@ Feature: multi-CV (docs/designs/cv/multi-cv-plan.md)
 - A CV whose sheet 1 overflows on open: "Page break re-fitted - Save CV to keep it" notice
 - Clear every field of a CV and Save CV: saved as empty, not silently ignored
 - Publish then immediately edit and Save CV: no false stale error
+
+- Phase 2: a default (read + write) token cannot change /cv or delete a CV
+- Phase 2: you are editing a CV an agent deletes; Save CV offers Save as new CV and keeps the draft
 
 ## Critical Paths
 

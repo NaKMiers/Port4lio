@@ -9,7 +9,6 @@ import ResumeMastheadSection from '@/components/settings/ResumeMastheadSection'
 import ResumeProjectsSection from '@/components/settings/ResumeProjectsSection'
 import ResumeSkillsSection from '@/components/settings/ResumeSkillsSection'
 import ResumeSummarySection from '@/components/settings/ResumeSummarySection'
-import { resumeOf, updateResume } from '@/components/settings/resume-utils'
 import { useCvPageBreakFit } from '@/components/settings/useCvPageBreakFit'
 import { helpTextCls } from '@/components/settings/settings-utils'
 import type {
@@ -17,7 +16,7 @@ import type {
   UploadingState,
 } from '@/components/settings/types'
 import { moveItem, normalizeResumeSectionOrder } from '@/lib/resume-sections'
-import type { Profile, ResumeSectionKey } from '@/types/profile'
+import type { Resume, ResumePageBreak, ResumeSectionKey } from '@/types/profile'
 
 const SECTION_COMPONENTS: Record<
   ResumeSectionKey,
@@ -40,32 +39,47 @@ const SECTION_COMPONENTS: Record<
  * The masthead sits outside the list on purpose - it is the page header, positioned against
  * the sheet's own top edge rather than in normal flow, so there is no "below SUMMARY" for it
  * to move to.
+ *
+ * Every card edits `resume`, the draft of the CV the picker selected. The draft itself lives
+ * in `useCvEditor` up in `SettingEditor`, because this component unmounts on every tab switch
+ * and the draft must not go with it (multi-cv-plan.md OV-4).
  */
 export default function CvTabSections({
-  profile,
-  setProfile,
+  cvId,
+  resume,
+  setResume,
+  avatar,
+  onClippedRefit,
   uploading,
   setUploading,
   setError,
 }: {
-  profile: Profile
-  setProfile: React.Dispatch<React.SetStateAction<Profile>>
+  /** The selected CV. A new one re-runs the on-open fit, as a fresh mount would. */
+  cvId: string
+  resume: Resume
+  setResume: React.Dispatch<React.SetStateAction<Resume>>
+  avatar: string
+  /** The on-open fit moved the break; see `useCvPageBreakFit`. */
+  onClippedRefit: (next: ResumePageBreak) => void
   uploading: UploadingState
   setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
   setError: React.Dispatch<React.SetStateAction<string | null>>
 }) {
-  const order = normalizeResumeSectionOrder(resumeOf(profile).sectionOrder)
-  const { requestFit, portal } = useCvPageBreakFit(profile, setProfile)
+  const order = normalizeResumeSectionOrder(resume.sectionOrder)
+  const { requestFit, portal } = useCvPageBreakFit(resume, avatar, setResume, {
+    onClippedRefit,
+  })
 
   // A break stored before a reorder - or by a build that predates the fitter - can render a
   // clipped sheet on open, and nothing else would ever re-measure it. Repairs only an
   // overflowing page, so a break that already fits is left exactly where its owner put it.
+  // Keyed on the CV too: picking another CV in the dropdown is an "open" for that CV.
   useEffect(() => {
     requestFit({ onlyIfClipped: true })
-  }, [requestFit])
+  }, [requestFit, cvId])
 
   const moveSection = (from: number, to: number) => {
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       sectionOrder: moveItem(
         normalizeResumeSectionOrder(r.sectionOrder),
@@ -79,19 +93,17 @@ export default function CvTabSections({
   return (
     <div className="space-y-5">
       <ResumeMastheadSection
-        profile={profile}
-        setProfile={setProfile}
+        resume={resume}
+        setResume={setResume}
+        avatar={avatar}
         uploading={uploading}
         setUploading={setUploading}
         setError={setError}
       />
 
       <p className={`${helpTextCls} px-1`}>
-        Drag a card by its grip to change the order these blocks print in on{' '}
-        <strong>/cv</strong> - the preview follows immediately. Arrow keys work
-        too once the grip has focus. The masthead above is the page header and
-        always prints first. Every reorder re-measures the sheets and moves the
-        page break to wherever sheet 1 now ends.
+        Drag a grip (or use arrow keys) to reorder. The masthead always prints
+        first; the page break re-fits itself.
       </p>
 
       <DragList
@@ -104,8 +116,9 @@ export default function CvTabSections({
           const SectionComponent = SECTION_COMPONENTS[order[index]]
           return (
             <SectionComponent
-              profile={profile}
-              setProfile={setProfile}
+              resume={resume}
+              setResume={setResume}
+              avatar={avatar}
               handle={handle}
               onFitPageBreak={requestFit}
             />

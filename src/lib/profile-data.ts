@@ -5,8 +5,11 @@ import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
 import type { PublicProfile } from './profile-public'
 import { PUBLIC_PROFILE_PROJECTION, toPublicProfile } from './profile-public'
 
-import type { Resume } from '@/types/profile'
-import { makeEmptyProfile, normalizeProfile, normalizeResume } from './profile'
+import {
+  readPublishedResumeSource,
+  type PublishedResumeSource,
+} from '@/lib/cv/cv-service'
+import { makeEmptyProfile, normalizeProfile } from './profile'
 
 export const PUBLIC_PROFILE_CACHE_TAG = 'public-profile'
 const PUBLIC_PROFILE_REVALIDATE_SECONDS = 60
@@ -77,29 +80,9 @@ export const loadPublicProfile = unstable_cache(
   }
 )
 
-export type PublicResumeSource = {
-  /** Absent when the document has never had a CV block written - see `deriveResume`. */
-  resume: Resume | undefined
-  /** The portfolio avatar, which the CV photo falls back to when it is unset. */
-  avatar: string
-}
-
-async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
+async function loadPublishedResumeUncached(): Promise<PublishedResumeSource> {
   try {
-    await connectDatabase()
-    // `avatar` rides along on the same query: the CV masthead inherits it whenever no
-    // CV-specific photo was uploaded, and a second round trip for one string would only
-    // add a way for the two reads to disagree.
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
-      .select('resume avatar')
-      .lean()
-    const record = doc as Record<string, unknown> | null
-    const raw = record?.resume
-
-    return {
-      resume: raw && typeof raw === 'object' ? normalizeResume(raw) : undefined,
-      avatar: typeof record?.avatar === 'string' ? record.avatar : '',
-    }
+    return await readPublishedResumeSource()
   } catch (error) {
     console.error('Failed to load resume from MongoDB.', error)
     throw new PublicProfileDataError('Failed to load resume from MongoDB.', {
@@ -109,7 +92,20 @@ async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
 }
 
 /**
- * The CV block, for `/cv` only.
+ * The published CV, for `/cv` only (multi-cv-plan.md, "Read paths").
+ *
+ * ```
+ *   loadPublishedResume ──▶ cv-service.readPublishedResumeSource
+ *        ├─ findPublished()   the CV with the latest publishedAt ──▶ its resume
+ *        ├─ none yet          (the CV tab never opened since deploy) ──▶ profile.resume, the
+ *        │                    legacy block, or undefined ──▶ deriveResume prints the seed
+ *        └─ + profile.avatar  the photo fallback
+ * ```
+ *
+ * Cached under `PUBLIC_PROFILE_CACHE_TAG`, which `cv-service` expires (`{ expire: 0 }`) after
+ * every Save CV and Publish, so the first full load of `/cv` after a publish is the new CV.
+ * It never migrates: a public read does not write, so until the owner opens the CV tab `/cv`
+ * prints exactly what it printed before multi-CV shipped.
  *
  * Kept off the public profile allowlist on purpose: `/cv` renders these contact details
  * as a page - as it always has - but they are never served as machine-readable JSON to
@@ -117,13 +113,14 @@ async function loadPublicResumeUncached(): Promise<PublicResumeSource> {
  * allowlist already, so including it here exposes nothing new.
  *
  * The one machine-readable exception is token-gated: the site MCP's `get_profile`
- * (section `resume`, via `profile-sections.ts`) and `get_me` hand the block, contact
+ * (section `resume`, via `profile-sections.ts`) and `get_me` hand the published CV, contact
  * details included, to a `p4_` agent token holding `read`. That is the owner's own agent
  * reading the owner's own CV, and it reveals nothing `/cv` does not already publish
- * (docs/designs/mcp/mcp.md premise 5, mcp-plan.md C7). No public route serves it as JSON.
+ * (docs/designs/mcp/mcp.md premise 5, mcp-plan.md C7). No public route serves it as JSON,
+ * and no CV but the published one is ever served at all.
  */
-export const loadPublicResume = unstable_cache(
-  loadPublicResumeUncached,
+export const loadPublishedResume = unstable_cache(
+  loadPublishedResumeUncached,
   ['public-resume'],
   {
     revalidate: PUBLIC_PROFILE_REVALIDATE_SECONDS,

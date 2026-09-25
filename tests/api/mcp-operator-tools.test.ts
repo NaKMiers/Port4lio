@@ -12,6 +12,7 @@ import {
 
 import { AgentActionModel } from '@/models/AgentAction'
 import { AgentTokenModel } from '@/models/AgentToken'
+import { CvModel } from '@/models/Cv'
 import { KindModel } from '@/models/Kind'
 import { PostModel } from '@/models/Post'
 import { RateLimitModel } from '@/models/RateLimit'
@@ -101,6 +102,7 @@ afterEach(async () => {
   await Promise.all([
     AgentTokenModel.deleteMany({}),
     AgentActionModel.deleteMany({}),
+    CvModel.deleteMany({}),
     KindModel.deleteMany({}),
     PostModel.deleteMany({}),
     ProfileModel.deleteMany({}),
@@ -438,6 +440,42 @@ describe('the CV an agent reads', () => {
       (await client.callTool(t, 'get_profile', { section: 'resume' })).text
     )
     expect(section.value.resume).toEqual(RESUME_SEED)
+  })
+
+  it('a published CV is what get_me and get_profile resume return (multi-CV)', async () => {
+    const { makeEmptyResume } = await import('@/lib/profile')
+    await ProfileModel.create({
+      _id: DOC_ID,
+      fullName: 'Ada',
+      avatar: 'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png',
+      resume: RESUME,
+    })
+    await CvModel.create([
+      {
+        label: 'Published',
+        labelKey: 'published',
+        resume: { ...makeEmptyResume(), name: 'Published CV' },
+        publishedAt: new Date('2026-09-25T10:00:00.000Z'),
+      },
+      {
+        label: 'Draft copy',
+        labelKey: 'draft copy',
+        resume: { ...makeEmptyResume(), name: 'Never published' },
+        publishedAt: null,
+      },
+    ])
+    const t = await token(['read'])
+
+    const me = JSON.parse((await client.callTool(t, 'get_me', {})).text)
+    expect(me.cv.name).toBe('Published CV')
+    // The avatar fallback still applies to the published CV.
+    expect(me.cv.photo).toBe(
+      'https://res.cloudinary.com/test-cloud/image/upload/v1/me.png'
+    )
+    const section = JSON.parse(
+      (await client.callTool(t, 'get_profile', { section: 'resume' })).text
+    )
+    expect(section.value.resume).toEqual(me.cv)
   })
 })
 

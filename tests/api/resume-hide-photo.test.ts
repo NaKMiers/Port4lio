@@ -1,15 +1,15 @@
+import { MongoMemoryServer } from 'mongodb-memory-server'
 import mongoose, { Schema } from 'mongoose'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { cleanProfileForSave } from '@/components/settings/cleanProfileForSave'
+import { pruneResumeForCv } from '@/components/settings/cleanProfileForSave'
+import { listCvs, saveCv } from '@/lib/cv/cv-service'
 import { compileModel } from '@/lib/mongoose-model'
-import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
+import { loadPublishedResume } from '@/lib/profile-data'
 import { RESUME_SEED } from '@/lib/resume-seed'
 import { deriveResume } from '@/lib/resume-view-model'
-import { PROFILE_DOCUMENT_ID, ProfileModel } from '@/models/Profile'
-import type { Profile } from '@/types/profile'
-
-import { startMongo, stopMongo } from './setup-mongo'
+import { CvModel } from '@/models/Cv'
+import type { Resume } from '@/types/profile'
 
 /**
  * `resume.hidePhoto`, verified against a real server rather than a mocked model.
@@ -17,84 +17,83 @@ import { startMongo, stopMongo } from './setup-mongo'
  * The settings editor toggles this client-side and the sheets react to it immediately,
  * which every unit test for `CvSheets` and `resume-view-model` already covers - but none
  * of those touch Mongo, so a schema field left off `resumeSchema`, or dropped by
- * `cleanProfileForSave`'s pruning, would still show a passing suite. This exercises the
- * exact three steps `/settings` and `/cv` perform: `cleanProfileForSave` (what the browser
- * sends), `findOneAndUpdate` (what `POST /api/profile` runs), and the `.select('resume
- * avatar')` read `loadPublicResume` performs for the public route.
+ * `pruneResumeForCv`'s pruning, would still show a passing suite. This exercises the exact
+ * three steps the settings CV tab and `/cv` perform since multi-CV: `pruneResumeForCv` (the
+ * Save CV body the browser sends), `cv-service.saveCv` (what `PATCH /api/admin/cvs/<id>`
+ * runs), and `loadPublishedResume`, the read `/cv` renders from.
+ *
+ * It used to go through `cleanProfileForSave` and `POST /api/profile`; the profile body no
+ * longer carries the CV at all (multi-cv-plan.md CQ-1).
  */
 
+vi.hoisted(() => {
+  process.env.PROFILE_DOCUMENT_ID = 'resume-hide-photo-profile'
+})
+
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
+  revalidatePath: vi.fn(),
+  unstable_cache: <T>(fn: T) => fn,
+}))
+
+let memory: MongoMemoryServer
+let mainId: string
+let base: string
+
 beforeAll(async () => {
-  await startMongo()
+  memory = await MongoMemoryServer.create()
+  // `connectDatabase` (inside cv-service) reads the URI; the test connects to the same one.
+  process.env.MONGODB_URI = memory.getUri()
+  await mongoose.connect(memory.getUri())
+  const { cvs, publishedId } = await listCvs()
+  mainId = publishedId!
+  base = cvs[0].updatedAt
 }, 120_000)
 
 afterAll(async () => {
-  await stopMongo()
+  await mongoose.disconnect()
+  await memory.stop()
 })
 
+/** What Save CV sends, round-tripped through JSON like the browser does. */
+function saveCvBody(resume: Resume): Resume {
+  const body = pruneResumeForCv(resume)
+  return JSON.parse(JSON.stringify(body)) as Resume
+}
+
 describe('resume.hidePhoto', () => {
-  it('is still true after a save/load round trip through the real API path', async () => {
-    const editorProfile: Profile = {
-      ...normalizeProfile(makeEmptyProfile()),
-      resume: { ...RESUME_SEED, hidePhoto: true },
-    }
+  it('is still true after a save/load round trip through the real Save CV path', async () => {
+    const body = saveCvBody({ ...RESUME_SEED, hidePhoto: true })
+    expect(body.hidePhoto).toBe(true)
 
-    // What SettingEditor.onSave sends.
-    const body = cleanProfileForSave(editorProfile)
-    expect(body.resume?.hidePhoto).toBe(true)
-    const sent = JSON.parse(JSON.stringify(body)) as Profile
+    // What PATCH /api/admin/cvs/<id> writes.
+    const saved = await saveCv(mainId, { resume: body, base: new Date(base) })
+    expect(saved.ok).toBe(true)
+    if (saved.ok) base = saved.value.updatedAt
 
-    // What POST /api/profile writes.
-    const now = new Date()
-    await ProfileModel.findOneAndUpdate(
-      { _id: PROFILE_DOCUMENT_ID },
-      {
-        $set: { ...sent, updatedAt: now },
-        $setOnInsert: { _id: PROFILE_DOCUMENT_ID, createdAt: now },
-      },
-      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
-    )
+    // The raw document, so a field the schema dropped cannot hide behind normalizeResume.
+    const raw = await CvModel.collection.findOne({
+      _id: new mongoose.Types.ObjectId(mainId),
+    })
+    expect((raw?.resume as Record<string, unknown>).hidePhoto).toBe(true)
 
-    // What loadPublicResume reads for /cv.
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
-      .select('resume avatar')
-      .lean()
-    const raw = (doc as Record<string, unknown> | null)?.resume as Record<
-      string,
-      unknown
-    >
-
-    expect(raw.hidePhoto).toBe(true)
-    expect(deriveResume({ resume: raw as never }).hidePhoto).toBe(true)
+    // What /cv renders.
+    const { resume: stored, avatar } = await loadPublishedResume()
+    expect(deriveResume({ resume: stored }, avatar).hidePhoto).toBe(true)
   })
 
   it('turning it back off and saving again clears it', async () => {
-    const now = new Date()
-    await ProfileModel.findOneAndUpdate(
-      { _id: PROFILE_DOCUMENT_ID },
-      {
-        $set: {
-          ...JSON.parse(
-            JSON.stringify(
-              cleanProfileForSave({
-                ...normalizeProfile(makeEmptyProfile()),
-                resume: { ...RESUME_SEED, hidePhoto: false },
-              })
-            )
-          ),
-          updatedAt: now,
-        },
-      },
-      { upsert: true, returnDocument: 'after', lean: true, runValidators: true }
-    )
+    const saved = await saveCv(mainId, {
+      resume: saveCvBody({ ...RESUME_SEED, hidePhoto: false }),
+      base: new Date(base),
+    })
+    expect(saved.ok).toBe(true)
 
-    const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
-      .select('resume')
-      .lean()
-    const raw = (doc as Record<string, unknown> | null)?.resume as Record<
-      string,
-      unknown
-    >
-    expect(raw.hidePhoto).toBe(false)
+    const raw = await CvModel.collection.findOne({
+      _id: new mongoose.Types.ObjectId(mainId),
+    })
+    expect((raw?.resume as Record<string, unknown>).hidePhoto).toBe(false)
+    expect((await loadPublishedResume()).resume?.hidePhoto).toBe(false)
   })
 })
 

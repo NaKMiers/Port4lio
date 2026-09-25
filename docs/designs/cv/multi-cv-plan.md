@@ -12,7 +12,7 @@ Target: the multi-CV requirements given in chat on 2026-09-25 (below, verbatim i
 - R3. The published CV cannot be deleted. Publish another CV first, then delete.
 - R4. The CV tab in `/admin/settings` gets a dropdown to pick the CV being edited, plus
   create, rename (label) and delete actions. Delete asks for confirmation.
-- R5. On the CV tab, "Save profile" is disabled and a "Save CV" button is shown instead.
+- R5. On the CV tab, "Save profile" is hidden and a "Save CV" button is shown instead. (Revised 2026-09-25 at the owner's request: it was disabled before.)
 
 ## Current state (what exists today)
 
@@ -194,7 +194,7 @@ without React.
 `get_me` and `get_profile resume` return the published CV through the shared resolver
 (unchanged contract: one `resume` value, avatar fallback, seed when nothing exists).
 `tailor-cv` text stays valid; its tool description can say "the published CV".
-Listing or reading non-published CVs over MCP is not in scope.
+Listing, reading and writing every CV over MCP is Phase 2.
 
 ### Legacy field
 
@@ -207,7 +207,7 @@ T1 in `TODOS.md`.
 ## NOT in scope
 
 - Per-CV public URLs (`/cv/<slug>`): R2 says only the published CV is public.
-- MCP tools to list, read or write non-published CVs: the resume stays human-edited (R8).
+- MCP tools for CVs: moved to Phase 2 (below), which reverses R8.
 - Unpublishing (zero published CVs): R2/R3 imply there is always one.
 - Removing the legacy `profile.resume` field: TODO T1, after the new path is proven.
 - Version history per CV, per-CV drafts in memory (D4 chose one draft).
@@ -224,6 +224,105 @@ T1 in `TODOS.md`.
 - `PUBLIC_PROFILE_CACHE_TAG` - `/cv` already invalidates through it.
 - Catch-11000-and-re-read (`src/lib/blog/post-service.ts`, `src/lib/mcp/run-tool.ts`) and the
   real-mongod index test (`tests/api/retention.test.ts`, `tests/api/setup-mongo.ts`).
+
+## Phase 2: MCP controls the CVs
+
+Added 2026-09-25 at the owner's request: "MCP can fully control the CV". Builds on Phase 1
+(IT1-IT9). Nothing here starts before the Phase 1 `cv-service` and routes are merged.
+
+### Requirements
+
+- R6. Over `/api/mcp`, an agent can list CVs, read any CV, create one (a copy), edit its
+  label and content, publish it, and delete it. The same rules apply as in the editor: one
+  published CV, and the published CV cannot be deleted.
+- R7. Agent writes go through the same `cv-service` functions as the settings routes (AGENTS.md
+  "one service per write"), including the stale guard and `/cv` revalidation.
+
+### What this reverses, and the risk that comes with it
+
+Premise R8 (`src/lib/profile-service.ts:35-40`) kept the resume human-only for one reason:
+`/cv` is fixed A4 (`height: 297mm; overflow: hidden`). Text that runs long is clipped with no
+signal, and only a browser can measure it (`fitResumePageBreak` reads DOM geometry,
+`src/lib/resume-page-fit.ts:27-40`). There is no server-side fit check, and this phase does not
+invent one. The mitigation is P2-A below.
+
+### Tools (all registry entries run through `runTool`, `src/lib/mcp/tools/cv.ts`)
+
+```text
+ list_cvs      read     -> [{ id, label, published, version, updatedAt, fitVerified }]
+ get_cv        read     { id? = published } -> { id, label, published, version, fitVerified,
+                          resume (STORED: photo '' means "inherits avatar"), avatar }
+ create_cv     write    keyed (clientRef)  { label, fromId? = published } -> { id, version }
+ update_cv     write*   { id, version, label?, resume? } -> { id, version, fitVerified: false }
+                        * the published CV needs publish   [P2-B]
+ publish_cv    publish  { id } -> { publishedId, warning? }   [P2-A]
+ delete_cv     publish  { id } -> { ok } ; published -> refused 'published'   [P2-B]
+```
+
+- `version` is the CV's `updatedAt` as an ISO string: the same stale guard `saveCv` already
+  takes as `base`, so editor and agent share one guard. A stale version is refused ("call
+  get_cv again"). `'*'` is never accepted from an agent.
+- `get_cv` returns the stored resume, not `deriveResume`: a derived copy carries the avatar URL
+  in `photo`, and writing it back would silently stop the CV following the portfolio avatar.
+- `resume` is replaced whole (sections are never paged, C10) and goes through
+  `normalizeResume`. New URLs must pass the same rule as `update_profile`: images from this
+  site's Cloudinary, links http/https/mailto. `urlsIn`/`unsafeUrls` move from
+  `profile-service.ts` to `src/lib/mcp/safe-urls.ts` and both services call them.
+- Every write is `audited: true` with `setTarget({ kind: 'cv', id })`; `create_cv` is keyed so a
+  timeout retry cannot make two CVs.
+- Service errors map to refusals the agent can act on: `stale`, `labelTaken`, `cap`,
+  `published`, `not-found`.
+
+Scopes [P2-B]: read for list/get (all CVs, [P2-C]); write for create and for updating an
+unpublished CV; publish for updating the published CV, publishing and deleting.
+
+### Fit tracking [P2-A, approved: warn, do not refuse]
+
+```text
+ Cv.fitVerified: boolean
+   agent create/update  ──▶ false
+   editor Save CV       ──▶ true   (the browser fitter has measured this exact content)
+   migrated and editor-created CVs start true
+   publish_cv / update_cv(published) on an unverified CV: allowed, response carries a warning
+     'Fit not verified: /cv may clip text. Ask the owner to open this CV in /admin/settings and Save CV.'
+   editor opens a CV with fitVerified false:
+     banner "Edited by an agent - check the page fit, then Save CV"
+     requestFit({ onlyIfClipped: true }) runs as in D9
+```
+
+### Other changes
+
+- `update_profile` still refuses the `resume` section, now pointing to `update_cv`
+  (`tests/api/mcp-operator-tools.test.ts:201` keeps passing: the text still names
+  `/admin/settings`).
+- `get_me` keeps `cv` = the published resume and adds `cvs: [{ id, label, published }]`.
+- `tailor-cv` prompt: create a copy of the published CV (`create_cv`), tailor it with
+  `update_cv`, do not publish unless the owner asks, and tell the owner to check the fit in
+  `/admin/settings`. Everything must still come from the owner's real data.
+- `SCOPE_INFO` copy: `read` covers all CVs, `write` covers unpublished CVs, and `publish`
+  covers the published CV plus publish and delete. The "(never the CV)" wording is dropped.
+- Header comments: `profile-service.ts` R8 section rewritten (the resume is now written
+  through `update_cv`, with fit tracking), and `tools/cv.ts` gets its own flow diagram.
+- Editor: agents can now write while a tab is open. The CV stale banner copy mentions agent
+  edits again (amends OV-5). A Save CV on a CV an agent deleted returns 404; the editor offers [Save as new CV], and `createCv` / `POST /api/admin/cvs` accept `{ label, resume }` as an alternative to `{ label, fromId }` [P2-D].
+
+### Tests (Phase 2)
+
+- `tests/api/mcp-cv-tools.test.ts` covers:
+  - each tool on its happy path
+  - scope refusals per tool (P2-B)
+  - stale version refused
+  - the published CV cannot be deleted
+  - create_cv replays on a repeated clientRef
+  - `get_cv` returns `photo: ''` for an inheriting CV
+  - a third-party image URL is refused; an already stored one passes
+  - agent writes set `fitVerified: false`; publish of an unverified CV follows P2-A
+  - `update_cv` on the published CV revalidates `/cv`
+  - exactly one audit row per call
+- `tests/api/profile-safe-urls.test.ts`: the extracted helper, called by both services
+  (shared-contract test). The existing update_profile URL tests stay green.
+- `tests/unit/cv-editor-state.test.ts`: the agent-edit banner, and the 404 rescue path (P2-D).
+- `tests/api/mcp-core.test.ts`: the tool list per scope includes the new tools.
 
 ## Review
 
@@ -397,7 +496,7 @@ behavior, no question needed):
 - OV-5 [P2] (8/10) CV stale banner: Reload refetches the CV list and resets the draft to the
   server copy (it must NOT call `refetchProfile`, which unmounts the editor); Overwrite sends
   `base: '*'` like the profile route. `StaleSaveBanner` gets `subject="cv"`, its own test id,
-  and copy that does not blame an agent.
+  and copy that mentions agent edits (Phase 2 lets agents write CVs).
 - OV-6 [P2] (8/10) While `uploading.cvPhoto` is set, the picker, New, Delete and Publish are
   disabled, so a finishing upload cannot land in another CV. Save CV gates only on
   `uploading.cvPhoto`, not on avatar or project uploads from other tabs.
@@ -672,22 +771,81 @@ Actual answer: A) Add to TODOS.md (T1, 2026-09-25)
 Accepted scope: Add the 'remove legacy profile.resume' item to TODOS.md with trigger 'multi-CV live and Main CV migrated in prod'. No code in this change.
 History: -
 
-Approval readiness: PASS - S1 (D1), A1 (D2), P1 (D3), D4, D5, D6, D7, D8, D9, D10, T1, each approved by its own answer on 2026-09-25. Outside-voice corrections OV-1..6, OV-8, OV-10..12, OV-14 are necessary implementation of those approved decisions (recorded above); OV-7, OV-9 and OV-13 were decided as D9, D10 and D8.
+### P2-A: Fit safety when an agent publishes
+
+Finding: Phase 2 risk, P1, 9/10, `src/lib/profile-service.ts:35-40` (R8: "nothing on the server can tell whether a tailored CV still fits without rendering it") and `src/lib/resume-page-fit.ts:27-40` (fit is DOM-measured). Reviewer: plan-eng-review.
+Plan baseline: R8, the resume is never agent-written. Reversed by the owner's Phase 2 request.
+Runtime evidence: no server-side measurement exists.
+Header: Fit safety
+Options:
+A) Track fit, warn on publish (recommended)
+B) Refuse agent-publishing unverified CVs
+C) No fit tracking
+State: approved
+Actual answer: A) Track fit, warn on publish (P2-A, 2026-09-25)
+Accepted scope: `Cv.fitVerified` (default true for editor-created and migrated CVs): agent create/update sets false, editor Save CV sets true. `publish_cv` and `update_cv` on the published CV succeed on an unverified CV and return `warning: 'Fit not verified: /cv may clip text. Ask the owner to open this CV in /admin/settings and Save CV.'` The editor shows 'Edited by an agent - check the page fit, then Save CV' and runs the D9 auto-fit. `list_cvs`/`get_cv` expose `fitVerified`.
+History: -
+
+### P2-B: Scopes for CV tools
+
+Finding: Phase 2, P1, 8/10, `src/lib/mcp/scopes.ts:5-10` (publish = "anything the public sees"). Reviewer: plan-eng-review.
+Plan baseline: mirror the blog rules.
+Header: CV scopes
+Options:
+A) Mirror blog rules (recommended)
+B) All CV writes need write
+C) All CV writes need publish
+State: approved
+Actual answer: A) Mirror blog rules (P2-B, 2026-09-25)
+Accepted scope: list_cvs/get_cv: read. create_cv and update_cv on an unpublished CV: write. update_cv on the published CV (checked in the tool against findPublished, refused 'scope' without publish), publish_cv, delete_cv: publish.
+History: -
+
+### P2-C: Reading non-published CVs
+
+Finding: Phase 2, P2, 7/10, `src/lib/profile-data.ts:111-124` (the resume is inside `read` because /cv already publishes it, premise 5). Non-published CVs are not published. Reviewer: plan-eng-review.
+Plan baseline: read.
+Header: Read scope
+Options:
+A) read covers all CVs (recommended)
+B) Non-published CVs need pii
+State: approved
+Actual answer: A) read covers all CVs (P2-C, 2026-09-25)
+Accepted scope: list_cvs and get_cv read every CV with the read scope; SCOPE_INFO read copy says 'Profile, all CVs, posts...'. pii unchanged.
+History: -
+
+### P2-D: Owner saves a CV an agent deleted
+
+Finding: Phase 2, P2, 8/10. The editor keeps a draft of a CV that no longer exists; Save CV returns 404 and the draft is lost on reload. Reviewer: plan-eng-review.
+Plan baseline: unspecified.
+Header: Deleted CV
+Options:
+A) Offer Save as new CV (recommended)
+B) Error message only
+State: approved
+Actual answer: A) Offer Save as new CV (P2-D, 2026-09-25)
+Accepted scope: Save CV 404 shows 'This CV was deleted, maybe by an agent.' with [Save as new CV]: label dialog, then `createCv({ label, resume: draft })` (POST /api/admin/cvs accepts `{ label, fromId }` or `{ label, resume }`, exactly one). The draft is kept until it is saved or discarded.
+History: -
+
+Approval readiness: PASS - S1 (D1), A1 (D2), P1 (D3), D4, D5, D6, D7, D8, D9, D10, T1, and Phase 2 P2-A, P2-B, P2-C, P2-D, each approved by its own answer on 2026-09-25. Phase 2 supersedes R8 at the owner's request; OV-5's 'copy without agent' is amended by Phase 2 (agents can now write CVs). Outside-voice corrections OV-1..6, OV-8, OV-10..12, OV-14 are necessary implementation of those approved decisions (recorded above); OV-7, OV-9 and OV-13 were decided as D9, D10 and D8.
 
 ## Failure modes
 
-| New path         | Realistic production failure                                          | Covered by                                                                                      | User sees                                   |
-| ---------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `ensureMigrated` | two first loads (strict-mode double effect) race before indexes build | fixed `_id` + catch 11000 + `CvModel.init()`; cv-service concurrency test without `syncIndexes` | one "Main CV", no error                     |
-| `publishCv`      | publish bumps `updatedAt`, next Save CV 409s                          | `timestamps: false`; publish-then-save test                                                     | nothing (prevented)                         |
-| `/cv` resolver   | cvs empty (never migrated)                                            | legacy fallback; existing MCP tests :416/:431                                                   | today's CV, unchanged                       |
-| `/cv` freshness  | stale ISR after publish                                               | `revalidateTag(..., { expire: 0 })`; e2e full-load check                                        | new CV on the next full load                |
-| `saveCv`         | two tabs save the same CV                                             | `updatedAt` guard -> 409 `stale`; route test                                                    | StaleSaveBanner with Reload / Overwrite     |
-| `deleteCv`       | delete races a publish of the same CV                                 | conditional `deleteOne` (D10); service test                                                     | 409 "published" message                     |
-| `createCv`       | 21st CV, or taken label                                               | 409 `cap` / `labelTaken`; service + route tests                                                 | inline dialog error                         |
-| Save CV body     | draft cleared to empty                                                | `pruneResumeForCv` always returns a Resume; unit test                                           | empty CV saved as asked, not a silent no-op |
-| CV photo upload  | upload finishes after switching CV                                    | picker locked during `uploading.cvPhoto`; unit test                                             | picker disabled until upload ends           |
-| Profile save     | legacy `resume` still sent via `...profile` spread                    | explicit delete; unit test                                                                      | nothing (prevented)                         |
+| New path           | Realistic production failure                                          | Covered by                                                                                         | User sees                                       |
+| ------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `ensureMigrated`   | two first loads (strict-mode double effect) race before indexes build | fixed `_id` + catch 11000 + `CvModel.init()`; cv-service concurrency test without `syncIndexes`    | one "Main CV", no error                         |
+| `publishCv`        | publish bumps `updatedAt`, next Save CV 409s                          | `timestamps: false`; publish-then-save test                                                        | nothing (prevented)                             |
+| `/cv` resolver     | cvs empty (never migrated)                                            | legacy fallback; existing MCP tests :416/:431                                                      | today's CV, unchanged                           |
+| `/cv` freshness    | stale ISR after publish                                               | `revalidateTag(..., { expire: 0 })`; e2e full-load check                                           | new CV on the next full load                    |
+| `saveCv`           | two tabs save the same CV                                             | `updatedAt` guard -> 409 `stale`; route test                                                       | StaleSaveBanner with Reload / Overwrite         |
+| `deleteCv`         | delete races a publish of the same CV                                 | conditional `deleteOne` (D10); service test                                                        | 409 "published" message                         |
+| `createCv`         | 21st CV, or taken label                                               | 409 `cap` / `labelTaken`; service + route tests                                                    | inline dialog error                             |
+| Save CV body       | draft cleared to empty                                                | `pruneResumeForCv` always returns a Resume; unit test                                              | empty CV saved as asked, not a silent no-op     |
+| CV photo upload    | upload finishes after switching CV                                    | picker locked during `uploading.cvPhoto`; unit test                                                | picker disabled until upload ends               |
+| Profile save       | legacy `resume` still sent via `...profile` spread                    | explicit delete; unit test                                                                         | nothing (prevented)                             |
+| agent `publish_cv` | tailored CV longer than two A4 sheets goes live clipped               | P2-A: `fitVerified` false, warning in the tool result, editor banner + auto-fit; mcp-cv-tools test | agent relays the warning; owner sees the banner |
+| agent `update_cv`  | agent re-sends a derived resume and freezes the avatar into `photo`   | `get_cv` returns the STORED resume; test asserts `photo: ''`                                       | nothing (prevented)                             |
+| agent `create_cv`  | client retries after a timeout                                        | keyed `clientRef` replay; test                                                                     | one CV                                          |
+| owner Save CV      | agent deleted the CV meanwhile                                        | 404 -> [Save as new CV] (P2-D); unit test                                                          | clear message, draft kept                       |
 
 Critical gaps (no test AND no handling AND silent): none.
 
@@ -699,73 +857,104 @@ Critical gaps (no test AND no handling AND silent): none.
 | B. CV card prop refactor (resume/setResume/avatar)                                                     | `src/components/settings/Resume*`, `src/components/settings/preview/`, `useCvPageBreakFit`                                | -                   |
 | C. useCvEditor, cv-editor-state, CvPicker, CvLabelDialog, toolbar/floating split, profile-body cleanup | `src/components/settings/`, `src/app/(admin)/admin/settings/`, `src/components/blog-admin/StaleSaveBanner`, `tests/unit/` | A (API contract), B |
 | D. e2e                                                                                                 | `tests/e2e/`                                                                                                              | A, C                |
+| E. Phase 2 server: safe-urls, fitVerified, MCP CV tools, MCP copy (IT10-IT13)                          | `src/lib/mcp/`, `src/lib/cv/`, `src/models/`, `tests/api/`                                                                | A                   |
+| F. Phase 2 editor: fit banner, 404 rescue (IT14)                                                       | `src/components/settings/`, `tests/unit/`                                                                                 | C, E                |
 
 Lane A: step A (server). Lane B: step B (client props). Launch A + B in parallel worktrees,
 merge both, then C, then D. Conflict flag: B and C both touch `src/components/settings/`, so
-C starts only after B merges.
+C starts only after B merges. Phase 2: E can start as soon as A merges (in parallel with B/C);
+F waits for C and E. E and A both touch `src/lib/cv/` and `src/models/`, so E never runs
+before A is merged.
 
 ## Implementation Tasks
 
 Synthesized from this review's findings. Each task derives from a specific finding above.
 Task ids are `IT*` so they do not collide with TODO `T1`.
 
-- [ ] **IT1 (P1, human: ~2h / CC: ~10min)** - models - move `resumeSchema` to `src/models/resume-schema.ts`; add `src/models/Cv.ts` (required resume, `labelKey` unique, `{ publishedAt: -1, _id: -1 }`, timestamps, `LEGACY_CV_ID`); `MAX_CVS`, `MAX_CV_JSON_BYTES` in `upload-limits.ts`
+- [x] **IT1 (P1, human: ~2h / CC: ~10min)** - models - move `resumeSchema` to `src/models/resume-schema.ts`; add `src/models/Cv.ts` (required resume, `labelKey` unique, `{ publishedAt: -1, _id: -1 }`, timestamps, `LEGACY_CV_ID`); `MAX_CVS`, `MAX_CV_JSON_BYTES` in `upload-limits.ts`
   - Surfaced by: A1, D6, D8, OV-2, OV-8
   - Files: `src/models/Profile.ts`, `src/models/resume-schema.ts`, `src/models/Cv.ts`, `src/lib/upload-limits.ts`
   - Verify: `bun run typecheck`; `bunx vitest run tests/api/cv-indexes.test.ts`
-- [ ] **IT2 (P1, human: ~1 day / CC: ~20min)** - cv-service - `findPublished`, `ensureMigrated`, `listCvs`, `createCv`, `saveCv`, `publishCv`, `deleteCv` exactly as in "Service", with header diagram
+- [x] **IT2 (P1, human: ~1 day / CC: ~20min)** - cv-service - `findPublished`, `ensureMigrated`, `listCvs`, `createCv`, `saveCv`, `publishCv`, `deleteCv` exactly as in "Service", with header diagram
   - Surfaced by: Arch-1..5, P1, D5, D6, D8, D10, OV-1, OV-2, OV-3
   - Files: `src/lib/cv/cv-service.ts`, `tests/api/cv-service.test.ts`, `tests/api/cv-indexes.test.ts`
   - Verify: `bunx vitest run tests/api/cv-service.test.ts tests/api/cv-indexes.test.ts`
-- [ ] **IT3 (P1, human: ~4h / CC: ~15min)** - routes - `/api/admin/cvs` GET/POST, `/[id]` PATCH/DELETE, `/[id]/publish` POST with `requireOwner`, `readJsonBody` (256 KB), awaited params, ObjectId 404
+- [x] **IT3 (P1, human: ~4h / CC: ~15min)** - routes - `/api/admin/cvs` GET/POST, `/[id]` PATCH/DELETE, `/[id]/publish` POST with `requireOwner`, `readJsonBody` (256 KB), awaited params, ObjectId 404
   - Surfaced by: Security note, D8, OV-5 (`base: '*'`), OV-14
   - Files: `src/app/api/admin/cvs/route.ts`, `src/app/api/admin/cvs/[id]/route.ts`, `src/app/api/admin/cvs/[id]/publish/route.ts`, `tests/api/cv-routes.test.ts`
   - Verify: `bunx vitest run tests/api/cv-routes.test.ts`
-- [ ] **IT4 (P1, human: ~3h / CC: ~10min)** - read paths - `loadPublishedResume` (replaces `loadPublicResume`), `/cv` page, `readProfileSection('resume')`, MCP descriptions; update the three header comments
+- [x] **IT4 (P1, human: ~3h / CC: ~10min)** - read paths - `loadPublishedResume` (replaces `loadPublicResume`), `/cv` page, `readProfileSection('resume')`, MCP descriptions; update the three header comments
   - Surfaced by: Arch-2, Arch-3, OV-3, OV-10, OV-12
   - Files: `src/lib/profile-data.ts`, `src/app/(me)/cv/page.tsx`, `src/lib/profile-sections.ts`, `src/lib/mcp/tools/me.ts`, `tests/api/mcp-operator-tools.test.ts`, `tests/api/resume-hide-photo.test.ts`
   - Verify: `bun run test:api`
-- [ ] **IT5 (P1, human: ~4h / CC: ~15min)** - CV cards - `CvSectionProps` to `resume`/`setResume`/`avatar`; remove `resumeOf`/`updateResume`; narrow `useCvPageBreakFit`, `CvTabPreview`, `PreviewRail`
+- [x] **IT5 (P1, human: ~4h / CC: ~15min)** - CV cards - `CvSectionProps` to `resume`/`setResume`/`avatar`; remove `resumeOf`/`updateResume`; narrow `useCvPageBreakFit`, `CvTabPreview`, `PreviewRail`
   - Surfaced by: S1, CQ-3
   - Files: `src/components/settings/types.ts`, `resume-utils.ts`, `Resume*Section.tsx` (6), `useCvPageBreakFit.tsx`, `CvTabSections.tsx`, `preview/CvTabPreview.tsx`, `preview/PreviewRail.tsx`
   - Verify: `bun run typecheck && bun run lint`
-- [ ] **IT6 (P1, human: ~1 day / CC: ~25min)** - editor - `cv-editor-state.ts` (pure), `useCvEditor` in `SettingEditor`, `CvPicker`, `CvLabelDialog`, discard/delete `ConfirmDialog`s, upload lock, auto-fit notice, CV stale banner (Reload/Overwrite), loading/error states
+- [x] **IT6 (P1, human: ~1 day / CC: ~25min)** - editor - `cv-editor-state.ts` (pure), `useCvEditor` in `SettingEditor`, `CvPicker`, `CvLabelDialog`, discard/delete `ConfirmDialog`s, upload lock, auto-fit notice, CV stale banner (Reload/Overwrite), loading/error states
   - Surfaced by: R4, D4, D9, OV-4, OV-5, OV-6, CQ-5
   - Files: `src/components/settings/cv-editor-state.ts`, `useCvEditor.ts`, `CvPicker.tsx`, `CvLabelDialog.tsx`, `src/app/(admin)/admin/settings/page.tsx`, `src/components/blog-admin/StaleSaveBanner.tsx`, `tests/unit/cv-editor-state.test.ts`
   - Verify: `bunx vitest run tests/unit/cv-editor-state.test.ts`; manual walk in `bun run dev`
-- [ ] **IT7 (P1, human: ~2h / CC: ~10min)** - save buttons + profile body - Save CV / disabled Save profile in `SettingToolbar`, `FloatingSaveButton` follows the primary; `cleanProfileForSave` deletes `resume`; `pruneResumeForCv`; `SettingEditor` stops seeding `resume`
+- [x] **IT7 (P1, human: ~2h / CC: ~10min)** - save buttons + profile body - Save CV / disabled Save profile in `SettingToolbar`, `FloatingSaveButton` follows the primary; `cleanProfileForSave` deletes `resume`; `pruneResumeForCv`; `SettingEditor` stops seeding `resume`
   - Surfaced by: R5, CQ-1, CQ-2, OV-8, OV-14
   - Files: `src/components/settings/SettingToolbar.tsx`, `FloatingSaveButton.tsx`, `cleanProfileForSave.ts`, `src/app/(admin)/admin/settings/page.tsx`, `tests/unit/clean-profile-for-save.test.ts`
   - Verify: `bunx vitest run tests/unit/clean-profile-for-save.test.ts tests/api/profile-route.test.ts`
-- [ ] **IT8 (P2, human: ~3h / CC: ~10min)** - e2e - `tests/e2e/cv-publish.spec.ts` with pre-load, per-run label, cleanup
+- [x] **IT8 (P2, human: ~3h / CC: ~10min)** - e2e - `tests/e2e/cv-publish.spec.ts` with pre-load, per-run label, cleanup
   - Surfaced by: D7, OV-11
   - Files: `tests/e2e/cv-publish.spec.ts`
   - Verify: `bun run test:e2e:local -- tests/e2e/cv-publish.spec.ts`
-- [ ] **IT9 (P2, human: ~15min / CC: ~2min)** - final gate - `bun run format:check && bun run lint && bun run typecheck && bun run test && bun run build`
+- [x] **IT9 (P2, human: ~15min / CC: ~2min)** - final gate - `bun run format:check && bun run lint && bun run typecheck && bun run test && bun run build`
   - Surfaced by: testing-quality rules
   - Files: -
   - Verify: all green
+  - Result (2026-09-25): lint, typecheck, build and the new tests green; `cv-publish.spec.ts`
+    green via `bun run test:e2e:local`. Not green, and identical on the tree before this
+    change: `format:check` (3 docs + `src/components/cv/CvSheets.tsx`) and 4 tests in
+    `tests/api/blog-cron-route.test.ts` / `tests/api/blog-post-data.test.ts`.
+
+Phase 2 (MCP controls the CVs), after IT1-IT4 are merged:
+
+- [ ] **IT10 (P1, human: ~2h / CC: ~10min)** - shared URL rule - move `urlsIn`/`unsafeUrls`/`isSafeLink` from `profile-service.ts` to `src/lib/mcp/safe-urls.ts`; both services call it
+  - Surfaced by: Phase 2 "Tools" (URL rule), shared-code rubric (2 real callers: `patchProfileSection`, CV agent writes)
+  - Files: `src/lib/mcp/safe-urls.ts`, `src/lib/profile-service.ts`, `tests/api/profile-safe-urls.test.ts`
+  - Verify: `bunx vitest run tests/api/profile-safe-urls.test.ts tests/api/mcp-operator-tools.test.ts`
+- [ ] **IT11 (P1, human: ~3h / CC: ~10min)** - fit tracking + service - `Cv.fitVerified`; `cv-service` takes an `actor: 'owner' | 'agent'` so agent writes set false and editor saves set true; `createCv({ label, resume })` variant
+  - Surfaced by: P2-A, P2-D
+  - Files: `src/models/Cv.ts`, `src/lib/cv/cv-service.ts`, `src/app/api/admin/cvs/route.ts`, `tests/api/cv-service.test.ts`
+  - Verify: `bunx vitest run tests/api/cv-service.test.ts tests/api/cv-routes.test.ts`
+- [ ] **IT12 (P1, human: ~1 day / CC: ~25min)** - MCP tools - `src/lib/mcp/tools/cv.ts` (list_cvs, get_cv, create_cv keyed, update_cv, publish_cv, delete_cv) with the P2-B scope rules, the P2-A warning, stored-resume reads, the URL rule and error-to-refusal mapping; register them in `server.ts`; tool header diagram
+  - Surfaced by: R6, R7, P2-A, P2-B, P2-C
+  - Files: `src/lib/mcp/tools/cv.ts`, `src/lib/mcp/server.ts`, `tests/api/mcp-cv-tools.test.ts`, `tests/api/mcp-core.test.ts`
+  - Verify: `bunx vitest run tests/api/mcp-cv-tools.test.ts tests/api/mcp-core.test.ts`
+- [ ] **IT13 (P2, human: ~2h / CC: ~10min)** - MCP copy - `get_me` adds `cvs`; `update_profile` resume refusal points to `update_cv`; `tailor-cv` prompt uses create_cv + update_cv and never publishes unasked; `SCOPE_INFO`; rewrite the R8 section of the `profile-service.ts` header
+  - Surfaced by: Phase 2 "Other changes", P2-C
+  - Files: `src/lib/mcp/tools/me.ts`, `src/lib/mcp/tools/prompts.ts`, `src/lib/mcp/scopes.ts`, `src/lib/profile-service.ts`, `tests/api/mcp-operator-tools.test.ts`
+  - Verify: `bun run test:api`
+- [ ] **IT14 (P2, human: ~3h / CC: ~10min)** - editor - agent-edit fit banner; 404 rescue with [Save as new CV]; stale banner copy mentions agents
+  - Surfaced by: P2-A, P2-D, OV-5 amendment
+  - Files: `src/components/settings/cv-editor-state.ts`, `useCvEditor.ts`, `CvPicker.tsx`, `src/components/blog-admin/StaleSaveBanner.tsx`, `tests/unit/cv-editor-state.test.ts`
+  - Verify: `bunx vitest run tests/unit/cv-editor-state.test.ts`; then IT9's full gate again
 
 Effort ratios assumed: features ~30x, tests ~50x, scaffolding ~100x.
 
 ## Unresolved decisions
 
-None. Every choice in this review has an answer (D1-D10, T1).
+None. Every choice in this review has an answer (D1-D10, T1, P2-A to P2-D).
 
 ## Completion summary
 
-- Step 0: Scope Challenge - scope accepted as-is (Original arrangement, D1)
-- Architecture Review: 5 issues found
-- Code Quality Review: 5 issues found
-- Test Review: diagram produced, 28 gaps identified (all new paths) + 1 critical regression (CQ-1)
+- Step 0: Scope Challenge - scope accepted as-is (Original arrangement, D1); Phase 2 added by owner request
+- Architecture Review: 5 issues found (+1 Phase 2: R8 reversal, P2-A)
+- Code Quality Review: 5 issues found (+1 Phase 2: shared URL rule, IT10)
+- Test Review: diagram produced, 28 gaps identified (all new paths) + 1 critical regression (CQ-1); Phase 2 adds mcp-cv-tools and safe-urls suites
 - Performance Review: 2 issues found
-- NOT in scope: written
+- NOT in scope: written (MCP CV tools moved into Phase 2)
 - What already exists: written
 - TODOS.md updates: 1 item proposed to user (T1, added)
-- Failure modes: 0 critical gaps flagged
+- Failure modes: 0 critical gaps flagged (Phase 2 rows included)
 - Unresolved decisions: 0 in this review
-- Outside voice: codex model_unusable; fresh-context Claude Plan subagent completed (same harness, not outside coverage), 14 findings, all resolved (11 corrections, 3 decisions)
-- Parallelization: 2 lanes, 2 parallel / 2 sequential
+- Outside voice: codex model_unusable; fresh-context Claude Plan subagent completed for Phase 1 (same harness, not outside coverage), 14 findings, all resolved. Phase 2 not re-run through an outside voice.
+- Parallelization: 3 lanes (A, B, E), then C, D, F sequential
 - Lake Score: 1/1 (D7 chose the complete option; other choices differ in kind)
 
 ## Suppressed findings
@@ -775,15 +964,15 @@ None. Every choice in this review has an answer (D1-D10, T1).
 
 ## GSTACK REVIEW REPORT
 
-| Review         | Trigger                                                 | Why                             | Runs | Status                                   | Findings                   |
-| -------------- | ------------------------------------------------------- | ------------------------------- | ---- | ---------------------------------------- | -------------------------- |
-| CEO Review     | `/plan-ceo-review`                                      | Scope & strategy                | 0    | -                                        | -                          |
-| Outside Review | codex (model_unusable) -> Claude Plan subagent fallback | Independent 2nd opinion         | 2    | unavailable (in-host fallback completed) | 14 findings, all resolved  |
-| Eng Review     | `/plan-eng-review`                                      | Architecture & tests (required) | 2    | issues_open                              | 40 issues, 0 critical gaps |
-| Design Review  | `/plan-design-review`                                   | UI/UX gaps                      | 0    | -                                        | -                          |
-| DX Review      | `/plan-devex-review`                                    | Developer experience gaps       | 0    | -                                        | -                          |
+| Review         | Trigger                                                 | Why                             | Runs | Status                                                 | Findings                   |
+| -------------- | ------------------------------------------------------- | ------------------------------- | ---- | ------------------------------------------------------ | -------------------------- |
+| CEO Review     | `/plan-ceo-review`                                      | Scope & strategy                | 0    | -                                                      | -                          |
+| Outside Review | codex (model_unusable) -> Claude Plan subagent fallback | Independent 2nd opinion         | 2    | unavailable (in-host fallback completed, Phase 1 only) | 14 findings, all resolved  |
+| Eng Review     | `/plan-eng-review`                                      | Architecture & tests (required) | 3    | issues_open                                            | 42 issues, 0 critical gaps |
+| Design Review  | `/plan-design-review`                                   | UI/UX gaps                      | 0    | -                                                      | -                          |
+| DX Review      | `/plan-devex-review`                                    | Developer experience gaps       | 0    | -                                                      | -                          |
 
-- **OUTSIDE COVERAGE:** codex, plan-review phase, unavailable (the gstack default model is not supported on this ChatGPT-account Codex login). A native Claude Plan subagent completed instead; it is not outside-model coverage.
-- **VERDICT:** No review CLEAR for this plan: Eng Review is issues_open because it mapped 40 issues into approved work (IT1-IT9), not because anything is undecided. eng review required.
+- **OUTSIDE COVERAGE:** codex, plan-review phase, unavailable (the gstack default model is not supported on this ChatGPT-account Codex login). A native Claude Plan subagent reviewed Phase 1; Phase 2 had no second opinion.
+- **VERDICT:** No review CLEAR for this plan: Eng Review is issues_open because its 42 issues are mapped into approved work (IT1-IT14), not because anything is undecided. eng review required.
 
 NO UNRESOLVED DECISIONS

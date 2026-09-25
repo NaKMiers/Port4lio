@@ -5,11 +5,10 @@ import { createPortal } from 'react-dom'
 
 import { CvFlowSheet } from '@/components/cv/CvSheets'
 import { SHEET_WIDTH_PX } from '@/components/cv/cv-sheet-css'
-import { updateResume } from '@/components/settings/resume-utils'
 import { arimo } from '@/lib/cv-font'
 import { fitResumePageBreak, resumeBreakOverflows } from '@/lib/resume-page-fit'
 import { deriveResume, locateResumeItems } from '@/lib/resume-view-model'
-import type { Profile, ResumePageBreak } from '@/types/profile'
+import type { Resume, ResumePageBreak } from '@/types/profile'
 
 function samePageBreak(a: ResumePageBreak, b: ResumePageBreak): boolean {
   return (
@@ -33,10 +32,17 @@ function samePageBreak(a: ResumePageBreak, b: ResumePageBreak): boolean {
  * Pass `onlyIfClipped` to repair a page that is overflowing and otherwise leave the stored
  * break exactly as it is. That is what the CV tab does on open, so a break saved before a
  * reorder - or by a build that predates this - stops rendering a clipped sheet.
+ *
+ * `onClippedRefit` fires when such a repair actually moved the break. The CV editor shows
+ * "Page break re-fitted - Save CV to keep it" then (multi-cv-plan.md D9): the draft now
+ * differs from the saved CV, and without the notice the owner would find a CV marked
+ * unsaved that they never touched.
  */
 export function useCvPageBreakFit(
-  profile: Profile,
-  setProfile: React.Dispatch<React.SetStateAction<Profile>>
+  draft: Resume,
+  avatar: string,
+  setResume: React.Dispatch<React.SetStateAction<Resume>>,
+  { onClippedRefit }: { onClippedRefit?: (next: ResumePageBreak) => void } = {}
 ) {
   // `null` when idle. `onlyIfClipped` is how the on-open pass avoids touching a break the
   // owner chose deliberately - it repairs a clipping page and leaves a fitting one alone.
@@ -48,9 +54,14 @@ export function useCvPageBreakFit(
 
   // Matches what the preview and `/cv` render, so the measurement is of the real thing.
   const resume = useMemo(
-    () => deriveResume({ resume: profile.resume }, profile.avatar),
-    [profile.resume, profile.avatar]
+    () => deriveResume({ resume: draft }, avatar),
+    [draft, avatar]
   )
+  // A ref, so a caller's inline callback does not re-run the measuring effect.
+  const refitRef = useRef(onClippedRefit)
+  useEffect(() => {
+    refitRef.current = onClippedRefit
+  })
 
   useEffect(() => {
     if (!pending) return
@@ -76,11 +87,13 @@ export function useCvPageBreakFit(
         return
 
       const next = fitResumePageBreak(sheet, limitPx, locateResumeItems(resume))
-      if (!next) return
+      if (!next || samePageBreak(resume.pageBreak, next)) return
 
-      updateResume(setProfile, r =>
-        samePageBreak(r.pageBreak, next) ? r : { ...r, pageBreak: next }
-      )
+      if (pending.onlyIfClipped && refitRef.current) refitRef.current(next)
+      else
+        setResume(r =>
+          samePageBreak(r.pageBreak, next) ? r : { ...r, pageBreak: next }
+        )
     }
 
     // The CV faces change every line height, so measuring before they land measures the
@@ -104,7 +117,7 @@ export function useCvPageBreakFit(
     return () => {
       done = true
     }
-  }, [pending, resume, setProfile])
+  }, [pending, resume, setResume])
 
   const portal =
     pending !== null && typeof document !== 'undefined'

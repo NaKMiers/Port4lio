@@ -1,6 +1,6 @@
 import type React from 'react'
 
-import type { Profile } from '@/types/profile'
+import type { Resume } from '@/types/profile'
 
 /**
  * The editor's tabs. Lives here rather than in the page so the preview rail can switch on
@@ -27,10 +27,16 @@ export type UploadingState = {
 /**
  * What every reorderable CV section card takes. They are rendered from a lookup keyed by
  * `ResumeSectionKey`, so they have to agree on one prop shape.
+ *
+ * The card edits one CV's draft, not the profile: the CV tab edits whichever CV the picker
+ * selected (`useCvEditor`), and that draft lives beside the profile rather than inside it.
+ * `avatar` is the one profile field a card needs, for the photo fallback `/cv` applies.
  */
 export type CvSectionProps = {
-  profile: Profile
-  setProfile: React.Dispatch<React.SetStateAction<Profile>>
+  resume: Resume
+  setResume: React.Dispatch<React.SetStateAction<Resume>>
+  /** The portfolio avatar, which an unset CV photo inherits. */
+  avatar: string
   /** Drag grip supplied by the CV tab's `DragList`. */
   handle?: React.ReactNode
   /**

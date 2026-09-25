@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { AdminHubPill } from '@/components/admin/AdminHomeLink'
+
 /**
  * The shared loading screen for every owner board.
  *
@@ -15,16 +17,27 @@ import React from 'react'
  * three files to change the behaviour of two. The default is the settings copy because that
  * is the caller the words were written for, and the boards that need different words now say
  * so.
+ *
+ * `hubPill` is for `/admin/settings` only: `AdminHomeLink` hides on that route (its toolbar
+ * carries the pill instead), so while the page loads it would otherwise have no way back.
+ * Every other board still gets the pill from `AdminHomeLink`, and would show two.
  */
 export default function SettingLoading({
+  hubPill = false,
   title = 'Loading profile...',
   subtitle = 'Preparing your editorial settings view.',
 }: {
+  hubPill?: boolean
   title?: string
   subtitle?: string
 } = {}) {
   return (
     <div className="mx-auto w-full max-w-editorial px-gutter py-10">
+      {hubPill ? (
+        <div className="mb-6">
+          <AdminHubPill />
+        </div>
+      ) : null}
       <div className="bg-white/78 rounded-[1.8rem] border border-pp-line p-6 shadow-panel backdrop-blur-md">
         <h2 className="font-display text-2xl font-semibold tracking-tight text-pp-text">
           {title}

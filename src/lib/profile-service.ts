@@ -22,6 +22,7 @@ import type { Profile } from '@/types/profile'
  *
  * ```
  *   POST /api/profile ──▶ replaceProfile(body)        the whole document, $set + upsert, unchanged
+ *                            the editor's body no longer carries `resume` (multi-CV, below)
  *   update_profile    ──▶ patchProfileSection(section, value, version)
  *                            resume ──▶ refused: edited only in /admin/settings        (R8)
  *                            keys   ──▶ exactly the section's fields, or refused
@@ -38,6 +39,15 @@ import type { Profile } from '@/types/profile'
  * off at the bottom of the sheet with no signal, and nothing on the server can tell whether a
  * tailored CV still fits without rendering it. The settings editor is the one place the owner
  * sees the page. So `tailor-cv` returns markdown and the owner pastes what they keep.
+ *
+ * ## Where the CV is written now
+ *
+ * Not here. Since multi-CV the CVs live in the `cvs` collection and every CV write goes
+ * through `lib/cv/cv-service.ts` (Save CV, Publish, Delete in the settings CV tab), which
+ * does its own cache expiry. `profile.resume` is the legacy block: the migration source and
+ * the pre-migration `/cv` fallback. `replaceProfile` still stores it if a body sends it -
+ * `tests/api/profile-route.test.ts` pins that (R10) - but `cleanProfileForSave` never does,
+ * and nothing reads it once "Main CV" exists (TODOS.md tracks removing it).
  *
  * ## Why a section is replaced whole, with a version
  *

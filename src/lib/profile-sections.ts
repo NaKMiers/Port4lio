@@ -2,6 +2,7 @@ import 'server-only'
 
 import crypto from 'node:crypto'
 
+import { readPublishedResumeSource } from '@/lib/cv/cv-service'
 import { connectDatabase } from '@/lib/mongodb'
 import { makeEmptyProfile, normalizeProfile } from '@/lib/profile'
 import { deriveResume } from '@/lib/resume-view-model'
@@ -21,7 +22,8 @@ import type { Profile } from '@/types/profile'
  *   resume    resume                   the private /cv block, the owner's contact details included
  *
  *   read:  one indexed findById, projected to the section's fields ──▶ normalizeProfile ──▶ pick
- *          resume: deriveResume, so a never-written block reads as the seed /cv prints
+ *          resume: the PUBLISHED CV (cv-service.readPublishedResumeSource, the resolver /cv
+ *                  uses, uncached here) ──▶ deriveResume, so "no CV yet" reads as the seed
  *   version = sha256(stable JSON of exactly what was returned), 16 hex chars
  * ```
  *
@@ -30,8 +32,16 @@ import type { Profile } from '@/types/profile'
  *
  * `resume` is the one private section, and reading it here is deliberate: the owner's own
  * contact details are inside the `read` scope because `/cv` already publishes them (premise
- * 5). See the `loadPublicResume` comment in `profile-data.ts` for why this token-gated read is
- * the one machine-readable exception.
+ * 5). See the `loadPublishedResume` comment in `profile-data.ts` for why this token-gated read
+ * is the one machine-readable exception. Only the published CV is ever returned; the owner's
+ * other CVs are not readable over MCP at all (multi-cv-plan.md, NOT in scope).
+ *
+ * ## Why `resume` comes from the published CV, with the legacy block as fallback
+ *
+ * CVs live in the `cvs` collection since multi-CV, and `/cv` prints whichever is published.
+ * An agent reading `profile.resume` would describe a CV the site no longer shows. Before the
+ * owner first opens the CV tab nothing is migrated, and the resolver falls back to
+ * `profile.resume` exactly as `/cv` does, so both keep agreeing.
  *
  * ## Why `resume` is derived, not raw
  *
@@ -107,20 +117,19 @@ export async function readProfileSection(section: ProfileSection): Promise<{
   value: Record<string, unknown>
   version: string
 }> {
+  if (section === 'resume') {
+    // The avatar rides along: `/cv` falls back to it when the CV has no photo of its own,
+    // and the agent must see (and version) the sheet `/cv` actually prints.
+    const { resume, avatar } = await readPublishedResumeSource()
+    const value = { resume: deriveResume({ resume }, avatar) }
+    return { value, version: sectionVersion(value) }
+  }
+
   await connectDatabase()
-  // The resume also reads `avatar`: `/cv` falls back to it when the CV has no photo of its
-  // own, and the agent must see (and version) the sheet `/cv` actually prints.
   const doc = await ProfileModel.findById(PROFILE_DOCUMENT_ID)
-    .select(
-      section === 'resume'
-        ? 'resume avatar'
-        : PROFILE_SECTIONS[section].join(' ')
-    )
+    .select(PROFILE_SECTIONS[section].join(' '))
     .lean()
   const profile = doc ? normalizeProfile(doc) : makeEmptyProfile()
-  const value =
-    section === 'resume'
-      ? { resume: deriveResume(profile, profile.avatar) }
-      : pickSection(profile, section)
+  const value = pickSection(profile, section)
   return { value, version: sectionVersion(value) }
 }

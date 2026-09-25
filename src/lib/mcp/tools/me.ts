@@ -20,14 +20,15 @@ import { loadAgentVisible } from '@/lib/whiteboard/data'
  *   get_profile(section) ──▶ profile-sections: one findById, projected ──▶ { section, version, value }
  *   update_profile(section, version, value) ──▶ profile-service.patchProfileSection
  *                            resume refused (R8) · stale version refused (R6) · revalidateTag
- *   get_me ──▶ identity + about (clipped) + resume   (profile-sections)
+ *   get_me ──▶ identity + about (clipped) + resume   (profile-sections: the PUBLISHED CV)
  *            + active dreams and goals              (loadAgentVisible overview: visible only)
  *            + 5 latest published posts             (post-service listPosts)
  * ```
  *
  * The resume carries the owner's own contact details on purpose (premise 5: `/cv` already
  * publishes them). These two tools are the one token-gated machine-readable exception, which
- * the `loadPublicResume` comment in `profile-data.ts` records (C7).
+ * the `loadPublishedResume` comment in `profile-data.ts` records (C7). The owner keeps many
+ * CVs; only the published one - the one `/cv` prints - is readable here.
  */
 
 export const getProfileTool = defineTool({
@@ -37,7 +38,7 @@ export const getProfileTool = defineTool({
     "One section of the owner's portfolio profile, returned whole as JSON with a `version` hash.",
     'Sections: identity (name, job titles, description, avatar, location, socials), about (headings, stats, about me),',
     'career (skills, experience, education, certificates), offering (services), work (projects),',
-    "cvFile (the public CV file link), resume (the printable /cv sheet, including the owner's own contact details).",
+    "cvFile (the public CV file link), resume (the published CV: the printable /cv sheet, including the owner's own contact details).",
     'Keep the version: editing a section later requires the version you read.',
   ].join(' '),
   scopes: ['read'],
@@ -63,7 +64,7 @@ export const getMeTool = defineTool({
   name: 'get_me',
   title: 'Who the owner is',
   description:
-    "One call for 'who am I': the owner's public profile summary, their CV (the printable /cv sheet, including their own contact details), their active goals and dreams from the whiteboard (titles only), and their 5 most recent published posts (titles only). Use get_profile for a whole section, whiteboard_get_item or get_post for detail.",
+    "One call for 'who am I': the owner's public profile summary, their published CV (the printable /cv sheet, including their own contact details), their active goals and dreams from the whiteboard (titles only), and their 5 most recent published posts (titles only). Use get_profile for a whole section, whiteboard_get_item or get_post for detail.",
   scopes: ['read'],
   input: z.object({}),
   annotations: { readOnlyHint: true, openWorldHint: false },

@@ -135,13 +135,16 @@ function pruneProjects(projects: ProjectItem[]): ProjectItem[] {
 }
 
 /**
- * Trims the CV block and drops empty entries. Returns `undefined` when nothing is left,
- * so the key is omitted from the payload rather than blanking the stored CV via `$set`.
+ * The Save CV body: the draft trimmed, with empty entries dropped.
+ *
+ * Always a `Resume`, never `undefined`. The profile save used to omit a CV block that
+ * pruned down to nothing, so that editor state which never populated the CV tab could not
+ * blank a stored CV. A CV is its own document now, and Save CV is an explicit act on it, so
+ * "the owner cleared this CV" must save an empty CV rather than silently do nothing
+ * (multi-cv-plan.md OV-8). `Cv.resume` is required on the server for the same reason.
  */
-function pruneResume(resume: Resume | undefined): Resume | undefined {
-  if (!resume) return undefined
-
-  const cleaned: Resume = {
+export function pruneResumeForCv(resume: Resume): Resume {
+  return {
     name: trimOrEmpty(resume.name),
     role: trimOrEmpty(resume.role),
     photo: trimOrEmpty(resume.photo),
@@ -224,17 +227,6 @@ function pruneResume(resume: Resume | undefined): Resume | undefined {
       ),
     },
   }
-
-  const isEmpty =
-    isBlank(cleaned.name) &&
-    isBlank(cleaned.role) &&
-    cleaned.skillBlocks.length === 0 &&
-    cleaned.projectSections.length === 0 &&
-    cleaned.summary.lines.length === 0 &&
-    cleaned.education.lines.length === 0 &&
-    cleaned.certifications.groups.length === 0
-
-  return isEmpty ? undefined : cleaned
 }
 
 function pruneTextBlock(block: ResumeTextBlock | undefined): ResumeTextBlock {
@@ -244,6 +236,10 @@ function pruneTextBlock(block: ResumeTextBlock | undefined): ResumeTextBlock {
   }
 }
 
+/**
+ * The Save profile body. Never carries `resume`: every CV is written through Save CV
+ * (`/api/admin/cvs`), and `profile.resume` is only the legacy migration source.
+ */
 export function cleanProfileForSave(profile: Profile): Partial<Profile> {
   const cleaned: Partial<Profile> = {
     ...profile,
@@ -276,7 +272,6 @@ export function cleanProfileForSave(profile: Profile): Partial<Profile> {
     projects: pruneProjects(profile.projects ?? []),
 
     publicLocation: trimOrEmpty(profile.publicLocation),
-    resume: pruneResume(profile.resume),
   }
 
   // Omit empty arrays/objects from payload (JSON.stringify drops `undefined` keys).
@@ -289,10 +284,11 @@ export function cleanProfileForSave(profile: Profile): Partial<Profile> {
   if (!cleaned.briefServices?.length) delete cleaned.briefServices
   if (!cleaned.services?.length) delete cleaned.services
   if (!cleaned.projects?.length) delete cleaned.projects
-  // Omitted rather than sent empty: an absent key leaves the stored resume alone, while
-  // `resume: {}` would overwrite it. That is what stops any editor state that never
-  // populated the CV tab from blanking a saved CV on the next save.
-  if (!cleaned.resume) delete cleaned.resume
+  // Deleted explicitly, because `...profile` above copies it in: `/api/admin/profile` still
+  // returns the legacy `resume` field. Sending it back would rewrite a field nothing reads
+  // after migration, and before migration it would be the one CV write that skips
+  // `cv-service` (multi-cv-plan.md OV-8).
+  delete cleaned.resume
 
   return cleaned
 }

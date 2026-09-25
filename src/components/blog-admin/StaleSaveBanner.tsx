@@ -6,15 +6,26 @@ interface Props {
   onReload: () => void
   onOverwrite: () => void
   busy?: boolean
-  /** What changed, for the sentence: the blog editor's post, or the settings profile. */
-  subject?: 'post' | 'profile'
+  /**
+   * What changed, for the sentence: the blog editor's post, the settings profile, or one of
+   * the settings CVs.
+   */
+  subject?: 'post' | 'profile' | 'cv'
   className?: string
+}
+
+const TEST_ID: Record<NonNullable<Props['subject']>, string> = {
+  post: 'blog-stale-banner',
+  profile: 'profile-stale-banner',
+  cv: 'cv-stale-banner',
 }
 
 /**
  * Shown when Save was refused because the post changed after this tab loaded it (R9) -
  * almost always an agent's `update_post` or an image run through the site MCP. The settings
- * editor shows it too (`subject="profile"`), for an agent's `update_profile`.
+ * editor shows it too (`subject="profile"`), for an agent's `update_profile`, and the CV tab
+ * (`subject="cv"`) for a CV saved in another tab. Agents never write CVs (R8), so the CV copy
+ * does not blame one.
  *
  * Reload discards what is on screen and loads the server's copy. Overwrite anyway resends the
  * save without the staleness check, which is the old behaviour, chosen on purpose.
@@ -29,9 +40,7 @@ export default function StaleSaveBanner({
   return (
     <div
       role="alert"
-      data-testid={
-        subject === 'post' ? 'blog-stale-banner' : 'profile-stale-banner'
-      }
+      data-testid={TEST_ID[subject]}
       className={cn(
         'mb-6 flex flex-wrap items-center gap-3 rounded-[1.35rem] border border-[rgba(163,110,47,0.22)] bg-[rgba(233,176,97,0.14)] px-4 py-3 text-sm text-[#6b4515] shadow-[0_12px_28px_rgba(107,69,21,0.08)]',
         className
@@ -43,7 +52,9 @@ export default function StaleSaveBanner({
         className="shrink-0"
       />
       <p className="min-w-0 flex-1 font-medium">
-        This {subject} changed since you opened it - probably an agent edit.
+        {subject === 'cv'
+          ? 'This CV was saved somewhere else since you opened it - probably another tab.'
+          : `This ${subject} changed since you opened it - probably an agent edit.`}{' '}
         Reload to see it (your unsaved changes here are dropped), or overwrite
         it with what you have.
       </p>
