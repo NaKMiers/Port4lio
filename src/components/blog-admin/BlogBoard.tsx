@@ -1,10 +1,24 @@
 'use client'
 
-import { Archive, Eye, Pencil, RotateCcw, Send, Trash2 } from 'lucide-react'
+import {
+  Archive,
+  Eye,
+  Pencil,
+  RotateCcw,
+  SearchCheck,
+  Send,
+  Trash2,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useCallback, useEffect, useEffectEvent, useState } from 'react'
 
 import ConfirmDialog from '@/components/admin/ConfirmDialog'
+import {
+  describeCheckAll,
+  runCheckAll,
+  type CheckOutcome,
+} from '@/components/blog-admin/check-all'
+import IndexStatusDot from '@/components/blog-admin/IndexStatusDot'
 import GenerateBlogButton from '@/components/blog-admin/GenerateBlogButton'
 import GenerateBlogDialog from '@/components/blog-admin/GenerateBlogDialog'
 import PostRowActions from '@/components/blog-admin/PostRowActions'
@@ -23,6 +37,10 @@ import {
   primaryBtnCls,
   secondaryBtnCls,
 } from '@/components/settings/settings-utils'
+import type {
+  IndexingSummary,
+  IndexStatus,
+} from '@/lib/blog/index-status-badge'
 
 /**
  * `/admin/blog` - every post, and the two numbers that decide whether this is working.
@@ -91,6 +109,26 @@ type BoardPost = {
    * broken-image icon on a live page.
    */
   unresolvedImages: number
+  /** What Google said at the last check. Absent until checked; cleared on every publish. */
+  indexStatus?: IndexStatus | null
+}
+
+/**
+ * Search Console wiring for the whole board. `configured: false` disables Re-check, Check all
+ * and Resubmit sitemap, and `problem` says what to fix.
+ */
+type Indexing = IndexingSummary & {
+  sitemap: {
+    lastSubmittedAt: string | null
+    lastError: string | null
+    lastErrorAt: string | null
+  } | null
+}
+
+const NOT_LOADED: Indexing = {
+  configured: false,
+  problem: 'Loading Search Console status...',
+  sitemap: null,
 }
 
 const STATUS_MARK: Record<BoardPost['status'], string> = {
@@ -142,6 +180,20 @@ export default function BlogBoard() {
   const [generating, setGenerating] = useState(false)
 
   /**
+   * Google index status. Kept apart from `busy` on purpose: a check is a read on Google's
+   * side, so Publish and Archive stay usable while one runs. `checkingId` and `checkAll` are
+   * the mutual exclusion - one row check, or one Check all, never both.
+   */
+  const [indexing, setIndexing] = useState<Indexing>(NOT_LOADED)
+  const [checkingId, setCheckingId] = useState<string | null>(null)
+  const [checkAll, setCheckAll] = useState<{
+    done: number
+    total: number
+  } | null>(null)
+  const [sitemapBusy, setSitemapBusy] = useState(false)
+  const [indexNotice, setIndexNotice] = useState<string | null>(null)
+
+  /**
    * Kind and series filters, keyed by slug - `'all'` is not a real slug, so it can never
    * collide with one. Fetched rather than derived from `posts`: a kind or series with zero
    * posts right now (just created, or every post using it was archived) still belongs in the
@@ -166,9 +218,14 @@ export default function BlogBoard() {
         setPosts(null)
         return
       }
-      const data = (await res.json()) as { posts?: BoardPost[]; error?: string }
+      const data = (await res.json()) as {
+        posts?: BoardPost[]
+        indexing?: Indexing
+        error?: string
+      }
       if (!res.ok) throw new Error(data.error ?? 'Could not load posts')
       setPosts(data.posts ?? [])
+      if (data.indexing) setIndexing(data.indexing)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load posts')
       setPosts([])
@@ -279,6 +336,92 @@ export default function BlogBoard() {
       setError(cause instanceof Error ? cause.message : 'That did not work')
     } finally {
       setBusy(false)
+    }
+  }
+
+  /**
+   * Ask Google about one post and put the answer on its row - without reloading the board.
+   *
+   * A failed check that wrote `lastError` returns the stored status too, so the row shows the
+   * prior badge with an error dot rather than a guess. A refusal that wrote nothing (not
+   * configured, not published any more) carries no status and leaves the row as it was.
+   */
+  async function checkIndex(id: string): Promise<CheckOutcome> {
+    try {
+      const res = await fetch(`/api/admin/blog/${id}/index-status`, {
+        method: 'POST',
+      })
+      const data = (await res.json()) as {
+        indexStatus?: IndexStatus | null
+        error?: string
+        code?: string
+      }
+      if ('indexStatus' in data)
+        setPosts(current =>
+          (current ?? []).map(post =>
+            post._id === id ? { ...post, indexStatus: data.indexStatus } : post
+          )
+        )
+      if (res.ok) return { ok: true }
+      return {
+        ok: false,
+        code: data.code ?? 'error',
+        message: data.error ?? 'The check did not work',
+      }
+    } catch {
+      return {
+        ok: false,
+        code: 'network',
+        message: 'Could not reach the server',
+      }
+    }
+  }
+
+  async function recheck(id: string) {
+    setCheckingId(id)
+    setIndexNotice(null)
+    const outcome = await checkIndex(id)
+    if (!outcome.ok) setIndexNotice(outcome.message)
+    setCheckingId(null)
+  }
+
+  async function checkAllPublished() {
+    const ids = (posts ?? [])
+      .filter(post => post.status === 'published')
+      .map(post => post._id)
+    if (ids.length === 0) return
+
+    setIndexNotice(null)
+    setCheckAll({ done: 0, total: ids.length })
+    const result = await runCheckAll(ids, checkIndex, (done, total) =>
+      setCheckAll({ done, total })
+    )
+    setCheckAll(null)
+    setIndexNotice(describeCheckAll(result))
+  }
+
+  async function resubmitSitemap() {
+    setSitemapBusy(true)
+    setIndexNotice(null)
+    try {
+      const res = await fetch('/api/admin/blog/sitemap-submit', {
+        method: 'POST',
+      })
+      const data = (await res.json()) as {
+        sitemap?: Indexing['sitemap']
+        error?: string
+      }
+      if ('sitemap' in data)
+        setIndexing(current => ({ ...current, sitemap: data.sitemap ?? null }))
+      setIndexNotice(
+        res.ok
+          ? 'Sitemap resubmitted. Google reads it on its own schedule.'
+          : (data.error ?? 'Could not resubmit the sitemap')
+      )
+    } catch {
+      setIndexNotice('Could not reach the server')
+    } finally {
+      setSitemapBusy(false)
     }
   }
 
@@ -563,6 +706,60 @@ export default function BlogBoard() {
           ) : null}
         </div>
 
+        {/*
+          Google index status. Checks are READS on Google's side - Search Console has no API
+          to request indexing, so the badges link to its inspection page for that. Check all
+          runs one post at a time and stops early on errors that would repeat on every row
+          (see `check-all.ts`).
+
+          Two blocks, not one wrapping row: in a single `flex-wrap` row the status text was
+          the only shrinkable item, so on a phone it got squeezed into a one-word column
+          between the label and the buttons. Text stacks above the buttons below `md`.
+        */}
+        <div className="mt-6 flex flex-col gap-3 rounded-[1.4rem] border border-pp-line bg-white/85 px-4 py-3 text-xs text-pp-muted md:flex-row md:items-center">
+          <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
+            <span className="shrink-0 font-semibold uppercase tracking-[0.16em]">
+              Google index
+            </span>
+            <span className="min-w-0 break-words">
+              {!indexing.configured
+                ? indexing.problem
+                : indexing.sitemap?.lastError
+                  ? `Last sitemap submit failed: ${indexing.sitemap.lastError}`
+                  : indexing.sitemap?.lastSubmittedAt
+                    ? `Sitemap submitted ${new Date(indexing.sitemap.lastSubmittedAt).toLocaleString('en-GB')}`
+                    : 'Sitemap not submitted from here yet.'}
+              {indexNotice ? (
+                <span className="mt-1 block text-pp-text">{indexNotice}</span>
+              ) : null}
+            </span>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
+            <button
+              type="button"
+              className={ghostBtnCls}
+              disabled={
+                !indexing.configured || checkAll !== null || checkingId !== null
+              }
+              title={indexing.configured ? undefined : (indexing.problem ?? '')}
+              onClick={() => void checkAllPublished()}
+            >
+              {checkAll
+                ? `Checking ${checkAll.done}/${checkAll.total}`
+                : 'Check all'}
+            </button>
+            <button
+              type="button"
+              className={secondaryBtnCls}
+              disabled={!indexing.configured || sitemapBusy}
+              title={indexing.configured ? undefined : (indexing.problem ?? '')}
+              onClick={() => void resubmitSitemap()}
+            >
+              {sitemapBusy ? 'Submitting...' : 'Resubmit sitemap'}
+            </button>
+          </div>
+        </div>
+
         {posts !== null ? (
           <p className="mt-8 text-xs text-pp-muted">
             {filtersActive
@@ -600,20 +797,31 @@ export default function BlogBoard() {
                   Raising the row's stacking level while a descendant holds focus (the menu
                   trigger, or a focused menu item) is what actually lifts the open menu above
                   the row below it.
+                  `hover:z-20` does the same for the index dot's tooltip, which can run taller
+                  than the row and opens on hover without taking focus.
                 */
-                'relative flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line bg-white/85 px-4 py-3 shadow-[0_18px_36px_rgba(46,35,28,0.06)] backdrop-blur-md transition focus-within:z-20',
+                'relative flex flex-wrap items-center gap-3 rounded-[1.4rem] border border-pp-line bg-white/85 px-4 py-3 shadow-[0_18px_36px_rgba(46,35,28,0.06)] backdrop-blur-md transition focus-within:z-20 hover:z-20',
                 'hover:border-pp-blue/30 hover:bg-white/95',
                 post.status === 'deleted' ? 'opacity-50' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
             >
-              <span
-                aria-hidden
-                className="w-4 text-pp-muted"
-              >
-                {STATUS_MARK[post.status]}
-              </span>
+              {/* Published only: Google cannot index a draft, an archived or a deleted post. */}
+              {post.status === 'published' ? (
+                <IndexStatusDot
+                  status={post.indexStatus}
+                  indexing={indexing}
+                  checking={checkingId === post._id}
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="w-4 text-pp-muted"
+                >
+                  {STATUS_MARK[post.status]}
+                </span>
+              )}
               <span className="sr-only">{post.status}</span>
 
               {/*
@@ -635,8 +843,10 @@ export default function BlogBoard() {
               ) : null}
 
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-display text-sm font-semibold">
-                  {post.title}
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-display text-sm font-semibold">
+                    {post.title}
+                  </span>
                 </span>
                 <span className="block truncate text-xs text-pp-muted">
                   /blog/{post.slug}
@@ -687,6 +897,20 @@ export default function BlogBoard() {
                             href: `/blog/${post.slug}`,
                             tone: 'blue' as const,
                             icon: Eye,
+                          },
+                          {
+                            key: 'recheck',
+                            label: 'Check Google index',
+                            title: indexing.configured
+                              ? undefined
+                              : (indexing.problem ?? undefined),
+                            disabled:
+                              !indexing.configured ||
+                              checkAll !== null ||
+                              checkingId !== null,
+                            tone: 'blue' as const,
+                            icon: SearchCheck,
+                            onSelect: () => void recheck(post._id),
                           },
                         ]
                       : []),

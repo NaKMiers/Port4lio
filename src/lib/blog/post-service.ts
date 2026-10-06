@@ -15,6 +15,7 @@ import { aggregatePostMetrics, type PostMetrics } from '@/lib/blog/post-events'
 import { isAllowedImageUrl } from '@/lib/blog/rehype-restrict-image-hosts'
 import { revalidatePublishedPost } from '@/lib/blog/revalidate'
 import { seriesExists } from '@/lib/blog/series-data'
+import { scheduleSitemapResubmit } from '@/lib/blog/sitemap-resubmit'
 import { connectDatabase } from '@/lib/mongodb'
 import { ContactMessageModel } from '@/models/ContactMessage'
 import { PostEventModel } from '@/models/PostEvent'
@@ -145,7 +146,7 @@ export async function listBoardPosts(): Promise<BoardPost[]> {
   */
   const posts = await PostModel.find({})
     .select(
-      'slug title kind series isPillar status language coverImage publishedAt contentUpdatedAt updatedAt +bodyMarkdown'
+      'slug title kind series isPillar status language coverImage publishedAt contentUpdatedAt updatedAt indexStatus +bodyMarkdown'
     )
     .sort({ updatedAt: -1 })
     .lean()
@@ -589,6 +590,7 @@ export async function patchPost(
    * apply to it. Generated posts are now the largest population of archived posts, so the
    * narrow case became the common one.
    */
+  const wasPublished = post.status === 'published'
   if (body.status && body.status !== post.status) {
     if (
       post.status === 'archived' &&
@@ -624,6 +626,16 @@ export async function patchPost(
    */
   if (post.status === 'published' && post.publishedAt === null)
     post.publishedAt = new Date()
+
+  /*
+    Entering `published` clears what Google said last time, in this same write. A post that
+    was archived or deleted may have 404'd while it was gone, so an old "Indexed" would be a
+    claim about a URL Google has since dropped. Clearing on ENTRY covers every way out -
+    archive here, and `softDeletePost`, which never comes through this function.
+  */
+  const enteringPublished = !wasPublished && post.status === 'published'
+  if (enteringPublished && post.get('indexStatus') != null)
+    post.set('indexStatus', undefined)
 
   try {
     if (base) {
@@ -670,6 +682,10 @@ export async function patchPost(
   // Not in a try/catch, deliberately - see `revalidate.ts`. Runs whatever the new status
   // is, because published → archived also needs the cached 200 cleared.
   revalidatePublishedPost(post.slug)
+
+  // Only on the transition, never on an edit of a live post. Swallows its own errors - see
+  // `sitemap-resubmit.ts` for why a publish must not fail over Google.
+  if (enteringPublished) scheduleSitemapResubmit()
 
   return success({
     slug: post.slug,

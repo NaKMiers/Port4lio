@@ -10,6 +10,7 @@ import {
   vi,
 } from 'vitest'
 
+import { scheduleSitemapResubmit } from '@/lib/blog/sitemap-resubmit'
 import { PostModel } from '@/models/Post'
 
 /**
@@ -30,6 +31,9 @@ import { PostModel } from '@/models/Post'
 const draw = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/blog/image-asset', () => ({ drawImageAsset: draw }))
 vi.mock('@/lib/blog/revalidate', () => ({ revalidatePublishedPost: vi.fn() }))
+vi.mock('@/lib/blog/sitemap-resubmit', () => ({
+  scheduleSitemapResubmit: vi.fn(),
+}))
 vi.mock('@/lib/blog/markdown', async () => {
   const actual = await vi.importActual<typeof import('@/lib/blog/markdown')>(
     '@/lib/blog/markdown'
@@ -530,5 +534,51 @@ describe('the cron path', () => {
       'An image run is already in progress for this post.',
     ])
     expect(draw).not.toHaveBeenCalled()
+  })
+})
+
+describe('the cron publish and the Google index status (eng review R3)', () => {
+  const draws = () =>
+    draw.mockImplementation(async ({ name }: { name: string }) => ({
+      url: URL(name),
+      model: 'm',
+    }))
+
+  it('a real transition clears the stored status and schedules one resubmit', async () => {
+    draws()
+    const post = await makePost({
+      status: 'archived',
+      indexStatus: { verdict: 'PASS', checkedAt: new Date() },
+    })
+    const doc = (await PostModel.findById(post._id).select('+bodyMarkdown'))!
+
+    const outcome = await run.illustratePost(doc, {
+      model: 'gemini-3.1-flash-lite-image',
+      deadlineAt: Date.now() + 240_000,
+    })
+
+    expect(outcome.published).toBe(true)
+    expect((await stored(post._id))?.indexStatus).toBeUndefined()
+    expect(scheduleSitemapResubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('a post already published keeps its status, makes no hook call, and still revalidates', async () => {
+    draws()
+    const post = await makePost({
+      status: 'published',
+      publishedAt: new Date('2026-09-01T00:00:00Z'),
+      indexStatus: { verdict: 'PASS', checkedAt: new Date() },
+    })
+    const doc = (await PostModel.findById(post._id).select('+bodyMarkdown'))!
+
+    const outcome = await run.illustratePost(doc, {
+      model: 'gemini-3.1-flash-lite-image',
+      deadlineAt: Date.now() + 240_000,
+    })
+
+    expect(outcome.published).toBe(true)
+    expect((await stored(post._id))?.indexStatus?.verdict).toBe('PASS')
+    expect(scheduleSitemapResubmit).not.toHaveBeenCalled()
+    expect(revalidate).toHaveBeenCalledWith('illustrated')
   })
 })

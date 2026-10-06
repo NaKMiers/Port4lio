@@ -12,6 +12,7 @@ import {
 } from 'vitest'
 
 import { MAX_IMAGE_PROMPTS } from '@/lib/blog/constants'
+import { scheduleSitemapResubmit } from '@/lib/blog/sitemap-resubmit'
 import { PostModel } from '@/models/Post'
 
 /**
@@ -27,6 +28,9 @@ import { PostModel } from '@/models/Post'
  */
 
 vi.mock('@/lib/blog/revalidate', () => ({ revalidatePublishedPost: vi.fn() }))
+vi.mock('@/lib/blog/sitemap-resubmit', () => ({
+  scheduleSitemapResubmit: vi.fn(),
+}))
 
 vi.mock('@/lib/blog/markdown', async () => {
   const actual = await vi.importActual<typeof import('@/lib/blog/markdown')>(
@@ -284,5 +288,101 @@ describe('image prompts', () => {
     const after = await PostModel.findById(post._id)
     expect(after?.coverImagePrompt).toBe('A cover.')
     expect(after?.imagePrompts).toHaveLength(1)
+  })
+})
+
+/**
+ * The Google index status rides on the two write paths that put posts live (eng review R3).
+ * What must NOT change: a plain edit or an archive keeps the stored result, and R9's
+ * stale-save check still refuses with the new `$unset` in the same conditional write.
+ */
+describe('index status across status transitions', () => {
+  const indexStatus = {
+    verdict: 'PASS',
+    coverageState: 'Submitted and indexed',
+    checkedAt: new Date('2026-10-01T00:00:00Z'),
+  }
+
+  it('an R9 publish clears the stored status in the same write and schedules one resubmit', async () => {
+    const post = await makePost({
+      status: 'archived',
+      publishedAt: new Date('2026-09-01T00:00:00Z'),
+      indexStatus,
+    })
+
+    const response = await call(String(post._id), {
+      status: 'published',
+      baseUpdatedAt: post.updatedAt.toISOString(),
+    })
+
+    expect(response.status).toBe(200)
+    const after = await PostModel.findById(post._id).lean()
+    expect(after?.status).toBe('published')
+    expect(after?.indexStatus).toBeUndefined()
+    expect(scheduleSitemapResubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('a plain-save publish clears it too', async () => {
+    const post = await makePost({ status: 'draft', indexStatus })
+    await call(String(post._id), { status: 'published' })
+    expect(
+      (await PostModel.findById(post._id).lean())?.indexStatus
+    ).toBeUndefined()
+    expect(scheduleSitemapResubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('a stale base still 409s and leaves the status alone', async () => {
+    const post = await makePost({ status: 'archived', indexStatus })
+
+    const response = await call(String(post._id), {
+      status: 'published',
+      baseUpdatedAt: new Date('2020-01-01T00:00:00Z').toISOString(),
+    })
+
+    expect(response.status).toBe(409)
+    expect((await response.json()).code).toBe('stale')
+    const after = await PostModel.findById(post._id).lean()
+    expect(after?.status).toBe('archived')
+    expect(after?.indexStatus?.verdict).toBe('PASS')
+    expect(scheduleSitemapResubmit).not.toHaveBeenCalled()
+  })
+
+  it('a plain edit of a published post keeps the status and does not resubmit', async () => {
+    const post = await makePost({
+      status: 'published',
+      publishedAt: new Date(),
+      indexStatus,
+    })
+
+    await call(String(post._id), { title: 'A sharper title' })
+    await call(String(post._id), {
+      bodyMarkdown: 'New prose.',
+      baseUpdatedAt: (await PostModel.findById(
+        post._id
+      ))!.updatedAt.toISOString(),
+    })
+
+    const after = await PostModel.findById(post._id).lean()
+    expect(after?.title).toBe('A sharper title')
+    expect(after?.indexStatus?.verdict).toBe('PASS')
+    expect(after?.indexStatus?.checkedAt?.toISOString()).toBe(
+      indexStatus.checkedAt.toISOString()
+    )
+    expect(scheduleSitemapResubmit).not.toHaveBeenCalled()
+  })
+
+  it('archive keeps the status - it is cleared only when the post goes live again', async () => {
+    const post = await makePost({
+      status: 'published',
+      publishedAt: new Date(),
+      indexStatus,
+    })
+
+    await call(String(post._id), { status: 'archived' })
+
+    expect(
+      (await PostModel.findById(post._id).lean())?.indexStatus?.verdict
+    ).toBe('PASS')
+    expect(scheduleSitemapResubmit).not.toHaveBeenCalled()
   })
 })

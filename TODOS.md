@@ -28,6 +28,18 @@
 **Priority:** P3
 **Depends on:** None
 
+### IndexNow pings and a get_index_status MCP tool
+
+**What:** Ping IndexNow (Bing, Yandex) on publish, and add a read-scope `get_index_status` MCP tool that calls `index-status-service`.
+
+**Why:** Bing picks up new posts within minutes instead of on its own crawl schedule, and agents can answer "which posts aren't indexed?" without opening the board.
+
+**Context:** Approach C in `docs/designs/blog-index/blog-index-status.md`, deferred in office hours (D1) and recorded by the eng review (D6), 2026-10-06. IndexNow needs a key file served at the site root. The MCP tool goes in the registry under `src/lib/mcp/tools/` and runs through `runTool`, like the other blog tools.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** The blog index-status feature shipping.
+
 ## CV
 
 ### Remove the legacy `profile.resume` field once multi-CV is proven

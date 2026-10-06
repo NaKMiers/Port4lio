@@ -27,11 +27,11 @@ export const inputCls =
 export const textareaCls =
   'block w-full min-h-[88px] rounded-[1.1rem] border border-pp-line bg-white/78 px-4 py-3 text-sm text-pp-text shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] outline-none transition placeholder:text-pp-muted/75 focus:border-pp-blue/55 focus:bg-white focus:ring-4 focus:ring-pp-blue/10'
 export const secondaryBtnCls =
-  'inline-flex items-center justify-center rounded-full border border-pp-line bg-white/82 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_12px_30px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white'
+  'inline-flex items-center justify-center rounded-full border border-pp-line bg-white/82 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-text shadow-[0_12px_30px_rgba(46,35,28,0.06)] transition hover:-translate-y-0.5 hover:bg-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:bg-white/82'
 export const ghostBtnCls =
-  'inline-flex items-center justify-center rounded-full border border-transparent px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted transition hover:border-pp-line hover:bg-white/78 hover:text-pp-text'
+  'inline-flex items-center justify-center rounded-full border border-transparent px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted transition hover:border-pp-line hover:bg-white/78 hover:text-pp-text cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-pp-muted'
 export const primaryBtnCls =
-  'inline-flex items-center justify-center rounded-full bg-pp-text px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(17,17,17,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_40px_rgba(17,17,17,0.22)] disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex items-center justify-center rounded-full bg-pp-text px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_rgba(17,17,17,0.18)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_40px_rgba(17,17,17,0.22)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60'
 export const itemCardCls =
   'rounded-[1.4rem] border border-pp-line bg-white/72 p-4 shadow-[0_18px_36px_rgba(46,35,28,0.06)] backdrop-blur-md'
 export const nestedItemCardCls =

@@ -5,6 +5,7 @@ import { drawImageAsset } from '@/lib/blog/image-asset'
 import { ImageGenError } from '@/lib/blog/image-gen'
 import { patchImageIntoPost } from '@/lib/blog/image-service'
 import { revalidatePublishedPost } from '@/lib/blog/revalidate'
+import { scheduleSitemapResubmit } from '@/lib/blog/sitemap-resubmit'
 import type { PostRecord } from '@/lib/blog/generate-run'
 import { connectDatabase } from '@/lib/mongodb'
 import { PostModel } from '@/models/Post'
@@ -374,6 +375,10 @@ export async function runIllustration(
         coverImage: fresh.coverImage,
       })
       if (blockers.length > 0) break
+      // This write filters on updatedAt, not status, so it also matches a post the owner
+      // published while the run was drawing. Only a real transition clears the stored index
+      // status and resubmits the sitemap - the same rule `patchPost` applies.
+      const entering = fresh.status !== 'published'
       const written = await PostModel.updateOne(
         { _id: postId, updatedAt: fresh.updatedAt },
         {
@@ -384,10 +389,12 @@ export async function runIllustration(
             // re-publish, telling every feed reader a months-old post is new.
             publishedAt: fresh.publishedAt ?? new Date(),
           },
+          ...(entering ? { $unset: { indexStatus: 1 } } : {}),
         }
       )
       if (written.matchedCount === 0) continue
       published = true
+      if (entering) scheduleSitemapResubmit()
 
       /*
         Isolated from the save it follows, and the post IS public at this point whatever
