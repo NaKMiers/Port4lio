@@ -37,7 +37,7 @@ export async function loadCcafState(): Promise<CcafState> {
     // Deliberately not rethrown. This is a study tracker; a database blip should degrade it
     // to the plan with no ticks, not 500 the route and take the roadmap - which is static
     // content - down with it. (A WRITER must not read through this - it would save the empty
-    // defaults over the real state. `applyCcafUpdate` reads the document itself.)
+    // defaults over the real state.)
     console.error('[ccaf] failed to load progress, serving defaults', error)
     return emptyState()
   }

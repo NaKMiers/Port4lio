@@ -16,8 +16,8 @@ import {
 import { LEGACY_SCOPE, type TokenScope } from '@/lib/mcp/scopes'
 import type { AgentContext } from '@/lib/mcp/token'
 import { BLOG_TOOLS } from '@/lib/mcp/tools/blog'
-import { CCAF_TOOLS } from '@/lib/mcp/tools/ccaf'
 import { CLOUDINARY_TOOLS } from '@/lib/mcp/tools/cloudinary'
+import { CV_TOOLS } from '@/lib/mcp/tools/cv'
 import {
   getMeTool,
   getProfileTool,
@@ -160,7 +160,11 @@ export interface ServerSpec {
 /**
  * The site-wide registry: the design's 27 less the four the Assignment cut (delete_post,
  * save_taxonomy, get_test_metrics, whiteboard_update_item - acceptance.md D1), plus the four
- * Cloudinary asset tools added after the Assignment (`tools/cloudinary.ts`).
+ * Cloudinary asset tools added after the Assignment (`tools/cloudinary.ts`) and the two
+ * whiteboard composition tools (`whiteboard_compose`, `whiteboard_arrange`), less the two
+ * CCA-F tools (`ccaf_status`, `ccaf_update`). Certificates will grow past CCA-F, so a
+ * per-certificate tool pair was the wrong shape; nothing replaces them yet. Plus the six CV
+ * tools (`tools/cv.ts`, multi-cv-plan.md Phase 2).
  */
 export const SITE_SERVER: ServerSpec = {
   name: 'port4lio',
@@ -169,9 +173,9 @@ export const SITE_SERVER: ServerSpec = {
     getMeTool,
     getProfileTool,
     updateProfileTool,
+    ...CV_TOOLS,
     ...BLOG_TOOLS,
     ...METRICS_TOOLS,
-    ...CCAF_TOOLS,
     ...CLOUDINARY_TOOLS,
     ...whiteboardReadTools(SITE_WHITEBOARD_NAMES, ['read']),
     ...whiteboardWriteTools(),
@@ -179,15 +183,21 @@ export const SITE_SERVER: ServerSpec = {
   prompts: compilePrompts(PROMPTS),
   instructions: tools =>
     [
-      "The owner's own site, Port4lio: portfolio profile and CV, blog, metrics, a private whiteboard and a certificate study tracker.",
+      "The owner's own site, Port4lio: portfolio profile and CV, blog, metrics and a private whiteboard.",
       'Your tool list is exactly what this token allows; a tool you do not see is not available to you.',
       'Errors come back as tool results that say how to fix the call.',
       tools.has('get_me') ? 'For "who am I", call get_me first.' : '',
+      tools.has('create_cv')
+        ? 'The owner keeps several CVs and /cv prints the published one. To tailor a CV, copy it (create_cv) and edit the copy (update_cv, or the tailor-cv prompt); publish only when the owner asks.'
+        : '',
       tools.has('create_draft')
         ? 'To write a post, read get_writing_brief (or use the write-post prompt) and follow its loop; drafts never publish themselves.'
         : '',
       tools.has('whiteboard_overview')
         ? 'For the whiteboard, start with whiteboard_overview, then whiteboard_search, then whiteboard_get_item. Cite item ids.'
+        : '',
+      tools.has('whiteboard_compose')
+        ? 'To build or fill a board, use whiteboard_compose (or the build-whiteboard prompt): describe sections and cards, and the server lays them out.'
         : '',
     ]
       .filter(Boolean)

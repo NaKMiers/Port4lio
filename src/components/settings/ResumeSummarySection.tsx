@@ -5,11 +5,7 @@ import ListTextarea, {
   textToLines,
 } from '@/components/settings/ListTextarea'
 import Section from '@/components/settings/Section'
-import {
-  BOLD_HINT,
-  resumeOf,
-  updateResume,
-} from '@/components/settings/resume-utils'
+import { BOLD_HINT } from '@/components/settings/resume-utils'
 import {
   helpTextCls,
   inputCls,
@@ -19,17 +15,14 @@ import {
 import type { CvSectionProps } from '@/components/settings/types'
 
 export default function ResumeSummarySection({
-  profile,
-  setProfile,
+  resume,
+  setResume,
   handle,
 }: CvSectionProps) {
-  const resume = resumeOf(profile)
-
   return (
     <Section
       id="cv-summary"
       title="CV Summary"
-      badge="**bold** supported"
       handle={handle}
     >
       <div className="space-y-4">
@@ -42,7 +35,7 @@ export default function ResumeSummarySection({
             placeholder="SUMMARY"
             value={resume.summary.heading}
             onChange={e =>
-              updateResume(setProfile, r => ({
+              setResume(r => ({
                 ...r,
                 summary: { ...r.summary, heading: e.target.value },
               }))
@@ -59,7 +52,7 @@ export default function ResumeSummarySection({
             join={linesToText}
             parse={textToLines}
             onChange={lines =>
-              updateResume(setProfile, r => ({
+              setResume(r => ({
                 ...r,
                 summary: { ...r.summary, lines },
               }))

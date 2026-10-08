@@ -28,6 +28,32 @@
 **Priority:** P3
 **Depends on:** None
 
+### IndexNow pings and a get_index_status MCP tool
+
+**What:** Ping IndexNow (Bing, Yandex) on publish, and add a read-scope `get_index_status` MCP tool that calls `index-status-service`.
+
+**Why:** Bing picks up new posts within minutes instead of on its own crawl schedule, and agents can answer "which posts aren't indexed?" without opening the board.
+
+**Context:** Approach C in `docs/designs/blog-index/blog-index-status.md`, deferred in office hours (D1) and recorded by the eng review (D6), 2026-10-06. IndexNow needs a key file served at the site root. The MCP tool goes in the registry under `src/lib/mcp/tools/` and runs through `runTool`, like the other blog tools.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** The blog index-status feature shipping.
+
+## CV
+
+### Remove the legacy `profile.resume` field once multi-CV is proven
+
+**What:** Drop `resume` from the Profile schema, stop `POST /api/profile` accepting it, and `$unset` it from the stored profile.
+
+**Why:** After multi-CV ships, the `cvs` collection is the only CV source. `profile.resume` is read only as the pre-migration fallback, and a stale settings tab can still write to it and get a 200 while nothing reads it.
+
+**Context:** Kept on purpose by the multi-CV plan (`docs/designs/cv/multi-cv-plan.md` D5, T1) as the migration source and rollback path. Removing it touches `src/models/Profile.ts`, `src/lib/profile.ts` (`normalizeProfile`), the legacy fallback in `loadPublishedResume` and `readProfileSection('resume')`, and the pinned `tests/api/profile-route.test.ts:265` and `tests/api/mcp-operator-tools.test.ts:416,431` cases, which move to the `cvs` path.
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Multi-CV live in prod and the "Main CV" migrated (the CV tab opened once after deploy)
+
 ## Completed
 
 ### Local undo/redo on the canvas

@@ -8,12 +8,7 @@ import ListTextarea, {
 } from '@/components/settings/ListTextarea'
 import NumberField from '@/components/settings/NumberField'
 import Section from '@/components/settings/Section'
-import {
-  BOLD_HINT,
-  replaceAt,
-  resumeOf,
-  updateResume,
-} from '@/components/settings/resume-utils'
+import { BOLD_HINT, replaceAt } from '@/components/settings/resume-utils'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -73,12 +68,11 @@ function indexAfterMove(index: number, from: number, to: number): number {
 }
 
 export default function ResumeProjectsSection({
-  profile,
-  setProfile,
+  resume,
+  setResume,
   handle,
   onFitPageBreak,
 }: CvSectionProps) {
-  const resume = resumeOf(profile)
   const summary = describePageBreak(resume)
 
   const updateProject = (
@@ -86,7 +80,7 @@ export default function ResumeProjectsSection({
     projectIdx: number,
     patch: Partial<ResumeProject>
   ) => {
-    updateResume(setProfile, r => {
+    setResume(r => {
       const section = r.projectSections[sectionIdx]
       return {
         ...r,
@@ -110,20 +104,20 @@ export default function ResumeProjectsSection({
   }
 
   const addSection = () =>
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       projectSections: [...r.projectSections, { heading: '', items: [] }],
     }))
 
   const setBreak = (patch: Partial<Resume['pageBreak']>) => {
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       pageBreak: { ...r.pageBreak, ...patch },
     }))
   }
 
   const moveSection = (from: number, to: number) => {
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       projectSections: moveItem(r.projectSections, from, to),
       pageBreak: {
@@ -135,7 +129,7 @@ export default function ResumeProjectsSection({
   }
 
   const moveProject = (sectionIdx: number, from: number, to: number) => {
-    updateResume(setProfile, r => {
+    setResume(r => {
       const section = r.projectSections[sectionIdx]
       return {
         ...r,
@@ -162,7 +156,6 @@ export default function ResumeProjectsSection({
     <Section
       id="cv-projects"
       title="CV Projects"
-      badge="personal & work"
       handle={handle}
     >
       <div className="space-y-4">
@@ -259,7 +252,7 @@ export default function ResumeProjectsSection({
                       placeholder="PERSONAL PROJECTS"
                       value={section.heading}
                       onChange={e =>
-                        updateResume(setProfile, r => ({
+                        setResume(r => ({
                           ...r,
                           projectSections: replaceAt(
                             r.projectSections,
@@ -458,7 +451,7 @@ export default function ResumeProjectsSection({
                               type="button"
                               className={ghostBtnCls}
                               onClick={() =>
-                                updateResume(setProfile, r => ({
+                                setResume(r => ({
                                   ...r,
                                   projectSections: replaceAt(
                                     r.projectSections,
@@ -488,7 +481,7 @@ export default function ResumeProjectsSection({
                     type="button"
                     className={secondaryBtnCls}
                     onClick={() =>
-                      updateResume(setProfile, r => ({
+                      setResume(r => ({
                         ...r,
                         projectSections: replaceAt(
                           r.projectSections,
@@ -516,7 +509,7 @@ export default function ResumeProjectsSection({
                     type="button"
                     className={ghostBtnCls}
                     onClick={() =>
-                      updateResume(setProfile, r => ({
+                      setResume(r => ({
                         ...r,
                         projectSections: r.projectSections.filter(
                           (_, i) => i !== sectionIdx

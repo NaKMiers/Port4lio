@@ -7,11 +7,7 @@ import ListTextarea, {
   textToItems,
 } from '@/components/settings/ListTextarea'
 import Section from '@/components/settings/Section'
-import {
-  replaceAt,
-  resumeOf,
-  updateResume,
-} from '@/components/settings/resume-utils'
+import { replaceAt } from '@/components/settings/resume-utils'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -27,21 +23,19 @@ import type { CvSectionProps } from '@/components/settings/types'
 import { moveItem } from '@/lib/resume-sections'
 
 export default function ResumeSkillsSection({
-  profile,
-  setProfile,
+  resume,
+  setResume,
   handle,
   onFitPageBreak,
 }: CvSectionProps) {
-  const resume = resumeOf(profile)
-
   const addBlock = () =>
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       skillBlocks: [...r.skillBlocks, { heading: '', rows: [{ items: [] }] }],
     }))
 
   const updateRow = (blockIdx: number, rowIdx: number, items: string[]) => {
-    updateResume(setProfile, r => {
+    setResume(r => {
       const block = r.skillBlocks[blockIdx]
       return {
         ...r,
@@ -53,7 +47,7 @@ export default function ResumeSkillsSection({
   }
 
   const moveBlock = (from: number, to: number) => {
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       skillBlocks: moveItem(r.skillBlocks, from, to),
     }))
@@ -61,7 +55,7 @@ export default function ResumeSkillsSection({
   }
 
   const moveRow = (blockIdx: number, from: number, to: number) => {
-    updateResume(setProfile, r => {
+    setResume(r => {
       const block = r.skillBlocks[blockIdx]
       return {
         ...r,
@@ -77,7 +71,6 @@ export default function ResumeSkillsSection({
     <Section
       id="cv-skills"
       title="CV Skills"
-      badge="rows are layout"
       handle={handle}
     >
       <div className="space-y-4">
@@ -120,7 +113,7 @@ export default function ResumeSkillsSection({
                       placeholder="TECHNICAL SKILLS"
                       value={block.heading}
                       onChange={e =>
-                        updateResume(setProfile, r => ({
+                        setResume(r => ({
                           ...r,
                           skillBlocks: replaceAt(r.skillBlocks, blockIdx, {
                             heading: e.target.value,
@@ -165,7 +158,7 @@ export default function ResumeSkillsSection({
                               type="button"
                               className={ghostBtnCls}
                               onClick={() =>
-                                updateResume(setProfile, r => ({
+                                setResume(r => ({
                                   ...r,
                                   skillBlocks: replaceAt(
                                     r.skillBlocks,
@@ -193,7 +186,7 @@ export default function ResumeSkillsSection({
                     type="button"
                     className={secondaryBtnCls}
                     onClick={() =>
-                      updateResume(setProfile, r => ({
+                      setResume(r => ({
                         ...r,
                         skillBlocks: replaceAt(r.skillBlocks, blockIdx, {
                           rows: [...block.rows, { items: [] }],
@@ -207,7 +200,7 @@ export default function ResumeSkillsSection({
                     type="button"
                     className={ghostBtnCls}
                     onClick={() =>
-                      updateResume(setProfile, r => ({
+                      setResume(r => ({
                         ...r,
                         skillBlocks: r.skillBlocks.filter(
                           (_, i) => i !== blockIdx

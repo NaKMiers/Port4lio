@@ -1,7 +1,13 @@
 import mongoose, { Schema, type Types } from 'mongoose'
 
 import { compileModel } from '@/lib/mongoose-model'
-import { SHARE_MODES, type ShareMode } from '@/lib/whiteboard/limits'
+import {
+  DEFAULT_SHARE_UNLOCK_TTL,
+  SHARE_MODES,
+  SHARE_UNLOCK_TTLS,
+  type ShareMode,
+  type ShareUnlockTtl,
+} from '@/lib/whiteboard/limits'
 
 /**
  * One whiteboard (D32). A board is a title, a privacy switch, and the scope every item and
@@ -45,6 +51,25 @@ import { SHARE_MODES, type ShareMode } from '@/lib/whiteboard/limits'
  * opens. Off is the default and a new board starts off - sharing is always something the
  * owner turned on for one board, never something a board inherits.
  *
+ * ## An optional password on the link
+ *
+ * ```
+ *   no sharePasswordHash ──▶ the link is the whole credential, as above
+ *   sharePasswordHash    ──▶ the link shows a password form first; the right password sets
+ *                            an httpOnly cookie signed over { board, shareAccessVersion, iat }
+ *   next request ──▶ cookie's version == board's? ── no ──▶ the form again (password changed)
+ *                    iat + shareUnlockTtl > now?  ── no ──▶ the form again (time is up)
+ * ```
+ *
+ * `shareAccessVersion` is what makes "change the password" also mean "sign everyone out":
+ * it is a fresh random value on every password set, change or removal, and a cookie is only
+ * good for the version it was signed with - however much of its time is left. The TTL is
+ * read from the board at check time rather than baked into the cookie, so the owner
+ * shortening it cuts sessions already open too. The hash is scrypt with its own salt
+ * (share-password.ts) and never leaves the server. The board list tells the owner's client
+ * only that a password is set; the password itself comes from an owner-only route, out of an
+ * encrypted copy kept beside the hash for that alone (`sharePasswordCipher`).
+ *
  * The id form is an accepted trade-off (D34): it cannot be rotated - turning sharing off is
  * the only revoke - and ids made close together by one server run are guessable from each
  * other. A random, resettable share key is the upgrade if that stops being acceptable.
@@ -61,6 +86,13 @@ export type WhiteboardBoardDocument = {
   includeInAi: boolean
   share: ShareMode
   slug?: string
+  /** `scrypt$<salt>$<hash>` (share-password.ts). Absent: the link needs no password. */
+  sharePasswordHash?: string
+  /** The password again, encrypted, for the owner's eye button only (share-password.ts). */
+  sharePasswordCipher?: string
+  /** New on every password change; an unlock cookie is only good for its own version. */
+  shareAccessVersion?: string
+  shareUnlockTtl: ShareUnlockTtl
   createdAt: Date
   updatedAt: Date
 }
@@ -71,6 +103,14 @@ const whiteboardBoardSchema = new Schema<WhiteboardBoardDocument>(
     includeInAi: { type: Boolean, default: true },
     share: { type: String, enum: SHARE_MODES, default: 'off' },
     slug: { type: String },
+    sharePasswordHash: { type: String },
+    sharePasswordCipher: { type: String },
+    shareAccessVersion: { type: String },
+    shareUnlockTtl: {
+      type: String,
+      enum: SHARE_UNLOCK_TTLS,
+      default: DEFAULT_SHARE_UNLOCK_TTL,
+    },
   },
   { collection: 'whiteboard_boards', timestamps: true, versionKey: false }
 )

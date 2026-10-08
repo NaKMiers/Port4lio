@@ -19,7 +19,8 @@ import type { ExportScope } from '@/lib/whiteboard/types'
 import { buildExportPreview } from '@/lib/whiteboard/visible'
 
 /**
- * Export to AI: a 480px NON-modal sheet over the inspector (DR3).
+ * Export to AI: a 480px NON-modal sheet over the inspector (DR3); below md it covers the whole
+ * canvas, like the phone's inspector.
  *
  * ```
  *   board.data (every keystroke) ─┐
@@ -189,10 +190,9 @@ export default function ExportSheet({
   else if (result.excludedCount > 0)
     notice = (
       <Notice icon={<EyeOff size={14} />}>
-        {result.excludedCount}{' '}
-        {scope.kind === 'selection' ? 'selected' : 'items in this scope'}{' '}
-        {result.excludedCount === 1 ? 'item is' : 'items are'} hidden and not
-        included.
+        {result.excludedCount} {scope.kind === 'selection' ? 'selected ' : ''}
+        {result.excludedCount === 1 ? 'item is' : 'items are'} hidden
+        {scope.kind === 'selection' ? '' : ' in this scope'} and not included.
       </Notice>
     )
 
@@ -203,10 +203,13 @@ export default function ExportSheet({
       aria-labelledby="wb-export-title"
       data-testid="wb-export-sheet"
       className={cn(
-        // Below lg a bottom sheet over the canvas like the inspector, max 60dvh (DR8); from
-        // lg the 480px right sheet over the inspector (DR3).
+        // md-lg a bottom sheet over the canvas like the inspector, max 60dvh (DR8); from lg
+        // the 480px right sheet over the inspector (DR3). Below md the whole canvas, header
+        // to bottom edge, like the phone's inspector: a 60dvh sheet left a preview a few
+        // lines tall. `top-12` is the top bar's one 48px row (TopBar).
         'absolute inset-x-0 bottom-0 z-30 flex max-h-[60dvh] flex-col rounded-t-[1.4rem] border-t border-pp-line bg-pp-panel-strong pb-[env(safe-area-inset-bottom)] shadow-[0_-24px_60px_rgba(46,35,28,0.1)]',
-        'lg:left-auto lg:top-14 lg:max-h-none lg:w-full lg:max-w-[480px] lg:rounded-none lg:border-l lg:border-t-0 lg:pb-0 lg:shadow-[-24px_0_60px_rgba(46,35,28,0.1)]',
+        'max-md:top-12 max-md:max-h-none max-md:rounded-none max-md:border-t-0 max-md:shadow-none',
+        'lg:left-auto lg:top-12 lg:max-h-none lg:w-full lg:max-w-[480px] lg:rounded-none lg:border-l lg:border-t-0 lg:pb-0 lg:shadow-[-24px_0_60px_rgba(46,35,28,0.1)]',
         !reduced &&
           'animate-[wb-sheet-up_180ms_ease-out] lg:animate-[wb-sheet-in_180ms_ease-out]',
         className

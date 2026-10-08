@@ -18,38 +18,36 @@ import {
   uploadAssetToCloudinary,
   uploadInputCls,
 } from '@/components/settings/settings-utils'
-import {
-  replaceAt,
-  resumeOf,
-  updateResume,
-} from '@/components/settings/resume-utils'
+import { replaceAt } from '@/components/settings/resume-utils'
 import { moveItem } from '@/lib/resume-sections'
 import type { UploadingState } from '@/components/settings/types'
-import type { Profile, ResumeContactLink } from '@/types/profile'
+import type { Resume, ResumeContactLink } from '@/types/profile'
 
 export default function ResumeMastheadSection({
-  profile,
-  setProfile,
+  resume,
+  setResume,
+  avatar,
   uploading,
   setUploading,
   setError,
 }: {
-  profile: Profile
-  setProfile: React.Dispatch<React.SetStateAction<Profile>>
+  resume: Resume
+  setResume: React.Dispatch<React.SetStateAction<Resume>>
+  /** The portfolio avatar, which an unset CV photo inherits. */
+  avatar: string
   uploading: UploadingState
   setUploading: React.Dispatch<React.SetStateAction<UploadingState>>
   setError: React.Dispatch<React.SetStateAction<string | null>>
 }) {
-  const resume = resumeOf(profile)
   const { contact } = resume
 
   // An empty `resume.photo` means "inherit". Mirroring the full chain `/cv` resolves at
   // render time means this preview shows what will actually print, not what is stored.
   const inheritsAvatar = !resume.photo
-  const effectivePhoto = resume.photo || profile.avatar || CV_FALLBACK_PHOTO
+  const effectivePhoto = resume.photo || avatar || CV_FALLBACK_PHOTO
 
   const addLink = () =>
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       contact: {
         ...r.contact,
@@ -58,14 +56,14 @@ export default function ResumeMastheadSection({
     }))
 
   const updateLink = (idx: number, patch: Partial<ResumeContactLink>) => {
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       contact: { ...r.contact, links: replaceAt(r.contact.links, idx, patch) },
     }))
   }
 
   const moveLink = (from: number, to: number) =>
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       contact: { ...r.contact, links: moveItem(r.contact.links, from, to) },
     }))
@@ -74,7 +72,6 @@ export default function ResumeMastheadSection({
     <Section
       id="cv-masthead"
       title="CV Masthead"
-      badge="name, role, contact"
       defaultOpen
     >
       <div className="space-y-4">
@@ -92,9 +89,7 @@ export default function ResumeMastheadSection({
             <input
               className={inputCls}
               value={resume.name}
-              onChange={e =>
-                updateResume(setProfile, r => ({ ...r, name: e.target.value }))
-              }
+              onChange={e => setResume(r => ({ ...r, name: e.target.value }))}
             />
           </div>
           <div className="space-y-2">
@@ -102,9 +97,7 @@ export default function ResumeMastheadSection({
             <input
               className={inputCls}
               value={resume.role}
-              onChange={e =>
-                updateResume(setProfile, r => ({ ...r, role: e.target.value }))
-              }
+              onChange={e => setResume(r => ({ ...r, role: e.target.value }))}
             />
           </div>
         </div>
@@ -118,7 +111,7 @@ export default function ResumeMastheadSection({
                 type="button"
                 className={ghostBtnCls}
                 onClick={() =>
-                  updateResume(setProfile, r => ({
+                  setResume(r => ({
                     ...r,
                     hidePhoto: !r.hidePhoto,
                   }))
@@ -175,7 +168,7 @@ export default function ResumeMastheadSection({
                   setUploading(u => ({ ...u, cvPhoto: true }))
                   try {
                     const url = await uploadAssetToCloudinary(file, 'cv-photo')
-                    updateResume(setProfile, r => ({ ...r, photo: url }))
+                    setResume(r => ({ ...r, photo: url }))
                   } catch (err) {
                     setError(
                       err instanceof Error ? err.message : 'Upload failed'
@@ -192,10 +185,10 @@ export default function ResumeMastheadSection({
                   className={inputCls}
                   value={resume.photo}
                   placeholder={
-                    profile.avatar || 'Leave empty to use your profile avatar'
+                    avatar || 'Leave empty to use your profile avatar'
                   }
                   onChange={e =>
-                    updateResume(setProfile, r => ({
+                    setResume(r => ({
                       ...r,
                       photo: e.target.value,
                     }))
@@ -208,15 +201,13 @@ export default function ResumeMastheadSection({
                   type="button"
                   className={ghostBtnCls}
                   disabled={inheritsAvatar}
-                  onClick={() =>
-                    updateResume(setProfile, r => ({ ...r, photo: '' }))
-                  }
+                  onClick={() => setResume(r => ({ ...r, photo: '' }))}
                 >
                   Use profile avatar
                 </button>
                 <span className={helpTextCls}>
                   {inheritsAvatar
-                    ? profile.avatar
+                    ? avatar
                       ? 'Using your profile avatar.'
                       : 'No profile avatar set - the CV falls back to its bundled photo.'
                     : 'Using the CV-specific photo above.'}
@@ -234,7 +225,7 @@ export default function ResumeMastheadSection({
                 className={inputCls}
                 value={contact.email}
                 onChange={e =>
-                  updateResume(setProfile, r => ({
+                  setResume(r => ({
                     ...r,
                     contact: { ...r.contact, email: e.target.value },
                   }))
@@ -247,7 +238,7 @@ export default function ResumeMastheadSection({
                 className={inputCls}
                 value={contact.phone}
                 onChange={e =>
-                  updateResume(setProfile, r => ({
+                  setResume(r => ({
                     ...r,
                     contact: { ...r.contact, phone: e.target.value },
                   }))
@@ -260,7 +251,7 @@ export default function ResumeMastheadSection({
                 className={inputCls}
                 value={contact.location}
                 onChange={e =>
-                  updateResume(setProfile, r => ({
+                  setResume(r => ({
                     ...r,
                     contact: { ...r.contact, location: e.target.value },
                   }))
@@ -341,7 +332,7 @@ export default function ResumeMastheadSection({
                     type="button"
                     className={ghostBtnCls}
                     onClick={() =>
-                      updateResume(setProfile, r => ({
+                      setResume(r => ({
                         ...r,
                         contact: {
                           ...r.contact,

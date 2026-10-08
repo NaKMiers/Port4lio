@@ -127,8 +127,28 @@ export type PostDocument = {
    * starts; absent reads as idle. See `lib/blog/illustrate-run.ts`.
    */
   illustration?: PostIllustration
+  /**
+   * What Google Search Console last said about this URL. Absent until the owner checks it;
+   * cleared on every transition into `published`. See `lib/blog/index-status-service.ts`.
+   */
+  indexStatus?: PostIndexStatus
   createdAt: Date
   updatedAt: Date
+}
+
+export type PostIndexStatus = {
+  verdict: string | null
+  coverageState: string | null
+  indexingState: string | null
+  robotsTxtState: string | null
+  pageFetchState: string | null
+  lastCrawlTime: Date | null
+  googleCanonical: string | null
+  userCanonical: string | null
+  inspectionResultLink: string | null
+  checkedAt: Date | null
+  lastError: string | null
+  lastErrorAt: Date | null
 }
 
 export type IllustrationState = 'idle' | 'running' | 'failed'
@@ -309,6 +329,35 @@ const postSchema = new Schema<PostDocument>(
           publishing: { type: Boolean, default: false },
           startedAt: { type: Date, default: null },
           finishedAt: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
+    /*
+      Same `default: undefined` shape as `illustration`, for the same reason: a post nobody
+      has checked carries nothing, and every existing read and test is unchanged.
+
+      Written ONLY by `index-status-service` with `timestamps: false` and a
+      `status: 'published'` filter. `updatedAt` is the editor's stale-save check (R9),
+      illustrate-run's publish fence and the board's sort key, so a check that bumped it
+      would 409 an open editor and reshuffle the board.
+    */
+    indexStatus: {
+      type: new Schema(
+        {
+          verdict: { type: String, default: null },
+          coverageState: { type: String, default: null },
+          indexingState: { type: String, default: null },
+          robotsTxtState: { type: String, default: null },
+          pageFetchState: { type: String, default: null },
+          lastCrawlTime: { type: Date, default: null },
+          googleCanonical: { type: String, default: null },
+          userCanonical: { type: String, default: null },
+          inspectionResultLink: { type: String, default: null },
+          checkedAt: { type: Date, default: null },
+          lastError: { type: String, default: null, maxlength: 500 },
+          lastErrorAt: { type: Date, default: null },
         },
         { _id: false }
       ),

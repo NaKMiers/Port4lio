@@ -3,11 +3,7 @@ import React from 'react'
 import AddMoreButton from '@/components/settings/AddMoreButton'
 import DragList from '@/components/settings/DragList'
 import Section from '@/components/settings/Section'
-import {
-  replaceAt,
-  resumeOf,
-  updateResume,
-} from '@/components/settings/resume-utils'
+import { replaceAt } from '@/components/settings/resume-utils'
 import {
   emptyStateCls,
   ghostBtnCls,
@@ -23,15 +19,13 @@ import { moveItem } from '@/lib/resume-sections'
 import type { Certificate, ResumeCertificationGroup } from '@/types/profile'
 
 export default function ResumeCertificationsSection({
-  profile,
-  setProfile,
+  resume,
+  setResume,
   handle,
   onFitPageBreak,
 }: CvSectionProps) {
-  const resume = resumeOf(profile)
-
   const addGroup = () =>
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       certifications: {
         ...r.certifications,
@@ -43,7 +37,7 @@ export default function ResumeCertificationsSection({
     idx: number,
     patch: Partial<ResumeCertificationGroup>
   ) => {
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       certifications: {
         ...r.certifications,
@@ -57,7 +51,7 @@ export default function ResumeCertificationsSection({
     certIdx: number,
     patch: Partial<Certificate>
   ) => {
-    updateResume(setProfile, r => {
+    setResume(r => {
       const group = r.certifications.groups[groupIdx]
       return {
         ...r,
@@ -72,7 +66,7 @@ export default function ResumeCertificationsSection({
   }
 
   const moveGroup = (from: number, to: number) => {
-    updateResume(setProfile, r => ({
+    setResume(r => ({
       ...r,
       certifications: {
         ...r.certifications,
@@ -83,7 +77,7 @@ export default function ResumeCertificationsSection({
   }
 
   const moveCert = (groupIdx: number, from: number, to: number) => {
-    updateResume(setProfile, r => {
+    setResume(r => {
       const group = r.certifications.groups[groupIdx]
       return {
         ...r,
@@ -102,7 +96,6 @@ export default function ResumeCertificationsSection({
     <Section
       id="cv-certifications"
       title="CV Certifications"
-      badge="drag to reorder"
       handle={handle}
     >
       <div className="space-y-4">
@@ -119,7 +112,7 @@ export default function ResumeCertificationsSection({
             placeholder="CERTIFICATIONS"
             value={resume.certifications.heading}
             onChange={e =>
-              updateResume(setProfile, r => ({
+              setResume(r => ({
                 ...r,
                 certifications: {
                   ...r.certifications,
@@ -245,7 +238,7 @@ export default function ResumeCertificationsSection({
                     type="button"
                     className={ghostBtnCls}
                     onClick={() =>
-                      updateResume(setProfile, r => ({
+                      setResume(r => ({
                         ...r,
                         certifications: {
                           ...r.certifications,

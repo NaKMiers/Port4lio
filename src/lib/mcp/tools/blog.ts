@@ -4,7 +4,6 @@ import { after } from 'next/server'
 import { z } from 'zod'
 
 import { COVER_KEY } from '@/lib/blog/auto-illustrate'
-import { findImagePlaceholders } from '@/lib/blog/image-placeholders'
 import { POST_STATUSES } from '@/lib/blog/constants'
 import { IMAGE_MODEL_OPTIONS } from '@/lib/blog/generation-fields'
 import {
@@ -13,6 +12,7 @@ import {
   runIllustration,
 } from '@/lib/blog/illustrate-run'
 import { ImageGenError } from '@/lib/blog/image-gen'
+import { findImagePlaceholders } from '@/lib/blog/image-placeholders'
 import {
   generateImageUrl,
   patchImageIntoPost,

@@ -10,7 +10,7 @@ import {
 } from '@/components/cv/cv-sheet-css'
 import { arimo } from '@/lib/cv-font'
 import { deriveResume } from '@/lib/resume-view-model'
-import type { Profile, Resume } from '@/types/profile'
+import type { Resume } from '@/types/profile'
 
 /**
  * The printed CV, live, at whatever width the rail gives us.
@@ -36,23 +36,27 @@ const MIN_SCALE = 0.2
 const MAX_SCALE = 1
 
 export default function CvTabPreview({
-  profile,
+  draft,
+  avatar,
   printing,
   startPrint,
   expanded,
   onCloseExpand,
 }: {
-  profile: Profile
+  /** The selected CV's unsaved draft, from `useCvEditor`. */
+  draft: Resume
+  /** The portfolio avatar, which an unset CV photo inherits. */
+  avatar: string
   printing: boolean
   startPrint: () => void
   expanded: boolean
   onCloseExpand: () => void
 }) {
-  // Keyed on `resume` alone so typing in another tab cannot re-plan the sheets. `deriveResume`
+  // Keyed on the draft alone so typing in another tab cannot re-plan the sheets. `deriveResume`
   // returns the same reference when the photo is unchanged, so this stays stable.
   const resume = useMemo(
-    () => deriveResume({ resume: profile.resume }, profile.avatar),
-    [profile.resume, profile.avatar]
+    () => deriveResume({ resume: draft }, avatar),
+    [draft, avatar]
   )
 
   return (

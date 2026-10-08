@@ -1,5 +1,6 @@
 import React from 'react'
 
+import { AdminHubPill } from '@/components/admin/AdminHomeLink'
 import { secondaryBtnCls } from '@/components/settings/settings-utils'
 
 /**
@@ -17,6 +18,9 @@ import { secondaryBtnCls } from '@/components/settings/settings-utils'
  * that component is not in the admin tree at all. Either way this page is the only thing
  * surfacing its own fetch failures, and without it a 500 from `/api/admin/profile` looks
  * identical to a slow one: a spinner, forever.
+ *
+ * It carries the "All boards" pill itself because `AdminHomeLink` hides on this route (the
+ * editor's toolbar row holds the pill instead), and a failed load must not be a dead end.
  */
 export default function SettingLoadError({
   message,
@@ -27,6 +31,9 @@ export default function SettingLoadError({
 }) {
   return (
     <div className="mx-auto w-full max-w-editorial px-gutter py-10">
+      <div className="mb-6">
+        <AdminHubPill />
+      </div>
       <div className="bg-white/78 rounded-[1.8rem] border border-pp-line p-6 shadow-panel backdrop-blur-md">
         <h2 className="font-display text-2xl font-semibold tracking-tight text-pp-text">
           Could not load your profile

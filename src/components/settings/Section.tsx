@@ -22,6 +22,11 @@ export default function Section({
    * blog's sections do not announce themselves as part of the portfolio editor.
    */
   eyebrow?: string
+  /**
+   * A short hint beside the title, from `sm` up only. The header row does not wrap, so on
+   * a phone a badge would squeeze the title; hidden there, the open toggle stays on the
+   * title's line. The CV tab's sections pass none: each one's help text says the same.
+   */
   badge?: string
   /** Drag grip from a `DragList`, shown ahead of the title when the card is reorderable. */
   handle?: React.ReactNode
@@ -38,12 +43,12 @@ export default function Section({
       className="bg-white/72 group overflow-hidden rounded-[1.75rem] border border-pp-line shadow-panel backdrop-blur-md"
     >
       <summary className="cursor-pointer list-none px-5 py-5 sm:px-6">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
           {handle}
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-pp-line bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(246,240,233,0.84))] shadow-[0_10px_24px_rgba(46,35,28,0.06)]">
             <span className="h-2.5 w-2.5 rounded-full bg-[linear-gradient(135deg,var(--pp-blue),var(--pp-violet))]" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1 sm:flex-none">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-pp-muted">
               {eyebrow}
             </div>
@@ -52,11 +57,11 @@ export default function Section({
             </div>
           </div>
           {badge ? (
-            <span className="bg-white/78 rounded-full border border-pp-line px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted">
+            <span className="bg-white/78 hidden shrink-0 whitespace-nowrap rounded-full border border-pp-line px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-muted sm:inline">
               {badge}
             </span>
           ) : null}
-          <div className="ml-auto flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
+          <div className="ml-auto flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted">
             <span className="hidden sm:inline">Open section</span>
             <span className="bg-white/86 relative block h-8 w-8 shrink-0 rounded-full border border-pp-line shadow-[0_8px_16px_rgba(46,35,28,0.06)]">
               <span className="absolute left-1/2 top-1/2 h-px w-3 -translate-x-1/2 -translate-y-1/2 bg-pp-text" />

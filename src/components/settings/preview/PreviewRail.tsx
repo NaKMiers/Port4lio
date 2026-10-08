@@ -12,7 +12,7 @@ import { MAX_UPLOAD_MB_LABEL } from '@/components/settings/settings-utils'
 import type { SettingTabId } from '@/components/settings/types'
 import { toPublicProfile } from '@/lib/profile-public'
 import { derivePublicPortfolioViewModel } from '@/lib/profile-view-model'
-import type { Profile } from '@/types/profile'
+import type { Profile, Resume } from '@/types/profile'
 
 /**
  * The editor's live preview column, one panel per tab.
@@ -28,7 +28,8 @@ import type { Profile } from '@/types/profile'
  * editor already replaces `profile` on every keystroke.
  *
  * The CV tab is the exception: the printed CV has fixed A4 geometry that no summary can
- * stand in for, so it renders the real sheets. See `CvTabPreview`.
+ * stand in for, so it renders the real sheets. See `CvTabPreview`. It also reads a different
+ * source: `cvDraft`, the selected CV's draft from `useCvEditor`, not the profile.
  */
 
 const TAB_LABEL: Record<SettingTabId, string> = {
@@ -51,9 +52,12 @@ const headerActionBtnCls =
 export default function PreviewRail({
   tab,
   profile,
+  cvDraft,
 }: {
   tab: SettingTabId
   profile: Profile
+  /** The selected CV's draft; `null` while the CV list is still loading. */
+  cvDraft: Resume | null
 }) {
   // `toPublicProfile` is the allowlist gate, so the preview can only ever show what is
   // publishable - a private field added to `Profile` later cannot leak in here by accident.
@@ -83,7 +87,7 @@ export default function PreviewRail({
               <button
                 type="button"
                 className={headerActionBtnCls}
-                disabled={printing}
+                disabled={printing || !cvDraft}
                 onClick={startPrint}
               >
                 {printing ? 'Preparing...' : 'Download PDF'}
@@ -91,6 +95,7 @@ export default function PreviewRail({
               <button
                 type="button"
                 className={headerActionBtnCls}
+                disabled={!cvDraft}
                 onClick={() => setCvExpanded(true)}
               >
                 Expand
@@ -122,14 +127,20 @@ export default function PreviewRail({
               viewModel={viewModel}
             />
           ) : null}
-          {tab === 'cv' ? (
+          {tab === 'cv' && cvDraft ? (
             <CvTabPreview
-              profile={profile}
+              draft={cvDraft}
+              avatar={profile.avatar ?? ''}
               printing={printing}
               startPrint={startPrint}
               expanded={cvExpanded}
               onCloseExpand={() => setCvExpanded(false)}
             />
+          ) : null}
+          {tab === 'cv' && !cvDraft ? (
+            <p className="text-xs text-pp-muted">
+              The preview appears once the CV has loaded.
+            </p>
           ) : null}
         </div>
       </div>

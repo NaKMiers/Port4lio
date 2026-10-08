@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { jsonError, serviceErrorResponse } from '@/lib/api-response'
+import {
+  indexingSummary,
+  readSitemapState,
+} from '@/lib/blog/index-status-service'
 import { createBarePost, listBoardPosts } from '@/lib/blog/post-service'
 import { readJsonBody } from '@/lib/read-json-body'
 import { requireOwner } from '@/lib/require-owner'
@@ -37,7 +41,16 @@ export async function GET(request: NextRequest) {
   if (denied) return denied
 
   try {
-    return NextResponse.json({ posts: await listBoardPosts() })
+    // `indexing` never fails the list: the config check cannot throw and a failed state read
+    // degrades to `sitemap: null`, the same way the metrics join does.
+    const [posts, sitemap] = await Promise.all([
+      listBoardPosts(),
+      readSitemapState(),
+    ])
+    return NextResponse.json({
+      posts,
+      indexing: { ...indexingSummary(), sitemap },
+    })
   } catch (error) {
     console.error('[api/admin/blog] list failed', error)
     return jsonError('Unable to load posts right now.', 500)

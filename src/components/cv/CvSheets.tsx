@@ -159,7 +159,7 @@ function TextBlock({
   gTop: boolean
 }) {
   return (
-    <div className={`p ${gTop ? 'gTop' : 'gBody'}${justify ? 'jt' : ''}`}>
+    <div className={`p ${gTop ? 'gTop' : 'gBody'}${justify ? ' jt' : ''}`}>
       {lines.map((line, index) => (
         <div key={index}>{renderInlineBold(line)}</div>
       ))}
@@ -333,7 +333,7 @@ function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
 
     case 'details':
       return (
-        <div className={`p ind1${gTop ? 'gTop' : ''}`}>
+        <div className={`p ind1${gTop ? ' gTop' : ''}`}>
           {item.lines.map((line, index) => (
             <div
               className="i1"
@@ -347,7 +347,7 @@ function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
 
     case 'highlights':
       return (
-        <div className={`p ind2${gTop ? 'gTop' : ''}`}>
+        <div className={`p ind2${gTop ? ' gTop' : ''}`}>
           {item.lines.map((line, index) => (
             <div
               className="i2"
@@ -361,7 +361,7 @@ function PrintItem({ item, gTop }: { item: ResumePrintItem; gTop: boolean }) {
 
     case 'demo':
       return (
-        <div className={`p ind1${gTop ? 'gTop' : ''}`}>
+        <div className={`p ind1${gTop ? ' gTop' : ''}`}>
           <div className="i1">
             <b>Demo:</b>{' '}
             {joinNodes(

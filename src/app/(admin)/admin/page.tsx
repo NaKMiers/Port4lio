@@ -141,16 +141,18 @@ export default function AdminHubPage() {
           {BOARDS.map(({ href, title, blurb, Icon, tint, secondary }) => (
             <div
               key={href}
-              className="relative"
+              className="relative transition-transform motion-safe:hover:-translate-y-1"
             >
               {/*
                 The whole card is the link, so the target is the card and not the six
                 characters of its title. `secondary` sits outside it and above it - a link
-                inside a link is invalid HTML and the browser drops the inner one.
+                inside a link is invalid HTML and the browser drops the inner one. That is
+                also why the hover lift is on this wrapper and not on the link: lifting the
+                link alone left the `secondary` chips standing still while the card rose.
               */}
               <Link
                 href={href}
-                className="group flex h-full flex-col rounded-panel border border-pp-line bg-pp-panel p-6 no-underline shadow-panel backdrop-blur-md transition-transform motion-safe:hover:-translate-y-1"
+                className="group flex h-full flex-col rounded-panel border border-pp-line bg-pp-panel p-6 no-underline shadow-panel backdrop-blur-md"
               >
                 <span
                   className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border ${tint}`}

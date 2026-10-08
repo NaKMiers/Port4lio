@@ -2,11 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 
-import {
-  hasActiveUploads,
-  primaryBtnCls,
-} from '@/components/settings/settings-utils'
-import type { UploadingState } from '@/components/settings/types'
+import { primaryBtnCls } from '@/components/settings/settings-utils'
 
 /**
  * Save, kept within reach once the toolbar's own button has scrolled away.
@@ -20,17 +16,29 @@ import type { UploadingState } from '@/components/settings/types'
  * Presence is driven by an `IntersectionObserver` on the toolbar button rather than a
  * scroll threshold, so it stays correct at any zoom, viewport height, or toolbar layout -
  * including the wrap that moves the button down a row on a narrow window.
+ *
+ * It follows whichever toolbar button is primary on the tab: Save profile, or Save CV on the
+ * CV tab (multi-cv-plan.md R5, OV-14). The caller passes that button's ref, label and gate;
+ * a new ref re-attaches the observer, because the two buttons are different elements.
  */
 export default function FloatingSaveButton({
   anchorRef,
+  label,
   saving,
-  uploading,
+  blocked,
+  blockedTitle,
+  disabled = false,
   onSave,
 }: {
-  /** The toolbar's save button. This one shows exactly while that one is out of view. */
+  /** The toolbar's primary save button. This one shows exactly while that one is out of view. */
   anchorRef: React.RefObject<HTMLButtonElement | null>
+  label: string
   saving: boolean
-  uploading: UploadingState
+  /** An upload the save must wait for is still running. */
+  blocked: boolean
+  blockedTitle?: string
+  /** Any other reason the save cannot run yet (the CV list still loading). */
+  disabled?: boolean
   onSave: () => void
 }) {
   const [anchorVisible, setAnchorVisible] = useState(true)
@@ -52,19 +60,19 @@ export default function FloatingSaveButton({
 
   if (anchorVisible) return null
 
-  const hasUploads = hasActiveUploads(uploading)
-
   return (
     // Under the icon picker (z-60) and every other overlay, above the editor itself.
     <div className="fixed bottom-6 right-6 z-[55] print:hidden">
       <button
         type="button"
         onClick={onSave}
-        disabled={saving || hasUploads}
-        title={hasUploads ? 'Waiting for uploads to finish' : 'Save profile'}
+        disabled={saving || blocked || disabled}
+        title={
+          blocked ? (blockedTitle ?? 'Waiting for uploads to finish') : label
+        }
         className={`${primaryBtnCls} min-w-[160px] shadow-[0_18px_44px_rgba(17,17,17,0.32)]`}
       >
-        {saving ? 'Saving...' : hasUploads ? 'Uploading...' : 'Save profile'}
+        {saving ? 'Saving...' : blocked ? 'Uploading...' : label}
       </button>
     </div>
   )

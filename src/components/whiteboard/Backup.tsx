@@ -331,8 +331,10 @@ export function BackupMenu({
     <div
       ref={rootRef}
       // Below md the popover anchors to the header (TopBar), not to this button: on a phone the
-      // button sits mid-row, and a panel hung off its right edge ran past the left of the screen.
-      className={cn('md:relative', className)}
+      // button sat mid-row, and a panel hung off its right edge ran past the left of the screen.
+      // The trigger itself is gone there - the top bar's More menu opens this - and
+      // `contents` keeps the empty box from taking a gap in the row.
+      className={cn('max-md:contents md:relative', className)}
     >
       <button
         type="button"
@@ -340,7 +342,7 @@ export function BackupMenu({
         aria-expanded={open}
         aria-label="Backup"
         onClick={() => onToggle(!open)}
-        className="inline-flex min-h-[40px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-pp-line bg-white/85 px-3 font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-text sm:px-3.5"
+        className="inline-flex h-9 min-w-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-pp-line bg-white/85 px-2.5 font-display text-[11px] font-semibold uppercase tracking-[0.13em] text-pp-text max-md:hidden xl:px-3.5"
       >
         <Archive
           aria-hidden

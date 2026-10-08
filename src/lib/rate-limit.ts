@@ -208,6 +208,19 @@ export const WHITEBOARD_SHARE_READ_LIMIT: RateLimitOptions = {
 }
 
 /**
+ * Password tries on a whiteboard share link's form (share-password.ts). Ten per quarter
+ * hour per caller is plenty for someone mistyping and nowhere near enough to guess even a
+ * short password: at that rate a four-digit PIN takes over two weeks. It is its own bucket
+ * so that a visitor who is simply reading the board never uses up their tries, and so the
+ * tries cannot be spent through the far looser read bucket.
+ */
+export const WHITEBOARD_SHARE_UNLOCK_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-share-unlock',
+  limit: 10,
+  windowSeconds: 15 * 60,
+}
+
+/**
  * The contact form. The tightest bucket here, and the window is an hour rather than a
  * minute.
  *
@@ -360,6 +373,29 @@ export const CLOUDINARY_DELETE_LIMIT: RateLimitOptions = {
   route: 'cloudinary-delete',
   limit: 15,
   windowSeconds: 10 * 60,
+}
+
+/**
+ * The small whiteboard writes an agent makes - `whiteboard_add_item`, `whiteboard_link`,
+ * `whiteboard_arrange` - per token. Sized for a session that records a briefing and links it
+ * to a dozen goals, or tidies a board it composed, several times over; it only stops a loop
+ * that is adding cards one by one at request speed.
+ */
+export const WHITEBOARD_AGENT_WRITE_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-agent-write',
+  limit: 200,
+  windowSeconds: 10 * 60,
+}
+
+/**
+ * `whiteboard_compose`, per token. One call writes up to COMPOSE_LIMITS.items (150), so this
+ * bounds an agent at a few thousand items an hour - room to compose a board, look at the
+ * result and compose a second draft, without a runaway filling the collection.
+ */
+export const WHITEBOARD_COMPOSE_LIMIT: RateLimitOptions = {
+  route: 'whiteboard-compose',
+  limit: 20,
+  windowSeconds: 60 * 60,
 }
 
 /**
