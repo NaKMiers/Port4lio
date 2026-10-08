@@ -20,6 +20,7 @@ import TaxonomyDialog, {
 import BlogToolbar from '@/components/blog-admin/BlogToolbar'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
 import RailResizeHandle from '@/components/settings/RailResizeHandle'
+import ManageButton from '@/components/settings/ManageButton'
 import SelectField, {
   type SelectOption,
 } from '@/components/settings/SelectField'
@@ -1154,20 +1155,17 @@ export default function BlogEditor({ id }: { id: string }) {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
                         <label
                           className={`${labelCls} mb-0`}
                           htmlFor="kind"
                         >
                           Kind
                         </label>
-                        <button
-                          type="button"
-                          className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
+                        <ManageButton
+                          label="Manage kinds"
                           onClick={() => setTaxonomyDialog('kinds')}
-                        >
-                          Manage
-                        </button>
+                        />
                       </div>
                       <SelectField
                         id="kind"
@@ -1177,20 +1175,17 @@ export default function BlogEditor({ id }: { id: string }) {
                       />
                     </div>
                     <div>
-                      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
                         <label
                           className={`${labelCls} mb-0`}
                           htmlFor="series"
                         >
                           Series
                         </label>
-                        <button
-                          type="button"
-                          className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
+                        <ManageButton
+                          label="Manage series"
                           onClick={() => setTaxonomyDialog('series')}
-                        >
-                          Manage
-                        </button>
+                        />
                       </div>
                       {/* `''` is the wire value for "no series"; the model stores `null`. The
                           empty string exists only so the option has a value at all. */}

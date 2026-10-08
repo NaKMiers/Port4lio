@@ -4,6 +4,7 @@ import { ArrowDownLeft, ArrowUpRight, Sparkles, Trash2, X } from 'lucide-react'
 import { memo, useLayoutEffect, useRef, useState } from 'react'
 
 import ToggleSwitch from '@/components/blog-admin/ToggleSwitch'
+import ManageButton from '@/components/settings/ManageButton'
 import SelectField from '@/components/settings/SelectField'
 import {
   ghostBtnCls,
@@ -109,7 +110,7 @@ function statusOptions(vocab: Vocab, current: string | null) {
   return options
 }
 
-/** "Meaning" / "Status" with a Manage button beside it, like the blog editor's Kind. */
+/** "Meaning" / "Status" with a Manage gear beside it, like the blog editor's Kind. */
 function ManagedLabel({
   htmlFor,
   label,
@@ -122,24 +123,18 @@ function ManagedLabel({
   onManage?: (kind: VocabKind) => void
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
+    <div className="mb-1.5 flex items-center justify-between gap-2">
       <label
         htmlFor={htmlFor}
-        className={labelCls}
+        className={cn(labelCls, 'mb-0')}
       >
         {label}
       </label>
       {onManage ? (
-        <button
-          type="button"
+        <ManageButton
+          label={kind === 'meaning' ? 'Manage meanings' : 'Manage statuses'}
           onClick={() => onManage(kind)}
-          aria-label={
-            kind === 'meaning' ? 'Manage meanings' : 'Manage statuses'
-          }
-          className="font-display text-[10.5px] font-semibold uppercase tracking-[0.12em] text-pp-muted hover:text-pp-text"
-        >
-          Manage
-        </button>
+        />
       ) : null}
     </div>
   )

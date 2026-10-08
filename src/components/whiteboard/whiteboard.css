@@ -74,7 +74,8 @@
   border-color: rgba(22, 103, 196, 0.35);
 }
 .wb-resize-handle.react-flow__resize-control.handle,
-.wb-resize-x.react-flow__resize-control {
+.wb-resize-x.react-flow__resize-control,
+.wb-resize-y.react-flow__resize-control {
   width: 9px;
   height: 9px;
   border-radius: 3px;
@@ -88,6 +89,12 @@
   top: 50%;
   transform: translateY(-50%);
   cursor: ew-resize;
+}
+/* The card's bottom edge: the right-edge grip turned on its side. React Flow centres it. */
+.wb-resize-y.react-flow__resize-control {
+  width: 22px;
+  height: 7px;
+  cursor: ns-resize;
 }
 
 /*
@@ -113,6 +120,10 @@
     width: 14px;
     height: 36px;
     right: -8px;
+  }
+  .wb-resize-y.react-flow__resize-control {
+    width: 36px;
+    height: 14px;
   }
 }
 

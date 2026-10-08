@@ -38,14 +38,23 @@ export function applyNodeTransient(
           edit(change.id, { selected: change.selected })
         break
       case 'dimensions':
+        // A one-axis resize (a card's right or bottom edge) sets only that attribute and
+        // clears the other, so a stale height from an earlier corner drag cannot freeze a
+        // card's height while its width is being dragged.
         edit(change.id, {
           ...(change.dimensions
             ? {
                 measured: change.dimensions,
                 ...(change.setAttributes
                   ? {
-                      width: change.dimensions.width,
-                      height: change.dimensions.height,
+                      width:
+                        change.setAttributes !== 'height'
+                          ? change.dimensions.width
+                          : undefined,
+                      height:
+                        change.setAttributes !== 'width'
+                          ? change.dimensions.height
+                          : undefined,
                     }
                   : {}),
               }

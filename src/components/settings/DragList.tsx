@@ -3,6 +3,8 @@
 import { GripVertical } from 'lucide-react'
 import React, { useRef, useState } from 'react'
 
+import { cn } from '@/lib/utils'
+
 /**
  * A reorderable list built on native HTML5 drag and drop.
  *
@@ -26,6 +28,7 @@ export default function DragList({
   onReorder,
   itemLabel,
   className = 'space-y-3',
+  rowClassName,
   children,
 }: {
   /** One stable key per row. Also the row count. */
@@ -34,6 +37,8 @@ export default function DragList({
   /** Singular noun used in the handle's accessible name, e.g. `skill block`. */
   itemLabel: string
   className?: string
+  /** Merged onto every row, after the defaults (a flat list wants square rows, say). */
+  rowClassName?: string
   /** Renders one row. `handle` must be placed somewhere inside it to enable dragging. */
   children: (index: number, handle: React.ReactNode) => React.ReactNode
 }) {
@@ -146,11 +151,14 @@ export default function DragList({
               move(dragIndex, index)
               reset()
             }}
-            className={`rounded-[1.45rem] transition ${isDragging ? 'opacity-45' : ''} ${
+            className={cn(
+              'rounded-[1.45rem] transition',
+              isDragging && 'opacity-45',
               isTarget
                 ? 'outline-dashed outline-2 outline-offset-2 outline-pp-blue/55'
-                : 'outline-none'
-            }`}
+                : 'outline-none',
+              rowClassName
+            )}
           >
             {children(index, handle)}
           </div>

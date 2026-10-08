@@ -1,8 +1,9 @@
 'use client'
 
-import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import DragList from '@/components/settings/DragList'
 import {
   ghostBtnCls,
   helpTextCls,
@@ -16,6 +17,7 @@ import {
 } from '@/components/whiteboard/meaning-style'
 import { MeaningChip } from '@/components/whiteboard/nodes/badges'
 import { useVocab } from '@/components/whiteboard/vocab-context'
+import { moveItem } from '@/lib/resume-sections'
 import { cn } from '@/lib/utils'
 import {
   VOCAB_ICONS,
@@ -49,13 +51,19 @@ import {
  *
  * Every answer is the whole new list, and it goes straight into the shared context, so the
  * chips on the canvas change with the dialog still open. No optimistic guess: the server
- * decides the key, the order and the refusals, and the list is a dozen rows.
+ * decides the key and the refusals, and the list is a dozen rows.
+ *
+ * The one exception is a drag. Its order is shown at once, because a row that jumps back to
+ * where it was picked up for the length of a round trip reads as "the drop did not take". The
+ * server's answer replaces it a moment later, and a refused move reloads the list. Another
+ * drag waits for that answer (`busy`), so two moves cannot answer out of order.
  *
  * ## Why every row is collapsed
  *
  * ```
  *   [GOAL chip]            3 cards  v     one line per entry: what it looks like, how used
- *     └ open ─▶ label · colour · icon · has a status · key · move · delete
+ *     └ open ─▶ label · colour · icon · has a status · key · delete
+ *   the grip at its left: drag the row, or focus it and use the arrow keys
  *   + New meaning                         label and colour; the rest is set on the row after
  * ```
  *
@@ -244,6 +252,19 @@ export default function VocabDialog({
   const update = (key: string, changes: Record<string, unknown>) =>
     run(() => updateVocabApi(tab, key, changes))
 
+  const reorder = async (from: number, to: number) => {
+    if (busy) return
+    const key = entries[from].key
+    setSnapshot({
+      vocab:
+        tab === 'meaning'
+          ? { ...vocab, meanings: moveItem(vocab.meanings, from, to) }
+          : { ...vocab, statuses: moveItem(vocab.statuses, from, to) },
+      usage: usage ?? undefined,
+    })
+    if (!(await update(key, { to }))) void reload()
+  }
+
   const suggestedKey = keyFromLabel(newLabel)
   const shownKey = keyTouched ? newKey : suggestedKey
 
@@ -322,153 +343,145 @@ export default function VocabDialog({
           </p>
         ) : null}
 
-        <ul
+        <div
           role="tabpanel"
           className="mt-3 divide-y divide-pp-line overflow-hidden rounded-2xl border border-pp-line bg-white/80"
         >
           {!loaded ? (
-            <li className={cn(helpTextCls, 'px-3.5 py-3')}>Loading...</li>
+            <p className={cn(helpTextCls, 'px-3.5 py-3')}>Loading...</p>
           ) : null}
 
-          {entries.map((entry, index) => {
-            const used = counts?.[entry.key] ?? 0
-            const meaning = tab === 'meaning' ? (entry as VocabMeaning) : null
-            const open = openKey === entry.key
-            return (
-              <li
-                key={entry.key}
-                data-testid="wb-vocab-row"
-              >
-                <button
-                  type="button"
-                  aria-expanded={open}
-                  onClick={() => toggle(entry.key)}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-pp-text/[0.03]"
-                >
-                  {meaning ? (
-                    <MeaningChip meaning={meaning.key} />
-                  ) : (
-                    <span className="text-[13px] font-semibold text-pp-text">
-                      {entry.label}
-                    </span>
-                  )}
-                  <span className="ml-auto text-[11.5px] text-pp-muted">
-                    {used} card{used === 1 ? '' : 's'}
-                  </span>
-                  <ChevronDown
-                    aria-hidden
-                    size={14}
-                    className={cn(
-                      'text-pp-muted transition-transform',
-                      open && 'rotate-180'
-                    )}
-                  />
-                </button>
-
-                {open ? (
-                  <div className="space-y-3 border-t border-pp-line bg-pp-text/[0.02] px-3.5 py-3">
-                    <input
-                      // Remounts on a new label from the server, so the field shows it.
-                      key={entry.label}
-                      className={inputCls}
-                      defaultValue={entry.label}
-                      maxLength={VOCAB_LIMITS.label}
-                      aria-label={`Label for ${entry.key}`}
-                      onBlur={event => {
-                        const next = event.target.value.trim()
-                        if (next && next !== entry.label)
-                          void update(entry.key, { label: next })
-                      }}
-                    />
-                    {meaning ? (
-                      <>
-                        <ToneChoice
-                          name={meaning.label}
-                          value={meaning.tone}
-                          onChange={tone => void update(meaning.key, { tone })}
-                        />
-                        <IconChoice
-                          name={meaning.label}
-                          value={meaning.icon}
-                          onChange={icon => void update(meaning.key, { icon })}
-                        />
-                        <label className="flex items-center gap-2 text-[12.5px] text-pp-muted">
-                          <input
-                            type="checkbox"
-                            checked={meaning.tracksStatus}
-                            disabled={busy}
-                            onChange={event =>
-                              void update(meaning.key, {
-                                tracksStatus: event.target.checked,
-                              })
-                            }
-                          />
-                          Has a status
-                        </label>
-                      </>
-                    ) : null}
-                    <div className="flex items-center gap-1">
-                      <code
-                        className="mr-auto text-[11px] text-pp-muted"
-                        title="Permanent - cards store it"
-                      >
-                        key: {entry.key}
-                      </code>
+          {entries.length ? (
+            <DragList
+              ids={entries.map(entry => entry.key)}
+              onReorder={(from, to) => void reorder(from, to)}
+              itemLabel={noun}
+              className="divide-y divide-pp-line"
+              // Flat rows in a bordered list: square, and the drop outline drawn inside.
+              rowClassName="rounded-none outline-offset-[-2px]"
+            >
+              {(index, handle) => {
+                const entry = entries[index]
+                const used = counts?.[entry.key] ?? 0
+                const meaning =
+                  tab === 'meaning' ? (entry as VocabMeaning) : null
+                const open = openKey === entry.key
+                return (
+                  <div data-testid="wb-vocab-row">
+                    <div className="flex items-center pl-1.5 hover:bg-pp-text/[0.03]">
+                      {handle}
                       <button
                         type="button"
-                        className={ghostBtnCls}
-                        disabled={busy || index === 0}
-                        aria-label={`Move ${entry.label} up`}
-                        onClick={() =>
-                          void update(entry.key, { to: index - 1 })
-                        }
+                        aria-expanded={open}
+                        onClick={() => toggle(entry.key)}
+                        className="flex min-w-0 flex-1 items-center gap-2.5 py-2.5 pl-1 pr-3.5 text-left"
                       >
-                        <ChevronUp
-                          aria-hidden
-                          size={14}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        className={ghostBtnCls}
-                        disabled={busy || index === entries.length - 1}
-                        aria-label={`Move ${entry.label} down`}
-                        onClick={() =>
-                          void update(entry.key, { to: index + 1 })
-                        }
-                      >
+                        {meaning ? (
+                          <MeaningChip meaning={meaning.key} />
+                        ) : (
+                          <span className="text-[13px] font-semibold text-pp-text">
+                            {entry.label}
+                          </span>
+                        )}
+                        <span className="ml-auto text-[11.5px] text-pp-muted">
+                          {used} card{used === 1 ? '' : 's'}
+                        </span>
                         <ChevronDown
                           aria-hidden
                           size={14}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        className={cn(ghostBtnCls, 'hover:text-pp-ink-rose')}
-                        disabled={busy}
-                        aria-label={`Delete ${entry.label}`}
-                        title={
-                          used > 0
-                            ? 'Cards still use this - give them another first'
-                            : 'Delete'
-                        }
-                        onClick={() =>
-                          void run(() => deleteVocabApi(tab, entry.key))
-                        }
-                      >
-                        <Trash2
-                          aria-hidden
-                          size={14}
+                          className={cn(
+                            'text-pp-muted transition-transform',
+                            open && 'rotate-180'
+                          )}
                         />
                       </button>
                     </div>
-                  </div>
-                ) : null}
-              </li>
-            )
-          })}
 
-          <li>
+                    {open ? (
+                      <div className="space-y-3 border-t border-pp-line bg-pp-text/[0.02] px-3.5 py-3">
+                        <input
+                          // Remounts on a new label from the server, so the field shows it.
+                          key={entry.label}
+                          className={inputCls}
+                          defaultValue={entry.label}
+                          maxLength={VOCAB_LIMITS.label}
+                          aria-label={`Label for ${entry.key}`}
+                          onBlur={event => {
+                            const next = event.target.value.trim()
+                            if (next && next !== entry.label)
+                              void update(entry.key, { label: next })
+                          }}
+                        />
+                        {meaning ? (
+                          <>
+                            <ToneChoice
+                              name={meaning.label}
+                              value={meaning.tone}
+                              onChange={tone =>
+                                void update(meaning.key, { tone })
+                              }
+                            />
+                            <IconChoice
+                              name={meaning.label}
+                              value={meaning.icon}
+                              onChange={icon =>
+                                void update(meaning.key, { icon })
+                              }
+                            />
+                            <label className="flex items-center gap-2 text-[12.5px] text-pp-muted">
+                              <input
+                                type="checkbox"
+                                checked={meaning.tracksStatus}
+                                disabled={busy}
+                                onChange={event =>
+                                  void update(meaning.key, {
+                                    tracksStatus: event.target.checked,
+                                  })
+                                }
+                              />
+                              Has a status
+                            </label>
+                          </>
+                        ) : null}
+                        <div className="flex items-center gap-1">
+                          <code
+                            className="mr-auto text-[11px] text-pp-muted"
+                            title="Permanent - cards store it"
+                          >
+                            key: {entry.key}
+                          </code>
+                          <button
+                            type="button"
+                            className={cn(
+                              ghostBtnCls,
+                              'hover:text-pp-ink-rose'
+                            )}
+                            disabled={busy}
+                            aria-label={`Delete ${entry.label}`}
+                            title={
+                              used > 0
+                                ? 'Cards still use this - give them another first'
+                                : 'Delete'
+                            }
+                            onClick={() =>
+                              void run(() => deleteVocabApi(tab, entry.key))
+                            }
+                          >
+                            <Trash2
+                              aria-hidden
+                              size={14}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              }}
+            </DragList>
+          ) : null}
+
+          <div>
             <button
               type="button"
               aria-expanded={openKey === NEW}
@@ -531,8 +544,8 @@ export default function VocabDialog({
                 </div>
               </form>
             ) : null}
-          </li>
-        </ul>
+          </div>
+        </div>
       </div>
     </div>
   )

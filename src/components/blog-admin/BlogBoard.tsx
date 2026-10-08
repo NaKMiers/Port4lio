@@ -12,6 +12,7 @@ import TaxonomyDialog, {
   type TaxonomyResource,
 } from '@/components/blog-admin/TaxonomyDialog'
 import OwnerAuthGate from '@/components/settings/OwnerAuthGate'
+import ManageButton from '@/components/settings/ManageButton'
 import SelectField, {
   type SelectOption,
 } from '@/components/settings/SelectField'
@@ -489,20 +490,17 @@ export default function BlogBoard() {
         */}
         <div className="mt-6 flex flex-wrap items-end gap-3">
           <div className="min-w-[10rem] flex-1">
-            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
                 htmlFor="filter-kind"
               >
                 Kind
               </label>
-              <button
-                type="button"
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
+              <ManageButton
+                label="Manage kinds"
                 onClick={() => setTaxonomyDialog('kinds')}
-              >
-                Manage
-              </button>
+              />
             </div>
             <SelectField
               id="filter-kind"
@@ -512,20 +510,17 @@ export default function BlogBoard() {
             />
           </div>
           <div className="min-w-[10rem] flex-1">
-            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
               <label
                 className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-pp-muted"
                 htmlFor="filter-series"
               >
                 Series
               </label>
-              <button
-                type="button"
-                className="text-[11px] font-semibold uppercase tracking-[0.14em] text-pp-blue transition hover:underline"
+              <ManageButton
+                label="Manage series"
                 onClick={() => setTaxonomyDialog('series')}
-              >
-                Manage
-              </button>
+              />
             </div>
             <SelectField
               id="filter-series"

@@ -873,6 +873,209 @@ test('(22) Manage meanings: add one, give it to a card, and it cannot be deleted
   expect(gone.ok()).toBe(true)
 })
 
+test('(23) a card resizes vertically: taller shows more body, shorter stops at its text', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  const body = Array.from({ length: 24 }, (_, i) => `Line ${i + 1}`).join('\n')
+  await request.post(on('/items'), {
+    data: { _id: card, form: 'text', title: 'Tall me', body, x: 0, y: 0 },
+  })
+  await openBoard(page)
+  const node = page.getByTestId('wb-card')
+  const text = node.locator('p').first()
+  await page.getByText('Tall me').click()
+  await expect(node.getByRole('button', { name: '... more' })).toBeVisible()
+  const before = (await node.boundingBox())!
+  const linesBefore = (await text.boundingBox())!.height
+
+  const grip = await centreOf(page.locator('.wb-resize-y'))
+  await page.mouse.move(grip.x, grip.y)
+  await page.mouse.down()
+  await page.mouse.move(grip.x, grip.y + 220, { steps: 12 })
+  await page.mouse.up()
+
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  await expect
+    .poll(async () => (await itemOnServer(request, card))?.height)
+    .toBeGreaterThan(200)
+  const taller = (await node.boundingBox())!
+  expect(taller.height).toBeGreaterThan(before.height + 150)
+  // The room went to the body, not to blank paper under it.
+  expect((await text.boundingBox())!.height).toBeGreaterThan(linesBefore + 100)
+
+  // Dragged far above its text, the card stops at the text instead of clipping it.
+  const up = await centreOf(page.locator('.wb-resize-y'))
+  await page.mouse.move(up.x, up.y)
+  await page.mouse.down()
+  await page.mouse.move(up.x, up.y - 600, { steps: 12 })
+  await page.mouse.up()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  await expect
+    .poll(async () => (await node.boundingBox())!.height)
+    .toBeGreaterThanOrEqual(before.height - 1)
+  await expect(node.getByRole('button', { name: '... more' })).toBeVisible()
+})
+
+test('(24) typing fast in the middle of a card keeps the caret where it is', async ({
+  page,
+  request,
+}) => {
+  const card = objectId()
+  await request.post(on('/items'), {
+    data: {
+      _id: card,
+      form: 'text',
+      title: 'Caret',
+      body: 'first\nsecond',
+      x: 0,
+      y: 0,
+    },
+  })
+  await openBoard(page)
+  await page.getByText('Caret').dblclick()
+  const editor = page.getByTestId('wb-card')
+
+  // Faster than React Flow hands the new text back to the card: the keys land inside the
+  // gap that used to snap the caret to the end ("first\nAsecondBC").
+  const body = editor.getByRole('textbox', { name: 'Body' })
+  await body.click()
+  await body.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(6, 6))
+  await page.keyboard.type('ABC', { delay: 30 })
+  await expect(body).toHaveValue('first\nABCsecond')
+
+  const title = editor.getByRole('textbox', { name: 'Title' })
+  await title.click()
+  await title.evaluate((el: HTMLInputElement) => el.setSelectionRange(0, 0))
+  await page.keyboard.type('My ', { delay: 30 })
+  await expect(title).toHaveValue('My Caret')
+
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/)
+  await expect
+    .poll(async () => (await itemOnServer(request, card))?.body)
+    .toBe('first\nABCsecond')
+  expect((await itemOnServer(request, card))?.title).toBe('My Caret')
+})
+
+test('(25) editing a card in place never changes its size', async ({
+  page,
+  request,
+}) => {
+  const body = Array.from({ length: 12 }, (_, i) => `Line ${i + 1}`).join('\n')
+  const textId = objectId()
+  const listId = objectId()
+  await request.post(on('/items'), {
+    data: {
+      _id: textId,
+      form: 'text',
+      title: 'Hold still',
+      body,
+      x: 0,
+      y: 0,
+    },
+  })
+  await request.post(on('/items'), {
+    data: {
+      _id: listId,
+      form: 'todo',
+      title: 'Hold the list',
+      todos: [
+        { id: 'a', text: 'One', done: false },
+        { id: 'b', text: 'Two', done: true },
+        { id: 'c', text: 'Three', done: false },
+      ],
+      x: 400,
+      y: 0,
+    },
+  })
+  await openBoard(page)
+
+  // By id: once editing, the title is an input's value, which `hasText` cannot see.
+  const text = page.locator(`[data-item-id="${textId}"]`)
+  await page.getByText('Hold still').click()
+  const before = (await text.boundingBox())!
+  await page.getByText('Hold still').dblclick()
+  const field = text.getByRole('textbox', { name: 'Body' })
+  await expect(field).toBeVisible()
+  const editing = (await text.boundingBox())!
+  expect(Math.abs(editing.height - before.height)).toBeLessThanOrEqual(1)
+  expect(Math.abs(editing.width - before.width)).toBeLessThanOrEqual(1)
+  // The body did not fit, so the field scrolls instead of the card growing.
+  expect(
+    await field.evaluate(el => el.scrollHeight > el.clientHeight + 1)
+  ).toBe(true)
+  await field.click()
+  await page.keyboard.press('Control+End')
+  await page.keyboard.type('\nLine 13')
+  const typed = (await text.boundingBox())!
+  expect(Math.abs(typed.height - before.height)).toBeLessThanOrEqual(1)
+  await page.keyboard.press('Escape')
+
+  const list = page.locator(`[data-item-id="${listId}"]`)
+  await page.getByText('Hold the list').click()
+  const listBefore = (await list.boundingBox())!
+  await page.getByText('Hold the list').dblclick()
+  await expect(list.getByRole('textbox', { name: 'Title' })).toBeVisible()
+  const listEditing = (await list.boundingBox())!
+  expect(Math.abs(listEditing.height - listBefore.height)).toBeLessThanOrEqual(
+    1
+  )
+  await expect(list.getByText('Three')).toBeVisible()
+})
+
+test('(26) Manage meanings: drag a row to reorder, or move it from the keyboard', async ({
+  page,
+  request,
+}) => {
+  const vocabKeys = async () =>
+    (
+      (await (await request.get(`${API}/vocab`)).json()).vocab.meanings as {
+        key: string
+      }[]
+    ).map(entry => entry.key)
+  const start = await vocabKeys()
+  const n = start.length
+
+  await request.post(on('/items'), {
+    data: { _id: objectId(), form: 'text', title: 'Order me', x: 0, y: 0 },
+  })
+  await openBoard(page)
+  await page.getByText('Order me').click()
+  await page.getByRole('button', { name: 'Manage meanings' }).click()
+  const dialog = page.getByTestId('wb-vocab-dialog')
+  const rows = dialog.getByTestId('wb-vocab-row')
+  await expect(rows).toHaveCount(n)
+
+  try {
+    // Drag the last row onto the first: it takes that place.
+    await dialog
+      .getByRole('button', { name: `Reorder meaning, position ${n} of ${n}` })
+      .dragTo(rows.first())
+    const moved = [start[n - 1], ...start.slice(0, n - 1)]
+    await expect.poll(vocabKeys).toEqual(moved)
+    await expect(
+      dialog.getByRole('button', {
+        name: `Reorder meaning, position 1 of ${n}`,
+      })
+    ).toBeVisible()
+
+    // The grip is a button too: End sends the row back to the bottom.
+    await dialog
+      .getByRole('button', { name: `Reorder meaning, position 1 of ${n}` })
+      .press('End')
+    await expect.poll(vocabKeys).toEqual(start)
+  } finally {
+    // Leave the shared list as the other tests expect it, whatever happened above.
+    // Each key to its old index, first to last, rebuilds the original order.
+    for (const [index, key] of start.entries())
+      await request.patch(`${API}/vocab/meaning/${key}`, {
+        data: { to: index },
+      })
+  }
+})
+
 test.describe('on a phone, with a finger', () => {
   test.use({
     viewport: { width: 390, height: 844 },
