@@ -28,6 +28,7 @@ import { PROMPTS } from '@/lib/mcp/tools/prompts'
 import {
   ALIAS_WHITEBOARD_NAMES,
   SITE_WHITEBOARD_NAMES,
+  whiteboardBoardTool,
   whiteboardReadTools,
   whiteboardWriteTools,
 } from '@/lib/mcp/tools/whiteboard'
@@ -164,7 +165,8 @@ export interface ServerSpec {
  * whiteboard composition tools (`whiteboard_compose`, `whiteboard_arrange`), less the two
  * CCA-F tools (`ccaf_status`, `ccaf_update`). Certificates will grow past CCA-F, so a
  * per-certificate tool pair was the wrong shape; nothing replaces them yet. Plus the six CV
- * tools (`tools/cv.ts`, multi-cv-plan.md Phase 2).
+ * tools (`tools/cv.ts`, multi-cv-plan.md Phase 2), and `whiteboard_get_board` (one whole board
+ * by the id or slug the owner hands over).
  */
 export const SITE_SERVER: ServerSpec = {
   name: 'port4lio',
@@ -178,6 +180,7 @@ export const SITE_SERVER: ServerSpec = {
     ...METRICS_TOOLS,
     ...CLOUDINARY_TOOLS,
     ...whiteboardReadTools(SITE_WHITEBOARD_NAMES, ['read']),
+    whiteboardBoardTool(),
     ...whiteboardWriteTools(),
   ]),
   prompts: compilePrompts(PROMPTS),
@@ -194,7 +197,7 @@ export const SITE_SERVER: ServerSpec = {
         ? 'To write a post, read get_writing_brief (or use the write-post prompt) and follow its loop; drafts never publish themselves.'
         : '',
       tools.has('whiteboard_overview')
-        ? 'For the whiteboard, start with whiteboard_overview, then whiteboard_search, then whiteboard_get_item. Cite item ids.'
+        ? 'For the whiteboard, start with whiteboard_overview, then whiteboard_search, then whiteboard_get_item. Given a board id or slug (a /whiteboard/<slug|id> link), read it whole with whiteboard_get_board. Cite item ids.'
         : '',
       tools.has('whiteboard_compose')
         ? 'To build or fill a board, use whiteboard_compose (or the build-whiteboard prompt): describe sections and cards, and the server lays them out.'

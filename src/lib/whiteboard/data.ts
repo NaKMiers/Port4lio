@@ -1003,6 +1003,49 @@ async function loadOverview(visible: VisibleScope): Promise<OverviewInput> {
   }
 }
 
+/** One board as `whiteboard_get_board` reads it: its name, and its export. */
+export interface AgentBoardLoad {
+  board: { id: string; title: string }
+  load: ExportLoad
+}
+
+/**
+ * One whole board for an agent, by id or slug - the `context.md` export narrowed to it.
+ *
+ * ```
+ *   key ──▶ 24 hex? ── yes ──▶ findById
+ *                    └─ no ──▶ findOne({ slug })
+ *        ──▶ missing, or includeInAi false ──▶ null (one not-found, R3-14)
+ *        ──▶ loadAgentVisible({ kind: 'all' }, { board })   rules 1, 2, 7 still apply per card
+ * ```
+ *
+ * The lookup is by key, not through the share link: `share` says who may open the canvas
+ * by URL, `includeInAi` says what an agent may read, and only the second one counts here.
+ * A hidden board answers exactly like an unknown one, so the tool cannot confirm a private
+ * board exists.
+ */
+export async function loadAgentBoard(
+  key: string
+): Promise<AgentBoardLoad | null> {
+  const trimmed = key.trim()
+  if (!trimmed || trimmed.length > 64) return null
+  await connectDatabase()
+  const doc = /^[0-9a-f]{24}$/i.test(trimmed)
+    ? await WhiteboardBoardModel.findById(trimmed, {
+        title: 1,
+        includeInAi: 1,
+      }).lean()
+    : await WhiteboardBoardModel.findOne(
+        { slug: trimmed.toLowerCase() },
+        { title: 1, includeInAi: 1 }
+      ).lean()
+  if (!doc?.includeInAi) return null
+
+  const id = String(doc._id)
+  const load = await loadAgentVisible({ kind: 'all' }, { board: id })
+  return { board: { id, title: doc.title ?? '' }, load }
+}
+
 // MARK: Owner reads (the canvas and the backup include hidden items)
 
 /**

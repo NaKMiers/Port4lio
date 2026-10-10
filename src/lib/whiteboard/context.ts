@@ -714,7 +714,14 @@ function renderBody(
  */
 export function renderContext(
   input: ContextInput,
-  { maxBytes = EXPORT_MAX_BYTES }: { maxBytes?: number } = {}
+  {
+    maxBytes = EXPORT_MAX_BYTES,
+    searchTool = ALIAS_TOOL_NAMES.search,
+  }: {
+    maxBytes?: number
+    /** The search tool the truncation footer names - the reader's own server's. */
+    searchTool?: string
+  } = {}
 ): RenderedContext {
   const total = input.items.length
   if (total === 0)
@@ -737,7 +744,7 @@ export function renderContext(
   // Over budget: pick by priority with a pessimistic size per entry (every link carrying the
   // longer marker, plus a heading allowance), then render and trim if the estimate was low.
   const footer = (n: number) =>
-    `(truncated: ${n} of ${total} items - use search_context)`
+    `(truncated: ${n} of ${total} items - use ${searchTool})`
   const reserve = byteLength(EXPORT_HEADER) + byteLength(footer(total)) + 64
   const pessimistic = buildEntryContext(input, id =>
     scopeIds.has(id) ? 'truncated' : 'outside'

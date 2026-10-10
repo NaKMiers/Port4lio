@@ -2,6 +2,7 @@ import 'server-only'
 
 import { z } from 'zod'
 
+import { MCP_BUDGET_CHARS } from '@/lib/mcp/budget'
 import { defineTool, hashArgs, ok, refuse } from '@/lib/mcp/run-tool'
 import type { TokenScope } from '@/lib/mcp/scopes'
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/lib/whiteboard/compose-layout'
 import {
   isDayParam,
+  renderContext,
   renderItemDetail,
   renderOverview,
   renderSearchResults,
@@ -23,6 +25,7 @@ import {
   composeAgentBoard,
   createAgentItem,
   createAgentLink,
+  loadAgentBoard,
   loadAgentVisible,
 } from '@/lib/whiteboard/data'
 import { LIMITS, SHAPES } from '@/lib/whiteboard/limits'
@@ -37,6 +40,8 @@ import { VOCAB_KEY_PATTERN } from '@/lib/whiteboard/vocab'
  *   search     whiteboard_search          search_context     ──▶ loadAgentVisible search
  *   item       whiteboard_get_item        get_item           ──▶ loadAgentVisible item
  *                  scopes: read              scopes: read OR whiteboard:legacy (C5)
+ *
+ *   whiteboard_get_board                     (read, /api/mcp only)   ──▶ loadAgentBoard
  *
  *   whiteboard_add_item · whiteboard_link        (write, /api/mcp only)   visible-only, keyed (R4)
  *   whiteboard_compose · whiteboard_arrange      (write, /api/mcp only)   see whiteboardWriteTools
@@ -157,6 +162,52 @@ export function whiteboardReadTools(
   })
 
   return [overview, search, item]
+}
+
+/**
+ * `whiteboard_get_board`: one whole board by the id or slug the owner hands over (the
+ * `/whiteboard/<slug|id>` link), as the same markdown `context.md` serves. Site MCP only -
+ * the alias keeps its three names and nothing more.
+ *
+ * ```
+ *   board (id | slug) ──▶ loadAgentBoard ──▶ null ──▶ "No board with that id or slug."
+ *                                       └──▶ renderContext, capped under the MCP budget
+ * ```
+ *
+ * The cap is in bytes against a budget in chars: a byte is never less than a char, so the
+ * export always fits, and `renderContext` truncates by priority with a footer naming
+ * whiteboard_search rather than letting `clipToBudget` cut it mid-card.
+ */
+export function whiteboardBoardTool() {
+  return defineTool({
+    name: 'whiteboard_get_board',
+    title: 'Get one whole whiteboard',
+    description: `One whole board by its id or slug - the part of a /whiteboard/<slug|id> link the owner gives you: every card an agent can see on it, grouped frame > meaning, with bodies, to-do rows and links. Cards and frames the owner hid stay hidden, and a board not shared with agents answers like one that does not exist. Long boards are cut by priority and say so; then use ${SITE_WHITEBOARD_NAMES.search} or ${SITE_WHITEBOARD_NAMES.item}.`,
+    scopes: ['read'],
+    input: z.object({ board: z.string().trim().min(1).max(64) }),
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    async run({ board }) {
+      const found = await loadAgentBoard(board)
+      if (!found) return refuse('No board with that id or slug.', 'not-found')
+
+      const title = found.board.title || 'Untitled board'
+      const head = `Board: ${title} (id ${found.board.id})`
+      const { markdown, totalCount, renderedCount } = renderContext(
+        found.load.input,
+        {
+          maxBytes: MCP_BUDGET_CHARS - head.length - 200,
+          searchTool: SITE_WHITEBOARD_NAMES.search,
+        }
+      )
+      if (totalCount === 0)
+        return ok(`${head}\n\nNo cards on this board are visible to agents.`)
+      const shown =
+        renderedCount === totalCount
+          ? `${totalCount} cards`
+          : `${renderedCount} of ${totalCount} cards`
+      return ok(`${head} · ${shown}\n\n${markdown}`)
+    },
+  })
 }
 
 // MARK: Writes

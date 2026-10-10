@@ -350,3 +350,70 @@ describe('whiteboard_link', () => {
     })
   })
 })
+
+describe('whiteboard_get_board', () => {
+  it('reads one whole board by id or slug, hidden cards and other boards left out', async () => {
+    await WhiteboardBoardModel.updateOne({ _id: BOARD }, { slug: 'life-plan' })
+    const frame = await owner(BOARD, {
+      form: 'frame',
+      title: 'Career',
+      width: 800,
+      height: 600,
+    })
+    const goal = await owner(BOARD, {
+      title: 'Ship v2',
+      meaning: 'goal',
+      status: 'active',
+      body: 'Before December.',
+      parentId: frame,
+    })
+    await owner(BOARD, { title: 'Secret plan', includeInAi: false })
+    const work = String(
+      (await WhiteboardBoardModel.create({ title: 'Work' }))._id
+    )
+    await owner(work, { title: 'Other board card' })
+
+    const t = await token(['read'])
+    for (const key of [BOARD, 'Life-Plan']) {
+      const call = await client.callTool(t, 'whiteboard_get_board', {
+        board: key,
+      })
+      expect(call.isError, call.text).toBe(false)
+      expect(call.text).toContain(`Board: Life (id ${BOARD}) · 2 cards`)
+      expect(call.text).toContain('## Career')
+      expect(call.text).toContain(goal)
+      expect(call.text).toContain('Before December.')
+      expect(call.text).not.toContain('Secret plan')
+      expect(call.text).not.toContain('Other board card')
+    }
+  })
+
+  it('a hidden, unknown or malformed board gets the same answer', async () => {
+    await owner(HIDDEN_BOARD, { title: 'Diary card' })
+    const t = await token(['read'])
+    for (const key of [
+      HIDDEN_BOARD,
+      new mongoose.Types.ObjectId().toHexString(),
+      'no-such-slug',
+    ]) {
+      const call = await client.callTool(t, 'whiteboard_get_board', {
+        board: key,
+      })
+      expect(call, key).toMatchObject({
+        isError: true,
+        text: 'No board with that id or slug.',
+      })
+    }
+  })
+
+  it('a visible board with nothing visible on it says so', async () => {
+    await owner(BOARD, { title: 'Hidden', includeInAi: false })
+    const call = await client.callTool(
+      await token(['read']),
+      'whiteboard_get_board',
+      { board: BOARD }
+    )
+    expect(call.isError, call.text).toBe(false)
+    expect(call.text).toContain('No cards on this board are visible to agents.')
+  })
+})

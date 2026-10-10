@@ -150,6 +150,7 @@ const READ_TOOLS = [
   'list_cvs',
   'list_posts',
   'list_taxonomy',
+  'whiteboard_get_board',
   'whiteboard_get_item',
   'whiteboard_overview',
   'whiteboard_search',
@@ -379,11 +380,15 @@ describe('per-request registration (C1, C6)', () => {
     expect(expected).toEqual(READ_TOOLS)
   })
 
-  it('the registry is the 27 designed tools less the four the Assignment cut (D1), plus the 4 Cloudinary tools and the 2 whiteboard composition tools, less the 2 CCA-F tools, plus the 6 CV tools', () => {
+  it('the registry is the 27 designed tools less the four the Assignment cut (D1), plus the 4 Cloudinary tools and the 2 whiteboard composition tools, less the 2 CCA-F tools, plus the 6 CV tools and whiteboard_get_board', () => {
     const names = serverLib.SITE_SERVER.tools.map(({ def }) => def.name)
-    expect(names).toHaveLength(33)
+    expect(names).toHaveLength(34)
     expect(names).toEqual(
-      expect.arrayContaining(['whiteboard_compose', 'whiteboard_arrange'])
+      expect.arrayContaining([
+        'whiteboard_compose',
+        'whiteboard_arrange',
+        'whiteboard_get_board',
+      ])
     )
     expect(names).toEqual(expect.arrayContaining(CV_TOOL_NAMES))
     for (const cut of [
