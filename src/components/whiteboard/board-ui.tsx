@@ -43,4 +43,10 @@ export interface ItemNodeData extends Record<string, unknown> {
   error: string | null
   childCount: number
   pulse: number
+  /**
+   * Only while a height is being dragged: the live height. A card cannot take it from React
+   * Flow's `height` prop, which is the MEASURED size (`getNodeDimensions`), so it would read
+   * its own DOM back as its floor and never see the stored height at all.
+   */
+  liveHeight?: number
 }

@@ -127,7 +127,7 @@ export interface LayoutResult {
 // MARK: Spacing
 
 const FRAME_PAD_X = 24
-/** Room under the frame's title tab, which hangs 13px over the top border (FrameNode.tsx). */
+/** Room under the frame's title tab, which hangs 14px over the top border (FrameNode.tsx). */
 const FRAME_PAD_TOP = 36
 const FRAME_PAD_BOTTOM = 24
 const CARD_GAP = 20
@@ -148,33 +148,36 @@ const MAX_COLUMNS = 4
 // MARK: Card height
 
 /**
- * Type sizes from CardNode.tsx: `py-3` (24), the chip row (`min-h-[20px]`), the title
- * (`mt-2 mb-1`, 14.5px `leading-snug`), the body (13.5px, clamped at 6 lines, then "... more"),
- * to-do rows (`space-y-1`, 13px beside a 15px box and an 8px gap, wrapping) plus the
- * "n of m done" line, and the tag row.
+ * Type sizes from CardNode.tsx (its `CHIP_CLS` / `BODY_TEXT_CLS` note): `py-3.5` plus the
+ * border (30), the chip row (26: an 11.5px chip with `py-1`), the title (`mt-2.5 mb-1.5`,
+ * 18px at `leading-[1.3]`), the body (15.5px at `leading-[1.45]`, clamped at 6 lines, then a 13px
+ * "... more"), to-do rows (`space-y-1`, 15.5px beside a 17px box and an 8px gap, wrapping)
+ * plus the 13px "n of m done" line, and the 12.5px tag row. Character widths are the old
+ * per-em measurements scaled to the new sizes; `tests/e2e` checks the result against cards
+ * the browser actually renders.
  */
 const CARD = {
-  padX: 26,
-  padY: 24,
-  chipRow: 20,
-  titleMargin: 12,
-  titleLine: 20,
-  titleCharPx: 8.6,
-  bodyLine: 18.6,
-  bodyCharPx: 7.1,
+  padX: 32,
+  padY: 30,
+  chipRow: 26,
+  titleMargin: 16,
+  titleLine: 24,
+  titleCharPx: 10.7,
+  bodyLine: 22.5,
+  bodyCharPx: 8.2,
   bodyClamp: 6,
-  moreLink: 18,
-  /** The 15px checkbox plus `gap-2`, taken off the row's text width. */
-  todoBox: 23,
-  todoCharPx: 6.9,
-  todoLine: 18,
-  todoRowMin: 20,
+  moreLink: 20,
+  /** The 17px checkbox plus `gap-2`, taken off the row's text width. */
+  todoBox: 25,
+  todoCharPx: 8.2,
+  todoLine: 21.4,
+  todoRowMin: 22,
   todoGap: 4,
-  todoFooter: 24,
-  tagRow: 22,
-  tagCharPx: 7,
-  tagChrome: 18,
-  createdLine: 20,
+  todoFooter: 27,
+  tagRow: 28,
+  tagCharPx: 8,
+  tagChrome: 22,
+  createdLine: 22,
 } as const
 
 /** Wrapped line count for pre-line text, breaking on fewer characters than would fit. */

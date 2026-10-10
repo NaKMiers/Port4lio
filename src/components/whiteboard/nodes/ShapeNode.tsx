@@ -117,10 +117,10 @@ function ShapeNodeView({ id, data, selected }: NodeProps<ShapeNode>) {
               ui.setEditingId(null)
             }
           }}
-          className="nodrag relative w-3/4 bg-transparent text-center font-display text-[14px] font-semibold outline-none"
+          className="nodrag relative w-3/4 bg-transparent text-center font-display text-[17px] font-semibold outline-none"
         />
       ) : (
-        <span className="relative max-w-[80%] break-words text-center font-display text-[14px] font-semibold text-pp-text">
+        <span className="relative max-w-[80%] break-words text-center font-display text-[17px] font-semibold text-pp-text">
           {item.title}
         </span>
       )}

@@ -291,6 +291,11 @@ export default function Canvas({
           position: live && t.position ? t.position : base.position,
           width: t.resizing && t.width ? t.width : base.width,
           height: t.resizing && t.height ? t.height : base.height,
+          // A new `data` only mid-resize, so every other render keeps it stable for memo.
+          data:
+            t.resizing && t.height
+              ? { ...base.data, liveHeight: t.height }
+              : base.data,
         }
       }),
     [baseNodes, nodeState]

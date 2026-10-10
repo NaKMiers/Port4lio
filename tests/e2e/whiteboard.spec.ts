@@ -8,6 +8,12 @@ import {
   type Page,
 } from '@playwright/test'
 
+import {
+  CARD_WIDTHS,
+  estimateCardHeight,
+  type LayoutCard,
+} from '@/lib/whiteboard/compose-layout'
+
 import { STORAGE_STATE } from './global-setup'
 
 /**
@@ -896,7 +902,7 @@ test('(23) a card resizes vertically: taller shows more body, shorter stops at i
   })
   await openBoard(page)
   const node = page.getByTestId('wb-card')
-  const text = node.locator('p').first()
+  const text = node.getByTestId('wb-card-body')
   await page.getByText('Tall me').click()
   await expect(node.getByRole('button', { name: '... more' })).toBeVisible()
   const before = (await node.boundingBox())!
@@ -916,6 +922,17 @@ test('(23) a card resizes vertically: taller shows more body, shorter stops at i
   expect(taller.height).toBeGreaterThan(before.height + 150)
   // The room went to the body, not to blank paper under it.
   expect((await text.boundingBox())!.height).toBeGreaterThan(linesBefore + 100)
+
+  // And it is still that tall after a reload: the stored height is what the card renders
+  // from, not the size it happened to be measured at (it used to fall back to its text).
+  await page.reload()
+  await expect(page.getByTestId('wb-save-pill')).toHaveText(/Saved/, {
+    timeout: 30_000,
+  })
+  await expect
+    .poll(async () => (await node.boundingBox())!.height)
+    .toBeGreaterThan(taller.height - 2)
+  await page.getByText('Tall me').click()
 
   // Dragged far above its text, the card stops at the text instead of clipping it.
   const up = await centreOf(page.locator('.wb-resize-y'))
@@ -1085,6 +1102,93 @@ test('(26) Manage meanings: drag a row to reorder, or move it from the keyboard'
       await request.patch(`${API}/vocab/meaning/${key}`, {
         data: { to: index },
       })
+  }
+})
+
+test('(27) compose never under-estimates how tall a card renders', async ({
+  page,
+  request,
+}) => {
+  // whiteboard_compose stacks cards by `estimateCardHeight`. Guess short and the next card
+  // overlaps this one, so every estimate must cover the real render - checked here against
+  // CardNode's actual type sizes, not the table in compose-layout.ts that copies them.
+  const sentence =
+    'Every fact is one entry in the log, append-only plain text, and mistakes are fixed with a new line.'
+  const cases: (LayoutCard & { width: number })[] = [
+    { title: 'A thing that is good for me', body: '', todos: [], tags: [] },
+    {
+      title: 'Morning: /today',
+      body: 'Read Due + Top 3 on Home.\nOne minute.\nThen start.',
+      todos: [],
+      tags: ['agent'],
+    },
+    {
+      title: 'Modules are config, not code',
+      body: Array.from({ length: 12 }, () => sentence).join('\n'),
+      todos: [],
+      tags: ['agent', 'design'],
+    },
+    {
+      title:
+        'One brain, two agents, standalone, shared by every tool on this machine',
+      body: `${sentence} ${sentence} ${sentence}`,
+      todos: [],
+      tags: [],
+      width: CARD_WIDTHS.wide,
+    },
+    {
+      title: 'Plan, learn, grow',
+      body: '',
+      todos: [
+        'Todo list',
+        sentence,
+        'Self development',
+        'English class each week',
+      ],
+      tags: ['agent'],
+      form: 'todo',
+    },
+  ].map((spec, index) => ({
+    ref: `c${index}`,
+    form: 'text',
+    hasMeta: false,
+    width: CARD_WIDTHS.normal,
+    ...spec,
+  })) as (LayoutCard & { width: number })[]
+
+  const ids = cases.map(() => objectId())
+  for (const [index, spec] of cases.entries())
+    await request.post(on('/items'), {
+      data: {
+        _id: ids[index],
+        form: spec.form,
+        title: spec.title,
+        body: spec.body,
+        todos: spec.todos.map((text, row) => ({
+          id: `r${row}`,
+          text,
+          done: false,
+        })),
+        tags: spec.tags,
+        // A 1px floor, so each card renders at exactly its content height.
+        height: 1,
+        width: spec.width,
+        x: index * 420,
+        y: 0,
+      },
+    })
+  await openBoard(page)
+
+  for (const [index, spec] of cases.entries()) {
+    const box = (await page
+      .locator(`[data-item-id="${ids[index]}"]`)
+      .boundingBox())!
+    const zoom = box.width / spec.width
+    const rendered = box.height / zoom
+    expect(
+      estimateCardHeight(spec, spec.width),
+      `${spec.ref} "${spec.title}" renders ${Math.round(rendered)}px`
+    ).toBeGreaterThanOrEqual(rendered)
   }
 })
 

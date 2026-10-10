@@ -58,6 +58,19 @@ import { LIMITS, type TodoRow } from '@/lib/whiteboard/limits'
 type CardNode = Node<ItemNodeData, 'card'>
 
 const BODY_CLAMP_LINES = 6
+
+/*
+  Type sizes, in canvas pixels. A board is usually read zoomed out to 50-60%, where the
+  original 13.5px body came out near 7px on screen and grey on cream. These are what stays
+  legible there: 18px titles, 15.5px body in near-text colour, 11.5px chips and meta.
+  `compose-layout.ts` predicts card heights from the same numbers (its CARD table) - change
+  them together, or composed boards overlap.
+*/
+const CHIP_CLS = 'px-2.5 py-1 text-[11.5px] [&>svg]:h-[13px] [&>svg]:w-[13px]'
+// The card's text is in `div`s, never `p`: `.portfolio-public-root p` (globals.css) outranks
+// a utility class and forced every paragraph here to the muted grey at line-height 1.75 - a
+// 27px line that spread six lines of body over 163px, and kept this colour from applying.
+const BODY_TEXT_CLS = 'text-pp-text/75 leading-[1.45]'
 const MIN_HEIGHT = 60
 const MAX_HEIGHT = 960
 
@@ -65,17 +78,19 @@ function formatMonth(day: string | null) {
   return day ? day.slice(0, 7) : null
 }
 
-function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
+function CardNodeView({ id, data, selected }: NodeProps<CardNode>) {
   const { item, hidden, hiddenByFrame, error } = data
   const ui = useBoardUi()
   const editing = ui.editingId === id
   const readOnly = ui.readOnly
 
-  // Mid-resize, React Flow's live height; otherwise the stored floor.
-  const minHeight = height ?? item.height
+  // Mid-resize, the live height; otherwise the stored floor. Not React Flow's `height` prop:
+  // that is the measured size (0 before the first measure), so the stored height was never
+  // applied and a resized card fell back to its text height on the next load.
+  const minHeight = data.liveHeight ?? item.height
   const rootRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
-  const bodyRef = useRef<HTMLParagraphElement | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   const bodyLines = useBodyLines(rootRef, contentRef, bodyRef, minHeight)
   const resting = useRestingHeight(rootRef, editing)
   const held = editing && resting !== null
@@ -96,7 +111,7 @@ function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
       data-hidden={hidden || undefined}
       style={{ minHeight, height: held ? resting : undefined }}
       className={cn(
-        'wb-card group/card relative h-full w-full rounded-2xl border border-pp-line bg-pp-panel-strong px-[13px] py-3 text-[13.5px] leading-snug text-pp-text shadow-[0_14px_30px_rgba(46,35,28,0.08)]',
+        'wb-card group/card relative h-full w-full rounded-2xl border border-pp-line bg-pp-panel-strong px-[15px] py-3.5 text-[15.5px] leading-snug text-pp-text shadow-[0_14px_30px_rgba(46,35,28,0.08)]',
         held && 'flex flex-col overflow-hidden',
         hiddenByFrame && 'opacity-55',
         selected && 'ring-2 ring-pp-ink-blue ring-offset-2 ring-offset-pp-bg',
@@ -164,10 +179,13 @@ function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
         ref={contentRef}
         className={cn(held && 'flex min-h-0 flex-1 flex-col')}
       >
-        <div className="flex min-h-[20px] items-center gap-2 pr-5">
-          <MeaningChip meaning={item.meaning} />
+        <div className="flex min-h-[24px] items-center gap-2 pr-5">
+          <MeaningChip
+            meaning={item.meaning}
+            className={CHIP_CLS}
+          />
           {meta.length ? (
-            <span className="truncate font-display text-[10px] font-semibold uppercase tracking-[0.1em] text-pp-muted">
+            <span className="truncate font-display text-[11.5px] font-semibold uppercase tracking-[0.1em] text-pp-muted">
               {meta.join(' · ')}
             </span>
           ) : null}
@@ -184,7 +202,7 @@ function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
           <>
             <h4
               className={cn(
-                'mb-1 mt-2 break-words font-display text-[14.5px] font-semibold tracking-[-0.01em]',
+                'mb-1.5 mt-2.5 break-words font-display text-[18px] font-semibold leading-[1.3] tracking-[-0.01em]',
                 !item.title && 'text-pp-muted/70'
               )}
             >
@@ -210,9 +228,9 @@ function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
           />
         ) : null}
         {item.form === 'todo' && item.todos.length ? (
-          <p className="mt-2 text-[11.5px] text-pp-muted">
+          <div className="mt-2 text-[13px] leading-snug text-pp-muted">
             {done} of {item.todos.length} done
-          </p>
+          </div>
         ) : null}
 
         {item.tags.length ? (
@@ -220,7 +238,7 @@ function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
             {item.tags.map(tag => (
               <span
                 key={tag}
-                className="rounded-md bg-pp-text/5 px-1.5 py-px font-mono text-[11px] text-pp-muted"
+                className="rounded-md bg-pp-text/5 px-2 py-0.5 font-mono text-[12.5px] text-pp-muted"
               >
                 {tag}
               </span>
@@ -233,9 +251,9 @@ function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
         !item.when &&
         item.form === 'text' &&
         !item.body ? (
-          <p className="mt-1 text-[11.5px] text-pp-muted">
+          <div className="mt-1 text-[12.5px] leading-snug text-pp-muted">
             created {item.createdAt.slice(0, 10)}
-          </p>
+          </div>
         ) : null}
       </div>
     </div>
@@ -258,7 +276,7 @@ function CardNodeView({ id, data, selected, height }: NodeProps<CardNode>) {
 function useBodyLines(
   rootRef: RefObject<HTMLDivElement | null>,
   contentRef: RefObject<HTMLDivElement | null>,
-  bodyRef: RefObject<HTMLParagraphElement | null>,
+  bodyRef: RefObject<HTMLDivElement | null>,
   minHeight: number
 ) {
   const [lines, setLines] = useState(BODY_CLAMP_LINES)
@@ -332,7 +350,7 @@ function ClampedBody({
 }: {
   body: string
   lines: number
-  textRef: RefObject<HTMLParagraphElement | null>
+  textRef: RefObject<HTMLDivElement | null>
   onMore: () => void
 }) {
   const [clamped, setClamped] = useState(false)
@@ -342,9 +360,10 @@ function ClampedBody({
   }, [body, lines, textRef])
   return (
     <>
-      <p
+      <div
+        data-testid="wb-card-body"
         ref={textRef}
-        className="whitespace-pre-line break-words text-pp-muted"
+        className={cn('whitespace-pre-line break-words', BODY_TEXT_CLS)}
         style={{
           display: '-webkit-box',
           WebkitBoxOrient: 'vertical',
@@ -353,11 +372,11 @@ function ClampedBody({
         }}
       >
         {body}
-      </p>
+      </div>
       {clamped ? (
         <button
           type="button"
-          className="nodrag mt-0.5 text-[11.5px] font-semibold text-pp-ink-blue hover:underline"
+          className="nodrag mt-0.5 text-[13px] font-semibold text-pp-ink-blue hover:underline"
           onClick={event => {
             event.stopPropagation()
             onMore()
@@ -421,8 +440,9 @@ function InlineEditor({
     <div
       ref={rootRef}
       className={cn(
-        'nodrag nopan nowheel mt-2 flex flex-col gap-1',
-        showBody && 'min-h-0 flex-1'
+        'nodrag nopan nowheel mt-2.5 flex flex-col gap-1.5',
+        // Matches the title's mb-1.5 above a to-do list, so its rows do not shift.
+        showBody ? 'min-h-0 flex-1' : 'pb-0.5'
       )}
       onBlur={event => {
         if (
@@ -459,7 +479,7 @@ function InlineEditor({
         }}
         // No vertical padding: the same line box as the title it replaces, so a to-do list
         // (no body field to give room back) keeps every row where it was.
-        className="w-full rounded-lg bg-white/80 px-1.5 py-0 font-display text-[14.5px] font-semibold tracking-[-0.01em] outline-none ring-1 ring-pp-line focus:ring-pp-ink-blue"
+        className="w-full rounded-lg bg-white/80 px-1.5 py-0 font-display text-[18px] font-semibold leading-[1.3] tracking-[-0.01em] outline-none ring-1 ring-pp-line focus:ring-pp-ink-blue"
       />
       {showBody ? (
         <textarea
@@ -473,7 +493,7 @@ function InlineEditor({
             setBody(event.target.value)
             ui.actions.updateItem(id, { body: event.target.value })
           }}
-          className="min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-lg bg-white/80 px-1.5 py-1 text-[13px] text-pp-muted outline-none ring-1 ring-pp-line focus:ring-pp-ink-blue"
+          className="min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-lg bg-white/80 px-1.5 py-1 text-[15.5px] leading-[1.45] text-pp-text/75 outline-none ring-1 ring-pp-line focus:ring-pp-ink-blue"
         />
       ) : null}
     </div>
@@ -500,7 +520,7 @@ function TodoRows({
       {rows.map(row => (
         <div
           key={row.id}
-          className="group/row flex items-center gap-2 text-[13px]"
+          className="group/row flex items-center gap-2"
         >
           <button
             type="button"
@@ -515,14 +535,14 @@ function TodoRows({
               )
             }}
             className={cn(
-              'nodrag grid h-[15px] w-[15px] flex-none place-items-center rounded-[5px] border-[1.5px] border-pp-text/30',
+              'nodrag grid h-[17px] w-[17px] flex-none place-items-center rounded-[5px] border-[1.5px] border-pp-text/30',
               row.done && 'border-pp-text bg-pp-text text-white'
             )}
           >
             {row.done ? (
               <Check
                 aria-hidden
-                size={10}
+                size={11}
                 strokeWidth={3}
               />
             ) : null}
@@ -580,16 +600,16 @@ function TodoRows({
               }}
               className="nodrag invisible text-pp-muted hover:text-pp-text group-hover/row:visible"
             >
-              <X size={12} />
+              <X size={14} />
             </button>
           ) : null}
         </div>
       ))}
       {editable && rows.length < LIMITS.todos ? (
-        <label className="flex items-center gap-2 text-[13px] text-pp-muted">
+        <label className="flex items-center gap-2 text-pp-muted">
           <Plus
             aria-hidden
-            size={14}
+            size={16}
           />
           <input
             aria-label="Add a step"

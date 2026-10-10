@@ -70,7 +70,7 @@ function FrameNodeView({ id, data, selected }: NodeProps<FrameNode>) {
       {error ? <ErrorBadge message={error} /> : null}
 
       <div
-        className="absolute -top-[13px] left-3.5 flex max-w-[calc(100%-28px)] items-center gap-1.5 rounded-full border border-pp-text/15 bg-pp-bg px-2.5 py-[3px] font-display text-[12px] font-semibold text-pp-text"
+        className="absolute -top-[14px] left-3.5 flex max-w-[calc(100%-28px)] items-center gap-1.5 rounded-full border border-pp-text/15 bg-pp-bg px-3 py-[3px] font-display text-[14px] font-semibold text-pp-text"
         onDoubleClick={event => {
           if (ui.readOnly) return
           event.stopPropagation()
@@ -80,7 +80,7 @@ function FrameNodeView({ id, data, selected }: NodeProps<FrameNode>) {
         {hidden ? (
           <EyeOff
             aria-hidden
-            size={13}
+            size={15}
             className="shrink-0 text-pp-muted"
           />
         ) : null}
@@ -109,11 +109,11 @@ function FrameNodeView({ id, data, selected }: NodeProps<FrameNode>) {
         ) : (
           <span className="truncate">{item.title || 'Untitled frame'}</span>
         )}
-        <span className="shrink-0 text-[11px] font-medium text-pp-muted">
+        <span className="shrink-0 text-[12.5px] font-medium text-pp-muted">
           {childCount}
         </span>
         {hidden ? (
-          <span className="shrink-0 text-[10px] uppercase tracking-[0.12em] text-pp-muted">
+          <span className="shrink-0 text-[11px] uppercase tracking-[0.12em] text-pp-muted">
             Hidden from AI
           </span>
         ) : null}
